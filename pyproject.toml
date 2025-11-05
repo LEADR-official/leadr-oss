@@ -1,0 +1,86 @@
+[project]
+name = "leadr-oss"
+version = "0.0.1"
+tescription = "LEADR is the cross-platform leadboard backend for indie game devs that turns any game into a social experience"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "alembic>=1.16.5",
+    "asyncpg>=0.30.0",
+    "bcrypt>=4.3.0",
+    "cryptography>=45.0.7",
+    "fastapi>=0.116.1",
+    "mailgun>=1.1.0",
+    "psycopg>=3.2.0",
+    "pydantic>=2.11.7",
+    "pydantic-settings>=2.10.1",
+    "pyjwt>=2.10.1",
+    "python-dotenv>=1.1.1",
+    "sqlalchemy>=2.0.43",
+    "uvicorn>=0.35.0",
+]
+packages = ["src"]
+
+[dependency-groups]
+dev = [
+    "coverage>=7.10.6",
+    "mdformat>=0.7.22",
+    "mdformat-gfm>=0.4.1",
+    "pre-commit>=4.0.0",
+    "pyright>=1.1.405",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=0.25.0",
+    "ruff>=0.12.12",
+    "httpx>=0.28.1",
+]
+
+[tool.ruff]
+src = ["src"]
+line-length = 100
+indent-width = 4
+include=["{src,tests}/**/*.py"]
+
+[tool.ruff.lint]
+select = ["A", "B", "DTZ", "E", "ERA", "F", "FAST", "FIX", "G", "I", "INT", "LOG", "N", "PERF", "PIE", "PTH", "Q", "S", "TID", "UP"]
+ignore = ["S104", "FAST001", "FIX002", "B008"]
+# Avoid trying to fix flake8-bugbear (`B`) violations.
+unfixable = ["B"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]
+"src/leadr/config.py" = ["S105"]
+"alembic/env.py" = ["E402", "F401"]
+"**/{tests,docs,tools}/*" = ["S101"]
+"tests/**/*" = ["S105", "S106"]
+"tests/conftest.py" = ["S608"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+include = ["src", "tests"]
+exclude = ["**/__pycache__"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+]
+
+[tool.coverage.report]
+fail_under = 90
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[tool.alembic]
+file_template = "%%(year)d%%(month).2d%%(day).2d%%(hour).2d%%(minute).2d%%(second).2d_%%(rev)s_%%(slug)s"

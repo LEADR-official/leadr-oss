@@ -1,0 +1,73 @@
+name: Migrations
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  ENV: TEST
+  LINEAR_CLIENT_ID: dummy
+  LINEAR_CLIENT_SECRET: dummy
+  LINEAR_DEV_TOKEN: dummy
+  GITHUB_CLIENT_ID: dummy
+  GITHUB_CLIENT_SECRET: dummy
+  GITHUB_KEY_PATH: dummy
+  NOTION_CLIENT_ID: dummy
+  NOTION_CLIENT_SECRET: dummy
+
+jobs:
+  migration-validation:
+    name: Migration Validation
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ${{ vars.DB_NAME }}
+          POSTGRES_USER: ${{ vars.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: "Set up Python"
+      uses: actions/setup-python@v5
+      with:
+        python-version-file: ".python-version"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+
+    - name: Install dependencies
+      run: uv sync --dev
+
+    - name: Test fresh migration from base
+      env:
+        DB_NAME: ${{ vars.DB_NAME }}
+        DB_USER: ${{ vars.DB_USER }}
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      run: |
+        # Apply all migrations to fresh database
+        uv run alembic upgrade head
+        echo "✅ All migrations applied successfully to fresh database"
+
+    - name: Verify no pending migrations
+      env:
+        DB_NAME: ${{ vars.DB_NAME }}
+        DB_USER: ${{ vars.DB_USER }}
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      run: |
+        # Check that there are no uncommitted model changes
+        uv run alembic check
+        echo "✅ No pending migrations detected"
