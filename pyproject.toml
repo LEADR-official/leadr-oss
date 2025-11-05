@@ -53,6 +53,7 @@ unfixable = ["B"]
 "**/{tests,docs,tools}/*" = ["S101"]
 "tests/**/*" = ["S105", "S106"]
 "tests/conftest.py" = ["S608"]
+"src/leadr/common/dependencies.py" = ["ERA001"]
 
 [tool.pyright]
 venvPath = "."

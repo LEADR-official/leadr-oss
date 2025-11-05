@@ -20,11 +20,18 @@ class CommonSettings(BaseSettings):
     BASE_URL: HttpUrl = HttpUrl("http://localhost:8000")
     DASHBOARD_URL: HttpUrl = HttpUrl("http://localhost:8000")
 
+    # Database Configuration
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
     DB_NAME: str = "leadr"
     DB_USER: str = "leadr"
     DB_PASSWORD: str = "leadr"
+
+    # Database Connection Pool Settings
+    DB_POOL_SIZE: int = 20
+    DB_POOL_MAX_OVERFLOW: int = 10
+    DB_POOL_RECYCLE: int = 3600  # Recycle connections after 1 hour
+    DB_ECHO: bool = False  # Set to True to log SQL queries (dev/debug)
 
     # JWT Configuration
     JWT_SECRET: str = "your-super-secret-jwt-key-change-in-production"
@@ -34,6 +41,9 @@ class CommonSettings(BaseSettings):
     KEYS_PATH: Path = PROJ_ROOT / ".keys"
 
     SOURCE_OAUTH_BASE_URL: HttpUrl = HttpUrl("http://localhost:8000")
+
+    ENABLE_ADMIN_API: bool = True
+    ENABLE_CLIENT_API: bool = True
 
     TESTING_EMAIL: str = "hello@example.com"
 

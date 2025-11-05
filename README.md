@@ -52,7 +52,7 @@ curl http://localhost:3000/health
 
 **Optional Configuration:**
 
-- `DATABASE_URL` - Specify a different PostgreSQL database to connec to
+- `DATABASE_URL` - Specify a different PostgreSQL database to connect to
 
 ## API Overview
 
