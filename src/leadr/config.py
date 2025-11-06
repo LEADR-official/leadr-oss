@@ -42,8 +42,8 @@ class CommonSettings(BaseSettings):
 
     SOURCE_OAUTH_BASE_URL: HttpUrl = HttpUrl("http://localhost:8000")
 
-    ENABLE_ADMIN_API: bool = True
-    ENABLE_CLIENT_API: bool = True
+    ENABLE_ADMIN_API: bool = False
+    ENABLE_CLIENT_API: bool = False
 
     TESTING_EMAIL: str = "hello@example.com"
 

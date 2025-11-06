@@ -1,12 +1,28 @@
 """Main FastAPI application."""
 
+import logging.config
 from contextlib import asynccontextmanager
+from pathlib import Path
 
+import yaml
 from fastapi import FastAPI
 
 from api.routes import router as api_router
 from leadr.common.database import engine
 from leadr.config import settings
+
+# Configure logging from YAML file
+log_config_path = Path(__file__).parent / "logging.yaml"
+with log_config_path.open() as f:
+    log_config = yaml.safe_load(f)
+
+# Substitute app and env values into the format strings
+for formatter in log_config["formatters"].values():
+    if "fmt" in formatter:
+        formatter["fmt"] = formatter["fmt"].format(app=settings.APP, env=settings.ENV)
+
+# Apply logging configuration
+logging.config.dictConfig(log_config)
 
 
 @asynccontextmanager
@@ -19,33 +35,48 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
+# Determine API title and description based on enabled APIs
+def get_api_title() -> str:
+    """Get API title based on enabled APIs."""
+    if settings.ENABLE_ADMIN_API and settings.ENABLE_CLIENT_API:
+        return "LEADR - Admin & Client API"
+    elif settings.ENABLE_ADMIN_API:
+        return "LEADR - Admin API"
+    elif settings.ENABLE_CLIENT_API:
+        return "LEADR - Client API"
+    else:
+        raise Exception("One or both of ENABLE_ADMIN_API or ENABLE_CLIENT_API must be TRUE")
+
+
 app = FastAPI(
-    title="LEADR",
-    description="LEADR is the cross-platform leadboard backend for indie game devs",
+    title=get_api_title(),
+    description="LEADR is the cross-platform leaderboard backend for indie game devs",
     version="0.1.0",
     lifespan=lifespan,
 )
 
+# Always include shared routes (health check, root endpoint)
 app.include_router(api_router, prefix=settings.API_PREFIX)
 
-# Include domain routers
-# Use settings.ENABLE_ADMIN_API & settings.ENABLE_CLIENT_API to control what routes are "on"
+# Conditionally include admin domain routers
+if settings.ENABLE_ADMIN_API:
+    # TODO: Import and include admin-specific domain routers here
+    # Example:
+    # from leadr.accounts.api.admin import router as accounts_admin_router
+    # app.include_router(accounts_admin_router, prefix=settings.API_PREFIX)
+    pass
+
+# Conditionally include client domain routers
+if settings.ENABLE_CLIENT_API:
+    # TODO: Import and include client-specific domain routers here
+    # Example:
+    # from leadr.boards.api.client import router as boards_client_router
+    # app.include_router(boards_client_router, prefix=settings.API_PREFIX)
+    pass
 
 
 if __name__ == "__main__":
-    from pathlib import Path
-
     import uvicorn
-    import yaml
 
-    # Load logging config from YAML file
-    log_config_path = Path(__file__).parent / "logging.yaml"
-    with log_config_path.open() as f:
-        log_config = yaml.safe_load(f)
-
-    # Substitute app and env values into the format strings
-    for formatter in log_config["formatters"].values():
-        if "fmt" in formatter:
-            formatter["fmt"] = formatter["fmt"].format(app=settings.APP, env=settings.ENV)
-
-    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True, log_config=log_config)
+    # Logging config already applied at module level
+    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)

@@ -26,12 +26,52 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-  api:
+  admin-api:
+    container_name: leadr-admin-api
     env_file:
       - ../.env
     environment:
       ENV: DEV
       DB_HOST: postgres
+      ENABLE_ADMIN_API: "true"
+      ENABLE_CLIENT_API: "false"
+    ports:
+      - "8001:8000"
+    volumes:
+      - ..:/app
+      - /app/.venv # Preserve the Docker/Linux venv & packages
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    depends_on:
+      - postgres
+    command: ./scripts/start.sh
+    develop:
+      # Create a `watch` configuration to update the app
+      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
+      watch:
+        # Sync the working directory with the `/app` directory in the container
+        - action: sync
+          path: ..
+          target: /app
+          # Exclude the project virtual environment — it could be for a
+          # different platform in the container
+          ignore:
+            - .venv/
+
+        # Rebuild the image if dependencies change by checking uv.lock
+        - action: rebuild
+          path: ../uv.lock
+
+  client-api:
+    container_name: leadr-client-api
+    env_file:
+      - ../.env
+    environment:
+      ENV: DEV
+      DB_HOST: postgres
+      ENABLE_ADMIN_API: "false"
+      ENABLE_CLIENT_API: "true"
     ports:
       - "8000:8000"
     volumes:

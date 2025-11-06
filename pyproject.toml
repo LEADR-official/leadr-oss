@@ -43,7 +43,7 @@ include=["{src,tests}/**/*.py"]
 
 [tool.ruff.lint]
 select = ["A", "B", "DTZ", "E", "ERA", "F", "FAST", "FIX", "G", "I", "INT", "LOG", "N", "PERF", "PIE", "PTH", "Q", "S", "TID", "UP"]
-ignore = ["S104", "FAST001", "FIX002", "B008"]
+ignore = ["ERA001", "S104", "FAST001", "FIX002", "B008"]
 # Avoid trying to fix flake8-bugbear (`B`) violations.
 unfixable = ["B"]
 
