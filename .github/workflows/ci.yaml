@@ -98,6 +98,12 @@ jobs:
     - name: Run tests with coverage
       id: tests
       continue-on-error: true
+      env:
+        DB_NAME: ${{ vars.DB_NAME }}
+        DB_USER: ${{ vars.DB_USER }}
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        ENABLE_ADMIN_API: true
+        ENABLE_CLIENT_API: true
       run: |
         uv run coverage run -m pytest
         echo "pytest_exit_code=$?" >> $GITHUB_OUTPUT

@@ -32,8 +32,9 @@ jobs:
         id: vars
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
+          REPO_NAME=${{ github.repository }}
           echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_OUTPUT
-          echo "IMG_URL=ghcr.io/${{ github.repository }}:${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "IMG_URL=ghcr.io/${REPO_NAME,,}:${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -57,16 +58,4 @@ jobs:
 
             ```
             ${{ steps.vars.outputs.IMG_URL }}
-            ```
-
-            **Pull the image:**
-            ```bash
-            docker pull ${{ steps.vars.outputs.IMG_URL }}
-            ```
-
-            **Run locally:**
-            ```bash
-            docker run -d -p 3000:3000 \
-              -e LEADR_API_KEY=your-key \
-              ${{ steps.vars.outputs.IMG_URL }}
             ```
