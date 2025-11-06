@@ -1,10 +1,19 @@
 """Account and User ORM models."""
 
-from sqlalchemy import Column, ForeignKey, String
+import enum
+
+from sqlalchemy import Column, Enum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 
 from leadr.common.orm import Base
+
+
+class AccountStatusEnum(str, enum.Enum):
+    """Account status enum for database."""
+
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
 
 
 class AccountORM(Base):  # type: ignore[misc,valid-type]
@@ -18,7 +27,17 @@ class AccountORM(Base):  # type: ignore[misc,valid-type]
 
     name = Column(String, nullable=False, unique=True, index=True)
     slug = Column(String, nullable=False, unique=True, index=True)
-    status = Column(String, nullable=False, default="active", server_default="active")
+    status = Column(
+        Enum(
+            AccountStatusEnum,
+            name="account_status",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=AccountStatusEnum.ACTIVE,
+        server_default="active",
+    )
 
     # Relationships
     users = relationship("UserORM", back_populates="account", cascade="all, delete-orphan")

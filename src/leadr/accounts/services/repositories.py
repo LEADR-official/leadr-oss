@@ -3,7 +3,7 @@
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.accounts.adapters.orm import AccountORM, UserORM
+from leadr.accounts.adapters.orm import AccountORM, AccountStatusEnum, UserORM
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
 from leadr.common.domain.models import EntityID
@@ -22,7 +22,7 @@ class AccountRepository:
             id=EntityID(value=orm.id),
             name=orm.name,  # type: ignore[arg-type]
             slug=orm.slug,  # type: ignore[arg-type]
-            status=AccountStatus(orm.status),
+            status=AccountStatus(orm.status.value),  # type: ignore[attr-defined]
             created_at=orm.created_at,
             updated_at=orm.updated_at,
         )
@@ -33,7 +33,7 @@ class AccountRepository:
             id=domain.id.value,
             name=domain.name,
             slug=domain.slug,
-            status=domain.status.value,
+            status=AccountStatusEnum(domain.status.value),
             created_at=domain.created_at,
             updated_at=domain.updated_at,
         )
@@ -71,7 +71,7 @@ class AccountRepository:
         # Update fields
         orm.name = account.name  # type: ignore[assignment]
         orm.slug = account.slug  # type: ignore[assignment]
-        orm.status = account.status.value  # type: ignore[assignment]
+        orm.status = AccountStatusEnum(account.status.value)  # type: ignore[assignment]
 
         await self.session.commit()
         await self.session.refresh(orm)

@@ -32,7 +32,7 @@ jobs:
         id: vars
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
-          REPO_NAME=$(${{ github.repository }})
+          REPO_NAME=${{ github.repository }}
           echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "IMG_URL=ghcr.io/${REPO_NAME,,}:${SHORT_SHA}" >> $GITHUB_OUTPUT
 
