@@ -1,4 +1,4 @@
-"""Account domain model - STUB for RED commit."""
+"""Account domain model."""
 
 from enum import Enum
 
@@ -13,14 +13,21 @@ class AccountStatus(Enum):
 
 
 class Account(Entity):
-    """Account domain entity - STUB implementation that will fail tests."""
+    """Account domain entity.
+
+    Represents an organization or team that owns games and manages users.
+    Accounts have a unique name and URL-friendly slug, and can be
+    active or suspended.
+    """
 
     name: str
     slug: str
     status: AccountStatus = AccountStatus.ACTIVE
 
     def suspend(self) -> None:
-        """Suspend the account - STUB."""
+        """Suspend the account, preventing access."""
+        self.status = AccountStatus.SUSPENDED
 
     def activate(self) -> None:
-        """Activate the account - STUB."""
+        """Activate the account, allowing access."""
+        self.status = AccountStatus.ACTIVE
