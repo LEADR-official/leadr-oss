@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EntityID(BaseModel):
@@ -43,7 +43,7 @@ class Entity(BaseModel):
 
     model_config = ConfigDict(validate_assignment=True)
 
-    id: EntityID
+    id: EntityID = Field(frozen=True)
     created_at: datetime
     updated_at: datetime
 
