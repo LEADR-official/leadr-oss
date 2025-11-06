@@ -1,8 +1,8 @@
 """Add accounts and users tables
 
-Revision ID: 22592df8d24d
+Revision ID: bc99a100eeb0
 Revises:
-Create Date: 2025-11-06 17:52:22.617027
+Create Date: 2025-11-06 18:03:18.536209
 
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "22592df8d24d"
+revision: str = "bc99a100eeb0"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -31,6 +31,7 @@ def upgrade() -> None:
             server_default="active",
             nullable=False,
         ),
+        sa.Column("id", sa.Uuid(), server_default=sa.text("gen_random_uuid()"), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -43,16 +44,16 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.Column("id", sa.UUID(), server_default=sa.text("gen_random_uuid()"), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_accounts_name"), "accounts", ["name"], unique=True)
     op.create_index(op.f("ix_accounts_slug"), "accounts", ["slug"], unique=True)
     op.create_table(
         "users",
-        sa.Column("account_id", sa.UUID(), nullable=False),
+        sa.Column("account_id", sa.Uuid(), nullable=False),
         sa.Column("email", sa.String(), nullable=False),
         sa.Column("display_name", sa.String(), nullable=False),
+        sa.Column("id", sa.Uuid(), server_default=sa.text("gen_random_uuid()"), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -65,7 +66,6 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.Column("id", sa.UUID(), server_default=sa.text("gen_random_uuid()"), nullable=False),
         sa.ForeignKeyConstraint(["account_id"], ["accounts.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )

@@ -1,10 +1,10 @@
 """Account and User ORM models."""
 
 import enum
+from uuid import UUID
 
-from sqlalchemy import Column, Enum, ForeignKey, String
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy import Enum, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from leadr.common.orm import Base
 
@@ -16,7 +16,7 @@ class AccountStatusEnum(str, enum.Enum):
     SUSPENDED = "suspended"
 
 
-class AccountORM(Base):  # type: ignore[misc,valid-type]
+class AccountORM(Base):
     """Account ORM model.
 
     Represents an organization or team in the database.
@@ -25,9 +25,9 @@ class AccountORM(Base):  # type: ignore[misc,valid-type]
 
     __tablename__ = "accounts"
 
-    name = Column(String, nullable=False, unique=True, index=True)
-    slug = Column(String, nullable=False, unique=True, index=True)
-    status = Column(
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    slug: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    status: Mapped[AccountStatusEnum] = mapped_column(
         Enum(
             AccountStatusEnum,
             name="account_status",
@@ -40,10 +40,12 @@ class AccountORM(Base):  # type: ignore[misc,valid-type]
     )
 
     # Relationships
-    users = relationship("UserORM", back_populates="account", cascade="all, delete-orphan")
+    users: Mapped[list["UserORM"]] = relationship(
+        back_populates="account", cascade="all, delete-orphan"
+    )
 
 
-class UserORM(Base):  # type: ignore[misc,valid-type]
+class UserORM(Base):
     """User ORM model.
 
     Represents a user within an account in the database.
@@ -52,14 +54,13 @@ class UserORM(Base):  # type: ignore[misc,valid-type]
 
     __tablename__ = "users"
 
-    account_id = Column(
-        PG_UUID(as_uuid=True),
+    account_id: Mapped[UUID] = mapped_column(
         ForeignKey("accounts.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    email = Column(String, nullable=False, unique=True, index=True)
-    display_name = Column(String, nullable=False)
+    email: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    display_name: Mapped[str] = mapped_column(String, nullable=False)
 
     # Relationships
-    account = relationship("AccountORM", back_populates="users")
+    account: Mapped["AccountORM"] = relationship(back_populates="users")

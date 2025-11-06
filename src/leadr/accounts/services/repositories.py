@@ -20,9 +20,9 @@ class AccountRepository:
         """Convert ORM model to domain entity."""
         return Account(
             id=EntityID(value=orm.id),
-            name=orm.name,  # type: ignore[arg-type]
-            slug=orm.slug,  # type: ignore[arg-type]
-            status=AccountStatus(orm.status.value),  # type: ignore[attr-defined]
+            name=orm.name,
+            slug=orm.slug,
+            status=AccountStatus(orm.status.value),
             created_at=orm.created_at,
             updated_at=orm.updated_at,
         )
@@ -49,14 +49,14 @@ class AccountRepository:
     async def get_by_id(self, account_id: EntityID) -> Account | None:
         """Get account by ID, returns None if not found."""
         result = await self.session.execute(
-            select(AccountORM).where(AccountORM.id == account_id.value)  # type: ignore[arg-type]
+            select(AccountORM).where(AccountORM.id == account_id.value)
         )
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
     async def get_by_slug(self, slug: str) -> Account | None:
         """Get account by slug, returns None if not found."""
-        result = await self.session.execute(select(AccountORM).where(AccountORM.slug == slug))  # type: ignore[arg-type]
+        result = await self.session.execute(select(AccountORM).where(AccountORM.slug == slug))
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
@@ -64,14 +64,14 @@ class AccountRepository:
         """Update an existing account in the database."""
         # Fetch the ORM object
         result = await self.session.execute(
-            select(AccountORM).where(AccountORM.id == account.id.value)  # type: ignore[arg-type]
+            select(AccountORM).where(AccountORM.id == account.id.value)
         )
         orm = result.scalar_one()
 
         # Update fields
-        orm.name = account.name  # type: ignore[assignment]
-        orm.slug = account.slug  # type: ignore[assignment]
-        orm.status = AccountStatusEnum(account.status.value)  # type: ignore[assignment]
+        orm.name = account.name
+        orm.slug = account.slug
+        orm.status = AccountStatusEnum(account.status.value)
 
         await self.session.commit()
         await self.session.refresh(orm)
@@ -79,9 +79,7 @@ class AccountRepository:
 
     async def delete(self, account_id: EntityID) -> None:
         """Delete an account from the database."""
-        await self.session.execute(
-            delete(AccountORM).where(AccountORM.id == account_id.value)  # type: ignore[arg-type]
-        )
+        await self.session.execute(delete(AccountORM).where(AccountORM.id == account_id.value))
         await self.session.commit()
 
     async def list_all(self) -> list[Account]:
@@ -102,9 +100,9 @@ class UserRepository:
         """Convert ORM model to domain entity."""
         return User(
             id=EntityID(value=orm.id),
-            account_id=EntityID(value=orm.account_id),  # type: ignore[arg-type]
-            email=orm.email,  # type: ignore[arg-type]
-            display_name=orm.display_name,  # type: ignore[arg-type]
+            account_id=EntityID(value=orm.account_id),
+            email=orm.email,
+            display_name=orm.display_name,
             created_at=orm.created_at,
             updated_at=orm.updated_at,
         )
@@ -130,22 +128,20 @@ class UserRepository:
 
     async def get_by_id(self, user_id: EntityID) -> User | None:
         """Get user by ID, returns None if not found."""
-        result = await self.session.execute(
-            select(UserORM).where(UserORM.id == user_id.value)  # type: ignore[arg-type]
-        )
+        result = await self.session.execute(select(UserORM).where(UserORM.id == user_id.value))
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
     async def get_by_email(self, email: str) -> User | None:
         """Get user by email, returns None if not found."""
-        result = await self.session.execute(select(UserORM).where(UserORM.email == email))  # type: ignore[arg-type]
+        result = await self.session.execute(select(UserORM).where(UserORM.email == email))
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
     async def list_by_account(self, account_id: EntityID) -> list[User]:
         """List all users for a given account."""
         result = await self.session.execute(
-            select(UserORM).where(UserORM.account_id == account_id.value)  # type: ignore[arg-type]
+            select(UserORM).where(UserORM.account_id == account_id.value)
         )
         orms = result.scalars().all()
         return [self._to_domain(orm) for orm in orms]
@@ -153,14 +149,12 @@ class UserRepository:
     async def update(self, user: User) -> User:
         """Update an existing user in the database."""
         # Fetch the ORM object
-        result = await self.session.execute(
-            select(UserORM).where(UserORM.id == user.id.value)  # type: ignore[arg-type]
-        )
+        result = await self.session.execute(select(UserORM).where(UserORM.id == user.id.value))
         orm = result.scalar_one()
 
         # Update fields (note: account_id is immutable so we don't update it)
-        orm.email = user.email  # type: ignore[assignment]
-        orm.display_name = user.display_name  # type: ignore[assignment]
+        orm.email = user.email
+        orm.display_name = user.display_name
 
         await self.session.commit()
         await self.session.refresh(orm)
@@ -168,7 +162,5 @@ class UserRepository:
 
     async def delete(self, user_id: EntityID) -> None:
         """Delete a user from the database."""
-        await self.session.execute(
-            delete(UserORM).where(UserORM.id == user_id.value)  # type: ignore[arg-type]
-        )
+        await self.session.execute(delete(UserORM).where(UserORM.id == user_id.value))
         await self.session.commit()
