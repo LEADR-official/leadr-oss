@@ -1,0 +1,63 @@
+services:
+  postgres:
+    container_name: postgres
+    image: postgres
+    env_file:
+      - ../.env
+    environment:
+      # Postgres superuser credentials
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      # Application database credentials (passed to init script)
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      # Postgres data directory
+      PGDATA: /data/postgres
+    volumes:
+      - db:/data/postgres
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    ports:
+      - "5332:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  api:
+    env_file:
+      - ../.env
+    environment:
+      ENV: DEV
+      DB_HOST: postgres
+    ports:
+      - "8000:8000"
+    volumes:
+      - ..:/app
+      - /app/.venv # Preserve the Docker/Linux venv & packages
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    depends_on:
+      - postgres
+    command: ./scripts/start.sh
+    develop:
+      # Create a `watch` configuration to update the app
+      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
+      watch:
+        # Sync the working directory with the `/app` directory in the container
+        - action: sync
+          path: ..
+          target: /app
+          # Exclude the project virtual environment — it could be for a
+          # different platform in the container
+          ignore:
+            - .venv/
+
+        # Rebuild the image if dependencies change by checking uv.lock
+        - action: rebuild
+          path: ../uv.lock
+volumes:
+  db:

@@ -8,14 +8,6 @@ on:
 
 env:
   ENV: TEST
-  LINEAR_CLIENT_ID: dummy
-  LINEAR_CLIENT_SECRET: dummy
-  LINEAR_DEV_TOKEN: dummy
-  GITHUB_CLIENT_ID: dummy
-  GITHUB_CLIENT_SECRET: dummy
-  GITHUB_KEY_PATH: dummy
-  NOTION_CLIENT_ID: dummy
-  NOTION_CLIENT_SECRET: dummy
 
 jobs:
   migration-validation:

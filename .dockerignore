@@ -1,0 +1,10 @@
+.env*
+exampe.env
+.github
+.pre-commit.config.yaml
+.coverage
+.pytest_cache
+.ruff_cache
+.venv
+htmlcov
+tests

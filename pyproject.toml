@@ -1,6 +1,7 @@
 [project]
 name = "leadr-oss"
-version = "0.0.1"
+license = {text = "Apache-2.0"}
+version = "0.1.0"
 tescription = "LEADR is the cross-platform leadboard backend for indie game devs that turns any game into a social experience"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -9,7 +10,7 @@ dependencies = [
     "asyncpg>=0.30.0",
     "bcrypt>=4.3.0",
     "cryptography>=45.0.7",
-    "fastapi>=0.116.1",
+    "fastapi[standard]>=0.116.1",
     "mailgun>=1.1.0",
     "psycopg>=3.2.0",
     "pydantic>=2.11.7",

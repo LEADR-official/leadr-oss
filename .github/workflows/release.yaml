@@ -1,0 +1,175 @@
+name: Release and Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Version bump type (auto will analyze commits)'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for version analysis
+          token: ${{ secrets.GITHUB_TOKEN }}  # Needed for pushing version bump
+
+      - name: Get current version
+        id: current_version
+        run: |
+          # Get the latest tag or default to v0.0.0
+          CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Determine next version
+        id: next_version
+        run: |
+          CURRENT="${{ steps.current_version.outputs.version }}"
+          BUMP_TYPE="${{ github.event.inputs.bump_type }}"
+
+          # Remove 'v' prefix for processing
+          CURRENT_CLEAN=${CURRENT#v}
+
+          # Split version
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_CLEAN"
+
+          if [ "$BUMP_TYPE" = "auto" ]; then
+            # Analyze commits since last tag
+            if [ "$CURRENT" = "v0.0.0" ]; then
+              # First release
+              COMMITS=$(git log --pretty=format:"%s" --no-merges)
+            else
+              COMMITS=$(git log ${CURRENT}..HEAD --pretty=format:"%s" --no-merges)
+            fi
+
+            # Default to patch
+            BUMP_TYPE="patch"
+
+            # Check for breaking changes (major)
+            if echo "$COMMITS" | grep -qiE "^(breaking|major|BREAKING CHANGE:)"; then
+              BUMP_TYPE="major"
+            # Check for features (minor)
+            elif echo "$COMMITS" | grep -qiE "^(feat|feature|add):"; then
+              BUMP_TYPE="minor"
+            fi
+          fi
+
+          # Apply bump
+          case $BUMP_TYPE in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "bump_type=${BUMP_TYPE}" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          CURRENT="${{ steps.current_version.outputs.version }}"
+          NEW="${{ steps.next_version.outputs.version }}"
+
+          echo "# Release ${NEW}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "## What's Changed" >> release_notes.md
+          echo "" >> release_notes.md
+
+          if [ "$CURRENT" = "v0.0.0" ]; then
+            git log --pretty=format:"- %s (%h)" --no-merges >> release_notes.md
+          else
+            git log ${CURRENT}..HEAD --pretty=format:"- %s (%h)" --no-merges >> release_notes.md
+          fi
+
+          echo "" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${CURRENT}...${NEW}" >> release_notes.md
+
+      - name: Update pyproject.toml version
+        run: |
+          NEW_VERSION="${{ steps.next_version.outputs.version }}"
+          # Remove 'v' prefix for pyproject.toml
+          VERSION_CLEAN=${NEW_VERSION#v}
+
+          # Use Python to update pyproject.toml (more reliable than sed)
+          python3 << EOF
+          import re
+
+          with open('pyproject.toml', 'r') as f:
+              content = f.read()
+
+          # Update version line (handle both quoted and unquoted versions)
+          content = re.sub(
+              r'^version\s*=\s*["\']?[^"\'\n]+["\']?',
+              f'version = "{VERSION_CLEAN}"',
+              content,
+              flags=re.MULTILINE
+          )
+
+          with open('pyproject.toml', 'w') as f:
+              f.write(content)
+          EOF
+
+          # Commit and push version bump
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add pyproject.toml
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+          git push
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.next_version.outputs.version }}
+          name: ${{ steps.next_version.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/api.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ steps.next_version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

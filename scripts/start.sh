@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-uv run --directory src -m api.main
+fastapi run --host 0.0.0.0 src/api/main.py
