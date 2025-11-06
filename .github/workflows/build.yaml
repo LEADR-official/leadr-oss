@@ -59,14 +59,3 @@ jobs:
             ```
             ${{ steps.vars.outputs.IMG_URL }}
             ```
-
-            **Pull the image:**
-            ```bash
-            docker pull ${{ steps.vars.outputs.IMG_URL }}
-            ```
-
-            **Run locally:**
-            ```bash
-            docker run -d -p 3000:3000 \
-              ${{ steps.vars.outputs.IMG_URL }}
-            ```
