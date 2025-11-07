@@ -1,5 +1,6 @@
 """API-level routes (health checks, root endpoint, etc.)."""
 
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
@@ -114,8 +115,8 @@ async def create_api_key(
 )
 async def list_api_keys(
     db: DatabaseSession,
-    account_id: UUID | None = Query(None, description="Filter by account ID"),
-    status: APIKeyStatus | None = Query(None, description="Filter by status"),
+    account_id: Annotated[UUID | None, Query(description="Filter by account ID")] = None,
+    status: Annotated[APIKeyStatus | None, Query(description="Filter by status")] = None,
 ) -> list[APIKeyResponse]:
     """List API keys with optional filters.
 

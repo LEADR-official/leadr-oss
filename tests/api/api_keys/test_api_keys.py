@@ -203,9 +203,7 @@ class TestCreateAPIKey:
 class TestListAPIKeys:
     """Test suite for GET /v1/api-keys endpoint (list/filter)."""
 
-    async def test_list_api_keys_by_account(
-        self, client: AsyncClient, db_session: AsyncSession
-    ):
+    async def test_list_api_keys_by_account(self, client: AsyncClient, db_session: AsyncSession):
         """Test listing API keys filtered by account_id."""
         # Create two accounts
         account_repo = AccountRepository(db_session)
@@ -240,7 +238,7 @@ class TestListAPIKeys:
                 "/api-keys",
                 json={
                     "account_id": str(account1_id.value),
-                    "name": f"Account 1 Key {i+1}",
+                    "name": f"Account 1 Key {i + 1}",
                 },
             )
 
@@ -250,7 +248,7 @@ class TestListAPIKeys:
                 "/api-keys",
                 json={
                     "account_id": str(account2_id.value),
-                    "name": f"Account 2 Key {i+1}",
+                    "name": f"Account 2 Key {i + 1}",
                 },
             )
 
@@ -300,7 +298,7 @@ class TestListAPIKeys:
                 "/api-keys",
                 json={
                     "account_id": str(account_id.value),
-                    "name": f"Test Key {i+1}",
+                    "name": f"Test Key {i + 1}",
                 },
             )
             created_keys.append(response.json())
@@ -309,7 +307,7 @@ class TestListAPIKeys:
         # For now, all keys should be active
 
         # Filter by active status
-        response = await client.get(f"/api-keys?status=active")
+        response = await client.get("/api-keys?status=active")
         assert response.status_code == 200
 
         data = response.json()
@@ -342,14 +340,12 @@ class TestListAPIKeys:
                 "/api-keys",
                 json={
                     "account_id": str(account_id.value),
-                    "name": f"Test Key {i+1}",
+                    "name": f"Test Key {i + 1}",
                 },
             )
 
         # Filter by both account_id and status
-        response = await client.get(
-            f"/api-keys?account_id={account_id.value}&status=active"
-        )
+        response = await client.get(f"/api-keys?account_id={account_id.value}&status=active")
         assert response.status_code == 200
 
         data = response.json()
@@ -383,7 +379,7 @@ class TestListAPIKeys:
                 "/api-keys",
                 json={
                     "account_id": str(account_id.value),
-                    "name": f"Test Key {i+1}",
+                    "name": f"Test Key {i + 1}",
                 },
             )
 
@@ -419,9 +415,7 @@ class TestListAPIKeys:
 class TestGetSingleAPIKey:
     """Test suite for GET /v1/api-keys/{key_id} endpoint."""
 
-    async def test_get_api_key_success(
-        self, client: AsyncClient, db_session: AsyncSession
-    ):
+    async def test_get_api_key_success(self, client: AsyncClient, db_session: AsyncSession):
         """Test getting a single API key by ID."""
         # Create an account
         account_repo = AccountRepository(db_session)
@@ -618,9 +612,7 @@ class TestUpdateAPIKey:
         )
         assert response.status_code == 422
 
-    async def test_update_api_key_soft_delete(
-        self, client: AsyncClient, db_session: AsyncSession
-    ):
+    async def test_update_api_key_soft_delete(self, client: AsyncClient, db_session: AsyncSession):
         """Test soft deleting an API key via PATCH."""
         # Create an account
         account_repo = AccountRepository(db_session)
@@ -655,9 +647,7 @@ class TestUpdateAPIKey:
         # For now, this should succeed as a placeholder
         assert response.status_code == 200
 
-    async def test_update_api_key_empty_body(
-        self, client: AsyncClient, db_session: AsyncSession
-    ):
+    async def test_update_api_key_empty_body(self, client: AsyncClient, db_session: AsyncSession):
         """Test updating with empty body returns 200 but no changes."""
         # Create an account
         account_repo = AccountRepository(db_session)
@@ -730,7 +720,8 @@ class TestUpdateAPIKey:
         )
         key_id = create_response.json()["id"]
 
-        # Try to update name (should be ignored since UpdateAPIKeyRequest only allows status/deleted)
+        # Try to update name (should be ignored since UpdateAPIKeyRequest
+        # only allows status/deleted)
         response = await client.patch(
             f"/api-keys/{key_id}",
             json={"name": "New Name"},
