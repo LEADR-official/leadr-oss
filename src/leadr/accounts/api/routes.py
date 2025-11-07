@@ -4,8 +4,15 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel, EmailStr
 
+from leadr.accounts.api.models import (
+    AccountCreateRequest,
+    AccountResponse,
+    AccountUpdateRequest,
+    UserCreateRequest,
+    UserResponse,
+    UserUpdateRequest,
+)
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
 from leadr.accounts.services.repositories import AccountRepository, UserRepository
@@ -13,84 +20,6 @@ from leadr.common.dependencies import DatabaseSession
 from leadr.common.domain.models import EntityID
 
 router = APIRouter()
-
-
-# Request/Response models for Accounts
-class AccountCreateRequest(BaseModel):
-    """Request model for creating an account."""
-
-    name: str
-    slug: str
-
-
-class AccountUpdateRequest(BaseModel):
-    """Request model for updating an account."""
-
-    name: str | None = None
-    slug: str | None = None
-    status: str | None = None
-
-
-class AccountResponse(BaseModel):
-    """Response model for an account."""
-
-    id: str
-    name: str
-    slug: str
-    status: str
-    created_at: datetime
-    updated_at: datetime
-
-    @classmethod
-    def from_domain(cls, account: Account) -> "AccountResponse":
-        """Convert domain entity to response model."""
-        return cls(
-            id=str(account.id),
-            name=account.name,
-            slug=account.slug,
-            status=account.status.value,
-            created_at=account.created_at,
-            updated_at=account.updated_at,
-        )
-
-
-# Request/Response models for Users
-class UserCreateRequest(BaseModel):
-    """Request model for creating a user."""
-
-    account_id: str
-    email: EmailStr
-    display_name: str
-
-
-class UserUpdateRequest(BaseModel):
-    """Request model for updating a user."""
-
-    email: EmailStr | None = None
-    display_name: str | None = None
-
-
-class UserResponse(BaseModel):
-    """Response model for a user."""
-
-    id: str
-    account_id: str
-    email: str
-    display_name: str
-    created_at: datetime
-    updated_at: datetime
-
-    @classmethod
-    def from_domain(cls, user: User) -> "UserResponse":
-        """Convert domain entity to response model."""
-        return cls(
-            id=str(user.id),
-            account_id=str(user.account_id),
-            email=user.email,
-            display_name=user.display_name,
-            created_at=user.created_at,
-            updated_at=user.updated_at,
-        )
 
 
 # Account routes
@@ -161,27 +90,11 @@ async def update_account(
         account.slug = request.slug
     if request.status is not None:
         account.status = AccountStatus(request.status)
+    if request.deleted is True:
+        account.soft_delete()
 
     updated = await repo.update(account)
     return AccountResponse.from_domain(updated)
-
-
-@router.post("/accounts/{account_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_account(account_id: str, db: DatabaseSession) -> None:
-    """Soft-delete an account."""
-    repo = AccountRepository(db)
-
-    try:
-        entity_id = EntityID.from_string(account_id)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID") from e
-
-    # Check if account exists
-    account = await repo.get_by_id(entity_id)
-    if not account:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
-
-    await repo.delete(entity_id)
 
 
 # User routes
@@ -266,24 +179,8 @@ async def update_user(user_id: str, request: UserUpdateRequest, db: DatabaseSess
         user.email = request.email
     if request.display_name is not None:
         user.display_name = request.display_name
+    if request.deleted is True:
+        user.soft_delete()
 
     updated = await repo.update(user)
     return UserResponse.from_domain(updated)
-
-
-@router.post("/users/{user_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(user_id: str, db: DatabaseSession) -> None:
-    """Soft-delete a user."""
-    repo = UserRepository(db)
-
-    try:
-        entity_id = EntityID.from_string(user_id)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID") from e
-
-    # Check if user exists
-    user = await repo.get_by_id(entity_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    await repo.delete(entity_id)

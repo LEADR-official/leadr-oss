@@ -34,6 +34,13 @@ class TestAccountRoutes:
         assert "created_at" in data
         assert "updated_at" in data
 
+        # Verify we can retrieve it
+        account_id = data["id"]
+        get_response = await client.get(f"/accounts/{account_id}")
+        assert get_response.status_code == 200
+        get_data = get_response.json()
+        assert get_data["id"] == account_id
+
     async def test_create_account_missing_name(self, client: AsyncClient):
         """Test creating account without name returns 422."""
         response = await client.post(
@@ -230,7 +237,7 @@ class TestAccountRoutes:
         assert response.status_code == 404
 
     async def test_delete_account(self, client: AsyncClient, db_session):
-        """Test soft-deleting account via POST /accounts/{id}/delete."""
+        """Test soft-deleting account via PATCH with deleted field."""
         # Create account
         repo = AccountRepository(db_session)
         account_id = EntityID.generate()
@@ -246,19 +253,25 @@ class TestAccountRoutes:
         )
         await repo.create(account)
 
-        # Delete it
-        response = await client.post(f"/accounts/{account_id}/delete")
+        # Soft-delete it via PATCH
+        response = await client.patch(
+            f"/accounts/{account_id}",
+            json={"deleted": True},
+        )
 
-        assert response.status_code == 204
+        assert response.status_code == 200
 
         # Verify it's gone from API
         get_response = await client.get(f"/accounts/{account_id}")
         assert get_response.status_code == 404
 
     async def test_delete_account_not_found(self, client: AsyncClient):
-        """Test deleting non-existent account returns 404."""
+        """Test soft-deleting non-existent account returns 404."""
         fake_id = EntityID.generate()
-        response = await client.post(f"/accounts/{fake_id}/delete")
+        response = await client.patch(
+            f"/accounts/{fake_id}",
+            json={"deleted": True},
+        )
 
         assert response.status_code == 404
 
@@ -281,13 +294,6 @@ class TestAccountRoutes:
         data = response.json()
         assert "Invalid account ID" in data["detail"]
 
-    async def test_delete_account_invalid_uuid(self, client: AsyncClient):
-        """Test deleting account with invalid UUID returns 400."""
-        response = await client.post("/accounts/not-a-uuid/delete")
-
-        assert response.status_code == 400
-        data = response.json()
-        assert "Invalid account ID" in data["detail"]
 
     async def test_update_account_partial(self, client: AsyncClient, db_session):
         """Test updating only some fields of an account."""
@@ -411,6 +417,57 @@ class TestAccountRoutes:
         assert data["slug"] == "acme-corp"  # unchanged
         assert data["status"] == "active"  # unchanged
 
+    async def test_update_account_all_fields_via_api(self, client: AsyncClient):
+        """Test updating account through API with all fields."""
+        # Create via API
+        create_response = await client.post(
+            "/accounts",
+            json={
+                "name": "Test Corp",
+                "slug": "test-corp",
+            },
+        )
+        assert create_response.status_code == 201
+        account_id = create_response.json()["id"]
+
+        # Update all fields
+        update_response = await client.patch(
+            f"/accounts/{account_id}",
+            json={
+                "name": "Updated Corp",
+                "slug": "updated-corp",
+                "status": "suspended",
+            },
+        )
+        assert update_response.status_code == 200
+        assert update_response.json()["name"] == "Updated Corp"
+        assert update_response.json()["slug"] == "updated-corp"
+        assert update_response.json()["status"] == "suspended"
+
+    async def test_delete_account_via_api(self, client: AsyncClient):
+        """Test soft-deleting account created via API."""
+        # Create via API
+        create_response = await client.post(
+            "/accounts",
+            json={
+                "name": "To Delete",
+                "slug": "to-delete",
+            },
+        )
+        assert create_response.status_code == 201
+        account_id = create_response.json()["id"]
+
+        # Soft-delete it via PATCH
+        delete_response = await client.patch(
+            f"/accounts/{account_id}",
+            json={"deleted": True},
+        )
+        assert delete_response.status_code == 200
+
+        # Confirm it's gone
+        get_response = await client.get(f"/accounts/{account_id}")
+        assert get_response.status_code == 404
+
 
 @pytest.mark.asyncio
 class TestUserRoutes:
@@ -451,6 +508,13 @@ class TestUserRoutes:
         assert "id" in data
         assert "created_at" in data
         assert "updated_at" in data
+
+        # Verify we can retrieve it
+        user_id = data["id"]
+        get_response = await client.get(f"/users/{user_id}")
+        assert get_response.status_code == 200
+        get_data = get_response.json()
+        assert get_data["id"] == user_id
 
     async def test_create_user_missing_fields(self, client: AsyncClient):
         """Test creating user without required fields returns 422."""
@@ -622,7 +686,7 @@ class TestUserRoutes:
         assert response.status_code == 404
 
     async def test_delete_user(self, client: AsyncClient, db_session):
-        """Test soft-deleting user via POST /users/{id}/delete."""
+        """Test soft-deleting user via PATCH with deleted field."""
         # Create account and user
         account_repo = AccountRepository(db_session)
         account_id = EntityID.generate()
@@ -651,19 +715,25 @@ class TestUserRoutes:
         )
         await user_repo.create(user)
 
-        # Delete it
-        response = await client.post(f"/users/{user_id}/delete")
+        # Soft-delete it via PATCH
+        response = await client.patch(
+            f"/users/{user_id}",
+            json={"deleted": True},
+        )
 
-        assert response.status_code == 204
+        assert response.status_code == 200
 
         # Verify it's gone from API
         get_response = await client.get(f"/users/{user_id}")
         assert get_response.status_code == 404
 
     async def test_delete_user_not_found(self, client: AsyncClient):
-        """Test deleting non-existent user returns 404."""
+        """Test soft-deleting non-existent user returns 404."""
         fake_id = EntityID.generate()
-        response = await client.post(f"/users/{fake_id}/delete")
+        response = await client.patch(
+            f"/users/{fake_id}",
+            json={"deleted": True},
+        )
 
         assert response.status_code == 404
 
@@ -686,13 +756,6 @@ class TestUserRoutes:
         data = response.json()
         assert "Invalid user ID" in data["detail"]
 
-    async def test_delete_user_invalid_uuid(self, client: AsyncClient):
-        """Test deleting user with invalid UUID returns 400."""
-        response = await client.post("/users/not-a-uuid/delete")
-
-        assert response.status_code == 400
-        data = response.json()
-        assert "Invalid user ID" in data["detail"]
 
     async def test_create_user_invalid_account_id(self, client: AsyncClient):
         """Test creating user with invalid account ID returns 400."""
@@ -932,3 +995,76 @@ class TestUserRoutes:
         data = response.json()
         assert data["email"] == "user@example.com"  # unchanged
         assert data["display_name"] == "John Doe"  # unchanged
+
+    async def test_update_user_both_fields_via_api(self, client: AsyncClient):
+        """Test updating user through API with both fields."""
+        # Create account via API
+        account_response = await client.post(
+            "/accounts",
+            json={
+                "name": "Test Account",
+                "slug": "test-account",
+            },
+        )
+        assert account_response.status_code == 201
+        account_id = account_response.json()["id"]
+
+        # Create user via API
+        create_response = await client.post(
+            "/users",
+            json={
+                "account_id": account_id,
+                "email": "test@example.com",
+                "display_name": "Test User",
+            },
+        )
+        assert create_response.status_code == 201
+        user_id = create_response.json()["id"]
+
+        # Update both fields
+        update_response = await client.patch(
+            f"/users/{user_id}",
+            json={
+                "email": "updated@example.com",
+                "display_name": "Updated User",
+            },
+        )
+        assert update_response.status_code == 200
+        assert update_response.json()["email"] == "updated@example.com"
+        assert update_response.json()["display_name"] == "Updated User"
+
+    async def test_delete_user_via_api(self, client: AsyncClient):
+        """Test soft-deleting user created via API."""
+        # Create account via API
+        account_response = await client.post(
+            "/accounts",
+            json={
+                "name": "Test Account",
+                "slug": "test-account",
+            },
+        )
+        assert account_response.status_code == 201
+        account_id = account_response.json()["id"]
+
+        # Create user via API
+        create_response = await client.post(
+            "/users",
+            json={
+                "account_id": account_id,
+                "email": "to-delete@example.com",
+                "display_name": "To Delete",
+            },
+        )
+        assert create_response.status_code == 201
+        user_id = create_response.json()["id"]
+
+        # Soft-delete it via PATCH
+        delete_response = await client.patch(
+            f"/users/{user_id}",
+            json={"deleted": True},
+        )
+        assert delete_response.status_code == 200
+
+        # Confirm it's gone
+        get_response = await client.get(f"/users/{user_id}")
+        assert get_response.status_code == 404

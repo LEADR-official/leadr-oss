@@ -73,6 +73,7 @@ omit = [
     "*/tests/*",
     "*/test_*",
 ]
+concurrency = ["greenlet"]
 
 [tool.coverage.report]
 fail_under = 90
