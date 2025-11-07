@@ -8,6 +8,7 @@ import yaml
 from fastapi import FastAPI
 
 from api.routes import router as api_router
+from leadr.accounts.api.routes import router as accounts_router
 from leadr.common.database import engine
 from leadr.config import settings
 
@@ -58,19 +59,8 @@ app = FastAPI(
 # Always include shared routes (health check, root endpoint)
 app.include_router(api_router, prefix=settings.API_PREFIX)
 
-# Conditionally include admin domain routers
-if settings.ENABLE_ADMIN_API:
-    from leadr.accounts.api.routes import router as accounts_router
-
-    app.include_router(accounts_router, prefix=settings.API_PREFIX, tags=["Accounts"])
-
-# Conditionally include client domain routers
-if settings.ENABLE_CLIENT_API:
-    # TODO: Import and include client-specific domain routers here
-    # Example:
-    # from leadr.boards.api.client import router as boards_client_router
-    # app.include_router(boards_client_router, prefix=settings.API_PREFIX)
-    pass
+# We will conditionally enable/disable admin-only routers/endpoints based on the env vars later
+app.include_router(accounts_router, prefix=settings.API_PREFIX, tags=["Accounts"])
 
 
 if __name__ == "__main__":
