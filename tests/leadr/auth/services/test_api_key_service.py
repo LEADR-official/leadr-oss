@@ -9,6 +9,7 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.api_key_service import APIKeyService
+from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.models import EntityID
 
 
@@ -446,3 +447,34 @@ class TestAPIKeyService:
         # Verify the timestamp is recent (within last 5 seconds)
         time_diff = datetime.now(UTC) - validated_key.last_used_at
         assert time_diff.total_seconds() < 5
+
+    async def test_revoke_api_key_not_found(self, db_session: AsyncSession):
+        """Test that revoking a non-existent API key raises EntityNotFoundError."""
+        service = APIKeyService(db_session)
+        non_existent_id = EntityID.generate()
+
+        with pytest.raises(EntityNotFoundError) as exc_info:
+            await service.revoke_api_key(non_existent_id)
+
+        assert "APIKey not found" in str(exc_info.value)
+
+    async def test_update_api_key_status_not_found(self, db_session: AsyncSession):
+        """Test that updating status of non-existent API key raises EntityNotFoundError."""
+        service = APIKeyService(db_session)
+        non_existent_id = EntityID.generate()
+
+        with pytest.raises(EntityNotFoundError) as exc_info:
+            await service.update_api_key_status(non_existent_id, "active")
+
+        assert "APIKey not found" in str(exc_info.value)
+
+    async def test_record_usage_not_found(self, db_session: AsyncSession):
+        """Test that recording usage for non-existent API key raises EntityNotFoundError."""
+        service = APIKeyService(db_session)
+        non_existent_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        with pytest.raises(EntityNotFoundError) as exc_info:
+            await service.record_usage(non_existent_id, now)
+
+        assert "APIKey not found" in str(exc_info.value)

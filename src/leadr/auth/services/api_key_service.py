@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.auth.domain.api_key import APIKey
 from leadr.auth.services.api_key_crypto import generate_api_key, hash_api_key, verify_api_key
 from leadr.auth.services.repositories import APIKeyRepository
+from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.models import EntityID
 from leadr.config import settings
 
@@ -211,13 +212,14 @@ class APIKeyService:
             The updated APIKey domain entity.
 
         Raises:
-            ValueError: If the key doesn't exist or status is invalid.
+            EntityNotFoundError: If the key doesn't exist.
+            ValueError: If the status is invalid.
         """
         from leadr.auth.domain.api_key import APIKeyStatus
 
         api_key = await self.repository.get_by_id(key_id)
         if not api_key:
-            raise ValueError(f"API key not found: {key_id}")
+            raise EntityNotFoundError("APIKey", str(key_id))
 
         # Convert string to enum and update
         status_enum = APIKeyStatus(status)
@@ -239,11 +241,11 @@ class APIKeyService:
             The updated APIKey domain entity with REVOKED status.
 
         Raises:
-            sqlalchemy.exc.NoResultFound: If the key doesn't exist.
+            EntityNotFoundError: If the key doesn't exist.
         """
         api_key = await self.repository.get_by_id(key_id)
         if not api_key:
-            raise ValueError(f"API key not found: {key_id}")
+            raise EntityNotFoundError("APIKey", str(key_id))
 
         api_key.revoke()
         return await self.repository.update(api_key)
@@ -262,11 +264,11 @@ class APIKeyService:
             The updated APIKey domain entity.
 
         Raises:
-            sqlalchemy.exc.NoResultFound: If the key doesn't exist.
+            EntityNotFoundError: If the key doesn't exist.
         """
         api_key = await self.repository.get_by_id(key_id)
         if not api_key:
-            raise ValueError(f"API key not found: {key_id}")
+            raise EntityNotFoundError("APIKey", str(key_id))
 
         api_key.record_usage(used_at)
         return await self.repository.update(api_key)
