@@ -60,11 +60,9 @@ app.include_router(api_router, prefix=settings.API_PREFIX)
 
 # Conditionally include admin domain routers
 if settings.ENABLE_ADMIN_API:
-    # TODO: Import and include admin-specific domain routers here
-    # Example:
-    # from leadr.accounts.api.admin import router as accounts_admin_router
-    # app.include_router(accounts_admin_router, prefix=settings.API_PREFIX)
-    pass
+    from leadr.accounts.api.routes import router as accounts_router
+
+    app.include_router(accounts_router, prefix=settings.API_PREFIX, tags=["Accounts"])
 
 # Conditionally include client domain routers
 if settings.ENABLE_CLIENT_API:
