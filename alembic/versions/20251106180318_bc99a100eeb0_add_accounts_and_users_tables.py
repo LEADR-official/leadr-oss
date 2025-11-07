@@ -84,3 +84,4 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_accounts_name"), table_name="accounts")
     op.drop_table("accounts")
     # ### end Alembic commands ###
+    op.execute('DROP TYPE account_status;')

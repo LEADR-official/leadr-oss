@@ -16,6 +16,7 @@ sys.path.append(str(Path(__file__).parent.parent / "src"))
 # Import all ORM models to ensure they're registered with SQLAlchemy
 # (Import your ORM model modules here as they're created)
 from leadr.accounts.adapters.orm import AccountORM, UserORM  # noqa: F401
+from leadr.auth.adapters.orm import APIKeyORM  # noqa: F401
 
 # Import for database configuration
 from leadr.common.database import build_database_url

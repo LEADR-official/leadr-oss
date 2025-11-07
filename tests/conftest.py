@@ -15,6 +15,9 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+# Import all ORM models to register them with SQLAlchemy metadata
+from leadr.accounts.adapters.orm import AccountORM, UserORM  # noqa: F401
+from leadr.auth.adapters.orm import APIKeyORM  # noqa: F401
 from leadr.common.database import get_db
 from leadr.common.orm import Base
 from leadr.config import settings
