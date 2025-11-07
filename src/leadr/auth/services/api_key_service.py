@@ -8,6 +8,7 @@ from leadr.auth.domain.api_key import APIKey
 from leadr.auth.services.api_key_crypto import generate_api_key, hash_api_key, verify_api_key
 from leadr.auth.services.repositories import APIKeyRepository
 from leadr.common.domain.models import EntityID
+from leadr.config import settings
 
 
 class APIKeyService:
@@ -61,7 +62,7 @@ class APIKeyService:
         plain_key = generate_api_key()
 
         # Hash the key for storage
-        key_hash = hash_api_key(plain_key)
+        key_hash = hash_api_key(plain_key, settings.API_KEY_SECRET)
 
         # Extract prefix for lookup (first 10 characters including ldr_)
         # Use more characters to ensure uniqueness while keeping searchable
@@ -120,7 +121,7 @@ class APIKeyService:
             return None
 
         # Verify hash matches
-        if not verify_api_key(plain_key, api_key.key_hash):
+        if not verify_api_key(plain_key, api_key.key_hash, settings.API_KEY_SECRET):
             return None
 
         # Check if key is valid (active and not expired)

@@ -37,6 +37,9 @@ class CommonSettings(BaseSettings):
     JWT_SECRET: str = "your-super-secret-jwt-key-change-in-production"
     JWT_LIFETIME_SECONDS: int = 3600
 
+    # API Key Configuration
+    API_KEY_SECRET: str = "your-super-secret-api-key-pepper-change-in-production"
+
     # Crypto/Keys Configuration
     KEYS_PATH: Path = PROJ_ROOT / ".keys"
 
