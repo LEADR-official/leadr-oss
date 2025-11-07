@@ -146,6 +146,30 @@ class APIKeyService:
         """
         return await self.repository.get_by_id(key_id)
 
+    async def list_api_keys(
+        self,
+        account_id: EntityID | None = None,
+        status: str | None = None,
+    ) -> list[APIKey]:
+        """List API keys with optional filters.
+
+        Args:
+            account_id: Optional account ID to filter by.
+            status: Optional status string to filter by.
+
+        Returns:
+            List of APIKey domain entities matching the filters.
+        """
+        from leadr.auth.domain.api_key import APIKeyStatus
+
+        # Convert status string to enum if provided
+        status_enum = APIKeyStatus(status) if status else None
+
+        return await self.repository.list(
+            account_id=account_id,
+            status=status_enum,
+        )
+
     async def list_account_api_keys(
         self,
         account_id: EntityID,

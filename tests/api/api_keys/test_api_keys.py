@@ -197,3 +197,219 @@ class TestCreateAPIKey:
         assert "key" not in get_data
         # Should have prefix for identification
         assert "prefix" in get_data
+
+
+@pytest.mark.asyncio
+class TestListAPIKeys:
+    """Test suite for GET /v1/api-keys endpoint (list/filter)."""
+
+    async def test_list_api_keys_by_account(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test listing API keys filtered by account_id."""
+        # Create two accounts
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account1_id = EntityID.generate()
+        account1 = Account(
+            id=account1_id,
+            name="Account 1",
+            slug="account-1",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account1)
+
+        account2_id = EntityID.generate()
+        account2 = Account(
+            id=account2_id,
+            name="Account 2",
+            slug="account-2",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account2)
+
+        # Create API keys for both accounts
+        # Account 1: 3 keys
+        for i in range(3):
+            await client.post(
+                "/api-keys",
+                json={
+                    "account_id": str(account1_id.value),
+                    "name": f"Account 1 Key {i+1}",
+                },
+            )
+
+        # Account 2: 2 keys
+        for i in range(2):
+            await client.post(
+                "/api-keys",
+                json={
+                    "account_id": str(account2_id.value),
+                    "name": f"Account 2 Key {i+1}",
+                },
+            )
+
+        # List keys for account 1
+        response = await client.get(f"/api-keys?account_id={account1_id.value}")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert len(data) == 3
+        for item in data:
+            assert item["account_id"] == str(account1_id.value)
+            assert "key" not in item  # Should not expose plain keys in list
+            assert "prefix" in item
+
+        # List keys for account 2
+        response = await client.get(f"/api-keys?account_id={account2_id.value}")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert len(data) == 2
+        for item in data:
+            assert item["account_id"] == str(account2_id.value)
+
+    async def test_list_api_keys_filter_by_status(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test listing API keys filtered by status."""
+        # Create an account
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create multiple API keys
+        created_keys = []
+        for i in range(3):
+            response = await client.post(
+                "/api-keys",
+                json={
+                    "account_id": str(account_id.value),
+                    "name": f"Test Key {i+1}",
+                },
+            )
+            created_keys.append(response.json())
+
+        # TODO: Revoke one key once PATCH endpoint is implemented
+        # For now, all keys should be active
+
+        # Filter by active status
+        response = await client.get(f"/api-keys?status=active")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert len(data) >= 3  # At least our 3 keys
+        for item in data:
+            assert item["status"] == "active"
+
+    async def test_list_api_keys_filter_by_account_and_status(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test listing API keys with multiple filters (account_id + status)."""
+        # Create an account
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create API keys
+        for i in range(2):
+            await client.post(
+                "/api-keys",
+                json={
+                    "account_id": str(account_id.value),
+                    "name": f"Test Key {i+1}",
+                },
+            )
+
+        # Filter by both account_id and status
+        response = await client.get(
+            f"/api-keys?account_id={account_id.value}&status=active"
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert len(data) == 2
+        for item in data:
+            assert item["account_id"] == str(account_id.value)
+            assert item["status"] == "active"
+
+    async def test_list_api_keys_no_filters_returns_all(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test listing API keys without filters returns all keys."""
+        # Create an account and some keys
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create 3 API keys
+        for i in range(3):
+            await client.post(
+                "/api-keys",
+                json={
+                    "account_id": str(account_id.value),
+                    "name": f"Test Key {i+1}",
+                },
+            )
+
+        # List all keys
+        response = await client.get("/api-keys")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert len(data) >= 3  # At least our 3 keys
+
+    async def test_list_api_keys_empty_result(self, client: AsyncClient):
+        """Test listing API keys with filter that matches nothing returns empty list."""
+        # Query for a non-existent account
+        non_existent_id = EntityID.generate()
+        response = await client.get(f"/api-keys?account_id={non_existent_id.value}")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data == []
+
+    async def test_list_api_keys_invalid_account_id_format(self, client: AsyncClient):
+        """Test listing API keys with invalid account_id format returns 422."""
+        response = await client.get("/api-keys?account_id=not-a-uuid")
+        assert response.status_code == 422
+
+    async def test_list_api_keys_invalid_status(self, client: AsyncClient):
+        """Test listing API keys with invalid status value returns 422."""
+        response = await client.get("/api-keys?status=invalid-status")
+        assert response.status_code == 422

@@ -1,11 +1,14 @@
 """API-level routes (health checks, root endpoint, etc.)."""
 
-from fastapi import APIRouter, HTTPException
+from uuid import UUID
+
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 
 from leadr.accounts.services.repositories import AccountRepository
-from leadr.auth.api.schemas import CreateAPIKeyRequest, CreateAPIKeyResponse
+from leadr.auth.api.schemas import APIKeyResponse, CreateAPIKeyRequest, CreateAPIKeyResponse
+from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.api_key_service import APIKeyService
 from leadr.common.dependencies import DatabaseSession
 from leadr.common.domain.models import EntityID
@@ -97,3 +100,52 @@ async def create_api_key(
         expires_at=api_key.expires_at,
         created_at=api_key.created_at,
     )
+
+
+@router.get(
+    "/api-keys",
+    response_model=list[APIKeyResponse],
+    tags=["API Keys"],
+)
+async def list_api_keys(
+    db: DatabaseSession,
+    account_id: UUID | None = Query(None, description="Filter by account ID"),
+    status: APIKeyStatus | None = Query(None, description="Filter by status"),
+) -> list[APIKeyResponse]:
+    """List API keys with optional filters.
+
+    Query parameters can be combined to narrow results.
+
+    Args:
+        account_id: Optional account ID to filter results.
+        status: Optional status to filter results (active or revoked).
+
+    Returns:
+        List of API keys matching the filters.
+    """
+    service = APIKeyService(db)
+
+    # Convert UUID to EntityID if provided
+    entity_id = EntityID(value=account_id) if account_id else None
+
+    # Get filtered list from service
+    api_keys = await service.list_api_keys(
+        account_id=entity_id,
+        status=status.value if status else None,
+    )
+
+    # Convert to response models
+    return [
+        APIKeyResponse(
+            id=key.id.value,
+            account_id=key.account_id.value,
+            name=key.name,
+            prefix=key.key_prefix,
+            status=key.status,
+            last_used_at=key.last_used_at,
+            expires_at=key.expires_at,
+            created_at=key.created_at,
+            updated_at=key.updated_at,
+        )
+        for key in api_keys
+    ]

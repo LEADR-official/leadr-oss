@@ -1,5 +1,7 @@
 """API Key repository service."""
 
+from __future__ import annotations
+
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,6 +68,32 @@ class APIKeyRepository:
         )
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
+
+    async def list(
+        self,
+        account_id: EntityID | None = None,
+        status: APIKeyStatus | None = None,
+    ) -> list[APIKey]:
+        """List API keys with optional filters.
+
+        Args:
+            account_id: Optional account ID to filter by.
+            status: Optional status to filter by.
+
+        Returns:
+            List of API keys matching the filters.
+        """
+        query = select(APIKeyORM)
+
+        if account_id is not None:
+            query = query.where(APIKeyORM.account_id == account_id.value)
+
+        if status is not None:
+            query = query.where(APIKeyORM.status == APIKeyStatusEnum(status.value))
+
+        result = await self.session.execute(query)
+        orms = result.scalars().all()
+        return [self._to_domain(orm) for orm in orms]
 
     async def list_by_account(
         self, account_id: EntityID, active_only: bool = False
