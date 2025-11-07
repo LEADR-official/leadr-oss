@@ -180,6 +180,89 @@ class TestAccountRepository:
         assert "acme-corp" in slugs
         assert "beta-industries" in slugs
 
+    async def test_delete_account_is_soft_delete(self, db_session: AsyncSession):
+        """Test that delete performs soft-delete, not hard-delete."""
+        repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        # Create account
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await repo.create(account)
+
+        # Soft-delete it
+        await repo.delete(account_id)
+
+        # Verify it's not returned by normal queries
+        retrieved = await repo.get_by_id(account_id)
+        assert retrieved is None
+
+    async def test_list_accounts_excludes_deleted(self, db_session: AsyncSession):
+        """Test that list_all excludes soft-deleted accounts."""
+        repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        # Create accounts
+        account1 = Account(
+            id=EntityID.generate(),
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        account2 = Account(
+            id=EntityID.generate(),
+            name="Beta Industries",
+            slug="beta-industries",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+
+        await repo.create(account1)
+        await repo.create(account2)
+
+        # Soft-delete one
+        await repo.delete(account1.id)
+
+        # List should only return non-deleted
+        accounts = await repo.list_all()
+
+        assert len(accounts) == 1
+        assert accounts[0].slug == "beta-industries"
+
+    async def test_get_by_slug_excludes_deleted(self, db_session: AsyncSession):
+        """Test that get_by_slug excludes soft-deleted accounts."""
+        repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        # Create account
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await repo.create(account)
+
+        # Soft-delete it
+        await repo.delete(account_id)
+
+        # Should not be found by slug
+        retrieved = await repo.get_by_slug("acme-corp")
+        assert retrieved is None
+
 
 @pytest.mark.asyncio
 class TestUserRepository:
@@ -424,4 +507,129 @@ class TestUserRepository:
 
         # Verify it's gone
         retrieved = await user_repo.get_by_id(user_id)
+        assert retrieved is None
+
+    async def test_delete_user_is_soft_delete(self, db_session: AsyncSession):
+        """Test that delete performs soft-delete, not hard-delete."""
+        # Create account first
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create user
+        user_repo = UserRepository(db_session)
+        user_id = EntityID.generate()
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+        await user_repo.create(user)
+
+        # Soft-delete it
+        await user_repo.delete(user_id)
+
+        # Verify it's not returned by normal queries
+        retrieved = await user_repo.get_by_id(user_id)
+        assert retrieved is None
+
+    async def test_list_users_excludes_deleted(self, db_session: AsyncSession):
+        """Test that list_by_account excludes soft-deleted users."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create users
+        user_repo = UserRepository(db_session)
+
+        user1 = User(
+            id=EntityID.generate(),
+            account_id=account_id,
+            email="user1@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+        user2 = User(
+            id=EntityID.generate(),
+            account_id=account_id,
+            email="user2@example.com",
+            display_name="Jane Smith",
+            created_at=now,
+            updated_at=now,
+        )
+
+        await user_repo.create(user1)
+        await user_repo.create(user2)
+
+        # Soft-delete one
+        await user_repo.delete(user1.id)
+
+        # List should only return non-deleted
+        users = await user_repo.list_by_account(account_id)
+
+        assert len(users) == 1
+        assert users[0].email == "user2@example.com"
+
+    async def test_get_by_email_excludes_deleted(self, db_session: AsyncSession):
+        """Test that get_by_email excludes soft-deleted users."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create user
+        user_repo = UserRepository(db_session)
+        user_id = EntityID.generate()
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+        await user_repo.create(user)
+
+        # Soft-delete it
+        await user_repo.delete(user_id)
+
+        # Should not be found by email
+        retrieved = await user_repo.get_by_email("user@example.com")
         assert retrieved is None
