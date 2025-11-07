@@ -1,8 +1,9 @@
 """Tests for common domain models."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
+from pydantic import ValidationError
 
 from leadr.common.domain.models import Entity, EntityID
 
@@ -32,7 +33,7 @@ class TestEntityID:
     def test_entity_id_immutable(self):
         """Test that EntityID is immutable."""
         entity_id = EntityID.generate()
-        with pytest.raises(Exception):  # Pydantic raises ValidationError
+        with pytest.raises(ValidationError):
             entity_id.value = EntityID.generate().value
 
 
@@ -43,8 +44,8 @@ class TestEntity:
         """Test that Entity has deleted_at field."""
         entity = Entity(
             id=EntityID.generate(),
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
             deleted_at=None,
         )
         assert entity.deleted_at is None
@@ -53,8 +54,8 @@ class TestEntity:
         """Test that Entity has soft_delete() method."""
         entity = Entity(
             id=EntityID.generate(),
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
             deleted_at=None,
         )
 
@@ -68,8 +69,8 @@ class TestEntity:
         """Test that Entity has is_deleted property."""
         entity = Entity(
             id=EntityID.generate(),
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
             deleted_at=None,
         )
 
@@ -84,8 +85,8 @@ class TestEntity:
         """Test that calling soft_delete() multiple times is safe."""
         entity = Entity(
             id=EntityID.generate(),
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
             deleted_at=None,
         )
 
@@ -100,8 +101,8 @@ class TestEntity:
         """Test that Entity has restore() method to undelete."""
         entity = Entity(
             id=EntityID.generate(),
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
             deleted_at=None,
         )
 

@@ -50,7 +50,9 @@ async def get_account(account_id: str, db: DatabaseSession) -> AccountResponse:
     try:
         entity_id = EntityID.from_string(account_id)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID") from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID"
+        ) from e
 
     account = await repo.get_by_id(entity_id)
     if not account:
@@ -77,7 +79,9 @@ async def update_account(
     try:
         entity_id = EntityID.from_string(account_id)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID") from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID"
+        ) from e
 
     account = await repo.get_by_id(entity_id)
     if not account:
@@ -106,7 +110,9 @@ async def create_user(request: UserCreateRequest, db: DatabaseSession) -> UserRe
     try:
         account_id = EntityID.from_string(request.account_id)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID") from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID"
+        ) from e
 
     now = datetime.now(UTC)
     user = User(
@@ -130,7 +136,9 @@ async def get_user(user_id: str, db: DatabaseSession) -> UserResponse:
     try:
         entity_id = EntityID.from_string(user_id)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID") from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID"
+        ) from e
 
     user = await repo.get_by_id(entity_id)
     if not user:
@@ -141,7 +149,7 @@ async def get_user(user_id: str, db: DatabaseSession) -> UserResponse:
 
 @router.get("/users", response_model=list[UserResponse])
 async def list_users(
-    account_id: Annotated[str | None, Query()] = None, db: DatabaseSession = None
+    db: DatabaseSession, account_id: Annotated[str | None, Query()] = None
 ) -> list[UserResponse]:
     """List users by account."""
     if not account_id:
@@ -154,21 +162,27 @@ async def list_users(
     try:
         entity_id = EntityID.from_string(account_id)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID") from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID"
+        ) from e
 
     users = await repo.list_by_account(entity_id)
     return [UserResponse.from_domain(user) for user in users]
 
 
 @router.patch("/users/{user_id}", response_model=UserResponse)
-async def update_user(user_id: str, request: UserUpdateRequest, db: DatabaseSession) -> UserResponse:
+async def update_user(
+    user_id: str, request: UserUpdateRequest, db: DatabaseSession
+) -> UserResponse:
     """Update a user."""
     repo = UserRepository(db)
 
     try:
         entity_id = EntityID.from_string(user_id)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID") from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID"
+        ) from e
 
     user = await repo.get_by_id(entity_id)
     if not user:

@@ -151,7 +151,7 @@ class TestAccountORM:
         await db_session.refresh(account)
 
         assert account.deleted_at is not None
-        assert abs((account.deleted_at - delete_time).total_seconds()) < 1
+        assert abs((account.deleted_at - delete_time).total_seconds()) < 1  # type: ignore[operator]
 
 
 @pytest.mark.asyncio
@@ -364,4 +364,4 @@ class TestUserORM:
         await db_session.refresh(user)
 
         assert user.deleted_at is not None
-        assert abs((user.deleted_at - delete_time).total_seconds()) < 1
+        assert abs((user.deleted_at - delete_time).total_seconds()) < 1  # type: ignore[operator]

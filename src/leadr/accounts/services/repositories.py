@@ -1,6 +1,6 @@
 """Account and User repository services."""
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.adapters.orm import AccountORM, AccountStatusEnum, UserORM

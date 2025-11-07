@@ -1,6 +1,6 @@
 """Common domain models and value objects."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -56,7 +56,7 @@ class Entity(BaseModel):
     def soft_delete(self) -> None:
         """Mark entity as deleted."""
         if self.deleted_at is None:
-            self.deleted_at = datetime.now(timezone.utc)
+            self.deleted_at = datetime.now(UTC)
 
     def restore(self) -> None:
         """Restore a soft-deleted entity."""
