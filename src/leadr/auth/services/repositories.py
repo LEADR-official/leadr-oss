@@ -55,9 +55,7 @@ class APIKeyRepository:
 
     async def get_by_id(self, key_id: EntityID) -> APIKey | None:
         """Get API key by ID, returns None if not found."""
-        result = await self.session.execute(
-            select(APIKeyORM).where(APIKeyORM.id == key_id.value)
-        )
+        result = await self.session.execute(select(APIKeyORM).where(APIKeyORM.id == key_id.value))
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 

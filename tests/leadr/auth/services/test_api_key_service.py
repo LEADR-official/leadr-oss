@@ -7,9 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
-from leadr.auth.domain.api_key import APIKey, APIKeyStatus
+from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.api_key_service import APIKeyService
-from leadr.auth.services.repositories import APIKeyRepository
 from leadr.common.domain.models import EntityID
 
 

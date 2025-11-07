@@ -2,8 +2,6 @@
 
 import re
 
-import pytest
-
 from leadr.auth.services.api_key_crypto import (
     generate_api_key,
     hash_api_key,
