@@ -197,3 +197,44 @@ class TestAccount:
 
         with pytest.raises(ValidationError):
             account.id = new_id
+
+    def test_account_soft_delete(self):
+        """Test that account can be soft-deleted."""
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert account.is_deleted is False
+        assert account.deleted_at is None
+
+        account.soft_delete()
+
+        assert account.is_deleted is True
+        assert account.deleted_at is not None
+
+    def test_account_restore(self):
+        """Test that soft-deleted account can be restored."""
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            created_at=now,
+            updated_at=now,
+        )
+
+        account.soft_delete()
+        assert account.is_deleted is True
+
+        account.restore()
+        assert account.is_deleted is False
+        assert account.deleted_at is None

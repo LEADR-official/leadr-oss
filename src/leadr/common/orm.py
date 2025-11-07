@@ -24,6 +24,15 @@ timestamp = Annotated[
     ),
 ]
 
+nullable_timestamp = Annotated[
+    datetime | None,
+    mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+    ),
+]
+
 
 class Base(DeclarativeBase):
     """Base class for all database models with UUID primary key and timestamps."""
@@ -31,3 +40,4 @@ class Base(DeclarativeBase):
     id: Mapped[uuid_pk]
     created_at: Mapped[timestamp]
     updated_at: Mapped[timestamp] = mapped_column(onupdate=func.now())
+    deleted_at: Mapped[nullable_timestamp]

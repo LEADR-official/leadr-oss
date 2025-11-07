@@ -197,3 +197,48 @@ class TestUser:
 
         with pytest.raises(ValidationError):
             user.account_id = new_account_id
+
+    def test_user_soft_delete(self):
+        """Test that user can be soft-deleted."""
+        user_id = EntityID.generate()
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.is_deleted is False
+        assert user.deleted_at is None
+
+        user.soft_delete()
+
+        assert user.is_deleted is True
+        assert user.deleted_at is not None
+
+    def test_user_restore(self):
+        """Test that soft-deleted user can be restored."""
+        user_id = EntityID.generate()
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+
+        user.soft_delete()
+        assert user.is_deleted is True
+
+        user.restore()
+        assert user.is_deleted is False
+        assert user.deleted_at is None

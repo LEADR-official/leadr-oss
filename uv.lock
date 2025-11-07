@@ -769,6 +769,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "coverage" },
+    { name = "greenlet" },
     { name = "httpx" },
     { name = "mdformat" },
     { name = "mdformat-gfm" },
@@ -799,13 +800,14 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "coverage", specifier = ">=7.10.6" },
+    { name = "greenlet", specifier = ">=3.2.4" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mdformat", specifier = ">=0.7.22" },
     { name = "mdformat-gfm", specifier = ">=0.4.1" },
     { name = "pre-commit", specifier = ">=4.0.0" },
     { name = "pyright", specifier = ">=1.1.405" },
     { name = "pytest", specifier = ">=8.4.2" },
-    { name = "pytest-asyncio", specifier = ">=0.25.0" },
+    { name = "pytest-asyncio", specifier = ">=1.2.0" },
     { name = "ruff", specifier = ">=0.12.12" },
 ]
 
