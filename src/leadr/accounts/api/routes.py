@@ -13,10 +13,11 @@ from leadr.accounts.api.schemas import (
     UserResponse,
     UserUpdateRequest,
 )
-from leadr.accounts.domain.account import Account, AccountStatus
-from leadr.accounts.domain.user import User
-from leadr.accounts.services.repositories import AccountRepository, UserRepository
+from leadr.accounts.domain.account import AccountStatus
+from leadr.accounts.services.account_service import AccountService
+from leadr.accounts.services.user_service import UserService
 from leadr.common.dependencies import DatabaseSession
+from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.models import EntityID
 
 router = APIRouter()
@@ -26,26 +27,24 @@ router = APIRouter()
 @router.post("/accounts", status_code=status.HTTP_201_CREATED, response_model=AccountResponse)
 async def create_account(request: AccountCreateRequest, db: DatabaseSession) -> AccountResponse:
     """Create a new account."""
-    repo = AccountRepository(db)
-
+    service = AccountService(db)
     now = datetime.now(UTC)
-    account = Account(
-        id=EntityID.generate(),
+
+    account = await service.create_account(
+        account_id=EntityID.generate(),
         name=request.name,
         slug=request.slug,
-        status=AccountStatus.ACTIVE,
         created_at=now,
         updated_at=now,
     )
 
-    created = await repo.create(account)
-    return AccountResponse.from_domain(created)
+    return AccountResponse.from_domain(account)
 
 
 @router.get("/accounts/{account_id}", response_model=AccountResponse)
 async def get_account(account_id: str, db: DatabaseSession) -> AccountResponse:
     """Get an account by ID."""
-    repo = AccountRepository(db)
+    service = AccountService(db)
 
     try:
         entity_id = EntityID.from_string(account_id)
@@ -54,7 +53,7 @@ async def get_account(account_id: str, db: DatabaseSession) -> AccountResponse:
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID"
         ) from e
 
-    account = await repo.get_by_id(entity_id)
+    account = await service.get_account(entity_id)
     if not account:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
 
@@ -64,8 +63,8 @@ async def get_account(account_id: str, db: DatabaseSession) -> AccountResponse:
 @router.get("/accounts", response_model=list[AccountResponse])
 async def list_accounts(db: DatabaseSession) -> list[AccountResponse]:
     """List all accounts."""
-    repo = AccountRepository(db)
-    accounts = await repo.list_all()
+    service = AccountService(db)
+    accounts = await service.list_accounts()
     return [AccountResponse.from_domain(acc) for acc in accounts]
 
 
@@ -74,7 +73,7 @@ async def update_account(
     account_id: str, request: AccountUpdateRequest, db: DatabaseSession
 ) -> AccountResponse:
     """Update an account."""
-    repo = AccountRepository(db)
+    service = AccountService(db)
 
     try:
         entity_id = EntityID.from_string(account_id)
@@ -83,40 +82,62 @@ async def update_account(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID"
         ) from e
 
-    account = await repo.get_by_id(entity_id)
-    if not account:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    try:
+        # Handle soft delete first
+        if request.deleted is True:
+            account = await service.get_account(entity_id)
+            if not account:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Account not found"
+                )
+            await service.delete_account(entity_id)
+            return AccountResponse.from_domain(account)
 
-    # Update fields if provided
-    if request.name is not None:
-        account.name = request.name
-    if request.slug is not None:
-        account.slug = request.slug
-    if request.status is not None:
-        account.status = AccountStatus(request.status)
-    if request.deleted is True:
-        account.soft_delete()
+        # Get account for updates
+        account = await service.get_account(entity_id)
+        if not account:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
 
-    updated = await repo.update(account)
-    return AccountResponse.from_domain(updated)
+        # Check if we need to update name/slug fields
+        needs_field_update = request.name is not None or request.slug is not None
+
+        # Handle status changes using service methods
+        if request.status == AccountStatus.SUSPENDED:
+            account = await service.suspend_account(entity_id)
+        elif request.status == AccountStatus.ACTIVE:
+            account = await service.activate_account(entity_id)
+
+        # Apply name/slug changes after status change (if any)
+        if needs_field_update:
+            if request.name is not None:
+                account.name = request.name
+            if request.slug is not None:
+                account.slug = request.slug
+            account = await service.repository.update(account)
+
+    except EntityNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Account not found"
+        ) from e
+
+    return AccountResponse.from_domain(account)
 
 
 # User routes
 @router.post("/users", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
 async def create_user(request: UserCreateRequest, db: DatabaseSession) -> UserResponse:
     """Create a new user."""
-    repo = UserRepository(db)
+    service = UserService(db)
+    now = datetime.now(UTC)
 
     try:
-        account_id = EntityID.from_string(str(request.account_id))
-    except ValueError as e:
+        account_id = EntityID(value=request.account_id)
+    except (ValueError, TypeError) as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID"
         ) from e
 
-    now = datetime.now(UTC)
-    user = User(
-        id=EntityID.generate(),
+    user = await service.create_user(
         account_id=account_id,
         email=request.email,
         display_name=request.display_name,
@@ -124,14 +145,13 @@ async def create_user(request: UserCreateRequest, db: DatabaseSession) -> UserRe
         updated_at=now,
     )
 
-    created = await repo.create(user)
-    return UserResponse.from_domain(created)
+    return UserResponse.from_domain(user)
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
 async def get_user(user_id: str, db: DatabaseSession) -> UserResponse:
     """Get a user by ID."""
-    repo = UserRepository(db)
+    service = UserService(db)
 
     try:
         entity_id = EntityID.from_string(user_id)
@@ -140,7 +160,7 @@ async def get_user(user_id: str, db: DatabaseSession) -> UserResponse:
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID"
         ) from e
 
-    user = await repo.get_by_id(entity_id)
+    user = await service.get_user(entity_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -157,7 +177,7 @@ async def list_users(
             status_code=status.HTTP_400_BAD_REQUEST, detail="account_id query parameter is required"
         )
 
-    repo = UserRepository(db)
+    service = UserService(db)
 
     try:
         entity_id = EntityID.from_string(account_id)
@@ -166,7 +186,7 @@ async def list_users(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID"
         ) from e
 
-    users = await repo.list_by_account(entity_id)
+    users = await service.list_users_by_account(entity_id)
     return [UserResponse.from_domain(user) for user in users]
 
 
@@ -175,7 +195,7 @@ async def update_user(
     user_id: str, request: UserUpdateRequest, db: DatabaseSession
 ) -> UserResponse:
     """Update a user."""
-    repo = UserRepository(db)
+    service = UserService(db)
 
     try:
         entity_id = EntityID.from_string(user_id)
@@ -184,17 +204,22 @@ async def update_user(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID"
         ) from e
 
-    user = await repo.get_by_id(entity_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    try:
+        # Handle soft delete first
+        if request.deleted is True:
+            user = await service.get_user(entity_id)
+            if not user:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            await service.delete_user(entity_id)
+            return UserResponse.from_domain(user)
 
-    # Update fields if provided
-    if request.email is not None:
-        user.email = request.email
-    if request.display_name is not None:
-        user.display_name = request.display_name
-    if request.deleted is True:
-        user.soft_delete()
+        # Update fields
+        user = await service.update_user(
+            user_id=entity_id,
+            email=request.email,
+            display_name=request.display_name,
+        )
+    except EntityNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found") from e
 
-    updated = await repo.update(user)
-    return UserResponse.from_domain(updated)
+    return UserResponse.from_domain(user)
