@@ -1,7 +1,7 @@
 """Add API Keys table
 
 Revision ID: 7d6e7dcb79c2
-Revises: bc99a100eeb0
+Revises: d2b3610a95a3
 Create Date: 2025-11-07 13:05:34.415003
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '7d6e7dcb79c2'
-down_revision: Union[str, Sequence[str], None] = 'bc99a100eeb0'
+down_revision: Union[str, Sequence[str], None] = 'd2b3610a95a3'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -47,3 +47,4 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_api_keys_account_id'), table_name='api_keys')
     op.drop_table('api_keys')
     # ### end Alembic commands ###
+    op.execute('DROP TYPE api_key_status;')
