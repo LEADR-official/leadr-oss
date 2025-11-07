@@ -262,6 +262,155 @@ class TestAccountRoutes:
 
         assert response.status_code == 404
 
+    async def test_get_account_invalid_uuid(self, client: AsyncClient):
+        """Test getting account with invalid UUID returns 400."""
+        response = await client.get("/accounts/not-a-uuid")
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "Invalid account ID" in data["detail"]
+
+    async def test_update_account_invalid_uuid(self, client: AsyncClient):
+        """Test updating account with invalid UUID returns 400."""
+        response = await client.patch(
+            "/accounts/not-a-uuid",
+            json={"name": "Updated Name"},
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "Invalid account ID" in data["detail"]
+
+    async def test_delete_account_invalid_uuid(self, client: AsyncClient):
+        """Test deleting account with invalid UUID returns 400."""
+        response = await client.post("/accounts/not-a-uuid/delete")
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "Invalid account ID" in data["detail"]
+
+    async def test_update_account_partial(self, client: AsyncClient, db_session):
+        """Test updating only some fields of an account."""
+        # Create account
+        repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await repo.create(account)
+
+        # Update only name
+        response = await client.patch(
+            f"/accounts/{account_id}",
+            json={
+                "name": "Acme Corp Updated",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Acme Corp Updated"
+        assert data["slug"] == "acme-corp"  # unchanged
+        assert data["status"] == "active"  # unchanged
+
+    async def test_update_account_only_slug(self, client: AsyncClient, db_session):
+        """Test updating only slug of an account."""
+        # Create account
+        repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await repo.create(account)
+
+        # Update only slug
+        response = await client.patch(
+            f"/accounts/{account_id}",
+            json={
+                "slug": "acme-corporation",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Acme Corporation"  # unchanged
+        assert data["slug"] == "acme-corporation"
+        assert data["status"] == "active"  # unchanged
+
+    async def test_update_account_only_status(self, client: AsyncClient, db_session):
+        """Test updating only status of an account."""
+        # Create account
+        repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await repo.create(account)
+
+        # Update only status
+        response = await client.patch(
+            f"/accounts/{account_id}",
+            json={
+                "status": "suspended",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Acme Corporation"  # unchanged
+        assert data["slug"] == "acme-corp"  # unchanged
+        assert data["status"] == "suspended"
+
+    async def test_update_account_empty_request(self, client: AsyncClient, db_session):
+        """Test updating account with empty request body."""
+        # Create account
+        repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await repo.create(account)
+
+        # Update with empty body (all fields None)
+        response = await client.patch(
+            f"/accounts/{account_id}",
+            json={},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Acme Corporation"  # unchanged
+        assert data["slug"] == "acme-corp"  # unchanged
+        assert data["status"] == "active"  # unchanged
+
 
 @pytest.mark.asyncio
 class TestUserRoutes:
@@ -517,3 +666,269 @@ class TestUserRoutes:
         response = await client.post(f"/users/{fake_id}/delete")
 
         assert response.status_code == 404
+
+    async def test_get_user_invalid_uuid(self, client: AsyncClient):
+        """Test getting user with invalid UUID returns 400."""
+        response = await client.get("/users/not-a-uuid")
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "Invalid user ID" in data["detail"]
+
+    async def test_update_user_invalid_uuid(self, client: AsyncClient):
+        """Test updating user with invalid UUID returns 400."""
+        response = await client.patch(
+            "/users/not-a-uuid",
+            json={"display_name": "Updated Name"},
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "Invalid user ID" in data["detail"]
+
+    async def test_delete_user_invalid_uuid(self, client: AsyncClient):
+        """Test deleting user with invalid UUID returns 400."""
+        response = await client.post("/users/not-a-uuid/delete")
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "Invalid user ID" in data["detail"]
+
+    async def test_create_user_invalid_account_id(self, client: AsyncClient):
+        """Test creating user with invalid account ID returns 400."""
+        response = await client.post(
+            "/users",
+            json={
+                "account_id": "not-a-uuid",
+                "email": "user@example.com",
+                "display_name": "John Doe",
+            },
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "Invalid account ID" in data["detail"]
+
+    async def test_list_users_invalid_account_id(self, client: AsyncClient):
+        """Test listing users with invalid account ID returns 400."""
+        response = await client.get("/users?account_id=not-a-uuid")
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "Invalid account ID" in data["detail"]
+
+    async def test_update_user_partial_email_only(self, client: AsyncClient, db_session):
+        """Test updating only email of a user."""
+        # Create account and user
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        user_repo = UserRepository(db_session)
+        user_id = EntityID.generate()
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+        await user_repo.create(user)
+
+        # Update only email
+        response = await client.patch(
+            f"/users/{user_id}",
+            json={
+                "email": "newemail@example.com",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["email"] == "newemail@example.com"
+        assert data["display_name"] == "John Doe"  # unchanged
+
+    async def test_update_user_partial_display_name_only(self, client: AsyncClient, db_session):
+        """Test updating only display_name of a user."""
+        # Create account and user
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        user_repo = UserRepository(db_session)
+        user_id = EntityID.generate()
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+        await user_repo.create(user)
+
+        # Update only display_name
+        response = await client.patch(
+            f"/users/{user_id}",
+            json={
+                "display_name": "Jane Doe",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["email"] == "user@example.com"  # unchanged
+        assert data["display_name"] == "Jane Doe"
+
+    async def test_list_users_excludes_deleted(self, client: AsyncClient, db_session):
+        """Test that list users excludes soft-deleted users."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create users
+        user_repo = UserRepository(db_session)
+
+        user1 = User(
+            id=EntityID.generate(),
+            account_id=account_id,
+            email="user1@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+        user2 = User(
+            id=EntityID.generate(),
+            account_id=account_id,
+            email="user2@example.com",
+            display_name="Jane Smith",
+            created_at=now,
+            updated_at=now,
+        )
+
+        await user_repo.create(user1)
+        await user_repo.create(user2)
+
+        # Soft-delete one
+        await user_repo.delete(user1.id)
+
+        # List should only return non-deleted
+        response = await client.get(f"/users?account_id={account_id}")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["email"] == "user2@example.com"
+
+    async def test_get_user_deleted(self, client: AsyncClient, db_session):
+        """Test getting soft-deleted user returns 404."""
+        # Create account and user
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        user_repo = UserRepository(db_session)
+        user_id = EntityID.generate()
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+        await user_repo.create(user)
+
+        # Delete it
+        await user_repo.delete(user_id)
+
+        # Try to get it
+        response = await client.get(f"/users/{user_id}")
+
+        assert response.status_code == 404
+
+    async def test_update_user_empty_request(self, client: AsyncClient, db_session):
+        """Test updating user with empty request body."""
+        # Create account and user
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        user_repo = UserRepository(db_session)
+        user_id = EntityID.generate()
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+        await user_repo.create(user)
+
+        # Update with empty body (all fields None)
+        response = await client.patch(
+            f"/users/{user_id}",
+            json={},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["email"] == "user@example.com"  # unchanged
+        assert data["display_name"] == "John Doe"  # unchanged
