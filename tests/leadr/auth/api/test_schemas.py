@@ -188,18 +188,19 @@ class TestAPIKeyResponse:
         created_at = datetime.now(UTC)
         updated_at = datetime.now(UTC)
 
-        # Should not be able to set key_hash
+        # Should not be able to set key_hash due to extra="forbid"
         with pytest.raises(ValidationError):
-            APIKeyResponse(  # type: ignore[call-arg]
-                id=key_id,
-                account_id=account_id,
-                name="Production Key",
-                prefix="ldr_test123456",
-                status=APIKeyStatus.ACTIVE,
-                key_hash="should_not_work",
-                created_at=created_at,
-                updated_at=updated_at,
-            )
+            data = {
+                "id": key_id,
+                "account_id": account_id,
+                "name": "Production Key",
+                "prefix": "ldr_test123456",
+                "status": APIKeyStatus.ACTIVE,
+                "key_hash": "should_not_work",
+                "created_at": created_at,
+                "updated_at": updated_at,
+            }
+            APIKeyResponse(**data)
 
 
 class TestUpdateAPIKeyRequest:

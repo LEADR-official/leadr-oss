@@ -19,6 +19,10 @@ from leadr.common.database import get_db
 from leadr.common.orm import Base
 from leadr.config import settings
 
+# Import all ORM models to register them with SQLAlchemy metadata
+from leadr.accounts.adapters.orm import AccountORM, UserORM  # noqa: F401
+from leadr.auth.adapters.orm import APIKeyORM  # noqa: F401
+
 
 @pytest.fixture(scope="session", autouse=True)
 def ensure_test_environment():
