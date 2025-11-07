@@ -200,6 +200,35 @@ class APIKeyService:
         """
         return await self.repository.count_active_by_account(account_id)
 
+    async def update_api_key_status(self, key_id: EntityID, status: str) -> APIKey:
+        """Update the status of an API key.
+
+        Args:
+            key_id: The ID of the API key to update.
+            status: The new status value (active or revoked).
+
+        Returns:
+            The updated APIKey domain entity.
+
+        Raises:
+            ValueError: If the key doesn't exist or status is invalid.
+        """
+        from leadr.auth.domain.api_key import APIKeyStatus
+
+        api_key = await self.repository.get_by_id(key_id)
+        if not api_key:
+            raise ValueError(f"API key not found: {key_id}")
+
+        # Convert string to enum and update
+        status_enum = APIKeyStatus(status)
+        if status_enum == APIKeyStatus.REVOKED:
+            api_key.revoke()
+        else:
+            # For other status changes, update directly
+            api_key.status = status_enum
+
+        return await self.repository.update(api_key)
+
     async def revoke_api_key(self, key_id: EntityID) -> APIKey:
         """Revoke an API key, preventing further use.
 

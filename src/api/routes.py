@@ -7,7 +7,12 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from leadr.accounts.services.repositories import AccountRepository
-from leadr.auth.api.schemas import APIKeyResponse, CreateAPIKeyRequest, CreateAPIKeyResponse
+from leadr.auth.api.schemas import (
+    APIKeyResponse,
+    CreateAPIKeyRequest,
+    CreateAPIKeyResponse,
+    UpdateAPIKeyRequest,
+)
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.api_key_service import APIKeyService
 from leadr.common.dependencies import DatabaseSession
@@ -176,6 +181,67 @@ async def get_api_key(
 
     api_key = await service.get_api_key(entity_id)
 
+    if not api_key:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+    return APIKeyResponse(
+        id=api_key.id.value,
+        account_id=api_key.account_id.value,
+        name=api_key.name,
+        prefix=api_key.key_prefix,
+        status=api_key.status,
+        last_used_at=api_key.last_used_at,
+        expires_at=api_key.expires_at,
+        created_at=api_key.created_at,
+        updated_at=api_key.updated_at,
+    )
+
+
+@router.patch(
+    "/api-keys/{key_id}",
+    response_model=APIKeyResponse,
+    tags=["API Keys"],
+)
+async def update_api_key(
+    key_id: UUID,
+    request: UpdateAPIKeyRequest,
+    db: DatabaseSession,
+) -> APIKeyResponse:
+    """Update an API key.
+
+    Currently supports:
+    - Updating status (e.g., to revoke a key)
+    - Soft delete flag (placeholder for future implementation)
+
+    Args:
+        key_id: The UUID of the API key to update.
+        request: Update request with optional status and deleted fields.
+
+    Returns:
+        APIKeyResponse with updated key details.
+
+    Raises:
+        404: API key not found.
+    """
+    service = APIKeyService(db)
+    entity_id = EntityID(value=key_id)
+
+    # Get existing key
+    api_key = await service.get_api_key(entity_id)
+    if not api_key:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+    # Update status if provided
+    if request.status is not None:
+        api_key = await service.update_api_key_status(entity_id, request.status.value)
+
+    # Handle soft delete if provided (placeholder for now)
+    if request.deleted is not None and request.deleted:
+        # TODO: Implement soft delete logic
+        pass
+
+    # Fetch updated key to return
+    api_key = await service.get_api_key(entity_id)
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found")
 

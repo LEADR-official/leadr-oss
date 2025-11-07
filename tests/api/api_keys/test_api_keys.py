@@ -523,3 +523,221 @@ class TestGetSingleAPIKey:
         # Verify sensitive fields are NOT present
         assert "key" not in data
         assert "key_hash" not in data
+
+
+@pytest.mark.asyncio
+class TestUpdateAPIKey:
+    """Test suite for PATCH /v1/api-keys/{key_id} endpoint."""
+
+    async def test_update_api_key_revoke_status(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test revoking an API key by updating status to revoked."""
+        # Create an account
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create an API key
+        create_response = await client.post(
+            "/api-keys",
+            json={
+                "account_id": str(account_id.value),
+                "name": "Test API Key",
+            },
+        )
+        key_id = create_response.json()["id"]
+
+        # Revoke the key
+        response = await client.patch(
+            f"/api-keys/{key_id}",
+            json={"status": "revoked"},
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["id"] == key_id
+        assert data["status"] == "revoked"
+
+        # Verify status was updated by fetching again
+        get_response = await client.get(f"/api-keys/{key_id}")
+        assert get_response.json()["status"] == "revoked"
+
+    async def test_update_api_key_not_found(self, client: AsyncClient):
+        """Test updating a non-existent API key returns 404."""
+        non_existent_id = EntityID.generate()
+        response = await client.patch(
+            f"/api-keys/{non_existent_id.value}",
+            json={"status": "revoked"},
+        )
+        assert response.status_code == 404
+
+    async def test_update_api_key_invalid_status(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test updating with invalid status value returns 422."""
+        # Create an account
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create an API key
+        create_response = await client.post(
+            "/api-keys",
+            json={
+                "account_id": str(account_id.value),
+                "name": "Test API Key",
+            },
+        )
+        key_id = create_response.json()["id"]
+
+        # Try to update with invalid status
+        response = await client.patch(
+            f"/api-keys/{key_id}",
+            json={"status": "invalid-status"},
+        )
+        assert response.status_code == 422
+
+    async def test_update_api_key_soft_delete(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test soft deleting an API key via PATCH."""
+        # Create an account
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create an API key
+        create_response = await client.post(
+            "/api-keys",
+            json={
+                "account_id": str(account_id.value),
+                "name": "Test API Key",
+            },
+        )
+        key_id = create_response.json()["id"]
+
+        # Soft delete the key
+        response = await client.patch(
+            f"/api-keys/{key_id}",
+            json={"deleted": True},
+        )
+        # For now, this should succeed as a placeholder
+        assert response.status_code == 200
+
+    async def test_update_api_key_empty_body(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test updating with empty body returns 200 but no changes."""
+        # Create an account
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create an API key
+        create_response = await client.post(
+            "/api-keys",
+            json={
+                "account_id": str(account_id.value),
+                "name": "Test API Key",
+            },
+        )
+        key_id = create_response.json()["id"]
+        original_status = create_response.json()["status"]
+
+        # Update with empty body
+        response = await client.patch(f"/api-keys/{key_id}", json={})
+        assert response.status_code == 200
+
+        # Status should remain unchanged
+        data = response.json()
+        assert data["status"] == original_status
+
+    async def test_update_api_key_invalid_uuid_format(self, client: AsyncClient):
+        """Test updating with invalid UUID format returns 422."""
+        response = await client.patch(
+            "/api-keys/not-a-uuid",
+            json={"status": "revoked"},
+        )
+        assert response.status_code == 422
+
+    async def test_update_api_key_cannot_change_name(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test that attempting to change name field is ignored or rejected."""
+        # Create an account
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create an API key
+        create_response = await client.post(
+            "/api-keys",
+            json={
+                "account_id": str(account_id.value),
+                "name": "Original Name",
+            },
+        )
+        key_id = create_response.json()["id"]
+
+        # Try to update name (should be ignored since UpdateAPIKeyRequest only allows status/deleted)
+        response = await client.patch(
+            f"/api-keys/{key_id}",
+            json={"name": "New Name"},
+        )
+        # Should succeed but name should remain unchanged
+        assert response.status_code == 200
+
+        # Verify name didn't change
+        get_response = await client.get(f"/api-keys/{key_id}")
+        assert get_response.json()["name"] == "Original Name"
