@@ -149,3 +149,44 @@ async def list_api_keys(
         )
         for key in api_keys
     ]
+
+
+@router.get(
+    "/api-keys/{key_id}",
+    response_model=APIKeyResponse,
+    tags=["API Keys"],
+)
+async def get_api_key(
+    key_id: UUID,
+    db: DatabaseSession,
+) -> APIKeyResponse:
+    """Get a single API key by ID.
+
+    Args:
+        key_id: The UUID of the API key to retrieve.
+
+    Returns:
+        APIKeyResponse with key details (excludes the plain key).
+
+    Raises:
+        404: API key not found.
+    """
+    service = APIKeyService(db)
+    entity_id = EntityID(value=key_id)
+
+    api_key = await service.get_api_key(entity_id)
+
+    if not api_key:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+    return APIKeyResponse(
+        id=api_key.id.value,
+        account_id=api_key.account_id.value,
+        name=api_key.name,
+        prefix=api_key.key_prefix,
+        status=api_key.status,
+        last_used_at=api_key.last_used_at,
+        expires_at=api_key.expires_at,
+        created_at=api_key.created_at,
+        updated_at=api_key.updated_at,
+    )

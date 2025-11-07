@@ -413,3 +413,113 @@ class TestListAPIKeys:
         """Test listing API keys with invalid status value returns 422."""
         response = await client.get("/api-keys?status=invalid-status")
         assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+class TestGetSingleAPIKey:
+    """Test suite for GET /v1/api-keys/{key_id} endpoint."""
+
+    async def test_get_api_key_success(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test getting a single API key by ID."""
+        # Create an account
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create an API key
+        create_response = await client.post(
+            "/api-keys",
+            json={
+                "account_id": str(account_id.value),
+                "name": "Test API Key",
+            },
+        )
+        assert create_response.status_code == 201
+        key_id = create_response.json()["id"]
+
+        # Get the API key by ID
+        response = await client.get(f"/api-keys/{key_id}")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["id"] == key_id
+        assert data["name"] == "Test API Key"
+        assert data["account_id"] == str(account_id.value)
+        assert data["status"] == "active"
+        assert "key" not in data  # Plain key should not be returned
+        assert "prefix" in data
+        assert "created_at" in data
+        assert "updated_at" in data
+
+    async def test_get_api_key_not_found(self, client: AsyncClient):
+        """Test getting a non-existent API key returns 404."""
+        non_existent_id = EntityID.generate()
+        response = await client.get(f"/api-keys/{non_existent_id.value}")
+        assert response.status_code == 404
+
+    async def test_get_api_key_invalid_uuid_format(self, client: AsyncClient):
+        """Test getting an API key with invalid UUID format returns 422."""
+        response = await client.get("/api-keys/not-a-uuid")
+        assert response.status_code == 422
+
+    async def test_get_api_key_includes_all_fields(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test that get response includes all expected fields."""
+        # Create an account
+        account_repo = AccountRepository(db_session)
+        account_id = EntityID.generate()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create an API key with expiration
+        expires_at = now + timedelta(days=90)
+        create_response = await client.post(
+            "/api-keys",
+            json={
+                "account_id": str(account_id.value),
+                "name": "Test API Key",
+                "expires_at": expires_at.isoformat(),
+            },
+        )
+        key_id = create_response.json()["id"]
+
+        # Get the API key
+        response = await client.get(f"/api-keys/{key_id}")
+        assert response.status_code == 200
+
+        data = response.json()
+        # Verify all expected fields are present
+        assert "id" in data
+        assert "account_id" in data
+        assert "name" in data
+        assert "prefix" in data
+        assert "status" in data
+        assert "last_used_at" in data
+        assert "expires_at" in data
+        assert "created_at" in data
+        assert "updated_at" in data
+        # Verify sensitive fields are NOT present
+        assert "key" not in data
+        assert "key_hash" not in data
