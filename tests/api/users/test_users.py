@@ -299,7 +299,7 @@ class TestUserAPI:
         assert "Invalid user ID" in data["detail"]
 
     async def test_create_user_invalid_account_id(self, client: AsyncClient):
-        """Test creating user with invalid account ID returns 400."""
+        """Test creating user with invalid account ID returns 422."""
         response = await client.post(
             "/users",
             json={
@@ -309,9 +309,7 @@ class TestUserAPI:
             },
         )
 
-        assert response.status_code == 400
-        data = response.json()
-        assert "Invalid account ID" in data["detail"]
+        assert response.status_code == 422
 
     async def test_list_users_invalid_account_id(self, client: AsyncClient):
         """Test listing users with invalid account ID returns 400."""

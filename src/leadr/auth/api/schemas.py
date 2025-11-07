@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from leadr.auth.domain.api_key import APIKeyStatus
+from leadr.auth.domain.api_key import APIKey, APIKeyStatus
 
 
 class CreateAPIKeyRequest(BaseModel):
@@ -31,6 +31,27 @@ class CreateAPIKeyResponse(BaseModel):
     expires_at: datetime | None = None
     created_at: datetime
 
+    @classmethod
+    def from_domain(cls, api_key: APIKey, plain_key: str) -> "CreateAPIKeyResponse":
+        """Convert domain entity to response model with plain key.
+
+        Args:
+            api_key: The domain APIKey entity
+            plain_key: The plain text API key (only available at creation)
+
+        Returns:
+            CreateAPIKeyResponse with all fields populated
+        """
+        return cls(
+            id=api_key.id.value,
+            name=api_key.name,
+            key=plain_key,
+            prefix=api_key.key_prefix,
+            status=api_key.status,
+            expires_at=api_key.expires_at,
+            created_at=api_key.created_at,
+        )
+
 
 class APIKeyResponse(BaseModel):
     """Response schema for API key details.
@@ -50,6 +71,28 @@ class APIKeyResponse(BaseModel):
     expires_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+    @classmethod
+    def from_domain(cls, api_key: APIKey) -> "APIKeyResponse":
+        """Convert domain entity to response model.
+
+        Args:
+            api_key: The domain APIKey entity
+
+        Returns:
+            APIKeyResponse with all fields populated
+        """
+        return cls(
+            id=api_key.id.value,
+            account_id=api_key.account_id.value,
+            name=api_key.name,
+            prefix=api_key.key_prefix,
+            status=api_key.status,
+            last_used_at=api_key.last_used_at,
+            expires_at=api_key.expires_at,
+            created_at=api_key.created_at,
+            updated_at=api_key.updated_at,
+        )
 
 
 class UpdateAPIKeyRequest(BaseModel):

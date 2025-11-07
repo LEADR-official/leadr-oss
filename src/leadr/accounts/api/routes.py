@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from leadr.accounts.api.models import (
+from leadr.accounts.api.schemas import (
     AccountCreateRequest,
     AccountResponse,
     AccountUpdateRequest,
@@ -108,7 +108,7 @@ async def create_user(request: UserCreateRequest, db: DatabaseSession) -> UserRe
     repo = UserRepository(db)
 
     try:
-        account_id = EntityID.from_string(request.account_id)
+        account_id = EntityID.from_string(str(request.account_id))
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid account ID"

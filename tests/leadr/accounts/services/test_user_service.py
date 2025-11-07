@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
-from leadr.accounts.domain.user import User
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.accounts.services.user_service import UserService
 from leadr.common.domain.exceptions import EntityNotFoundError
@@ -200,7 +199,7 @@ class TestUserService:
             created_at=now,
             updated_at=now,
         )
-        user2 = await service.create_user(
+        await service.create_user(
             account_id=account_id,
             email="user2@example.com",
             display_name="User Two",
