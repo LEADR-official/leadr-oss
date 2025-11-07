@@ -116,6 +116,43 @@ class TestAccountORM:
         # Timestamps are very close but may differ by microseconds due to separate DB calls
         assert abs((account.created_at - account.updated_at).total_seconds()) < 0.1
 
+    async def test_account_deleted_at_defaults_to_none(self, db_session: AsyncSession):
+        """Test that deleted_at defaults to None."""
+        account = AccountORM(
+            id=uuid4(),
+            name="Acme Corporation",
+            slug="acme-corp",
+            status="active",
+        )
+
+        db_session.add(account)
+        await db_session.commit()
+        await db_session.refresh(account)
+
+        assert account.deleted_at is None
+
+    async def test_account_deleted_at_can_be_set(self, db_session: AsyncSession):
+        """Test that deleted_at can be set and persisted."""
+        account = AccountORM(
+            id=uuid4(),
+            name="Acme Corporation",
+            slug="acme-corp",
+            status="active",
+        )
+
+        db_session.add(account)
+        await db_session.commit()
+        await db_session.refresh(account)
+
+        # Set deleted_at
+        delete_time = datetime.now(UTC)
+        account.deleted_at = delete_time
+        await db_session.commit()
+        await db_session.refresh(account)
+
+        assert account.deleted_at is not None
+        assert abs((account.deleted_at - delete_time).total_seconds()) < 1
+
 
 @pytest.mark.asyncio
 class TestUserORM:
@@ -269,3 +306,62 @@ class TestUserORM:
         assert before <= user.updated_at <= after
         # Timestamps are very close but may differ by microseconds due to separate DB calls
         assert abs((user.created_at - user.updated_at).total_seconds()) < 0.1
+
+    async def test_user_deleted_at_defaults_to_none(self, db_session: AsyncSession):
+        """Test that deleted_at defaults to None."""
+        # Create account
+        account = AccountORM(
+            id=uuid4(),
+            name="Acme Corporation",
+            slug="acme-corp",
+            status="active",
+        )
+        db_session.add(account)
+        await db_session.commit()
+
+        # Create user
+        user = UserORM(
+            id=uuid4(),
+            account_id=account.id,
+            email="user@example.com",
+            display_name="John Doe",
+        )
+
+        db_session.add(user)
+        await db_session.commit()
+        await db_session.refresh(user)
+
+        assert user.deleted_at is None
+
+    async def test_user_deleted_at_can_be_set(self, db_session: AsyncSession):
+        """Test that deleted_at can be set and persisted."""
+        # Create account
+        account = AccountORM(
+            id=uuid4(),
+            name="Acme Corporation",
+            slug="acme-corp",
+            status="active",
+        )
+        db_session.add(account)
+        await db_session.commit()
+
+        # Create user
+        user = UserORM(
+            id=uuid4(),
+            account_id=account.id,
+            email="user@example.com",
+            display_name="John Doe",
+        )
+
+        db_session.add(user)
+        await db_session.commit()
+        await db_session.refresh(user)
+
+        # Set deleted_at
+        delete_time = datetime.now(UTC)
+        user.deleted_at = delete_time
+        await db_session.commit()
+        await db_session.refresh(user)
+
+        assert user.deleted_at is not None
+        assert abs((user.deleted_at - delete_time).total_seconds()) < 1
