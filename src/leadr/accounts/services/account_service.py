@@ -8,9 +8,10 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.models import EntityID
+from leadr.common.services import BaseService
 
 
-class AccountService:
+class AccountService(BaseService[Account, AccountRepository]):
     """Service for managing account lifecycle and operations.
 
     This service orchestrates account creation, status management,
@@ -18,14 +19,13 @@ class AccountService:
     and repository layer.
     """
 
-    def __init__(self, session: AsyncSession):
-        """Initialize service with database session.
+    def _create_repository(self, session: AsyncSession) -> AccountRepository:
+        """Create AccountRepository instance."""
+        return AccountRepository(session)
 
-        Args:
-            session: The async database session to use for operations.
-        """
-        self.session = session
-        self.repository = AccountRepository(session)
+    def _get_entity_name(self) -> str:
+        """Get entity name for error messages."""
+        return "Account"
 
     async def create_account(
         self,
@@ -76,7 +76,7 @@ class AccountService:
         Returns:
             The Account domain entity if found, None otherwise.
         """
-        return await self.repository.get_by_id(account_id)
+        return await self.get_by_id(account_id)
 
     async def get_account_by_slug(self, slug: str) -> Account | None:
         """Get an account by its slug.
@@ -95,7 +95,7 @@ class AccountService:
         Returns:
             List of Account domain entities.
         """
-        return await self.repository.list_all()
+        return await self.list_all()
 
     async def suspend_account(self, account_id: EntityID) -> Account:
         """Suspend an account, preventing access.
@@ -144,4 +144,4 @@ class AccountService:
         Raises:
             EntityNotFoundError: If the account doesn't exist.
         """
-        await self.repository.delete(account_id)
+        await self.delete(account_id)
