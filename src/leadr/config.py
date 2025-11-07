@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from pydantic import Field, HttpUrl
+from pydantic import Field, HttpUrl, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJ_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -49,6 +49,13 @@ class CommonSettings(BaseSettings):
 
     MAILGUN_API_KEY: str = "mailgun_api_key"
     MAILGUN_DOMAIN: str = "example.mailgun.org"
+
+    @model_validator(mode="after")
+    def validate_api_enabled(self):
+        """Ensure at least one API (Admin or Client) is enabled."""
+        if not self.ENABLE_ADMIN_API and not self.ENABLE_CLIENT_API:
+            raise ValueError("At least one of ENABLE_ADMIN_API or ENABLE_CLIENT_API must be True")
+        return self
 
 
 class Settings(CommonSettings):
