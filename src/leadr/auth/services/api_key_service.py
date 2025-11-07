@@ -9,10 +9,11 @@ from leadr.auth.services.api_key_crypto import generate_api_key, hash_api_key, v
 from leadr.auth.services.repositories import APIKeyRepository
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.models import EntityID
+from leadr.common.services import BaseService
 from leadr.config import settings
 
 
-class APIKeyService:
+class APIKeyService(BaseService[APIKey, APIKeyRepository]):
     """Service for managing API key lifecycle and operations.
 
     This service orchestrates API key creation, validation, and management
@@ -20,14 +21,13 @@ class APIKeyService:
     and repository layer.
     """
 
-    def __init__(self, session: AsyncSession):
-        """Initialize service with database session.
+    def _create_repository(self, session: AsyncSession) -> APIKeyRepository:
+        """Create APIKeyRepository instance."""
+        return APIKeyRepository(session)
 
-        Args:
-            session: The async database session to use for operations.
-        """
-        self.session = session
-        self.repository = APIKeyRepository(session)
+    def _get_entity_name(self) -> str:
+        """Get entity name for error messages."""
+        return "APIKey"
 
     async def create_api_key(
         self,
@@ -145,7 +145,7 @@ class APIKeyService:
         Returns:
             The APIKey domain entity if found, None otherwise.
         """
-        return await self.repository.get_by_id(key_id)
+        return await self.get_by_id(key_id)
 
     async def list_api_keys(
         self,
