@@ -2,10 +2,10 @@
 
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.common.domain.exceptions import EntityNotFoundError
@@ -184,3 +184,94 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
         orms = result.scalars().all()
 
         return [self._to_domain(orm) for orm in orms]
+
+    # Helper methods for common repository patterns
+
+    async def _get_by_field(self, field_name: str, value: Any) -> DomainEntityT | None:
+        """Get an entity by a specific field value.
+
+        This is a helper method that reduces boilerplate for get_by_<field> patterns
+        like get_by_slug, get_by_email, get_by_prefix, etc.
+
+        Args:
+            field_name: Name of the ORM field to query
+            value: Value to match
+
+        Returns:
+            Domain entity if found, None otherwise
+
+        Example:
+            async def get_by_slug(self, slug: str) -> Account | None:
+                return await self._get_by_field("slug", slug)
+        """
+        orm_class = self._get_orm_class()
+        field = getattr(orm_class, field_name)
+        query = select(orm_class).where(field == value, orm_class.deleted_at.is_(None))
+        result = await self.session.execute(query)
+        orm = result.scalar_one_or_none()
+        return self._to_domain(orm) if orm else None
+
+    async def _list_by_account(
+        self,
+        account_id: EntityID,
+        additional_filters: list[Any] | None = None,
+    ) -> list[DomainEntityT]:
+        """List entities for a specific account.
+
+        This is a helper method that reduces boilerplate for list_by_account patterns.
+
+        Args:
+            account_id: Account ID to filter by
+            additional_filters: Optional list of additional SQLAlchemy filter expressions
+
+        Returns:
+            List of domain entities belonging to the account
+
+        Example:
+            async def list_by_account(self, account_id: EntityID, active_only: bool = False):
+                filters = []
+                if active_only:
+                    filters.append(UserORM.status == UserStatusEnum.ACTIVE)
+                return await self._list_by_account(account_id, filters)
+        """
+        orm_class = self._get_orm_class()
+        query = select(orm_class).where(
+            orm_class.account_id == account_id.value,  # type: ignore[attr-defined]
+            orm_class.deleted_at.is_(None),
+        )
+
+        if additional_filters:
+            for filter_expr in additional_filters:
+                query = query.where(filter_expr)
+
+        result = await self.session.execute(query)
+        orms = result.scalars().all()
+        return [self._to_domain(orm) for orm in orms]
+
+    async def _count_where(self, *conditions: Any) -> int:
+        """Count entities matching given conditions.
+
+        This is a helper method that reduces boilerplate for count operations.
+
+        Args:
+            *conditions: SQLAlchemy filter expressions to apply
+
+        Returns:
+            Count of entities matching the conditions
+
+        Example:
+            async def count_active_by_account(self, account_id: EntityID) -> int:
+                return await self._count_where(
+                    APIKeyORM.account_id == account_id.value,
+                    APIKeyORM.status == APIKeyStatusEnum.ACTIVE,
+                    APIKeyORM.deleted_at.is_(None),
+                )
+        """
+        orm_class = self._get_orm_class()
+        query = select(func.count()).select_from(orm_class)
+
+        for condition in conditions:
+            query = query.where(condition)
+
+        result = await self.session.execute(query)
+        return result.scalar_one()

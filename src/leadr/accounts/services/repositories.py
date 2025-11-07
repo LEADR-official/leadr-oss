@@ -1,7 +1,5 @@
 """Account and User repository services."""
 
-from sqlalchemy import select
-
 from leadr.accounts.adapters.orm import AccountORM, AccountStatusEnum, UserORM
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
@@ -42,11 +40,7 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
 
     async def get_by_slug(self, slug: str) -> Account | None:
         """Get account by slug, returns None if not found or soft-deleted."""
-        result = await self.session.execute(
-            select(AccountORM).where(AccountORM.slug == slug, AccountORM.deleted_at.is_(None))
-        )
-        orm = result.scalar_one_or_none()
-        return self._to_domain(orm) if orm else None
+        return await self._get_by_field("slug", slug)
 
 
 class UserRepository(BaseRepository[User, UserORM]):
@@ -82,18 +76,8 @@ class UserRepository(BaseRepository[User, UserORM]):
 
     async def get_by_email(self, email: str) -> User | None:
         """Get user by email, returns None if not found or soft-deleted."""
-        result = await self.session.execute(
-            select(UserORM).where(UserORM.email == email, UserORM.deleted_at.is_(None))
-        )
-        orm = result.scalar_one_or_none()
-        return self._to_domain(orm) if orm else None
+        return await self._get_by_field("email", email)
 
     async def list_by_account(self, account_id: EntityID) -> list[User]:
         """List all non-deleted users for a given account."""
-        result = await self.session.execute(
-            select(UserORM).where(
-                UserORM.account_id == account_id.value, UserORM.deleted_at.is_(None)
-            )
-        )
-        orms = result.scalars().all()
-        return [self._to_domain(orm) for orm in orms]
+        return await self._list_by_account(account_id)

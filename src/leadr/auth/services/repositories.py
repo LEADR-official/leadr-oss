@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from leadr.auth.adapters.orm import APIKeyORM, APIKeyStatusEnum
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
@@ -51,13 +51,7 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
 
     async def get_by_prefix(self, key_prefix: str) -> APIKey | None:
         """Get API key by prefix, returns None if not found or soft-deleted."""
-        result = await self.session.execute(
-            select(APIKeyORM).where(
-                APIKeyORM.key_prefix == key_prefix, APIKeyORM.deleted_at.is_(None)
-            )
-        )
-        orm = result.scalar_one_or_none()
-        return self._to_domain(orm) if orm else None
+        return await self._get_by_field("key_prefix", key_prefix)
 
     async def list(
         self,
@@ -102,16 +96,10 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         Returns:
             List of non-deleted API keys belonging to the account.
         """
-        query = select(APIKeyORM).where(
-            APIKeyORM.account_id == account_id.value, APIKeyORM.deleted_at.is_(None)
-        )
-
+        filters = []
         if active_only:
-            query = query.where(APIKeyORM.status == APIKeyStatusEnum.ACTIVE)
-
-        result = await self.session.execute(query)
-        orms = result.scalars().all()
-        return [self._to_domain(orm) for orm in orms]
+            filters.append(APIKeyORM.status == APIKeyStatusEnum.ACTIVE)
+        return await self._list_by_account(account_id, filters if filters else None)
 
     async def count_active_by_account(self, account_id: EntityID) -> int:
         """Count active, non-deleted API keys for a given account.
@@ -122,13 +110,8 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         Returns:
             Number of active, non-deleted API keys for the account.
         """
-        result = await self.session.execute(
-            select(func.count())
-            .select_from(APIKeyORM)
-            .where(
-                APIKeyORM.account_id == account_id.value,
-                APIKeyORM.status == APIKeyStatusEnum.ACTIVE,
-                APIKeyORM.deleted_at.is_(None),
-            )
+        return await self._count_where(
+            APIKeyORM.account_id == account_id.value,
+            APIKeyORM.status == APIKeyStatusEnum.ACTIVE,
+            APIKeyORM.deleted_at.is_(None),
         )
-        return result.scalar_one()
