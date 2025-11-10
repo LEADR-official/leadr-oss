@@ -43,7 +43,7 @@ class CreateAPIKeyResponse(BaseModel):
             CreateAPIKeyResponse with all fields populated
         """
         return cls(
-            id=api_key.id.value,
+            id=api_key.id,
             name=api_key.name,
             key=plain_key,
             prefix=api_key.key_prefix,
@@ -83,8 +83,8 @@ class APIKeyResponse(BaseModel):
             APIKeyResponse with all fields populated
         """
         return cls(
-            id=api_key.id.value,
-            account_id=api_key.account_id.value,
+            id=api_key.id,
+            account_id=api_key.account_id,
             name=api_key.name,
             prefix=api_key.key_prefix,
             status=api_key.status,

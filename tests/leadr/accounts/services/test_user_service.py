@@ -1,5 +1,7 @@
 """Tests for User service."""
 
+from uuid import uuid4
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,7 +9,6 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.accounts.services.user_service import UserService
 from leadr.common.domain.exceptions import EntityNotFoundError
-from leadr.common.domain.models import EntityID
 
 
 @pytest.mark.asyncio
@@ -18,7 +19,7 @@ class TestUserService:
         """Test creating a user."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
 
         account = Account(
             id=account_id,
@@ -45,7 +46,7 @@ class TestUserService:
         """Test retrieving a user by ID."""
         # Create account and user
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
 
         account = Account(
             id=account_id,
@@ -72,7 +73,7 @@ class TestUserService:
     async def test_get_user_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent user returns None."""
         service = UserService(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         result = await service.get_user(non_existent_id)
 
@@ -82,7 +83,7 @@ class TestUserService:
         """Test retrieving a user by email."""
         # Create account and user
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
 
         account = Account(
             id=account_id,
@@ -118,7 +119,7 @@ class TestUserService:
         """Test listing all users for an account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
 
         account = Account(
             id=account_id,
@@ -153,7 +154,7 @@ class TestUserService:
         """Test that listing users excludes soft-deleted users."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
 
         account = Account(
             id=account_id,
@@ -189,7 +190,7 @@ class TestUserService:
         """Test updating a user."""
         # Create account and user
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
 
         account = Account(
             id=account_id,
@@ -226,7 +227,7 @@ class TestUserService:
         """Test updating only the email of a user."""
         # Create account and user
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
 
         account = Account(
             id=account_id,
@@ -256,7 +257,7 @@ class TestUserService:
         """Test updating only the display name of a user."""
         # Create account and user
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
 
         account = Account(
             id=account_id,
@@ -285,7 +286,7 @@ class TestUserService:
     async def test_update_user_not_found(self, db_session: AsyncSession):
         """Test that updating a non-existent user raises EntityNotFoundError."""
         service = UserService(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         with pytest.raises(EntityNotFoundError) as exc_info:
             await service.update_user(
@@ -299,7 +300,7 @@ class TestUserService:
         """Test soft-deleting a user."""
         # Create account and user
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
 
         account = Account(
             id=account_id,
@@ -326,7 +327,7 @@ class TestUserService:
     async def test_delete_user_not_found(self, db_session: AsyncSession):
         """Test that deleting a non-existent user raises EntityNotFoundError."""
         service = UserService(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         with pytest.raises(EntityNotFoundError) as exc_info:
             await service.delete_user(non_existent_id)

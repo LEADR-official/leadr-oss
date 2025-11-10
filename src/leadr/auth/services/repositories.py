@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import select
 
 from leadr.auth.adapters.orm import APIKeyORM, APIKeyStatusEnum
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
-from leadr.common.domain.models import EntityID
 from leadr.common.repositories import BaseRepository
 
 
@@ -18,8 +18,8 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
     def _to_domain(self, orm: APIKeyORM) -> APIKey:
         """Convert ORM model to domain entity."""
         return APIKey(
-            id=EntityID(value=orm.id),
-            account_id=EntityID(value=orm.account_id),
+            id=orm.id,
+            account_id=orm.account_id,
             name=orm.name,
             key_hash=orm.key_hash,
             key_prefix=orm.key_prefix,
@@ -34,8 +34,8 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
     def _to_orm(self, entity: APIKey) -> APIKeyORM:
         """Convert domain entity to ORM model."""
         return APIKeyORM(
-            id=entity.id.value,
-            account_id=entity.account_id.value,
+            id=entity.id,
+            account_id=entity.account_id,
             name=entity.name,
             key_hash=entity.key_hash,
             key_prefix=entity.key_prefix,
@@ -55,7 +55,7 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         """Get API key by prefix, returns None if not found or soft-deleted."""
         return await self._get_by_field("key_prefix", key_prefix)
 
-    async def filter(self, account_id: EntityID, **kwargs: Any) -> list[APIKey]:
+    async def filter(self, account_id: UUID, **kwargs: Any) -> list[APIKey]:
         """Filter API keys by account and optional criteria.
 
         Args:
@@ -68,7 +68,7 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
             List of API keys for the account matching the filter criteria
         """
         query = select(APIKeyORM).where(
-            APIKeyORM.account_id == account_id.value,
+            APIKeyORM.account_id == account_id,
             APIKeyORM.deleted_at.is_(None),
         )
 
@@ -86,7 +86,7 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         orms = result.scalars().all()
         return [self._to_domain(orm) for orm in orms]
 
-    async def count_active_by_account(self, account_id: EntityID) -> int:
+    async def count_active_by_account(self, account_id: UUID) -> int:
         """Count active, non-deleted API keys for a given account.
 
         Args:
@@ -96,7 +96,7 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
             Number of active, non-deleted API keys for the account.
         """
         return await self._count_where(
-            APIKeyORM.account_id == account_id.value,
+            APIKeyORM.account_id == account_id,
             APIKeyORM.status == APIKeyStatusEnum.ACTIVE,
             APIKeyORM.deleted_at.is_(None),
         )

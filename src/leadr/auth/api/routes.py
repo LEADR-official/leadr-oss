@@ -1,9 +1,9 @@
 """API routes for authentication and API key management."""
 
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
+from pydantic import UUID4
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.api.schemas import (
@@ -15,7 +15,6 @@ from leadr.auth.api.schemas import (
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.api_key_service import APIKeyService
 from leadr.common.dependencies import DatabaseSession
-from leadr.common.domain.models import EntityID
 
 router = APIRouter()
 
@@ -41,12 +40,11 @@ async def create_api_key(
         404: Account not found.
     """
     service = APIKeyService(db)
-    account_id = EntityID(value=request.account_id)
 
     try:
         # Create API key
         api_key, plain_key = await service.create_api_key(
-            account_id=account_id,
+            account_id=request.account_id,
             name=request.name,
             expires_at=request.expires_at,
         )
@@ -66,7 +64,7 @@ async def create_api_key(
 )
 async def list_api_keys(
     db: DatabaseSession,
-    account_id: Annotated[UUID, Query(description="Account ID to filter by")],
+    account_id: Annotated[UUID4, Query(description="Account ID to filter by")],
     status: Annotated[APIKeyStatus | None, Query(description="Filter by status")] = None,
 ) -> list[APIKeyResponse]:
     """List API keys for an account with optional filters.
@@ -83,11 +81,9 @@ async def list_api_keys(
     service = APIKeyService(db)
 
     # TODO: Replace with account_id from authenticated user's token
-    entity_account_id = EntityID(value=account_id)
-
     # Get filtered list from service
     api_keys = await service.list_api_keys(
-        account_id=entity_account_id,
+        account_id=account_id,
         status=status.value if status else None,
     )
 
@@ -99,7 +95,7 @@ async def list_api_keys(
     response_model=APIKeyResponse,
 )
 async def get_api_key(
-    key_id: UUID,
+    key_id: UUID4,
     db: DatabaseSession,
 ) -> APIKeyResponse:
     """Get a single API key by ID.
@@ -114,7 +110,7 @@ async def get_api_key(
         404: API key not found.
     """
     service = APIKeyService(db)
-    api_key = await service.get_by_id_or_raise(EntityID(value=key_id))
+    api_key = await service.get_by_id_or_raise(key_id)
     return APIKeyResponse.from_domain(api_key)
 
 
@@ -123,7 +119,7 @@ async def get_api_key(
     response_model=APIKeyResponse,
 )
 async def update_api_key(
-    key_id: UUID,
+    key_id: UUID4,
     request: UpdateAPIKeyRequest,
     db: DatabaseSession,
 ) -> APIKeyResponse:
@@ -144,18 +140,17 @@ async def update_api_key(
         404: API key not found.
     """
     service = APIKeyService(db)
-    entity_id = EntityID(value=key_id)
 
     # Update status if provided
     if request.status is not None:
-        api_key = await service.update_api_key_status(entity_id, request.status.value)
+        api_key = await service.update_api_key_status(key_id, request.status.value)
         return APIKeyResponse.from_domain(api_key)
 
     # Handle soft delete if provided
     if request.deleted is not None and request.deleted:
-        api_key = await service.soft_delete(entity_id)
+        api_key = await service.soft_delete(key_id)
         return APIKeyResponse.from_domain(api_key)
 
     # No update requested, just fetch current state
-    api_key = await service.get_by_id_or_raise(entity_id)
+    api_key = await service.get_by_id_or_raise(key_id)
     return APIKeyResponse.from_domain(api_key)

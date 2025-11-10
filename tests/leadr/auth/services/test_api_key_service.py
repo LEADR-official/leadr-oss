@@ -1,6 +1,7 @@
 """Tests for APIKey service."""
 
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +11,6 @@ from leadr.accounts.services.repositories import AccountRepository
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.api_key_service import APIKeyService
 from leadr.common.domain.exceptions import EntityNotFoundError
-from leadr.common.domain.models import EntityID
 
 
 @pytest.mark.asyncio
@@ -21,7 +21,7 @@ class TestAPIKeyService:
         """Test creating an API key with automatic generation and hashing."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -62,7 +62,7 @@ class TestAPIKeyService:
         """Test creating an API key with an expiration date."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -92,7 +92,7 @@ class TestAPIKeyService:
         """Test validating a correct API key."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -132,7 +132,7 @@ class TestAPIKeyService:
         """Test validating with wrong key value."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -161,7 +161,7 @@ class TestAPIKeyService:
         """Test that revoked keys fail validation."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -192,7 +192,7 @@ class TestAPIKeyService:
         """Test that expired keys fail validation."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -224,7 +224,7 @@ class TestAPIKeyService:
         """Test retrieving an API key by ID."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -253,7 +253,7 @@ class TestAPIKeyService:
     async def test_get_api_key_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent API key."""
         service = APIKeyService(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         result = await service.get_api_key(non_existent_id)
 
@@ -263,7 +263,7 @@ class TestAPIKeyService:
         """Test listing all API keys for an account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -293,7 +293,7 @@ class TestAPIKeyService:
         """Test listing only active API keys for an account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -324,7 +324,7 @@ class TestAPIKeyService:
         """Test counting active API keys for an account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -355,7 +355,7 @@ class TestAPIKeyService:
         """Test revoking an API key."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -387,7 +387,7 @@ class TestAPIKeyService:
         """Test recording API key usage."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -420,7 +420,7 @@ class TestAPIKeyService:
         """Test that validating an API key records its usage."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -451,7 +451,7 @@ class TestAPIKeyService:
     async def test_revoke_api_key_not_found(self, db_session: AsyncSession):
         """Test that revoking a non-existent API key raises EntityNotFoundError."""
         service = APIKeyService(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         with pytest.raises(EntityNotFoundError) as exc_info:
             await service.revoke_api_key(non_existent_id)
@@ -461,7 +461,7 @@ class TestAPIKeyService:
     async def test_update_api_key_status_not_found(self, db_session: AsyncSession):
         """Test that updating status of non-existent API key raises EntityNotFoundError."""
         service = APIKeyService(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         with pytest.raises(EntityNotFoundError) as exc_info:
             await service.update_api_key_status(non_existent_id, "active")
@@ -471,7 +471,7 @@ class TestAPIKeyService:
     async def test_record_usage_not_found(self, db_session: AsyncSession):
         """Test that recording usage for non-existent API key raises EntityNotFoundError."""
         service = APIKeyService(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
         now = datetime.now(UTC)
 
         with pytest.raises(EntityNotFoundError) as exc_info:

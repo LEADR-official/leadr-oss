@@ -1,8 +1,10 @@
 """User domain model."""
 
+from uuid import UUID
+
 from pydantic import EmailStr, Field, field_validator
 
-from leadr.common.domain.models import Entity, EntityID
+from leadr.common.domain.models import Entity
 
 
 class User(Entity):
@@ -13,7 +15,7 @@ class User(Entity):
     address and display name.
     """
 
-    account_id: EntityID = Field(frozen=True)
+    account_id: UUID = Field(frozen=True)
     email: EmailStr
     display_name: str
 

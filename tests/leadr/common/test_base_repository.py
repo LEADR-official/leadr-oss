@@ -3,16 +3,17 @@
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
-from uuid import UUID
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from pydantic import UUID4
 from sqlalchemy import String, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from leadr.common.domain.exceptions import EntityNotFoundError
-from leadr.common.domain.models import Entity, EntityID
+from leadr.common.domain.models import Entity
 from leadr.common.orm import Base
 from leadr.common.repositories import BaseRepository
 
@@ -56,7 +57,7 @@ class TestRepository(BaseRepository[TestEntity, TestEntityORM]):
     def _to_domain(self, orm: TestEntityORM) -> TestEntity:
         """Convert ORM to domain entity."""
         return TestEntity(
-            id=EntityID(value=orm.id),
+            id=orm.id,
             name=orm.name,
             status=TestStatus(orm.status.value),
             created_at=orm.created_at,
@@ -67,7 +68,7 @@ class TestRepository(BaseRepository[TestEntity, TestEntityORM]):
     def _to_orm(self, entity: TestEntity) -> TestEntityORM:
         """Convert domain entity to ORM."""
         orm = TestEntityORM(
-            id=UUID(str(entity.id)),
+            id=entity.id,
             name=entity.name,
             status=TestStatusEnum(entity.status.value),
             created_at=entity.created_at,
@@ -80,7 +81,7 @@ class TestRepository(BaseRepository[TestEntity, TestEntityORM]):
         """Get the ORM model class."""
         return TestEntityORM
 
-    async def filter(self, **kwargs: Any) -> list[TestEntity]:
+    async def filter(self, account_id: UUID4 | None = None, **kwargs: Any) -> list[TestEntity]:
         """Filter test entities.
 
         This test repository doesn't require account_id (top-level tenant).
@@ -111,7 +112,7 @@ class TestBaseRepository:
     async def test_create(self, db_session: AsyncSession):
         """Test creating an entity via repository."""
         repo = TestRepository(db_session)
-        entity_id = EntityID.generate()
+        entity_id = uuid4()
         now = datetime.now(UTC)
 
         entity = TestEntity(
@@ -132,7 +133,7 @@ class TestBaseRepository:
     async def test_get_by_id_found(self, db_session: AsyncSession):
         """Test retrieving an entity by ID when it exists."""
         repo = TestRepository(db_session)
-        entity_id = EntityID.generate()
+        entity_id = uuid4()
         now = datetime.now(UTC)
 
         # Create entity
@@ -155,7 +156,7 @@ class TestBaseRepository:
     async def test_get_by_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent entity returns None."""
         repo = TestRepository(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         result = await repo.get_by_id(non_existent_id)
 
@@ -164,7 +165,7 @@ class TestBaseRepository:
     async def test_get_by_id_excludes_deleted_by_default(self, db_session: AsyncSession):
         """Test that get_by_id excludes soft-deleted entities by default."""
         repo = TestRepository(db_session)
-        entity_id = EntityID.generate()
+        entity_id = uuid4()
         now = datetime.now(UTC)
 
         # Create and delete entity
@@ -185,7 +186,7 @@ class TestBaseRepository:
     async def test_get_by_id_includes_deleted_when_requested(self, db_session: AsyncSession):
         """Test that get_by_id can include soft-deleted entities."""
         repo = TestRepository(db_session)
-        entity_id = EntityID.generate()
+        entity_id = uuid4()
         now = datetime.now(UTC)
 
         # Create and delete entity
@@ -208,7 +209,7 @@ class TestBaseRepository:
     async def test_update(self, db_session: AsyncSession):
         """Test updating an entity via repository."""
         repo = TestRepository(db_session)
-        entity_id = EntityID.generate()
+        entity_id = uuid4()
         now = datetime.now(UTC)
 
         # Create entity
@@ -238,7 +239,7 @@ class TestBaseRepository:
     async def test_update_non_existent_raises_error(self, db_session: AsyncSession):
         """Test that updating a non-existent entity raises an error."""
         repo = TestRepository(db_session)
-        entity_id = EntityID.generate()
+        entity_id = uuid4()
         now = datetime.now(UTC)
 
         entity = TestEntity(
@@ -255,7 +256,7 @@ class TestBaseRepository:
     async def test_delete_soft_deletes(self, db_session: AsyncSession):
         """Test that delete performs soft delete, not hard delete."""
         repo = TestRepository(db_session)
-        entity_id = EntityID.generate()
+        entity_id = uuid4()
         now = datetime.now(UTC)
 
         # Create entity
@@ -283,7 +284,7 @@ class TestBaseRepository:
     async def test_delete_non_existent_raises_error(self, db_session: AsyncSession):
         """Test that deleting a non-existent entity raises an error."""
         repo = TestRepository(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         with pytest.raises(EntityNotFoundError):
             await repo.delete(non_existent_id)

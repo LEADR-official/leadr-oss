@@ -1,13 +1,13 @@
 """End-to-end tests for Account API endpoints."""
 
 from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
-from leadr.common.domain.models import EntityID
 
 
 @pytest.mark.asyncio
@@ -66,7 +66,7 @@ class TestAccountAPI:
         """Test getting account by ID via GET /accounts/{id}."""
         # Create account first
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -91,7 +91,7 @@ class TestAccountAPI:
 
     async def test_get_account_by_id_not_found(self, client: AsyncClient):
         """Test getting non-existent account returns 404."""
-        fake_id = EntityID.generate()
+        fake_id = uuid4()
         response = await client.get(f"/accounts/{fake_id}")
 
         assert response.status_code == 404
@@ -100,7 +100,7 @@ class TestAccountAPI:
         """Test getting soft-deleted account returns 404."""
         # Create and delete account
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -126,7 +126,7 @@ class TestAccountAPI:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=EntityID.generate(),
+            id=uuid4(),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -134,7 +134,7 @@ class TestAccountAPI:
             updated_at=now,
         )
         account2 = Account(
-            id=EntityID.generate(),
+            id=uuid4(),
             name="Beta Industries",
             slug="beta-industries",
             status=AccountStatus.ACTIVE,
@@ -163,7 +163,7 @@ class TestAccountAPI:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=EntityID.generate(),
+            id=uuid4(),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -171,7 +171,7 @@ class TestAccountAPI:
             updated_at=now,
         )
         account2 = Account(
-            id=EntityID.generate(),
+            id=uuid4(),
             name="Beta Industries",
             slug="beta-industries",
             status=AccountStatus.ACTIVE,
@@ -197,7 +197,7 @@ class TestAccountAPI:
         """Test updating account via PATCH /accounts/{id}."""
         # Create account
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -227,7 +227,7 @@ class TestAccountAPI:
 
     async def test_update_account_not_found(self, client: AsyncClient):
         """Test updating non-existent account returns 404."""
-        fake_id = EntityID.generate()
+        fake_id = uuid4()
         response = await client.patch(
             f"/accounts/{fake_id}",
             json={"name": "Updated Name"},
@@ -239,7 +239,7 @@ class TestAccountAPI:
         """Test soft-deleting account via PATCH with deleted field."""
         # Create account
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -266,7 +266,7 @@ class TestAccountAPI:
 
     async def test_delete_account_not_found(self, client: AsyncClient):
         """Test soft-deleting non-existent account returns 404."""
-        fake_id = EntityID.generate()
+        fake_id = uuid4()
         response = await client.patch(
             f"/accounts/{fake_id}",
             json={"deleted": True},
@@ -297,7 +297,7 @@ class TestAccountAPI:
         """Test updating only some fields of an account."""
         # Create account
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -328,7 +328,7 @@ class TestAccountAPI:
         """Test updating only slug of an account."""
         # Create account
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -359,7 +359,7 @@ class TestAccountAPI:
         """Test updating only status of an account."""
         # Create account
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -390,7 +390,7 @@ class TestAccountAPI:
         """Test updating account with empty request body."""
         # Create account
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(

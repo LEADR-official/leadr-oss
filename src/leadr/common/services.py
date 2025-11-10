@@ -2,11 +2,12 @@
 
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.common.domain.exceptions import EntityNotFoundError
-from leadr.common.domain.models import Entity, EntityID
+from leadr.common.domain.models import Entity
 from leadr.common.repositories import BaseRepository
 
 # Type variables for generic service
@@ -64,7 +65,7 @@ class BaseService(ABC, Generic[DomainEntityT, RepositoryT]):
                 return "Account"
         """
 
-    async def get_by_id(self, entity_id: EntityID) -> DomainEntityT | None:
+    async def get_by_id(self, entity_id: UUID) -> DomainEntityT | None:
         """Get an entity by its ID.
 
         Args:
@@ -75,7 +76,7 @@ class BaseService(ABC, Generic[DomainEntityT, RepositoryT]):
         """
         return await self.repository.get_by_id(entity_id)
 
-    async def get_by_id_or_raise(self, entity_id: EntityID) -> DomainEntityT:
+    async def get_by_id_or_raise(self, entity_id: UUID) -> DomainEntityT:
         """Get an entity by its ID or raise EntityNotFoundError.
 
         Args:
@@ -93,7 +94,7 @@ class BaseService(ABC, Generic[DomainEntityT, RepositoryT]):
             raise EntityNotFoundError(self._get_entity_name(), str(entity_id))
         return entity
 
-    async def delete(self, entity_id: EntityID) -> None:
+    async def delete(self, entity_id: UUID) -> None:
         """Soft-delete an entity.
 
         Args:
@@ -106,7 +107,7 @@ class BaseService(ABC, Generic[DomainEntityT, RepositoryT]):
         await self.get_by_id_or_raise(entity_id)
         await self.repository.delete(entity_id)
 
-    async def soft_delete(self, entity_id: EntityID) -> DomainEntityT:
+    async def soft_delete(self, entity_id: UUID) -> DomainEntityT:
         """Soft-delete an entity and return it before deletion.
 
         Useful for endpoints that need to return the deleted entity in the response.
@@ -130,4 +131,4 @@ class BaseService(ABC, Generic[DomainEntityT, RepositoryT]):
         Returns:
             List of domain entities
         """
-        return await self.repository.list_all()
+        return await self.repository._list_all_unfiltered()

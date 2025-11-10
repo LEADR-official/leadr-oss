@@ -1,9 +1,9 @@
 """Account and User API routes."""
 
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
+from pydantic import UUID4
 from sqlalchemy.exc import IntegrityError
 
 from leadr.accounts.api.schemas import (
@@ -18,7 +18,6 @@ from leadr.accounts.domain.account import AccountStatus
 from leadr.accounts.services.account_service import AccountService
 from leadr.accounts.services.user_service import UserService
 from leadr.common.dependencies import DatabaseSession
-from leadr.common.domain.models import EntityID
 
 router = APIRouter()
 
@@ -38,10 +37,10 @@ async def create_account(request: AccountCreateRequest, db: DatabaseSession) -> 
 
 
 @router.get("/accounts/{account_id}", response_model=AccountResponse)
-async def get_account(account_id: UUID, db: DatabaseSession) -> AccountResponse:
+async def get_account(account_id: UUID4, db: DatabaseSession) -> AccountResponse:
     """Get an account by ID."""
     service = AccountService(db)
-    account = await service.get_by_id_or_raise(EntityID(value=account_id))
+    account = await service.get_by_id_or_raise(account_id)
     return AccountResponse.from_domain(account)
 
 
@@ -55,30 +54,29 @@ async def list_accounts(db: DatabaseSession) -> list[AccountResponse]:
 
 @router.patch("/accounts/{account_id}", response_model=AccountResponse)
 async def update_account(
-    account_id: UUID, request: AccountUpdateRequest, db: DatabaseSession
+    account_id: UUID4, request: AccountUpdateRequest, db: DatabaseSession
 ) -> AccountResponse:
     """Update an account."""
     service = AccountService(db)
-    entity_id = EntityID(value=account_id)
 
     # Handle soft delete first
     if request.deleted is True:
-        account = await service.soft_delete(entity_id)
+        account = await service.soft_delete(account_id)
         return AccountResponse.from_domain(account)
 
     # Get account for updates
-    account = await service.get_by_id_or_raise(entity_id)
+    account = await service.get_by_id_or_raise(account_id)
 
     # Handle status changes using service methods
     if request.status == AccountStatus.SUSPENDED:
-        account = await service.suspend_account(entity_id)
+        account = await service.suspend_account(account_id)
     elif request.status == AccountStatus.ACTIVE:
-        account = await service.activate_account(entity_id)
+        account = await service.activate_account(account_id)
 
     # Handle field updates using service method
     if request.name is not None or request.slug is not None:
         account = await service.update_account(
-            entity_id,
+            account_id,
             name=request.name,
             slug=request.slug,
         )
@@ -98,7 +96,7 @@ async def create_user(request: UserCreateRequest, db: DatabaseSession) -> UserRe
 
     try:
         user = await service.create_user(
-            account_id=EntityID(value=request.account_id),
+            account_id=request.account_id,
             email=request.email,
             display_name=request.display_name,
         )
@@ -113,17 +111,17 @@ async def create_user(request: UserCreateRequest, db: DatabaseSession) -> UserRe
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
-async def get_user(user_id: UUID, db: DatabaseSession) -> UserResponse:
+async def get_user(user_id: UUID4, db: DatabaseSession) -> UserResponse:
     """Get a user by ID."""
     service = UserService(db)
-    user = await service.get_by_id_or_raise(EntityID(value=user_id))
+    user = await service.get_by_id_or_raise(user_id)
     return UserResponse.from_domain(user)
 
 
 @router.get("/users", response_model=list[UserResponse])
 async def list_users(
     db: DatabaseSession,
-    account_id: Annotated[UUID, Query(description="Account ID to filter by")],
+    account_id: Annotated[UUID4, Query(description="Account ID to filter by")],
 ) -> list[UserResponse]:
     """List users for an account.
 
@@ -138,28 +136,25 @@ async def list_users(
     service = UserService(db)
 
     # TODO: Replace with account_id from authenticated user's token
-    entity_account_id = EntityID(value=account_id)
-
-    users = await service.list_users_by_account(entity_account_id)
+    users = await service.list_users_by_account(account_id)
     return [UserResponse.from_domain(user) for user in users]
 
 
 @router.patch("/users/{user_id}", response_model=UserResponse)
 async def update_user(
-    user_id: UUID, request: UserUpdateRequest, db: DatabaseSession
+    user_id: UUID4, request: UserUpdateRequest, db: DatabaseSession
 ) -> UserResponse:
     """Update a user."""
     service = UserService(db)
-    entity_id = EntityID(value=user_id)
 
     # Handle soft delete first
     if request.deleted is True:
-        user = await service.soft_delete(entity_id)
+        user = await service.soft_delete(user_id)
         return UserResponse.from_domain(user)
 
     # Update fields
     user = await service.update_user(
-        user_id=entity_id,
+        user_id=user_id,
         email=request.email,
         display_name=request.display_name,
     )

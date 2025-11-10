@@ -1,12 +1,13 @@
 """Tests for Account service."""
 
+from uuid import uuid4
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import AccountStatus
 from leadr.accounts.services.account_service import AccountService
 from leadr.common.domain.exceptions import EntityNotFoundError
-from leadr.common.domain.models import EntityID
 
 
 @pytest.mark.asyncio
@@ -47,7 +48,7 @@ class TestAccountService:
     async def test_get_account_by_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent account returns None."""
         service = AccountService(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         account = await service.get_account(non_existent_id)
 
@@ -123,7 +124,7 @@ class TestAccountService:
     async def test_suspend_account_not_found(self, db_session: AsyncSession):
         """Test that suspending a non-existent account raises an error."""
         service = AccountService(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         with pytest.raises(EntityNotFoundError) as exc_info:
             await service.suspend_account(non_existent_id)
@@ -154,7 +155,7 @@ class TestAccountService:
     async def test_activate_account_not_found(self, db_session: AsyncSession):
         """Test that activating a non-existent account raises an error."""
         service = AccountService(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         with pytest.raises(EntityNotFoundError) as exc_info:
             await service.activate_account(non_existent_id)
@@ -181,7 +182,7 @@ class TestAccountService:
     async def test_delete_account_not_found(self, db_session: AsyncSession):
         """Test that deleting a non-existent account raises an error."""
         service = AccountService(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         with pytest.raises(EntityNotFoundError) as exc_info:
             await service.delete_account(non_existent_id)

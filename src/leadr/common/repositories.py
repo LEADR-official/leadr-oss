@@ -5,11 +5,12 @@ from datetime import UTC, datetime
 from typing import Any, Generic, TypeVar
 from uuid import UUID
 
+from pydantic import UUID4
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.common.domain.exceptions import EntityNotFoundError
-from leadr.common.domain.models import Entity, EntityID
+from leadr.common.domain.models import Entity
 from leadr.common.orm import Base
 
 # Type variables for generic repository
@@ -80,7 +81,7 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
         return self._to_domain(orm)
 
     async def get_by_id(
-        self, entity_id: EntityID, include_deleted: bool = False
+        self, entity_id: UUID4, include_deleted: bool = False
     ) -> DomainEntityT | None:
         """Get an entity by its ID.
 
@@ -135,7 +136,7 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
         await self.session.refresh(orm)
         return self._to_domain(orm)
 
-    async def delete(self, entity_id: EntityID) -> None:
+    async def delete(self, entity_id: UUID4) -> None:
         """Soft delete an entity by setting its deleted_at timestamp.
 
         Args:
@@ -166,37 +167,38 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
         await self.session.commit()
 
     @abstractmethod
-    async def filter(self, **kwargs: Any) -> list[DomainEntityT]:
+    async def filter(self, account_id: UUID4, **kwargs: Any) -> list[DomainEntityT]:
         """Filter entities based on criteria.
 
-        This method is abstract to allow each repository to define its own
-        filtering requirements. For multi-tenant entities, implementations
-        MUST require account_id parameter. For top-level entities like Account,
-        implementations can filter by other criteria.
+        For multi-tenant entities, implementations MUST override this to make
+        account_id required (no default). For top-level entities like Account,
+        account_id can remain optional and unused.
 
         Args:
-            **kwargs: Filter parameters specific to the entity type.
-                     Multi-tenant entities MUST accept account_id: EntityID.
+            account_id: Optional account ID for filtering. Multi-tenant entities
+                       MUST override to make this required (account_id: UUID).
+            **kwargs: Additional filter parameters specific to the entity type.
 
         Returns:
             List of domain entities matching the filter criteria
 
-        Example (multi-tenant):
+        Example (multi-tenant - account_id required):
             async def filter(
                 self,
-                account_id: EntityID,
+                account_id: UUID,  # Required, no default
                 status: str | None = None,
                 **kwargs
             ) -> list[User]:
                 # Implementation with account_id required
 
-        Example (top-level tenant):
+        Example (top-level tenant - account_id optional/unused):
             async def filter(
                 self,
+                account_id: UUID | None = None,  # Optional, unused
                 status: str | None = None,
                 **kwargs
             ) -> list[Account]:
-                # Implementation without account_id
+                # Implementation where account_id is not used
         """
 
     async def _list_all_unfiltered(self, include_deleted: bool = False) -> list[DomainEntityT]:
@@ -250,7 +252,7 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
 
     async def _list_by_account(
         self,
-        account_id: EntityID,
+        account_id: UUID4,
         additional_filters: list[Any] | None = None,
     ) -> list[DomainEntityT]:
         """List entities for a specific account.
@@ -265,7 +267,7 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
             List of domain entities belonging to the account
 
         Example:
-            async def list_by_account(self, account_id: EntityID, active_only: bool = False):
+            async def list_by_account(self, account_id: UUID, active_only: bool = False):
                 filters = []
                 if active_only:
                     filters.append(UserORM.status == UserStatusEnum.ACTIVE)
@@ -273,7 +275,7 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
         """
         orm_class = self._get_orm_class()
         query = select(orm_class).where(
-            orm_class.account_id == account_id.value,  # type: ignore[attr-defined]
+            orm_class.account_id == account_id,  # type: ignore[attr-defined]
             orm_class.deleted_at.is_(None),
         )
 
@@ -297,9 +299,9 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
             Count of entities matching the conditions
 
         Example:
-            async def count_active_by_account(self, account_id: EntityID) -> int:
+            async def count_active_by_account(self, account_id: UUID) -> int:
                 return await self._count_where(
-                    APIKeyORM.account_id == account_id.value,
+                    APIKeyORM.account_id == account_id,
                     APIKeyORM.status == APIKeyStatusEnum.ACTIVE,
                     APIKeyORM.deleted_at.is_(None),
                 )

@@ -40,7 +40,7 @@ class AccountResponse(BaseModel):
     def from_domain(cls, account: Account) -> "AccountResponse":
         """Convert domain entity to response model."""
         return cls(
-            id=account.id.value,
+            id=account.id,
             name=account.name,
             slug=account.slug,
             status=account.status,
@@ -80,8 +80,8 @@ class UserResponse(BaseModel):
     def from_domain(cls, user: User) -> "UserResponse":
         """Convert domain entity to response model."""
         return cls(
-            id=user.id.value,
-            account_id=user.account_id.value,
+            id=user.id,
+            account_id=user.account_id,
             email=user.email,
             display_name=user.display_name,
             created_at=user.created_at,

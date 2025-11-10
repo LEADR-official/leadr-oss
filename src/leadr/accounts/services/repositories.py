@@ -2,12 +2,12 @@
 
 from typing import Any
 
+from pydantic import UUID4
 from sqlalchemy import select
 
 from leadr.accounts.adapters.orm import AccountORM, AccountStatusEnum, UserORM
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
-from leadr.common.domain.models import EntityID
 from leadr.common.repositories import BaseRepository
 
 
@@ -17,7 +17,7 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
     def _to_domain(self, orm: AccountORM) -> Account:
         """Convert ORM model to domain entity."""
         return Account(
-            id=EntityID(value=orm.id),
+            id=orm.id,
             name=orm.name,
             slug=orm.slug,
             status=AccountStatus(orm.status.value),
@@ -29,7 +29,7 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
     def _to_orm(self, entity: Account) -> AccountORM:
         """Convert domain entity to ORM model."""
         return AccountORM(
-            id=entity.id.value,
+            id=entity.id,
             name=entity.name,
             slug=entity.slug,
             status=AccountStatusEnum(entity.status.value),
@@ -46,12 +46,14 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
         """Get account by slug, returns None if not found or soft-deleted."""
         return await self._get_by_field("slug", slug)
 
-    async def filter(self, **kwargs: Any) -> list[Account]:
+    async def filter(self, account_id: UUID4 | None = None, **kwargs: Any) -> list[Account]:
         """Filter accounts by optional criteria.
 
         Account is the top-level tenant boundary, so no account_id filtering is required.
+        The account_id parameter is accepted for interface compatibility but is not used.
 
         Args:
+            account_id: Not used. Account is the top-level tenant.
             status: Optional AccountStatus to filter by
             slug: Optional slug to filter by
             **kwargs: Additional filter parameters (reserved for future use)
@@ -59,6 +61,7 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
         Returns:
             List of accounts matching the filter criteria
         """
+        # Note: account_id is intentionally unused - Account is the tenant boundary
         query = select(AccountORM).where(AccountORM.deleted_at.is_(None))
 
         # Apply optional filters
@@ -82,8 +85,8 @@ class UserRepository(BaseRepository[User, UserORM]):
     def _to_domain(self, orm: UserORM) -> User:
         """Convert ORM model to domain entity."""
         return User(
-            id=EntityID(value=orm.id),
-            account_id=EntityID(value=orm.account_id),
+            id=orm.id,
+            account_id=orm.account_id,
             email=orm.email,
             display_name=orm.display_name,
             created_at=orm.created_at,
@@ -94,8 +97,8 @@ class UserRepository(BaseRepository[User, UserORM]):
     def _to_orm(self, entity: User) -> UserORM:
         """Convert domain entity to ORM model."""
         return UserORM(
-            id=entity.id.value,
-            account_id=entity.account_id.value,
+            id=entity.id,
+            account_id=entity.account_id,
             email=entity.email,
             display_name=entity.display_name,
             created_at=entity.created_at,
@@ -111,7 +114,7 @@ class UserRepository(BaseRepository[User, UserORM]):
         """Get user by email, returns None if not found or soft-deleted."""
         return await self._get_by_field("email", email)
 
-    async def filter(self, account_id: EntityID, **kwargs: Any) -> list[User]:
+    async def filter(self, account_id: UUID4, **kwargs: Any) -> list[User]:
         """Filter users by account and optional criteria.
 
         Args:
@@ -122,7 +125,7 @@ class UserRepository(BaseRepository[User, UserORM]):
             List of users for the account matching the filter criteria
         """
         query = select(UserORM).where(
-            UserORM.account_id == account_id.value,
+            UserORM.account_id == account_id,
             UserORM.deleted_at.is_(None),
         )
 
