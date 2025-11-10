@@ -1,4 +1,3 @@
-# .github/workflows/publish-docs-bundle.yml
 name: Publish docs bundle to docs repo
 on:
   release:
@@ -9,28 +8,20 @@ jobs:
   build-and-pr:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: "Set up Python"
-      uses: actions/setup-python@v5
-      with:
-        python-version-file: ".python-version"
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v4
-      with:
-        version: "latest"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
 
-    - name: Install dependencies
-      run: uv sync --dev
-
-      - name: Build Markdown bundle
-        run: |
-          ./scripts/build_docs.sh
-          jq -n --arg ver "${{ github.event.release.tag_name || github.sha }}" \
-               --arg gen "griffe2md" \
-               '{language:"python", version:$ver, generator:$gen}' \
-            > site-md/package.meta.json
+      - name: Install dependencies
+        run: uv sync --dev
 
       - name: Clone portal
         run: git clone https://github.com/LEADR-official/leadr-oss.git portal
