@@ -1,7 +1,5 @@
 """Tests for Account service."""
 
-from datetime import UTC, datetime
-
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,18 +16,13 @@ class TestAccountService:
     async def test_create_account(self, db_session: AsyncSession):
         """Test creating an account via service."""
         service = AccountService(db_session)
-        account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         account = await service.create_account(
-            account_id=account_id,
             name="Acme Corporation",
             slug="acme-corp",
-            created_at=now,
-            updated_at=now,
         )
 
-        assert account.id == account_id
+        assert account.id is not None
         assert account.name == "Acme Corporation"
         assert account.slug == "acme-corp"
         assert account.status == AccountStatus.ACTIVE
@@ -37,23 +30,18 @@ class TestAccountService:
     async def test_get_account_by_id(self, db_session: AsyncSession):
         """Test retrieving an account by ID via service."""
         service = AccountService(db_session)
-        account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         # Create account
-        await service.create_account(
-            account_id=account_id,
+        created_account = await service.create_account(
             name="Acme Corporation",
             slug="acme-corp",
-            created_at=now,
-            updated_at=now,
         )
 
         # Retrieve it
-        account = await service.get_account(account_id)
+        account = await service.get_account(created_account.id)
 
         assert account is not None
-        assert account.id == account_id
+        assert account.id == created_account.id
         assert account.name == "Acme Corporation"
 
     async def test_get_account_by_id_not_found(self, db_session: AsyncSession):
@@ -68,23 +56,18 @@ class TestAccountService:
     async def test_get_account_by_slug(self, db_session: AsyncSession):
         """Test retrieving an account by slug via service."""
         service = AccountService(db_session)
-        account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         # Create account
-        await service.create_account(
-            account_id=account_id,
+        created_account = await service.create_account(
             name="Acme Corporation",
             slug="acme-corp",
-            created_at=now,
-            updated_at=now,
         )
 
         # Retrieve by slug
         account = await service.get_account_by_slug("acme-corp")
 
         assert account is not None
-        assert account.id == account_id
+        assert account.id == created_account.id
         assert account.slug == "acme-corp"
 
     async def test_get_account_by_slug_not_found(self, db_session: AsyncSession):
@@ -98,22 +81,15 @@ class TestAccountService:
     async def test_list_accounts(self, db_session: AsyncSession):
         """Test listing all accounts via service."""
         service = AccountService(db_session)
-        now = datetime.now(UTC)
 
         # Create multiple accounts
         await service.create_account(
-            account_id=EntityID.generate(),
             name="Acme Corporation",
             slug="acme-corp",
-            created_at=now,
-            updated_at=now,
         )
         await service.create_account(
-            account_id=EntityID.generate(),
             name="Beta Industries",
             slug="beta-industries",
-            created_at=now,
-            updated_at=now,
         )
 
         # List them
@@ -127,25 +103,20 @@ class TestAccountService:
     async def test_suspend_account(self, db_session: AsyncSession):
         """Test suspending an account via service."""
         service = AccountService(db_session)
-        account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         # Create account
-        await service.create_account(
-            account_id=account_id,
+        created_account = await service.create_account(
             name="Acme Corporation",
             slug="acme-corp",
-            created_at=now,
-            updated_at=now,
         )
 
         # Suspend it
-        suspended_account = await service.suspend_account(account_id)
+        suspended_account = await service.suspend_account(created_account.id)
 
         assert suspended_account.status == AccountStatus.SUSPENDED
 
         # Verify in database
-        account = await service.get_account(account_id)
+        account = await service.get_account(created_account.id)
         assert account is not None
         assert account.status == AccountStatus.SUSPENDED
 
@@ -162,26 +133,21 @@ class TestAccountService:
     async def test_activate_account(self, db_session: AsyncSession):
         """Test activating an account via service."""
         service = AccountService(db_session)
-        account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         # Create and suspend account
-        await service.create_account(
-            account_id=account_id,
+        created_account = await service.create_account(
             name="Acme Corporation",
             slug="acme-corp",
-            created_at=now,
-            updated_at=now,
         )
-        await service.suspend_account(account_id)
+        await service.suspend_account(created_account.id)
 
         # Activate it
-        activated_account = await service.activate_account(account_id)
+        activated_account = await service.activate_account(created_account.id)
 
         assert activated_account.status == AccountStatus.ACTIVE
 
         # Verify in database
-        account = await service.get_account(account_id)
+        account = await service.get_account(created_account.id)
         assert account is not None
         assert account.status == AccountStatus.ACTIVE
 
@@ -198,23 +164,18 @@ class TestAccountService:
     async def test_delete_account(self, db_session: AsyncSession):
         """Test soft-deleting an account via service."""
         service = AccountService(db_session)
-        account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         # Create account
-        await service.create_account(
-            account_id=account_id,
+        created_account = await service.create_account(
             name="Acme Corporation",
             slug="acme-corp",
-            created_at=now,
-            updated_at=now,
         )
 
         # Delete it
-        await service.delete_account(account_id)
+        await service.delete_account(created_account.id)
 
         # Verify it's not returned by normal queries
-        account = await service.get_account(account_id)
+        account = await service.get_account(created_account.id)
         assert account is None
 
     async def test_delete_account_not_found(self, db_session: AsyncSession):
@@ -230,27 +191,19 @@ class TestAccountService:
     async def test_list_accounts_excludes_deleted(self, db_session: AsyncSession):
         """Test that list_accounts excludes soft-deleted accounts."""
         service = AccountService(db_session)
-        now = datetime.now(UTC)
 
         # Create accounts
-        account1_id = EntityID.generate()
-        await service.create_account(
-            account_id=account1_id,
+        account1 = await service.create_account(
             name="Acme Corporation",
             slug="acme-corp",
-            created_at=now,
-            updated_at=now,
         )
         await service.create_account(
-            account_id=EntityID.generate(),
             name="Beta Industries",
             slug="beta-industries",
-            created_at=now,
-            updated_at=now,
         )
 
         # Delete one
-        await service.delete_account(account1_id)
+        await service.delete_account(account1.id)
 
         # List should only return non-deleted
         accounts = await service.list_accounts()

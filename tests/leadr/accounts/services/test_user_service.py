@@ -1,6 +1,5 @@
 """Tests for User service."""
 
-from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,15 +20,12 @@ class TestUserService:
         # Create account first
         account_repo = AccountRepository(db_session)
         account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         account = Account(
             id=account_id,
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
         )
         await account_repo.create(account)
 
@@ -39,8 +35,6 @@ class TestUserService:
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
-            created_at=now,
-            updated_at=now,
         )
 
         assert user.account_id == account_id
@@ -53,15 +47,12 @@ class TestUserService:
         # Create account and user
         account_repo = AccountRepository(db_session)
         account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         account = Account(
             id=account_id,
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
         )
         await account_repo.create(account)
 
@@ -70,8 +61,6 @@ class TestUserService:
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
-            created_at=now,
-            updated_at=now,
         )
 
         # Retrieve it
@@ -95,15 +84,12 @@ class TestUserService:
         # Create account and user
         account_repo = AccountRepository(db_session)
         account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         account = Account(
             id=account_id,
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
         )
         await account_repo.create(account)
 
@@ -112,8 +98,6 @@ class TestUserService:
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
-            created_at=now,
-            updated_at=now,
         )
 
         # Retrieve by email
@@ -136,15 +120,12 @@ class TestUserService:
         # Create account
         account_repo = AccountRepository(db_session)
         account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         account = Account(
             id=account_id,
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
         )
         await account_repo.create(account)
 
@@ -154,15 +135,11 @@ class TestUserService:
             account_id=account_id,
             email="user1@example.com",
             display_name="User One",
-            created_at=now,
-            updated_at=now,
         )
         await service.create_user(
             account_id=account_id,
             email="user2@example.com",
             display_name="User Two",
-            created_at=now,
-            updated_at=now,
         )
 
         # List them
@@ -178,15 +155,12 @@ class TestUserService:
         # Create account
         account_repo = AccountRepository(db_session)
         account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         account = Account(
             id=account_id,
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
         )
         await account_repo.create(account)
 
@@ -196,15 +170,11 @@ class TestUserService:
             account_id=account_id,
             email="user1@example.com",
             display_name="User One",
-            created_at=now,
-            updated_at=now,
         )
         await service.create_user(
             account_id=account_id,
             email="user2@example.com",
             display_name="User Two",
-            created_at=now,
-            updated_at=now,
         )
 
         # Delete one
@@ -221,15 +191,12 @@ class TestUserService:
         # Create account and user
         account_repo = AccountRepository(db_session)
         account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         account = Account(
             id=account_id,
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
         )
         await account_repo.create(account)
 
@@ -238,8 +205,6 @@ class TestUserService:
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
-            created_at=now,
-            updated_at=now,
         )
 
         # Update email and display name
@@ -263,15 +228,12 @@ class TestUserService:
         # Create account and user
         account_repo = AccountRepository(db_session)
         account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         account = Account(
             id=account_id,
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
         )
         await account_repo.create(account)
 
@@ -280,8 +242,6 @@ class TestUserService:
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
-            created_at=now,
-            updated_at=now,
         )
 
         # Update only email
@@ -298,15 +258,12 @@ class TestUserService:
         # Create account and user
         account_repo = AccountRepository(db_session)
         account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         account = Account(
             id=account_id,
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
         )
         await account_repo.create(account)
 
@@ -315,8 +272,6 @@ class TestUserService:
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
-            created_at=now,
-            updated_at=now,
         )
 
         # Update only display name
@@ -346,15 +301,12 @@ class TestUserService:
         # Create account and user
         account_repo = AccountRepository(db_session)
         account_id = EntityID.generate()
-        now = datetime.now(UTC)
 
         account = Account(
             id=account_id,
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
         )
         await account_repo.create(account)
 
@@ -363,8 +315,6 @@ class TestUserService:
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
-            created_at=now,
-            updated_at=now,
         )
 
         # Delete it

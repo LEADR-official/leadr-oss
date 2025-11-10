@@ -70,16 +70,12 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         key_prefix = plain_key[:14]  # ldr_ + 10 chars
 
         # Create domain entity
-        now = datetime.now(UTC)
         api_key = APIKey(
-            id=EntityID.generate(),
             account_id=account_id,
             name=name,
             key_hash=key_hash,
             key_prefix=key_prefix,
             expires_at=expires_at,
-            created_at=now,
-            updated_at=now,
         )
 
         # Persist to database

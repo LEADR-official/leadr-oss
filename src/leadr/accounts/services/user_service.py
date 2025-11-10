@@ -1,12 +1,9 @@
 """User service for managing user operations."""
 
-from datetime import datetime
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.user import User
 from leadr.accounts.services.repositories import UserRepository
-from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.models import EntityID
 from leadr.common.services import BaseService
 
@@ -31,8 +28,6 @@ class UserService(BaseService[User, UserRepository]):
         account_id: EntityID,
         email: str,
         display_name: str,
-        created_at: datetime,
-        updated_at: datetime,
     ) -> User:
         """Create a new user.
 
@@ -40,8 +35,6 @@ class UserService(BaseService[User, UserRepository]):
             account_id: The account ID the user belongs to.
             email: The user's email address.
             display_name: The user's display name.
-            created_at: The creation timestamp.
-            updated_at: The last update timestamp.
 
         Returns:
             The created User domain entity.
@@ -51,17 +44,12 @@ class UserService(BaseService[User, UserRepository]):
             ...     account_id=account_id,
             ...     email="user@example.com",
             ...     display_name="John Doe",
-            ...     created_at=datetime.now(UTC),
-            ...     updated_at=datetime.now(UTC),
             ... )
         """
         user = User(
-            id=EntityID.generate(),
             account_id=account_id,
             email=email,
             display_name=display_name,
-            created_at=created_at,
-            updated_at=updated_at,
         )
 
         return await self.repository.create(user)
@@ -118,9 +106,7 @@ class UserService(BaseService[User, UserRepository]):
         Raises:
             EntityNotFoundError: If the user doesn't exist.
         """
-        user = await self.repository.get_by_id(user_id)
-        if not user:
-            raise EntityNotFoundError("User", str(user_id))
+        user = await self.get_by_id_or_raise(user_id)
 
         # Update fields if provided
         if email is not None:

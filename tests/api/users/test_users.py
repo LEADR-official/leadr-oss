@@ -172,6 +172,7 @@ class TestUserAPI:
         response = await client.get("/users")
 
         assert response.status_code == 400
+        assert response.json()["detail"] == "account_id query parameter is required"
 
     async def test_update_user(self, client: AsyncClient, db_session):
         """Test updating user via PATCH /users/{id}."""
@@ -280,23 +281,23 @@ class TestUserAPI:
         assert response.status_code == 404
 
     async def test_get_user_invalid_uuid(self, client: AsyncClient):
-        """Test getting user with invalid UUID returns 400."""
+        """Test getting user with invalid UUID returns 422."""
         response = await client.get("/users/not-a-uuid")
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         data = response.json()
-        assert "Invalid user ID" in data["detail"]
+        assert "detail" in data  # FastAPI validation error
 
     async def test_update_user_invalid_uuid(self, client: AsyncClient):
-        """Test updating user with invalid UUID returns 400."""
+        """Test updating user with invalid UUID returns 422."""
         response = await client.patch(
             "/users/not-a-uuid",
             json={"display_name": "Updated Name"},
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         data = response.json()
-        assert "Invalid user ID" in data["detail"]
+        assert "detail" in data  # FastAPI validation error
 
     async def test_create_user_invalid_account_id(self, client: AsyncClient):
         """Test creating user with invalid account ID returns 422."""
@@ -312,12 +313,12 @@ class TestUserAPI:
         assert response.status_code == 422
 
     async def test_list_users_invalid_account_id(self, client: AsyncClient):
-        """Test listing users with invalid account ID returns 400."""
+        """Test listing users with invalid account ID returns 422."""
         response = await client.get("/users?account_id=not-a-uuid")
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         data = response.json()
-        assert "Invalid account ID" in data["detail"]
+        assert "detail" in data  # FastAPI validation error
 
     async def test_update_user_partial_email_only(self, client: AsyncClient, db_session):
         """Test updating only email of a user."""

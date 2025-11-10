@@ -1,7 +1,5 @@
 """Account service for managing account operations."""
 
-from datetime import datetime
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
@@ -28,40 +26,28 @@ class AccountService(BaseService[Account, AccountRepository]):
 
     async def create_account(
         self,
-        account_id: EntityID,
         name: str,
         slug: str,
-        created_at: datetime,
-        updated_at: datetime,
     ) -> Account:
         """Create a new account.
 
         Args:
-            account_id: The ID for the new account.
             name: The account name.
             slug: The URL-friendly slug for the account.
-            created_at: The creation timestamp.
-            updated_at: The last update timestamp.
 
         Returns:
             The created Account domain entity.
 
         Example:
             >>> account = await service.create_account(
-            ...     account_id=EntityID.generate(),
             ...     name="Acme Corporation",
             ...     slug="acme-corp",
-            ...     created_at=datetime.now(UTC),
-            ...     updated_at=datetime.now(UTC),
             ... )
         """
         account = Account(
-            id=account_id,
             name=name,
             slug=slug,
             status=AccountStatus.ACTIVE,
-            created_at=created_at,
-            updated_at=updated_at,
         )
 
         return await self.repository.create(account)

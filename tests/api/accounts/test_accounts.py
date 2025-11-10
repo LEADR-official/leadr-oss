@@ -275,23 +275,23 @@ class TestAccountAPI:
         assert response.status_code == 404
 
     async def test_get_account_invalid_uuid(self, client: AsyncClient):
-        """Test getting account with invalid UUID returns 400."""
+        """Test getting account with invalid UUID returns 422."""
         response = await client.get("/accounts/not-a-uuid")
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         data = response.json()
-        assert "Invalid account ID" in data["detail"]
+        assert "detail" in data  # FastAPI validation error
 
     async def test_update_account_invalid_uuid(self, client: AsyncClient):
-        """Test updating account with invalid UUID returns 400."""
+        """Test updating account with invalid UUID returns 422."""
         response = await client.patch(
             "/accounts/not-a-uuid",
             json={"name": "Updated Name"},
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         data = response.json()
-        assert "Invalid account ID" in data["detail"]
+        assert "detail" in data  # FastAPI validation error
 
     async def test_update_account_partial(self, client: AsyncClient, db_session):
         """Test updating only some fields of an account."""

@@ -15,7 +15,6 @@ from leadr.auth.api.schemas import (
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.api_key_service import APIKeyService
 from leadr.common.dependencies import DatabaseSession
-from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.models import EntityID
 
 router = APIRouter(prefix="/api-keys", tags=["API Keys"])
@@ -83,12 +82,9 @@ async def list_api_keys(
     """
     service = APIKeyService(db)
 
-    # Convert UUID to EntityID if provided
-    entity_id = EntityID(value=account_id) if account_id else None
-
     # Get filtered list from service
     api_keys = await service.list_api_keys(
-        account_id=entity_id,
+        account_id=EntityID(value=account_id) if account_id else None,
         status=status.value if status else None,
     )
 
@@ -115,16 +111,7 @@ async def get_api_key(
         404: API key not found.
     """
     service = APIKeyService(db)
-    entity_id = EntityID(value=key_id)
-
-    api_key = await service.get_api_key(entity_id)
-
-    if not api_key:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="API key not found",
-        )
-
+    api_key = await service.get_by_id_or_raise(EntityID(value=key_id))
     return APIKeyResponse.from_domain(api_key)
 
 
@@ -156,33 +143,16 @@ async def update_api_key(
     service = APIKeyService(db)
     entity_id = EntityID(value=key_id)
 
-    try:
-        # Update status if provided
-        if request.status is not None:
-            api_key = await service.update_api_key_status(entity_id, request.status.value)
-            return APIKeyResponse.from_domain(api_key)
-        # Handle soft delete if provided
-        elif request.deleted is not None and request.deleted:
-            # Get the key before deleting to return it
-            api_key = await service.get_api_key(entity_id)
-            if not api_key:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="API key not found",
-                )
-            await service.delete(entity_id)
-            return APIKeyResponse.from_domain(api_key)
-        else:
-            # No update requested, just fetch current state
-            api_key = await service.get_api_key(entity_id)
-            if not api_key:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="API key not found",
-                )
-            return APIKeyResponse.from_domain(api_key)
-    except EntityNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="API key not found",
-        ) from e
+    # Update status if provided
+    if request.status is not None:
+        api_key = await service.update_api_key_status(entity_id, request.status.value)
+        return APIKeyResponse.from_domain(api_key)
+
+    # Handle soft delete if provided
+    if request.deleted is not None and request.deleted:
+        api_key = await service.soft_delete(entity_id)
+        return APIKeyResponse.from_domain(api_key)
+
+    # No update requested, just fetch current state
+    api_key = await service.get_by_id_or_raise(entity_id)
+    return APIKeyResponse.from_domain(api_key)
