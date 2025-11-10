@@ -1,5 +1,9 @@
 """Account and User repository services."""
 
+from typing import Any
+
+from sqlalchemy import select
+
 from leadr.accounts.adapters.orm import AccountORM, AccountStatusEnum, UserORM
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
@@ -42,6 +46,35 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
         """Get account by slug, returns None if not found or soft-deleted."""
         return await self._get_by_field("slug", slug)
 
+    async def filter(self, **kwargs: Any) -> list[Account]:
+        """Filter accounts by optional criteria.
+
+        Account is the top-level tenant boundary, so no account_id filtering is required.
+
+        Args:
+            status: Optional AccountStatus to filter by
+            slug: Optional slug to filter by
+            **kwargs: Additional filter parameters (reserved for future use)
+
+        Returns:
+            List of accounts matching the filter criteria
+        """
+        query = select(AccountORM).where(AccountORM.deleted_at.is_(None))
+
+        # Apply optional filters
+        if "status" in kwargs and kwargs["status"] is not None:
+            status_value = kwargs["status"]
+            if isinstance(status_value, AccountStatus):
+                status_value = status_value.value
+            query = query.where(AccountORM.status == AccountStatusEnum(status_value))
+
+        if "slug" in kwargs and kwargs["slug"] is not None:
+            query = query.where(AccountORM.slug == kwargs["slug"])
+
+        result = await self.session.execute(query)
+        orms = result.scalars().all()
+        return [self._to_domain(orm) for orm in orms]
+
 
 class UserRepository(BaseRepository[User, UserORM]):
     """User repository for managing user persistence."""
@@ -78,6 +111,25 @@ class UserRepository(BaseRepository[User, UserORM]):
         """Get user by email, returns None if not found or soft-deleted."""
         return await self._get_by_field("email", email)
 
-    async def list_by_account(self, account_id: EntityID) -> list[User]:
-        """List all non-deleted users for a given account."""
-        return await self._list_by_account(account_id)
+    async def filter(self, account_id: EntityID, **kwargs: Any) -> list[User]:
+        """Filter users by account and optional criteria.
+
+        Args:
+            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            **kwargs: Additional filter parameters (reserved for future use)
+
+        Returns:
+            List of users for the account matching the filter criteria
+        """
+        query = select(UserORM).where(
+            UserORM.account_id == account_id.value,
+            UserORM.deleted_at.is_(None),
+        )
+
+        # Future: Add additional filters here as needed
+        # if "status" in kwargs:
+        #     query = query.where(UserORM.status == kwargs["status"])
+
+        result = await self.session.execute(query)
+        orms = result.scalars().all()
+        return [self._to_domain(orm) for orm in orms]

@@ -165,8 +165,45 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
         )
         await self.session.commit()
 
-    async def list_all(self, include_deleted: bool = False) -> list[DomainEntityT]:
-        """List all entities.
+    @abstractmethod
+    async def filter(self, **kwargs: Any) -> list[DomainEntityT]:
+        """Filter entities based on criteria.
+
+        This method is abstract to allow each repository to define its own
+        filtering requirements. For multi-tenant entities, implementations
+        MUST require account_id parameter. For top-level entities like Account,
+        implementations can filter by other criteria.
+
+        Args:
+            **kwargs: Filter parameters specific to the entity type.
+                     Multi-tenant entities MUST accept account_id: EntityID.
+
+        Returns:
+            List of domain entities matching the filter criteria
+
+        Example (multi-tenant):
+            async def filter(
+                self,
+                account_id: EntityID,
+                status: str | None = None,
+                **kwargs
+            ) -> list[User]:
+                # Implementation with account_id required
+
+        Example (top-level tenant):
+            async def filter(
+                self,
+                status: str | None = None,
+                **kwargs
+            ) -> list[Account]:
+                # Implementation without account_id
+        """
+
+    async def _list_all_unfiltered(self, include_deleted: bool = False) -> list[DomainEntityT]:
+        """List all entities without filtering by account.
+
+        PRIVATE METHOD - Use filter() in application code for multi-tenant safety.
+        This method is for internal use and testing only.
 
         Args:
             include_deleted: If True, include soft-deleted entities. Defaults to False.

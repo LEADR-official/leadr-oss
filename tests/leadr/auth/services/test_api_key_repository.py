@@ -193,7 +193,7 @@ class TestAPIKeyRepository:
         await api_key_repo.create(key2)
 
         # List keys for account
-        keys = await api_key_repo.list_by_account(account_id)
+        keys = await api_key_repo.filter(account_id)
 
         assert len(keys) == 2
         names = {key.name for key in keys}
@@ -245,7 +245,7 @@ class TestAPIKeyRepository:
         await api_key_repo.create(revoked_key)
 
         # List only active keys
-        active_keys = await api_key_repo.list_by_account(account_id, active_only=True)
+        active_keys = await api_key_repo.filter(account_id, active_only=True)
 
         assert len(active_keys) == 1
         assert active_keys[0].name == "Active Key"

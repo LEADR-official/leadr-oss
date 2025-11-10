@@ -122,16 +122,25 @@ async def get_user(user_id: UUID, db: DatabaseSession) -> UserResponse:
 
 @router.get("/users", response_model=list[UserResponse])
 async def list_users(
-    db: DatabaseSession, account_id: Annotated[UUID | None, Query()] = None
+    db: DatabaseSession,
+    account_id: Annotated[UUID, Query(description="Account ID to filter by")],
 ) -> list[UserResponse]:
-    """List users by account."""
-    if not account_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="account_id query parameter is required"
-        )
+    """List users for an account.
 
+    TODO: Replace account_id query param with account_id from auth token.
+
+    Args:
+        account_id: Account ID to filter results (REQUIRED for multi-tenant safety).
+
+    Returns:
+        List of users for the account.
+    """
     service = UserService(db)
-    users = await service.list_users_by_account(EntityID(value=account_id))
+
+    # TODO: Replace with account_id from authenticated user's token
+    entity_account_id = EntityID(value=account_id)
+
+    users = await service.list_users_by_account(entity_account_id)
     return [UserResponse.from_domain(user) for user in users]
 
 

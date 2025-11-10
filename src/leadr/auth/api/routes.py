@@ -66,15 +66,15 @@ async def create_api_key(
 )
 async def list_api_keys(
     db: DatabaseSession,
-    account_id: Annotated[UUID | None, Query(description="Filter by account ID")] = None,
+    account_id: Annotated[UUID, Query(description="Account ID to filter by")],
     status: Annotated[APIKeyStatus | None, Query(description="Filter by status")] = None,
 ) -> list[APIKeyResponse]:
-    """List API keys with optional filters.
+    """List API keys for an account with optional filters.
 
-    Query parameters can be combined to narrow results.
+    TODO: Replace account_id query param with account_id from auth token.
 
     Args:
-        account_id: Optional account ID to filter results.
+        account_id: Account ID to filter results (REQUIRED for multi-tenant safety).
         status: Optional status to filter results (active or revoked).
 
     Returns:
@@ -82,9 +82,12 @@ async def list_api_keys(
     """
     service = APIKeyService(db)
 
+    # TODO: Replace with account_id from authenticated user's token
+    entity_account_id = EntityID(value=account_id)
+
     # Get filtered list from service
     api_keys = await service.list_api_keys(
-        account_id=EntityID(value=account_id) if account_id else None,
+        account_id=entity_account_id,
         status=status.value if status else None,
     )
 

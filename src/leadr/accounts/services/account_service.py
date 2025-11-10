@@ -80,7 +80,7 @@ class AccountService(BaseService[Account, AccountRepository]):
         Returns:
             List of Account domain entities.
         """
-        return await self.list_all()
+        return await self.repository.filter()
 
     async def suspend_account(self, account_id: EntityID) -> Account:
         """Suspend an account, preventing access.

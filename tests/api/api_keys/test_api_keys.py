@@ -306,12 +306,12 @@ class TestListAPIKeys:
         # TODO: Revoke one key once PATCH endpoint is implemented
         # For now, all keys should be active
 
-        # Filter by active status
-        response = await client.get("/api-keys?status=active")
+        # Filter by active status for this account
+        response = await client.get(f"/api-keys?account_id={account_id.value}&status=active")
         assert response.status_code == 200
 
         data = response.json()
-        assert len(data) >= 3  # At least our 3 keys
+        assert len(data) == 3  # Exactly our 3 keys (filtered by account and status)
         for item in data:
             assert item["status"] == "active"
 
@@ -383,12 +383,12 @@ class TestListAPIKeys:
                 },
             )
 
-        # List all keys
-        response = await client.get("/api-keys")
+        # List all keys for the account
+        response = await client.get(f"/api-keys?account_id={account_id.value}")
         assert response.status_code == 200
 
         data = response.json()
-        assert len(data) >= 3  # At least our 3 keys
+        assert len(data) == 3  # Exactly our 3 keys (filtered by account)
 
     async def test_list_api_keys_empty_result(self, client: AsyncClient):
         """Test listing API keys with filter that matches nothing returns empty list."""

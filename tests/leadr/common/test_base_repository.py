@@ -2,11 +2,12 @@
 
 from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
 from uuid import UUID
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import String
+from sqlalchemy import String, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -78,6 +79,23 @@ class TestRepository(BaseRepository[TestEntity, TestEntityORM]):
     def _get_orm_class(self) -> type[TestEntityORM]:
         """Get the ORM model class."""
         return TestEntityORM
+
+    async def filter(self, **kwargs: Any) -> list[TestEntity]:
+        """Filter test entities.
+
+        This test repository doesn't require account_id (top-level tenant).
+        """
+        query = select(TestEntityORM).where(TestEntityORM.deleted_at.is_(None))
+
+        if "status" in kwargs and kwargs["status"] is not None:
+            status_value = kwargs["status"]
+            if isinstance(status_value, TestStatus):
+                status_value = status_value.value
+            query = query.where(TestEntityORM.status == TestStatusEnum(status_value))
+
+        result = await self.session.execute(query)
+        orms = result.scalars().all()
+        return [self._to_domain(orm) for orm in orms]
 
 
 @pytest.mark.asyncio
@@ -270,57 +288,43 @@ class TestBaseRepository:
         with pytest.raises(EntityNotFoundError):
             await repo.delete(non_existent_id)
 
-    async def test_list_all(self, db_session: AsyncSession):
-        """Test listing all entities."""
+    async def test_filter(self, db_session: AsyncSession):
+        """Test filtering entities."""
         repo = TestRepository(db_session)
-        now = datetime.now(UTC)
 
         # Create multiple entities
         entity1 = TestEntity(
-            id=EntityID.generate(),
             name="Entity 1",
             status=TestStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
         )
         entity2 = TestEntity(
-            id=EntityID.generate(),
             name="Entity 2",
             status=TestStatus.INACTIVE,
-            created_at=now,
-            updated_at=now,
         )
 
         await repo.create(entity1)
         await repo.create(entity2)
 
-        # List them
-        entities = await repo.list_all()
+        # Filter them
+        entities = await repo.filter()
 
         assert len(entities) == 2
         names = {e.name for e in entities}
         assert "Entity 1" in names
         assert "Entity 2" in names
 
-    async def test_list_all_excludes_deleted_by_default(self, db_session: AsyncSession):
-        """Test that list_all excludes soft-deleted entities by default."""
+    async def test_filter_excludes_deleted_by_default(self, db_session: AsyncSession):
+        """Test that filter() excludes soft-deleted entities by default."""
         repo = TestRepository(db_session)
-        now = datetime.now(UTC)
 
         # Create entities
         entity1 = TestEntity(
-            id=EntityID.generate(),
             name="Entity 1",
             status=TestStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
         )
         entity2 = TestEntity(
-            id=EntityID.generate(),
             name="Entity 2",
             status=TestStatus.INACTIVE,
-            created_at=now,
-            updated_at=now,
         )
 
         await repo.create(entity1)
@@ -329,43 +333,32 @@ class TestBaseRepository:
         # Soft-delete one
         await repo.delete(entity1.id)
 
-        # List should only return non-deleted
-        entities = await repo.list_all()
+        # Filter should only return non-deleted
+        entities = await repo.filter()
 
         assert len(entities) == 1
         assert entities[0].name == "Entity 2"
 
-    async def test_list_all_includes_deleted_when_requested(self, db_session: AsyncSession):
-        """Test that list_all can include soft-deleted entities."""
+    async def test_filter_with_status(self, db_session: AsyncSession):
+        """Test that filter() can filter by status."""
         repo = TestRepository(db_session)
-        now = datetime.now(UTC)
 
         # Create entities
         entity1 = TestEntity(
-            id=EntityID.generate(),
             name="Entity 1",
             status=TestStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
         )
         entity2 = TestEntity(
-            id=EntityID.generate(),
             name="Entity 2",
             status=TestStatus.INACTIVE,
-            created_at=now,
-            updated_at=now,
         )
 
         await repo.create(entity1)
         await repo.create(entity2)
 
-        # Soft-delete one
-        await repo.delete(entity1.id)
+        # Filter by status
+        active_entities = await repo.filter(status=TestStatus.ACTIVE)
 
-        # List with include_deleted=True
-        entities = await repo.list_all(include_deleted=True)
-
-        assert len(entities) == 2
-        deleted_entities = [e for e in entities if e.deleted_at is not None]
-        assert len(deleted_entities) == 1
-        assert deleted_entities[0].name == "Entity 1"
+        assert len(active_entities) == 1
+        assert active_entities[0].name == "Entity 1"
+        assert active_entities[0].status == TestStatus.ACTIVE

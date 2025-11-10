@@ -85,7 +85,7 @@ class UserService(BaseService[User, UserRepository]):
         Returns:
             List of User domain entities belonging to the account.
         """
-        return await self.repository.list_by_account(account_id)
+        return await self.repository.filter(account_id)
 
     async def update_user(
         self,

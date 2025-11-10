@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import select
 
 from leadr.auth.adapters.orm import APIKeyORM, APIKeyStatusEnum
@@ -53,53 +55,36 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         """Get API key by prefix, returns None if not found or soft-deleted."""
         return await self._get_by_field("key_prefix", key_prefix)
 
-    async def list(
-        self,
-        account_id: EntityID | None = None,
-        status: APIKeyStatus | None = None,
-        include_deleted: bool = False,
-    ) -> list[APIKey]:
-        """List API keys with optional filters.
+    async def filter(self, account_id: EntityID, **kwargs: Any) -> list[APIKey]:
+        """Filter API keys by account and optional criteria.
 
         Args:
-            account_id: Optional account ID to filter by.
-            status: Optional status to filter by.
-            include_deleted: If True, include soft-deleted keys. Defaults to False.
+            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            status: Optional APIKeyStatus to filter by
+            active_only: If True, only return ACTIVE keys (bool)
+            **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of API keys matching the filters.
+            List of API keys for the account matching the filter criteria
         """
-        query = select(APIKeyORM)
+        query = select(APIKeyORM).where(
+            APIKeyORM.account_id == account_id.value,
+            APIKeyORM.deleted_at.is_(None),
+        )
 
-        if not include_deleted:
-            query = query.where(APIKeyORM.deleted_at.is_(None))
+        # Apply optional filters
+        if "status" in kwargs and kwargs["status"] is not None:
+            status_value = kwargs["status"]
+            if isinstance(status_value, APIKeyStatus):
+                status_value = status_value.value
+            query = query.where(APIKeyORM.status == APIKeyStatusEnum(status_value))
 
-        if account_id is not None:
-            query = query.where(APIKeyORM.account_id == account_id.value)
-
-        if status is not None:
-            query = query.where(APIKeyORM.status == APIKeyStatusEnum(status.value))
+        if "active_only" in kwargs and kwargs["active_only"] is True:
+            query = query.where(APIKeyORM.status == APIKeyStatusEnum.ACTIVE)
 
         result = await self.session.execute(query)
         orms = result.scalars().all()
         return [self._to_domain(orm) for orm in orms]
-
-    async def list_by_account(
-        self, account_id: EntityID, active_only: bool = False
-    ) -> list[APIKey]:
-        """List API keys for a given account, excluding soft-deleted keys.
-
-        Args:
-            account_id: The account ID to filter by.
-            active_only: If True, only return keys with ACTIVE status.
-
-        Returns:
-            List of non-deleted API keys belonging to the account.
-        """
-        filters = []
-        if active_only:
-            filters.append(APIKeyORM.status == APIKeyStatusEnum.ACTIVE)
-        return await self._list_by_account(account_id, filters if filters else None)
 
     async def count_active_by_account(self, account_id: EntityID) -> int:
         """Count active, non-deleted API keys for a given account.

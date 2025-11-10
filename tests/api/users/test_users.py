@@ -168,11 +168,12 @@ class TestUserAPI:
         assert "user2@example.com" in emails
 
     async def test_list_users_requires_account_id(self, client: AsyncClient):
-        """Test that listing users without account_id returns 400."""
+        """Test that listing users without account_id returns 422 validation error."""
         response = await client.get("/users")
 
-        assert response.status_code == 400
-        assert response.json()["detail"] == "account_id query parameter is required"
+        assert response.status_code == 422  # FastAPI validation error
+        data = response.json()
+        assert "detail" in data  # FastAPI validation error structure
 
     async def test_update_user(self, client: AsyncClient, db_session):
         """Test updating user via PATCH /users/{id}."""

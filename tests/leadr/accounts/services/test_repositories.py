@@ -173,7 +173,7 @@ class TestAccountRepository:
         await repo.create(account2)
 
         # List them
-        accounts = await repo.list_all()
+        accounts = await repo.filter()
 
         assert len(accounts) == 2
         slugs = {acc.slug for acc in accounts}
@@ -205,7 +205,7 @@ class TestAccountRepository:
         assert retrieved is None
 
     async def test_list_accounts_excludes_deleted(self, db_session: AsyncSession):
-        """Test that list_all excludes soft-deleted accounts."""
+        """Test that filter() excludes soft-deleted accounts."""
         repo = AccountRepository(db_session)
         now = datetime.now(UTC)
 
@@ -234,7 +234,7 @@ class TestAccountRepository:
         await repo.delete(account1.id)
 
         # List should only return non-deleted
-        accounts = await repo.list_all()
+        accounts = await repo.filter()
 
         assert len(accounts) == 1
         assert accounts[0].slug == "beta-industries"
@@ -422,7 +422,7 @@ class TestUserRepository:
         await user_repo.create(user2)
 
         # List users for account
-        users = await user_repo.list_by_account(account_id)
+        users = await user_repo.filter(account_id)
 
         assert len(users) == 2
         emails = {u.email for u in users}
@@ -548,7 +548,7 @@ class TestUserRepository:
         assert retrieved is None
 
     async def test_list_users_excludes_deleted(self, db_session: AsyncSession):
-        """Test that list_by_account excludes soft-deleted users."""
+        """Test that filter() excludes soft-deleted users."""
         # Create account
         account_repo = AccountRepository(db_session)
         account_id = EntityID.generate()
@@ -591,7 +591,7 @@ class TestUserRepository:
         await user_repo.delete(user1.id)
 
         # List should only return non-deleted
-        users = await user_repo.list_by_account(account_id)
+        users = await user_repo.filter(account_id)
 
         assert len(users) == 1
         assert users[0].email == "user2@example.com"

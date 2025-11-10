@@ -145,13 +145,13 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
 
     async def list_api_keys(
         self,
-        account_id: EntityID | None = None,
+        account_id: EntityID,
         status: str | None = None,
     ) -> list[APIKey]:
-        """List API keys with optional filters.
+        """List API keys for an account with optional filters.
 
         Args:
-            account_id: Optional account ID to filter by.
+            account_id: REQUIRED - Account ID to filter by (multi-tenant safety).
             status: Optional status string to filter by.
 
         Returns:
@@ -159,13 +159,12 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         """
         from leadr.auth.domain.api_key import APIKeyStatus
 
-        # Convert status string to enum if provided
-        status_enum = APIKeyStatus(status) if status else None
+        # Build filter kwargs
+        kwargs = {}
+        if status is not None:
+            kwargs["status"] = APIKeyStatus(status)
 
-        return await self.repository.list(
-            account_id=account_id,
-            status=status_enum,
-        )
+        return await self.repository.filter(account_id, **kwargs)
 
     async def list_account_api_keys(
         self,
@@ -181,7 +180,11 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         Returns:
             List of APIKey domain entities.
         """
-        return await self.repository.list_by_account(account_id, active_only)
+        kwargs = {}
+        if active_only:
+            kwargs["active_only"] = True
+
+        return await self.repository.filter(account_id, **kwargs)
 
     async def count_active_api_keys(self, account_id: EntityID) -> int:
         """Count active API keys for an account.
