@@ -4,6 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy.exc import IntegrityError
 
 from leadr.accounts.api.schemas import (
     AccountCreateRequest,
@@ -88,14 +89,25 @@ async def update_account(
 # User routes
 @router.post("/users", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
 async def create_user(request: UserCreateRequest, db: DatabaseSession) -> UserResponse:
-    """Create a new user."""
+    """Create a new user.
+
+    Raises:
+        404: Account not found.
+    """
     service = UserService(db)
 
-    user = await service.create_user(
-        account_id=EntityID(value=request.account_id),
-        email=request.email,
-        display_name=request.display_name,
-    )
+    try:
+        user = await service.create_user(
+            account_id=EntityID(value=request.account_id),
+            email=request.email,
+            display_name=request.display_name,
+        )
+    except IntegrityError:
+        # Foreign key constraint violation - account doesn't exist
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found",
+        ) from None
 
     return UserResponse.from_domain(user)
 

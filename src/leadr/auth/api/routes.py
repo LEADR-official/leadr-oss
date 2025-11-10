@@ -17,7 +17,7 @@ from leadr.auth.services.api_key_service import APIKeyService
 from leadr.common.dependencies import DatabaseSession
 from leadr.common.domain.models import EntityID
 
-router = APIRouter(prefix="/api-keys", tags=["API Keys"])
+router = APIRouter()
 
 
 @router.post(
