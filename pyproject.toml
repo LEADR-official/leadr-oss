@@ -34,6 +34,7 @@ dev = [
     "httpx>=0.28.1",
     "pytest-asyncio>=1.2.0",
     "greenlet>=3.2.4",
+    "griffe2md>=1.2.5",
 ]
 
 [tool.ruff]
@@ -85,6 +86,19 @@ exclude_lines = [
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
 ]
+
+[tool.griffe2md]
+docstring_style = "google"       # parse Google-style sections
+extension = ["pydantic", "fastapi"]
+
+# Filtering & ordering
+exclude = ["^_"]                 # hide private members
+
+# Content options
+show_annotations = true
+show_bases = true
+show_inheritance = true
+show_signature_return_annotation = true
 
 [tool.alembic]
 file_template = "%%(year)d%%(month).2d%%(day).2d%%(hour).2d%%(minute).2d%%(second).2d_%%(rev)s_%%(slug)s"
