@@ -5,11 +5,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import yaml
-from fastapi import FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 
 from api.routes import router as api_router
 from leadr.accounts.api.routes import router as accounts_router
 from leadr.auth.api.routes import router as auth_router
+from leadr.auth.dependencies import require_api_key
 from leadr.common.api.exceptions import entity_not_found_handler
 from leadr.common.database import engine
 from leadr.common.domain.exceptions import EntityNotFoundError
@@ -62,12 +63,23 @@ app = FastAPI(
 # Register global exception handlers
 app.add_exception_handler(EntityNotFoundError, entity_not_found_handler)
 
-# Always include shared routes (health check, root endpoint)
-app.include_router(api_router, prefix=settings.API_PREFIX)
+# Create public and admin routers with separate authentication requirements
+public_router = APIRouter()
+admin_router = APIRouter(dependencies=[Depends(require_api_key)])
 
-# Include domain routers
-app.include_router(accounts_router, prefix=settings.API_PREFIX, tags=["Accounts"])
-app.include_router(auth_router, prefix=settings.API_PREFIX, tags=["API Keys"])
+# Public routes - accessible without authentication
+public_router.include_router(api_router)
+
+# Admin routes - require API key authentication
+admin_router.include_router(accounts_router, tags=["Accounts"])
+admin_router.include_router(auth_router, tags=["API Keys"])
+
+# Include public router (always available)
+app.include_router(public_router, prefix=settings.API_PREFIX)
+
+# Include admin router only when Admin API is enabled
+if settings.ENABLE_ADMIN_API:
+    app.include_router(admin_router, prefix=settings.API_PREFIX)
 
 
 if __name__ == "__main__":
