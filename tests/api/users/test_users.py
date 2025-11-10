@@ -321,7 +321,9 @@ class TestUserAPI:
         data = response.json()
         assert "detail" in data  # FastAPI validation error
 
-    async def test_update_user_partial_email_only(self, authenticated_client: AsyncClient, db_session):
+    async def test_update_user_partial_email_only(
+        self, authenticated_client: AsyncClient, db_session
+    ):
         """Test updating only email of a user."""
         # Create account and user
         account_repo = AccountRepository(db_session)
@@ -364,7 +366,9 @@ class TestUserAPI:
         assert data["email"] == "newemail@example.com"
         assert data["display_name"] == "John Doe"  # unchanged
 
-    async def test_update_user_partial_display_name_only(self, authenticated_client: AsyncClient, db_session):
+    async def test_update_user_partial_display_name_only(
+        self, authenticated_client: AsyncClient, db_session
+    ):
         """Test updating only display_name of a user."""
         # Create account and user
         account_repo = AccountRepository(db_session)

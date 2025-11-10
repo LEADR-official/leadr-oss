@@ -122,7 +122,9 @@ class TestRequireAPIKey:
             await require_api_key(api_key=plain_key, db=db_session)
 
         assert exc_info.value.status_code == 401
-        assert "invalid" in exc_info.value.detail.lower() or "expired" in exc_info.value.detail.lower()
+        assert (
+            "invalid" in exc_info.value.detail.lower() or "expired" in exc_info.value.detail.lower()
+        )
 
     async def test_revoked_api_key_raises_401(self, db_session: AsyncSession):
         """Test that a revoked API key raises 401 Unauthorized."""
@@ -157,7 +159,9 @@ class TestRequireAPIKey:
             await require_api_key(api_key=plain_key, db=db_session)
 
         assert exc_info.value.status_code == 401
-        assert "invalid" in exc_info.value.detail.lower() or "revoked" in exc_info.value.detail.lower()
+        assert (
+            "invalid" in exc_info.value.detail.lower() or "revoked" in exc_info.value.detail.lower()
+        )
 
     async def test_soft_deleted_api_key_raises_401(self, db_session: AsyncSession):
         """Test that a soft-deleted API key raises 401 Unauthorized."""

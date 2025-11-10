@@ -15,7 +15,9 @@ from leadr.accounts.services.repositories import AccountRepository
 class TestCreateAPIKey:
     """Test suite for POST /v1/api-keys endpoint."""
 
-    async def test_create_api_key_success(self, authenticated_client: AsyncClient, db_session: AsyncSession):
+    async def test_create_api_key_success(
+        self, authenticated_client: AsyncClient, db_session: AsyncSession
+    ):
         """Test creating an API key with valid data."""
         # Create an account first
         account_repo = AccountRepository(db_session)
@@ -99,7 +101,9 @@ class TestCreateAPIKey:
 
         assert response.status_code == 422
 
-    async def test_create_api_key_missing_name(self, authenticated_client: AsyncClient, db_session: AsyncSession):
+    async def test_create_api_key_missing_name(
+        self, authenticated_client: AsyncClient, db_session: AsyncSession
+    ):
         """Test creating an API key without name returns 422."""
         # Create an account first
         account_repo = AccountRepository(db_session)
@@ -125,7 +129,9 @@ class TestCreateAPIKey:
 
         assert response.status_code == 422
 
-    async def test_create_api_key_invalid_account_id_format(self, authenticated_client: AsyncClient):
+    async def test_create_api_key_invalid_account_id_format(
+        self, authenticated_client: AsyncClient
+    ):
         """Test creating an API key with invalid UUID format returns 422."""
         response = await authenticated_client.post(
             "/api-keys",
@@ -203,7 +209,9 @@ class TestCreateAPIKey:
 class TestListAPIKeys:
     """Test suite for GET /v1/api-keys endpoint (list/filter)."""
 
-    async def test_list_api_keys_by_account(self, authenticated_client: AsyncClient, db_session: AsyncSession):
+    async def test_list_api_keys_by_account(
+        self, authenticated_client: AsyncClient, db_session: AsyncSession
+    ):
         """Test listing API keys filtered by account_id."""
         # Create two accounts
         account_repo = AccountRepository(db_session)
@@ -307,7 +315,9 @@ class TestListAPIKeys:
         # For now, all keys should be active
 
         # Filter by active status for this account
-        response = await authenticated_client.get(f"/api-keys?account_id={account_id}&status=active")
+        response = await authenticated_client.get(
+            f"/api-keys?account_id={account_id}&status=active"
+        )
         assert response.status_code == 200
 
         data = response.json()
@@ -345,7 +355,9 @@ class TestListAPIKeys:
             )
 
         # Filter by both account_id and status
-        response = await authenticated_client.get(f"/api-keys?account_id={account_id}&status=active")
+        response = await authenticated_client.get(
+            f"/api-keys?account_id={account_id}&status=active"
+        )
         assert response.status_code == 200
 
         data = response.json()
@@ -415,7 +427,9 @@ class TestListAPIKeys:
 class TestGetSingleAPIKey:
     """Test suite for GET /v1/api-keys/{key_id} endpoint."""
 
-    async def test_get_api_key_success(self, authenticated_client: AsyncClient, db_session: AsyncSession):
+    async def test_get_api_key_success(
+        self, authenticated_client: AsyncClient, db_session: AsyncSession
+    ):
         """Test getting a single API key by ID."""
         # Create an account
         account_repo = AccountRepository(db_session)
@@ -612,7 +626,9 @@ class TestUpdateAPIKey:
         )
         assert response.status_code == 422
 
-    async def test_update_api_key_soft_delete(self, authenticated_client: AsyncClient, db_session: AsyncSession):
+    async def test_update_api_key_soft_delete(
+        self, authenticated_client: AsyncClient, db_session: AsyncSession
+    ):
         """Test soft deleting an API key via PATCH."""
         # Create an account
         account_repo = AccountRepository(db_session)
@@ -647,7 +663,9 @@ class TestUpdateAPIKey:
         # For now, this should succeed as a placeholder
         assert response.status_code == 200
 
-    async def test_update_api_key_empty_body(self, authenticated_client: AsyncClient, db_session: AsyncSession):
+    async def test_update_api_key_empty_body(
+        self, authenticated_client: AsyncClient, db_session: AsyncSession
+    ):
         """Test updating with empty body returns 200 but no changes."""
         # Create an account
         account_repo = AccountRepository(db_session)

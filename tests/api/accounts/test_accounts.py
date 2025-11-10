@@ -157,7 +157,9 @@ class TestAccountAPI:
         assert "acme-corp" in slugs
         assert "beta-industries" in slugs
 
-    async def test_list_accounts_excludes_deleted(self, authenticated_client: AsyncClient, db_session):
+    async def test_list_accounts_excludes_deleted(
+        self, authenticated_client: AsyncClient, db_session
+    ):
         """Test that list excludes soft-deleted accounts."""
         # Create accounts
         repo = AccountRepository(db_session)
@@ -390,7 +392,9 @@ class TestAccountAPI:
         assert data["slug"] == "acme-corp"  # unchanged
         assert data["status"] == "suspended"
 
-    async def test_update_account_empty_request(self, authenticated_client: AsyncClient, db_session):
+    async def test_update_account_empty_request(
+        self, authenticated_client: AsyncClient, db_session
+    ):
         """Test updating account with empty request body."""
         # Create account
         repo = AccountRepository(db_session)

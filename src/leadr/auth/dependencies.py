@@ -2,8 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Header, HTTPException
 
 from leadr.auth.domain.api_key import APIKey
 from leadr.auth.services.api_key_service import APIKeyService
@@ -11,8 +10,8 @@ from leadr.common.dependencies import DatabaseSession
 
 
 async def require_api_key(
+    db: DatabaseSession,
     api_key: Annotated[str | None, Header(alias="leadr-api-key")] = None,
-    db: DatabaseSession = None,
 ) -> APIKey:
     """Require and validate API key authentication.
 
