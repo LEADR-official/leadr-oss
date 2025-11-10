@@ -67,7 +67,7 @@ app.include_router(api_router, prefix=settings.API_PREFIX)
 
 # Include domain routers
 app.include_router(accounts_router, prefix=settings.API_PREFIX, tags=["Accounts"])
-app.include_router(auth_router, prefix=f"{settings.API_PREFIX}/api-keys", tags=["API Keys"])
+app.include_router(auth_router, prefix=settings.API_PREFIX, tags=["API Keys"])
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ router = APIRouter()
 
 
 @router.post(
-    "",
+    "/api-keys",
     response_model=CreateAPIKeyResponse,
     status_code=status.HTTP_201_CREATED,
 )
@@ -61,7 +61,7 @@ async def create_api_key(
 
 
 @router.get(
-    "",
+    "/api-keys",
     response_model=list[APIKeyResponse],
 )
 async def list_api_keys(
@@ -92,7 +92,7 @@ async def list_api_keys(
 
 
 @router.get(
-    "/{key_id}",
+    "/api-keys/{key_id}",
     response_model=APIKeyResponse,
 )
 async def get_api_key(
@@ -116,7 +116,7 @@ async def get_api_key(
 
 
 @router.patch(
-    "/{key_id}",
+    "/api-keys/{key_id}",
     response_model=APIKeyResponse,
 )
 async def update_api_key(

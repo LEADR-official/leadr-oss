@@ -1,6 +1,5 @@
 """Tests for User service."""
 
-
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
