@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
-from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.models import EntityID
 from leadr.common.services import BaseService
 
@@ -109,10 +108,7 @@ class AccountService(BaseService[Account, AccountRepository]):
         Raises:
             EntityNotFoundError: If the account doesn't exist.
         """
-        account = await self.repository.get_by_id(account_id)
-        if not account:
-            raise EntityNotFoundError("Account", str(account_id))
-
+        account = await self.get_by_id_or_raise(account_id)
         account.suspend()
         return await self.repository.update(account)
 
@@ -128,11 +124,36 @@ class AccountService(BaseService[Account, AccountRepository]):
         Raises:
             EntityNotFoundError: If the account doesn't exist.
         """
-        account = await self.repository.get_by_id(account_id)
-        if not account:
-            raise EntityNotFoundError("Account", str(account_id))
-
+        account = await self.get_by_id_or_raise(account_id)
         account.activate()
+        return await self.repository.update(account)
+
+    async def update_account(
+        self,
+        account_id: EntityID,
+        name: str | None = None,
+        slug: str | None = None,
+    ) -> Account:
+        """Update account fields.
+
+        Args:
+            account_id: The ID of the account to update
+            name: New account name, if provided
+            slug: New account slug, if provided
+
+        Returns:
+            The updated Account domain entity
+
+        Raises:
+            EntityNotFoundError: If the account doesn't exist
+        """
+        account = await self.get_by_id_or_raise(account_id)
+
+        if name is not None:
+            account.name = name
+        if slug is not None:
+            account.slug = slug
+
         return await self.repository.update(account)
 
     async def delete_account(self, account_id: EntityID) -> None:

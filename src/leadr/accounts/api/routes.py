@@ -85,21 +85,11 @@ async def update_account(
     try:
         # Handle soft delete first
         if request.deleted is True:
-            account = await service.get_account(entity_id)
-            if not account:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Account not found"
-                )
-            await service.delete_account(entity_id)
+            account = await service.soft_delete(entity_id)
             return AccountResponse.from_domain(account)
 
         # Get account for updates
-        account = await service.get_account(entity_id)
-        if not account:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
-
-        # Check if we need to update name/slug fields
-        needs_field_update = request.name is not None or request.slug is not None
+        account = await service.get_by_id_or_raise(entity_id)
 
         # Handle status changes using service methods
         if request.status == AccountStatus.SUSPENDED:
@@ -107,13 +97,13 @@ async def update_account(
         elif request.status == AccountStatus.ACTIVE:
             account = await service.activate_account(entity_id)
 
-        # Apply name/slug changes after status change (if any)
-        if needs_field_update:
-            if request.name is not None:
-                account.name = request.name
-            if request.slug is not None:
-                account.slug = request.slug
-            account = await service.repository.update(account)
+        # Handle field updates using service method
+        if request.name is not None or request.slug is not None:
+            account = await service.update_account(
+                entity_id,
+                name=request.name,
+                slug=request.slug,
+            )
 
     except EntityNotFoundError as e:
         raise HTTPException(

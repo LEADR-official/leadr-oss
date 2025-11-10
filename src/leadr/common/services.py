@@ -75,6 +75,24 @@ class BaseService(ABC, Generic[DomainEntityT, RepositoryT]):
         """
         return await self.repository.get_by_id(entity_id)
 
+    async def get_by_id_or_raise(self, entity_id: EntityID) -> DomainEntityT:
+        """Get an entity by its ID or raise EntityNotFoundError.
+
+        Args:
+            entity_id: The ID of the entity to retrieve
+
+        Returns:
+            The domain entity
+
+        Raises:
+            EntityNotFoundError: If the entity is not found
+                (converted to HTTP 404 by global handler)
+        """
+        entity = await self.repository.get_by_id(entity_id)
+        if not entity:
+            raise EntityNotFoundError(self._get_entity_name(), str(entity_id))
+        return entity
+
     async def delete(self, entity_id: EntityID) -> None:
         """Soft-delete an entity.
 
@@ -84,11 +102,27 @@ class BaseService(ABC, Generic[DomainEntityT, RepositoryT]):
         Raises:
             EntityNotFoundError: If the entity doesn't exist
         """
-        entity = await self.repository.get_by_id(entity_id)
-        if not entity:
-            raise EntityNotFoundError(self._get_entity_name(), str(entity_id))
-
+        # Verify entity exists before deleting
+        await self.get_by_id_or_raise(entity_id)
         await self.repository.delete(entity_id)
+
+    async def soft_delete(self, entity_id: EntityID) -> DomainEntityT:
+        """Soft-delete an entity and return it before deletion.
+
+        Useful for endpoints that need to return the deleted entity in the response.
+
+        Args:
+            entity_id: The ID of the entity to delete
+
+        Returns:
+            The entity before it was deleted
+
+        Raises:
+            EntityNotFoundError: If the entity doesn't exist
+        """
+        entity = await self.get_by_id_or_raise(entity_id)
+        await self.repository.delete(entity_id)
+        return entity
 
     async def list_all(self) -> list[DomainEntityT]:
         """List all non-deleted entities.
