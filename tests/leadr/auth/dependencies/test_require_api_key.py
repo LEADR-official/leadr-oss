@@ -150,7 +150,7 @@ class TestRequireAPIKey:
         )
 
         # Revoke it
-        await service.revoke_api_key(api_key.id, account_id=account_id)
+        await service.revoke_api_key(api_key.id)
 
         # Try to use revoked key
         with pytest.raises(HTTPException) as exc_info:
@@ -185,9 +185,7 @@ class TestRequireAPIKey:
         )
 
         # Soft delete it
-        from leadr.common.domain.models import EntityID
-
-        await service.soft_delete(EntityID(value=api_key.id))
+        await service.soft_delete(api_key.id)
 
         # Try to use deleted key
         with pytest.raises(HTTPException) as exc_info:
@@ -228,9 +226,7 @@ class TestRequireAPIKey:
         await require_api_key(api_key=plain_key, db=db_session)
 
         # Refresh the key from DB to get updated timestamp
-        from leadr.common.domain.models import EntityID
-
-        updated_key = await service.get_by_id_or_raise(EntityID(value=api_key.id))
+        updated_key = await service.get_by_id_or_raise(api_key.id)
 
         # Verify last_used_at was updated
         assert updated_key.last_used_at is not None
