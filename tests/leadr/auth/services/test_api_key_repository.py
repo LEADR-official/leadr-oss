@@ -1,6 +1,7 @@
 """Tests for APIKey repository service."""
 
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +10,6 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
 from leadr.auth.services.repositories import APIKeyRepository
-from leadr.common.domain.models import EntityID
 
 
 @pytest.mark.asyncio
@@ -20,7 +20,7 @@ class TestAPIKeyRepository:
         """Test creating an API key via repository."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -35,7 +35,7 @@ class TestAPIKeyRepository:
 
         # Create API key
         api_key_repo = APIKeyRepository(db_session)
-        key_id = EntityID.generate()
+        key_id = uuid4()
 
         api_key = APIKey(
             id=key_id,
@@ -61,7 +61,7 @@ class TestAPIKeyRepository:
         """Test retrieving an API key by ID."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -75,7 +75,7 @@ class TestAPIKeyRepository:
         await account_repo.create(account)
 
         api_key_repo = APIKeyRepository(db_session)
-        key_id = EntityID.generate()
+        key_id = uuid4()
 
         api_key = APIKey(
             id=key_id,
@@ -98,7 +98,7 @@ class TestAPIKeyRepository:
     async def test_get_api_key_by_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent API key returns None."""
         api_key_repo = APIKeyRepository(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         result = await api_key_repo.get_by_id(non_existent_id)
 
@@ -108,7 +108,7 @@ class TestAPIKeyRepository:
         """Test retrieving an API key by its prefix."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -122,7 +122,7 @@ class TestAPIKeyRepository:
         await account_repo.create(account)
 
         api_key_repo = APIKeyRepository(db_session)
-        key_id = EntityID.generate()
+        key_id = uuid4()
 
         api_key = APIKey(
             id=key_id,
@@ -154,7 +154,7 @@ class TestAPIKeyRepository:
         """Test listing all API keys for an account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -171,7 +171,7 @@ class TestAPIKeyRepository:
         api_key_repo = APIKeyRepository(db_session)
 
         key1 = APIKey(
-            id=EntityID.generate(),
+            id=uuid4(),
             account_id=account_id,
             name="Production Key",
             key_hash="hash1",
@@ -180,7 +180,7 @@ class TestAPIKeyRepository:
             updated_at=now,
         )
         key2 = APIKey(
-            id=EntityID.generate(),
+            id=uuid4(),
             account_id=account_id,
             name="Development Key",
             key_hash="hash2",
@@ -193,7 +193,7 @@ class TestAPIKeyRepository:
         await api_key_repo.create(key2)
 
         # List keys for account
-        keys = await api_key_repo.list_by_account(account_id)
+        keys = await api_key_repo.filter(account_id)
 
         assert len(keys) == 2
         names = {key.name for key in keys}
@@ -204,7 +204,7 @@ class TestAPIKeyRepository:
         """Test listing only active API keys for an account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -221,7 +221,7 @@ class TestAPIKeyRepository:
         api_key_repo = APIKeyRepository(db_session)
 
         active_key = APIKey(
-            id=EntityID.generate(),
+            id=uuid4(),
             account_id=account_id,
             name="Active Key",
             key_hash="hash1",
@@ -231,7 +231,7 @@ class TestAPIKeyRepository:
             updated_at=now,
         )
         revoked_key = APIKey(
-            id=EntityID.generate(),
+            id=uuid4(),
             account_id=account_id,
             name="Revoked Key",
             key_hash="hash2",
@@ -245,7 +245,7 @@ class TestAPIKeyRepository:
         await api_key_repo.create(revoked_key)
 
         # List only active keys
-        active_keys = await api_key_repo.list_by_account(account_id, active_only=True)
+        active_keys = await api_key_repo.filter(account_id, active_only=True)
 
         assert len(active_keys) == 1
         assert active_keys[0].name == "Active Key"
@@ -255,7 +255,7 @@ class TestAPIKeyRepository:
         """Test counting active API keys for an account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -273,7 +273,7 @@ class TestAPIKeyRepository:
 
         for i in range(3):
             key = APIKey(
-                id=EntityID.generate(),
+                id=uuid4(),
                 account_id=account_id,
                 name=f"Key {i}",
                 key_hash=f"hash{i}",
@@ -286,7 +286,7 @@ class TestAPIKeyRepository:
 
         # Create one revoked key
         revoked_key = APIKey(
-            id=EntityID.generate(),
+            id=uuid4(),
             account_id=account_id,
             name="Revoked Key",
             key_hash="revoked_hash",
@@ -306,7 +306,7 @@ class TestAPIKeyRepository:
         """Test updating an API key via repository."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -320,7 +320,7 @@ class TestAPIKeyRepository:
         await account_repo.create(account)
 
         api_key_repo = APIKeyRepository(db_session)
-        key_id = EntityID.generate()
+        key_id = uuid4()
 
         api_key = APIKey(
             id=key_id,
@@ -351,7 +351,7 @@ class TestAPIKeyRepository:
         """Test updating an API key status."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -365,7 +365,7 @@ class TestAPIKeyRepository:
         await account_repo.create(account)
 
         api_key_repo = APIKeyRepository(db_session)
-        key_id = EntityID.generate()
+        key_id = uuid4()
 
         api_key = APIKey(
             id=key_id,
@@ -394,7 +394,7 @@ class TestAPIKeyRepository:
         """Test deleting an API key via repository."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -408,7 +408,7 @@ class TestAPIKeyRepository:
         await account_repo.create(account)
 
         api_key_repo = APIKeyRepository(db_session)
-        key_id = EntityID.generate()
+        key_id = uuid4()
 
         api_key = APIKey(
             id=key_id,
@@ -432,7 +432,7 @@ class TestAPIKeyRepository:
         """Test creating and retrieving an API key with expiration."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -447,7 +447,7 @@ class TestAPIKeyRepository:
 
         # Create API key with expiration
         api_key_repo = APIKeyRepository(db_session)
-        key_id = EntityID.generate()
+        key_id = uuid4()
         expires_at = now + timedelta(days=90)
 
         api_key = APIKey(

@@ -1,6 +1,7 @@
 """Integration tests for API Key CRUD endpoints."""
 
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -8,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
-from leadr.common.domain.models import EntityID
 
 
 @pytest.mark.asyncio
@@ -19,7 +19,7 @@ class TestCreateAPIKey:
         """Test creating an API key with valid data."""
         # Create an account first
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -36,7 +36,7 @@ class TestCreateAPIKey:
         response = await client.post(
             "/api-keys",
             json={
-                "account_id": str(account_id.value),
+                "account_id": str(account_id),
                 "name": "Test API Key",
             },
         )
@@ -58,7 +58,7 @@ class TestCreateAPIKey:
         """Test creating an API key with expiration date."""
         # Create an account first
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -76,7 +76,7 @@ class TestCreateAPIKey:
         response = await client.post(
             "/api-keys",
             json={
-                "account_id": str(account_id.value),
+                "account_id": str(account_id),
                 "name": "Temporary Key",
                 "expires_at": expires_at.isoformat(),
             },
@@ -103,7 +103,7 @@ class TestCreateAPIKey:
         """Test creating an API key without name returns 422."""
         # Create an account first
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -119,7 +119,7 @@ class TestCreateAPIKey:
         response = await client.post(
             "/api-keys",
             json={
-                "account_id": str(account_id.value),
+                "account_id": str(account_id),
             },
         )
 
@@ -139,12 +139,12 @@ class TestCreateAPIKey:
 
     async def test_create_api_key_nonexistent_account(self, client: AsyncClient):
         """Test creating an API key for non-existent account returns 404."""
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         response = await client.post(
             "/api-keys",
             json={
-                "account_id": str(non_existent_id.value),
+                "account_id": str(non_existent_id),
                 "name": "Test API Key",
             },
         )
@@ -158,7 +158,7 @@ class TestCreateAPIKey:
         """Test that plain key is returned in create response but not in subsequent GETs."""
         # Create an account first
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -175,7 +175,7 @@ class TestCreateAPIKey:
         create_response = await client.post(
             "/api-keys",
             json={
-                "account_id": str(account_id.value),
+                "account_id": str(account_id),
                 "name": "Test API Key",
             },
         )
@@ -209,7 +209,7 @@ class TestListAPIKeys:
         account_repo = AccountRepository(db_session)
         now = datetime.now(UTC)
 
-        account1_id = EntityID.generate()
+        account1_id = uuid4()
         account1 = Account(
             id=account1_id,
             name="Account 1",
@@ -220,7 +220,7 @@ class TestListAPIKeys:
         )
         await account_repo.create(account1)
 
-        account2_id = EntityID.generate()
+        account2_id = uuid4()
         account2 = Account(
             id=account2_id,
             name="Account 2",
@@ -237,7 +237,7 @@ class TestListAPIKeys:
             await client.post(
                 "/api-keys",
                 json={
-                    "account_id": str(account1_id.value),
+                    "account_id": str(account1_id),
                     "name": f"Account 1 Key {i + 1}",
                 },
             )
@@ -247,30 +247,30 @@ class TestListAPIKeys:
             await client.post(
                 "/api-keys",
                 json={
-                    "account_id": str(account2_id.value),
+                    "account_id": str(account2_id),
                     "name": f"Account 2 Key {i + 1}",
                 },
             )
 
         # List keys for account 1
-        response = await client.get(f"/api-keys?account_id={account1_id.value}")
+        response = await client.get(f"/api-keys?account_id={account1_id}")
         assert response.status_code == 200
 
         data = response.json()
         assert len(data) == 3
         for item in data:
-            assert item["account_id"] == str(account1_id.value)
+            assert item["account_id"] == str(account1_id)
             assert "key" not in item  # Should not expose plain keys in list
             assert "prefix" in item
 
         # List keys for account 2
-        response = await client.get(f"/api-keys?account_id={account2_id.value}")
+        response = await client.get(f"/api-keys?account_id={account2_id}")
         assert response.status_code == 200
 
         data = response.json()
         assert len(data) == 2
         for item in data:
-            assert item["account_id"] == str(account2_id.value)
+            assert item["account_id"] == str(account2_id)
 
     async def test_list_api_keys_filter_by_status(
         self, client: AsyncClient, db_session: AsyncSession
@@ -278,7 +278,7 @@ class TestListAPIKeys:
         """Test listing API keys filtered by status."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -297,7 +297,7 @@ class TestListAPIKeys:
             response = await client.post(
                 "/api-keys",
                 json={
-                    "account_id": str(account_id.value),
+                    "account_id": str(account_id),
                     "name": f"Test Key {i + 1}",
                 },
             )
@@ -306,12 +306,12 @@ class TestListAPIKeys:
         # TODO: Revoke one key once PATCH endpoint is implemented
         # For now, all keys should be active
 
-        # Filter by active status
-        response = await client.get("/api-keys?status=active")
+        # Filter by active status for this account
+        response = await client.get(f"/api-keys?account_id={account_id}&status=active")
         assert response.status_code == 200
 
         data = response.json()
-        assert len(data) >= 3  # At least our 3 keys
+        assert len(data) == 3  # Exactly our 3 keys (filtered by account and status)
         for item in data:
             assert item["status"] == "active"
 
@@ -321,7 +321,7 @@ class TestListAPIKeys:
         """Test listing API keys with multiple filters (account_id + status)."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -339,19 +339,19 @@ class TestListAPIKeys:
             await client.post(
                 "/api-keys",
                 json={
-                    "account_id": str(account_id.value),
+                    "account_id": str(account_id),
                     "name": f"Test Key {i + 1}",
                 },
             )
 
         # Filter by both account_id and status
-        response = await client.get(f"/api-keys?account_id={account_id.value}&status=active")
+        response = await client.get(f"/api-keys?account_id={account_id}&status=active")
         assert response.status_code == 200
 
         data = response.json()
         assert len(data) == 2
         for item in data:
-            assert item["account_id"] == str(account_id.value)
+            assert item["account_id"] == str(account_id)
             assert item["status"] == "active"
 
     async def test_list_api_keys_no_filters_returns_all(
@@ -360,7 +360,7 @@ class TestListAPIKeys:
         """Test listing API keys without filters returns all keys."""
         # Create an account and some keys
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -378,23 +378,23 @@ class TestListAPIKeys:
             await client.post(
                 "/api-keys",
                 json={
-                    "account_id": str(account_id.value),
+                    "account_id": str(account_id),
                     "name": f"Test Key {i + 1}",
                 },
             )
 
-        # List all keys
-        response = await client.get("/api-keys")
+        # List all keys for the account
+        response = await client.get(f"/api-keys?account_id={account_id}")
         assert response.status_code == 200
 
         data = response.json()
-        assert len(data) >= 3  # At least our 3 keys
+        assert len(data) == 3  # Exactly our 3 keys (filtered by account)
 
     async def test_list_api_keys_empty_result(self, client: AsyncClient):
         """Test listing API keys with filter that matches nothing returns empty list."""
         # Query for a non-existent account
-        non_existent_id = EntityID.generate()
-        response = await client.get(f"/api-keys?account_id={non_existent_id.value}")
+        non_existent_id = uuid4()
+        response = await client.get(f"/api-keys?account_id={non_existent_id}")
         assert response.status_code == 200
 
         data = response.json()
@@ -419,7 +419,7 @@ class TestGetSingleAPIKey:
         """Test getting a single API key by ID."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -436,7 +436,7 @@ class TestGetSingleAPIKey:
         create_response = await client.post(
             "/api-keys",
             json={
-                "account_id": str(account_id.value),
+                "account_id": str(account_id),
                 "name": "Test API Key",
             },
         )
@@ -450,7 +450,7 @@ class TestGetSingleAPIKey:
         data = response.json()
         assert data["id"] == key_id
         assert data["name"] == "Test API Key"
-        assert data["account_id"] == str(account_id.value)
+        assert data["account_id"] == str(account_id)
         assert data["status"] == "active"
         assert "key" not in data  # Plain key should not be returned
         assert "prefix" in data
@@ -459,8 +459,8 @@ class TestGetSingleAPIKey:
 
     async def test_get_api_key_not_found(self, client: AsyncClient):
         """Test getting a non-existent API key returns 404."""
-        non_existent_id = EntityID.generate()
-        response = await client.get(f"/api-keys/{non_existent_id.value}")
+        non_existent_id = uuid4()
+        response = await client.get(f"/api-keys/{non_existent_id}")
         assert response.status_code == 404
 
     async def test_get_api_key_invalid_uuid_format(self, client: AsyncClient):
@@ -474,7 +474,7 @@ class TestGetSingleAPIKey:
         """Test that get response includes all expected fields."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -492,7 +492,7 @@ class TestGetSingleAPIKey:
         create_response = await client.post(
             "/api-keys",
             json={
-                "account_id": str(account_id.value),
+                "account_id": str(account_id),
                 "name": "Test API Key",
                 "expires_at": expires_at.isoformat(),
             },
@@ -529,7 +529,7 @@ class TestUpdateAPIKey:
         """Test revoking an API key by updating status to revoked."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -546,7 +546,7 @@ class TestUpdateAPIKey:
         create_response = await client.post(
             "/api-keys",
             json={
-                "account_id": str(account_id.value),
+                "account_id": str(account_id),
                 "name": "Test API Key",
             },
         )
@@ -569,9 +569,9 @@ class TestUpdateAPIKey:
 
     async def test_update_api_key_not_found(self, client: AsyncClient):
         """Test updating a non-existent API key returns 404."""
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
         response = await client.patch(
-            f"/api-keys/{non_existent_id.value}",
+            f"/api-keys/{non_existent_id}",
             json={"status": "revoked"},
         )
         assert response.status_code == 404
@@ -582,7 +582,7 @@ class TestUpdateAPIKey:
         """Test updating with invalid status value returns 422."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -599,7 +599,7 @@ class TestUpdateAPIKey:
         create_response = await client.post(
             "/api-keys",
             json={
-                "account_id": str(account_id.value),
+                "account_id": str(account_id),
                 "name": "Test API Key",
             },
         )
@@ -616,7 +616,7 @@ class TestUpdateAPIKey:
         """Test soft deleting an API key via PATCH."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -633,7 +633,7 @@ class TestUpdateAPIKey:
         create_response = await client.post(
             "/api-keys",
             json={
-                "account_id": str(account_id.value),
+                "account_id": str(account_id),
                 "name": "Test API Key",
             },
         )
@@ -651,7 +651,7 @@ class TestUpdateAPIKey:
         """Test updating with empty body returns 200 but no changes."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -668,7 +668,7 @@ class TestUpdateAPIKey:
         create_response = await client.post(
             "/api-keys",
             json={
-                "account_id": str(account_id.value),
+                "account_id": str(account_id),
                 "name": "Test API Key",
             },
         )
@@ -697,7 +697,7 @@ class TestUpdateAPIKey:
         """Test that attempting to change name field is ignored or rejected."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -714,7 +714,7 @@ class TestUpdateAPIKey:
         create_response = await client.post(
             "/api-keys",
             json={
-                "account_id": str(account_id.value),
+                "account_id": str(account_id),
                 "name": "Original Name",
             },
         )

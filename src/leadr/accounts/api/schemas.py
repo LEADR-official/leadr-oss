@@ -1,10 +1,11 @@
 """API request and response models for accounts."""
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, EmailStr
 
-from leadr.accounts.domain.account import Account
+from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
 
 
@@ -21,17 +22,17 @@ class AccountUpdateRequest(BaseModel):
 
     name: str | None = None
     slug: str | None = None
-    status: str | None = None
+    status: AccountStatus | None = None
     deleted: bool | None = None
 
 
 class AccountResponse(BaseModel):
     """Response model for an account."""
 
-    id: str
+    id: UUID
     name: str
     slug: str
-    status: str
+    status: AccountStatus
     created_at: datetime
     updated_at: datetime
 
@@ -39,10 +40,10 @@ class AccountResponse(BaseModel):
     def from_domain(cls, account: Account) -> "AccountResponse":
         """Convert domain entity to response model."""
         return cls(
-            id=str(account.id),
+            id=account.id,
             name=account.name,
             slug=account.slug,
-            status=account.status.value,
+            status=account.status,
             created_at=account.created_at,
             updated_at=account.updated_at,
         )
@@ -52,7 +53,7 @@ class AccountResponse(BaseModel):
 class UserCreateRequest(BaseModel):
     """Request model for creating a user."""
 
-    account_id: str
+    account_id: UUID
     email: EmailStr
     display_name: str
 
@@ -68,8 +69,8 @@ class UserUpdateRequest(BaseModel):
 class UserResponse(BaseModel):
     """Response model for a user."""
 
-    id: str
-    account_id: str
+    id: UUID
+    account_id: UUID
     email: str
     display_name: str
     created_at: datetime
@@ -79,8 +80,8 @@ class UserResponse(BaseModel):
     def from_domain(cls, user: User) -> "UserResponse":
         """Convert domain entity to response model."""
         return cls(
-            id=str(user.id),
-            account_id=str(user.account_id),
+            id=user.id,
+            account_id=user.account_id,
             email=user.email,
             display_name=user.display_name,
             created_at=user.created_at,

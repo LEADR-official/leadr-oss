@@ -1,12 +1,12 @@
 """Tests for User domain model."""
 
 from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
 
 from leadr.accounts.domain.user import User
-from leadr.common.domain.models import EntityID
 
 
 class TestUser:
@@ -14,8 +14,8 @@ class TestUser:
 
     def test_create_user_with_valid_data(self):
         """Test creating a user with all required fields."""
-        user_id = EntityID.generate()
-        account_id = EntityID.generate()
+        user_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         user = User(
@@ -36,8 +36,8 @@ class TestUser:
 
     def test_user_email_required(self):
         """Test that user email is required."""
-        user_id = EntityID.generate()
-        account_id = EntityID.generate()
+        user_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -53,8 +53,8 @@ class TestUser:
 
     def test_user_display_name_required(self):
         """Test that user display name is required."""
-        user_id = EntityID.generate()
-        account_id = EntityID.generate()
+        user_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -70,7 +70,7 @@ class TestUser:
 
     def test_user_account_id_required(self):
         """Test that user account_id is required."""
-        user_id = EntityID.generate()
+        user_id = uuid4()
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -86,8 +86,8 @@ class TestUser:
 
     def test_user_equality_based_on_id(self):
         """Test that user equality is based on ID."""
-        user_id = EntityID.generate()
-        account_id = EntityID.generate()
+        user_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         user1 = User(
@@ -112,11 +112,11 @@ class TestUser:
 
     def test_user_inequality_different_ids(self):
         """Test that users with different IDs are not equal."""
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         user1 = User(
-            id=EntityID.generate(),
+            id=uuid4(),
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
@@ -125,7 +125,7 @@ class TestUser:
         )
 
         user2 = User(
-            id=EntityID.generate(),
+            id=uuid4(),
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
@@ -137,8 +137,8 @@ class TestUser:
 
     def test_user_is_hashable(self):
         """Test that user can be used in sets and as dict keys."""
-        user_id = EntityID.generate()
-        account_id = EntityID.generate()
+        user_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         user = User(
@@ -160,8 +160,8 @@ class TestUser:
 
     def test_user_immutability_of_id(self):
         """Test that user ID cannot be changed after creation."""
-        user_id = EntityID.generate()
-        account_id = EntityID.generate()
+        user_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         user = User(
@@ -173,15 +173,15 @@ class TestUser:
             updated_at=now,
         )
 
-        new_id = EntityID.generate()
+        new_id = uuid4()
 
         with pytest.raises(ValidationError):
             user.id = new_id
 
     def test_user_immutability_of_account_id(self):
         """Test that user account_id cannot be changed after creation."""
-        user_id = EntityID.generate()
-        account_id = EntityID.generate()
+        user_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         user = User(
@@ -193,15 +193,15 @@ class TestUser:
             updated_at=now,
         )
 
-        new_account_id = EntityID.generate()
+        new_account_id = uuid4()
 
         with pytest.raises(ValidationError):
             user.account_id = new_account_id
 
     def test_user_soft_delete(self):
         """Test that user can be soft-deleted."""
-        user_id = EntityID.generate()
-        account_id = EntityID.generate()
+        user_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         user = User(
@@ -223,8 +223,8 @@ class TestUser:
 
     def test_user_restore(self):
         """Test that soft-deleted user can be restored."""
-        user_id = EntityID.generate()
-        account_id = EntityID.generate()
+        user_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         user = User(

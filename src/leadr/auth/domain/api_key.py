@@ -2,10 +2,11 @@
 
 from datetime import UTC, datetime
 from enum import Enum
+from uuid import UUID
 
 from pydantic import field_validator
 
-from leadr.common.domain.models import Entity, EntityID
+from leadr.common.domain.models import Entity
 
 
 class APIKeyStatus(Enum):
@@ -23,7 +24,7 @@ class APIKey(Entity):
     Keys are stored hashed for security and shown only once at creation.
     """
 
-    account_id: EntityID
+    account_id: UUID
     name: str
     key_hash: str
     key_prefix: str

@@ -9,7 +9,10 @@ from fastapi import FastAPI
 
 from api.routes import router as api_router
 from leadr.accounts.api.routes import router as accounts_router
+from leadr.auth.api.routes import router as auth_router
+from leadr.common.api.exceptions import entity_not_found_handler
 from leadr.common.database import engine
+from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.config import settings
 
 # Configure logging from YAML file
@@ -56,11 +59,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Register global exception handlers
+app.add_exception_handler(EntityNotFoundError, entity_not_found_handler)
+
 # Always include shared routes (health check, root endpoint)
 app.include_router(api_router, prefix=settings.API_PREFIX)
 
-# We will conditionally enable/disable admin-only routers/endpoints based on the env vars later
+# Include domain routers
 app.include_router(accounts_router, prefix=settings.API_PREFIX, tags=["Accounts"])
+app.include_router(auth_router, prefix=settings.API_PREFIX, tags=["API Keys"])
 
 
 if __name__ == "__main__":

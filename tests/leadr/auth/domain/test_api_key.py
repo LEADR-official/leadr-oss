@@ -1,13 +1,12 @@
 """Tests for APIKey domain model."""
 
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
 
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
-from leadr.common.domain.models import EntityID
 
 
 class TestAPIKeyStatus:
@@ -24,8 +23,8 @@ class TestAPIKey:
 
     def test_create_api_key_with_valid_data(self):
         """Test creating an API key with all required fields."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
         expires_at = now + timedelta(days=90)
 
@@ -55,8 +54,8 @@ class TestAPIKey:
 
     def test_create_api_key_defaults_to_active_status(self):
         """Test that API key status defaults to ACTIVE."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         api_key = APIKey(
@@ -73,8 +72,8 @@ class TestAPIKey:
 
     def test_api_key_name_required(self):
         """Test that API key name is required."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -91,7 +90,7 @@ class TestAPIKey:
 
     def test_api_key_account_id_required(self):
         """Test that account_id is required."""
-        key_id = EntityID.generate()
+        key_id = uuid4()
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -108,8 +107,8 @@ class TestAPIKey:
 
     def test_api_key_hash_required(self):
         """Test that key_hash is required."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -126,8 +125,8 @@ class TestAPIKey:
 
     def test_api_key_prefix_required(self):
         """Test that key_prefix is required."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -144,8 +143,8 @@ class TestAPIKey:
 
     def test_api_key_prefix_must_start_with_ldr(self):
         """Test that key_prefix must start with 'ldr_'."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -164,8 +163,8 @@ class TestAPIKey:
 
     def test_api_key_equality_based_on_id(self):
         """Test that API key equality is based on ID."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         api_key1 = APIKey(
@@ -192,11 +191,11 @@ class TestAPIKey:
 
     def test_api_key_inequality_different_ids(self):
         """Test that API keys with different IDs are not equal."""
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         api_key1 = APIKey(
-            id=EntityID.generate(),
+            id=uuid4(),
             account_id=account_id,
             name="Test Key",
             key_hash="hash",
@@ -206,7 +205,7 @@ class TestAPIKey:
         )
 
         api_key2 = APIKey(
-            id=EntityID.generate(),
+            id=uuid4(),
             account_id=account_id,
             name="Test Key",
             key_hash="hash",
@@ -219,8 +218,8 @@ class TestAPIKey:
 
     def test_api_key_is_hashable(self):
         """Test that API key can be used in sets and as dict keys."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         api_key = APIKey(
@@ -243,8 +242,8 @@ class TestAPIKey:
 
     def test_revoke_api_key(self):
         """Test revoking an active API key."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         api_key = APIKey(
@@ -264,8 +263,8 @@ class TestAPIKey:
 
     def test_is_expired_when_expiration_in_past(self):
         """Test that API key is expired when expires_at is in the past."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
         past_date = now - timedelta(days=1)
 
@@ -284,8 +283,8 @@ class TestAPIKey:
 
     def test_is_not_expired_when_expiration_in_future(self):
         """Test that API key is not expired when expires_at is in the future."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
         future_date = now + timedelta(days=30)
 
@@ -304,8 +303,8 @@ class TestAPIKey:
 
     def test_is_not_expired_when_no_expiration(self):
         """Test that API key is not expired when expires_at is None."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         api_key = APIKey(
@@ -323,8 +322,8 @@ class TestAPIKey:
 
     def test_is_valid_when_active_and_not_expired(self):
         """Test that API key is valid when active and not expired."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
         future_date = now + timedelta(days=30)
 
@@ -344,8 +343,8 @@ class TestAPIKey:
 
     def test_is_not_valid_when_revoked(self):
         """Test that API key is not valid when revoked."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         api_key = APIKey(
@@ -363,8 +362,8 @@ class TestAPIKey:
 
     def test_is_not_valid_when_expired(self):
         """Test that API key is not valid when expired."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
         past_date = now - timedelta(days=1)
 
@@ -384,8 +383,8 @@ class TestAPIKey:
 
     def test_record_usage_updates_last_used_at(self):
         """Test that record_usage updates last_used_at timestamp."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         api_key = APIKey(
@@ -408,8 +407,8 @@ class TestAPIKey:
 
     def test_api_key_immutability_of_id(self):
         """Test that API key ID cannot be changed after creation."""
-        key_id = EntityID.generate()
-        account_id = EntityID.generate()
+        key_id = uuid4()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         api_key = APIKey(
@@ -422,16 +421,15 @@ class TestAPIKey:
             updated_at=now,
         )
 
-        new_id = EntityID.generate()
+        new_id = uuid4()
 
         with pytest.raises(ValidationError):
             api_key.id = new_id
 
     def test_account_id_as_uuid(self):
         """Test that account_id can be created from UUID."""
-        key_id = EntityID.generate()
-        account_uuid = UUID("12345678-1234-5678-1234-567812345678")
-        account_id = EntityID(value=account_uuid)
+        key_id = uuid4()
+        account_id = UUID("12345678-1234-5678-1234-567812345678")
         now = datetime.now(UTC)
 
         api_key = APIKey(
@@ -444,4 +442,4 @@ class TestAPIKey:
             updated_at=now,
         )
 
-        assert api_key.account_id.value == account_uuid
+        assert api_key.account_id == account_id

@@ -1,6 +1,7 @@
 """Tests for Account and User repository services."""
 
 from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
 from leadr.accounts.services.repositories import AccountRepository, UserRepository
-from leadr.common.domain.models import EntityID
 
 
 @pytest.mark.asyncio
@@ -18,7 +18,7 @@ class TestAccountRepository:
     async def test_create_account(self, db_session: AsyncSession):
         """Test creating an account via repository."""
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -40,7 +40,7 @@ class TestAccountRepository:
     async def test_get_account_by_id(self, db_session: AsyncSession):
         """Test retrieving an account by ID."""
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         # Create account
@@ -64,7 +64,7 @@ class TestAccountRepository:
     async def test_get_account_by_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent account returns None."""
         repo = AccountRepository(db_session)
-        non_existent_id = EntityID.generate()
+        non_existent_id = uuid4()
 
         result = await repo.get_by_id(non_existent_id)
 
@@ -73,7 +73,7 @@ class TestAccountRepository:
     async def test_get_account_by_slug(self, db_session: AsyncSession):
         """Test retrieving an account by slug."""
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         # Create account
@@ -97,7 +97,7 @@ class TestAccountRepository:
     async def test_update_account(self, db_session: AsyncSession):
         """Test updating an account via repository."""
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         # Create account
@@ -125,7 +125,7 @@ class TestAccountRepository:
     async def test_delete_account(self, db_session: AsyncSession):
         """Test deleting an account via repository."""
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         # Create account
@@ -153,7 +153,7 @@ class TestAccountRepository:
 
         # Create multiple accounts
         account1 = Account(
-            id=EntityID.generate(),
+            id=uuid4(),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -161,7 +161,7 @@ class TestAccountRepository:
             updated_at=now,
         )
         account2 = Account(
-            id=EntityID.generate(),
+            id=uuid4(),
             name="Beta Industries",
             slug="beta-industries",
             status=AccountStatus.ACTIVE,
@@ -173,7 +173,7 @@ class TestAccountRepository:
         await repo.create(account2)
 
         # List them
-        accounts = await repo.list_all()
+        accounts = await repo.filter()
 
         assert len(accounts) == 2
         slugs = {acc.slug for acc in accounts}
@@ -183,7 +183,7 @@ class TestAccountRepository:
     async def test_delete_account_is_soft_delete(self, db_session: AsyncSession):
         """Test that delete performs soft-delete, not hard-delete."""
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         # Create account
@@ -205,13 +205,13 @@ class TestAccountRepository:
         assert retrieved is None
 
     async def test_list_accounts_excludes_deleted(self, db_session: AsyncSession):
-        """Test that list_all excludes soft-deleted accounts."""
+        """Test that filter() excludes soft-deleted accounts."""
         repo = AccountRepository(db_session)
         now = datetime.now(UTC)
 
         # Create accounts
         account1 = Account(
-            id=EntityID.generate(),
+            id=uuid4(),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -219,7 +219,7 @@ class TestAccountRepository:
             updated_at=now,
         )
         account2 = Account(
-            id=EntityID.generate(),
+            id=uuid4(),
             name="Beta Industries",
             slug="beta-industries",
             status=AccountStatus.ACTIVE,
@@ -234,7 +234,7 @@ class TestAccountRepository:
         await repo.delete(account1.id)
 
         # List should only return non-deleted
-        accounts = await repo.list_all()
+        accounts = await repo.filter()
 
         assert len(accounts) == 1
         assert accounts[0].slug == "beta-industries"
@@ -242,7 +242,7 @@ class TestAccountRepository:
     async def test_get_by_slug_excludes_deleted(self, db_session: AsyncSession):
         """Test that get_by_slug excludes soft-deleted accounts."""
         repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         # Create account
@@ -272,7 +272,7 @@ class TestUserRepository:
         """Test creating a user via repository."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -287,7 +287,7 @@ class TestUserRepository:
 
         # Create user
         user_repo = UserRepository(db_session)
-        user_id = EntityID.generate()
+        user_id = uuid4()
 
         user = User(
             id=user_id,
@@ -309,7 +309,7 @@ class TestUserRepository:
         """Test retrieving a user by ID."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -324,7 +324,7 @@ class TestUserRepository:
 
         # Create user
         user_repo = UserRepository(db_session)
-        user_id = EntityID.generate()
+        user_id = uuid4()
 
         user = User(
             id=user_id,
@@ -347,7 +347,7 @@ class TestUserRepository:
         """Test retrieving a user by email."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -362,7 +362,7 @@ class TestUserRepository:
 
         # Create user
         user_repo = UserRepository(db_session)
-        user_id = EntityID.generate()
+        user_id = uuid4()
 
         user = User(
             id=user_id,
@@ -385,7 +385,7 @@ class TestUserRepository:
         """Test listing all users for an account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -402,7 +402,7 @@ class TestUserRepository:
         user_repo = UserRepository(db_session)
 
         user1 = User(
-            id=EntityID.generate(),
+            id=uuid4(),
             account_id=account_id,
             email="user1@example.com",
             display_name="John Doe",
@@ -410,7 +410,7 @@ class TestUserRepository:
             updated_at=now,
         )
         user2 = User(
-            id=EntityID.generate(),
+            id=uuid4(),
             account_id=account_id,
             email="user2@example.com",
             display_name="Jane Smith",
@@ -422,7 +422,7 @@ class TestUserRepository:
         await user_repo.create(user2)
 
         # List users for account
-        users = await user_repo.list_by_account(account_id)
+        users = await user_repo.filter(account_id)
 
         assert len(users) == 2
         emails = {u.email for u in users}
@@ -433,7 +433,7 @@ class TestUserRepository:
         """Test updating a user via repository."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -448,7 +448,7 @@ class TestUserRepository:
 
         # Create user
         user_repo = UserRepository(db_session)
-        user_id = EntityID.generate()
+        user_id = uuid4()
 
         user = User(
             id=user_id,
@@ -475,7 +475,7 @@ class TestUserRepository:
         """Test deleting a user via repository."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -490,7 +490,7 @@ class TestUserRepository:
 
         # Create user
         user_repo = UserRepository(db_session)
-        user_id = EntityID.generate()
+        user_id = uuid4()
 
         user = User(
             id=user_id,
@@ -513,7 +513,7 @@ class TestUserRepository:
         """Test that delete performs soft-delete, not hard-delete."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -528,7 +528,7 @@ class TestUserRepository:
 
         # Create user
         user_repo = UserRepository(db_session)
-        user_id = EntityID.generate()
+        user_id = uuid4()
 
         user = User(
             id=user_id,
@@ -548,10 +548,10 @@ class TestUserRepository:
         assert retrieved is None
 
     async def test_list_users_excludes_deleted(self, db_session: AsyncSession):
-        """Test that list_by_account excludes soft-deleted users."""
+        """Test that filter() excludes soft-deleted users."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -568,7 +568,7 @@ class TestUserRepository:
         user_repo = UserRepository(db_session)
 
         user1 = User(
-            id=EntityID.generate(),
+            id=uuid4(),
             account_id=account_id,
             email="user1@example.com",
             display_name="John Doe",
@@ -576,7 +576,7 @@ class TestUserRepository:
             updated_at=now,
         )
         user2 = User(
-            id=EntityID.generate(),
+            id=uuid4(),
             account_id=account_id,
             email="user2@example.com",
             display_name="Jane Smith",
@@ -591,7 +591,7 @@ class TestUserRepository:
         await user_repo.delete(user1.id)
 
         # List should only return non-deleted
-        users = await user_repo.list_by_account(account_id)
+        users = await user_repo.filter(account_id)
 
         assert len(users) == 1
         assert users[0].email == "user2@example.com"
@@ -600,7 +600,7 @@ class TestUserRepository:
         """Test that get_by_email excludes soft-deleted users."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = EntityID.generate()
+        account_id = uuid4()
         now = datetime.now(UTC)
 
         account = Account(
@@ -615,7 +615,7 @@ class TestUserRepository:
 
         # Create user
         user_repo = UserRepository(db_session)
-        user_id = EntityID.generate()
+        user_id = uuid4()
 
         user = User(
             id=user_id,
