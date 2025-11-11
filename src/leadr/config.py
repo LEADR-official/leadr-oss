@@ -174,7 +174,6 @@ class Settings(CommonSettings):
     """
 
 
-
 class TestSettings(CommonSettings):
     """Test environment settings.
 
@@ -184,7 +183,6 @@ class TestSettings(CommonSettings):
     Used automatically when ENV='TEST' (set by test.sh script).
     Test-specific overrides can be added here.
     """
-
 
 
 settings = (
