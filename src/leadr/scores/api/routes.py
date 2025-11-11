@@ -18,10 +18,22 @@ async def create_score(
 ) -> ScoreResponse:
     """Create a new score.
 
-    Validates that:
-    - Board exists
-    - Board belongs to the specified account
-    - Game matches the board's game
+    Creates a new score submission for a board. Performs three-level validation:
+    board exists, board belongs to the specified account, and game matches
+    the board's game.
+
+    Args:
+        request: Score creation details including account_id, game_id, board_id,
+                user_id, player_name, value, and optional filters.
+        service: Injected score service dependency.
+
+    Returns:
+        ScoreResponse with the created score including auto-generated ID and timestamps.
+
+    Raises:
+        404: Account, game, board, or user not found.
+        400: Validation failed (board doesn't belong to account, or game doesn't
+            match board's game).
     """
     try:
         score = await service.create_score(
@@ -52,7 +64,18 @@ async def get_score(
     score_id: UUID,
     service: ScoreServiceDep,
 ) -> ScoreResponse:
-    """Get a score by ID."""
+    """Get a score by ID.
+
+    Args:
+        score_id: UUID of the score to retrieve.
+        service: Injected score service dependency.
+
+    Returns:
+        ScoreResponse with the score details.
+
+    Raises:
+        404: Score not found or soft-deleted.
+    """
     score = await service.get_by_id_or_raise(score_id)
     return ScoreResponse.from_domain(score)
 
@@ -67,11 +90,19 @@ async def list_scores(
 ) -> list[ScoreResponse]:
     """List scores for an account with optional filters.
 
+    Returns all non-deleted scores for the specified account, with optional
+    filtering by board, game, or user. Enforces multi-tenant safety by
+    requiring account_id.
+
     Args:
-        account_id: REQUIRED - Account ID to filter by
-        board_id: Optional board ID to filter by
-        game_id: Optional game ID to filter by
-        user_id: Optional user ID to filter by
+        account_id: REQUIRED - Account ID to filter by (multi-tenant safety).
+        board_id: Optional board ID to filter by.
+        game_id: Optional game ID to filter by.
+        user_id: Optional user ID to filter by.
+        service: Injected score service dependency.
+
+    Returns:
+        List of ScoreResponse objects matching the filter criteria.
     """
     scores = await service.list_scores(
         account_id=account_id,
@@ -90,8 +121,19 @@ async def update_score(
 ) -> ScoreResponse:
     """Update a score.
 
-    Supports partial updates. Any field not provided will remain unchanged.
-    Set `deleted: true` to soft delete the score.
+    Supports partial updates of score fields. Any field not provided will
+    remain unchanged. Set deleted: true to soft delete the score.
+
+    Args:
+        score_id: UUID of the score to update.
+        request: Score update details with optional fields to modify.
+        service: Injected score service dependency.
+
+    Returns:
+        ScoreResponse with the updated score details.
+
+    Raises:
+        404: Score not found or already soft-deleted.
     """
     # Handle soft delete
     if request.deleted is True:

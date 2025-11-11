@@ -46,7 +46,17 @@ class Score(Entity):
     @field_validator("player_name")
     @classmethod
     def validate_player_name(cls, v: str) -> str:
-        """Validate that player_name is not empty and strip whitespace."""
+        """Validate that player_name is not empty and strip whitespace.
+
+        Args:
+            v: The player_name to validate.
+
+        Returns:
+            The validated and trimmed player_name.
+
+        Raises:
+            ValueError: If player_name is empty or whitespace only.
+        """
         v = v.strip()
         if not v:
             raise ValueError("player_name cannot be empty")

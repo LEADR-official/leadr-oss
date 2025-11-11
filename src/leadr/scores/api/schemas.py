@@ -69,7 +69,14 @@ class ScoreResponse(BaseModel):
 
     @classmethod
     def from_domain(cls, score: Score) -> "ScoreResponse":
-        """Convert domain entity to response model."""
+        """Convert domain entity to response model.
+
+        Args:
+            score: The domain Score entity to convert.
+
+        Returns:
+            ScoreResponse with all fields populated from the domain entity.
+        """
         return cls(
             id=score.id,
             account_id=score.account_id,
