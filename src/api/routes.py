@@ -16,7 +16,7 @@ class HealthResponse(BaseModel):
     database: str = Field(description="Database connection status")
 
 
-@router.get("/health", response_model=HealthResponse, tags=["Health"])
+@router.get("/health", response_model=HealthResponse, tags=["Public"])
 async def health_check(db: DatabaseSession) -> HealthResponse:
     """Health check endpoint.
 
@@ -43,7 +43,7 @@ async def health_check(db: DatabaseSession) -> HealthResponse:
     )
 
 
-@router.get("/", tags=["Root"])
+@router.get("/", tags=["Public"])
 async def root():
     """Root endpoint.
 

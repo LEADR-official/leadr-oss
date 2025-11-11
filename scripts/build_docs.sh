@@ -73,6 +73,26 @@ fi
 mv site-md/http-api.md.tmp site-md/http-api.md
 echo "Transformed site-md/http-api.md for MkDocs compatibility"
 
+echo "Splitting Python reference into multiple files..."
+uv run python scripts/split_reference.py site-md/reference.md site-md/reference
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to split Python reference documentation"
+  exit 1
+fi
+rm site-md/reference.md
+echo "Split Python reference into site-md/reference/"
+
+echo "Splitting HTTP API into multiple files..."
+uv run python scripts/split_http_api.py site-md/http-api.md site-md/http-api
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to split HTTP API documentation"
+  exit 1
+fi
+rm site-md/http-api.md
+echo "Split HTTP API into site-md/http-api/"
+
 echo "Documentation build complete!"
 echo "Output directory: site-md/"
-ls -lh site-md/
+echo ""
+echo "Generated structure:"
+tree -L 2 site-md/ 2>/dev/null || find site-md -type f -o -type d | head -20
