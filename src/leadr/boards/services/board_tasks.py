@@ -35,7 +35,7 @@ async def process_due_templates() -> None:
             # Query for due templates
             result = await session.execute(
                 select(BoardTemplateORM).where(
-                    BoardTemplateORM.is_active == True,  # noqa: E712
+                    BoardTemplateORM.is_active.is_(True),
                     BoardTemplateORM.next_run_at <= datetime.now(UTC),
                     BoardTemplateORM.deleted_at.is_(None),
                 )
@@ -168,7 +168,7 @@ async def expire_boards() -> None:
                 select(BoardORM).where(
                     BoardORM.ends_at <= datetime.now(UTC),
                     BoardORM.ends_at.is_not(None),
-                    BoardORM.is_active == True,  # noqa: E712
+                    BoardORM.is_active.is_(True),
                     BoardORM.deleted_at.is_(None),
                 )
             )

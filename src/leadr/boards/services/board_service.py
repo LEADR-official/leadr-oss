@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
 from leadr.boards.services.repositories import BoardRepository
+from leadr.boards.services.short_code_generator import generate_unique_short_code
 from leadr.common.services import BaseService
 from leadr.games.services.game_service import GameService
 
@@ -33,11 +34,11 @@ class BoardService(BaseService[Board, BoardRepository]):
         game_id: UUID,
         name: str,
         icon: str,
-        short_code: str,
         unit: str,
         is_active: bool,
         sort_direction: SortDirection,
         keep_strategy: KeepStrategy,
+        short_code: str | None = None,
         template_id: UUID | None = None,
         template_name: str | None = None,
         starts_at: datetime | None = None,
@@ -51,11 +52,11 @@ class BoardService(BaseService[Board, BoardRepository]):
             game_id: The ID of the game this board belongs to.
             name: The board name.
             icon: Icon identifier for the board.
-            short_code: Globally unique short code for direct sharing.
             unit: Unit of measurement for scores.
             is_active: Whether the board is currently active.
             sort_direction: Direction to sort scores.
             keep_strategy: Strategy for keeping multiple scores from same user.
+            short_code: Globally unique short code for direct sharing.
             template_id: Optional template ID this board was created from.
             template_name: Optional template name.
             starts_at: Optional start time for time-bounded boards.
@@ -75,7 +76,6 @@ class BoardService(BaseService[Board, BoardRepository]):
             ...     game_id=game.id,
             ...     name="Speed Run Board",
             ...     icon="trophy",
-            ...     short_code="SR2025",
             ...     unit="seconds",
             ...     is_active=True,
             ...     sort_direction=SortDirection.ASCENDING,
@@ -94,7 +94,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             game_id=game_id,
             name=name,
             icon=icon,
-            short_code=short_code,
+            short_code=short_code or generate_unique_short_code(),
             unit=unit,
             is_active=is_active,
             sort_direction=sort_direction,
