@@ -1,14 +1,14 @@
 """Tests for Device and DeviceSession repository services."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.adapters.orm import AccountORM
-from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM
-from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
+from leadr.auth.adapters.orm import DeviceORM
+from leadr.auth.domain.device import Device, DeviceStatus
 from leadr.auth.services.repositories import DeviceRepository
 from leadr.games.adapters.orm import GameORM
 

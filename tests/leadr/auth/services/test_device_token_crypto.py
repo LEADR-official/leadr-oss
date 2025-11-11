@@ -5,7 +5,6 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import jwt
-import pytest
 
 from leadr.auth.services.device_token_crypto import (
     generate_access_token,
@@ -142,12 +141,8 @@ class TestGenerateAccessToken:
         expires_delta = timedelta(hours=1)
         secret = "test-secret"
 
-        token1, _ = generate_access_token(
-            device_id, game_id, account_id, expires_delta, secret
-        )
-        token2, _ = generate_access_token(
-            device_id, game_id, account_id, expires_delta, secret
-        )
+        token1, _ = generate_access_token(device_id, game_id, account_id, expires_delta, secret)
+        token2, _ = generate_access_token(device_id, game_id, account_id, expires_delta, secret)
 
         decoded1 = jwt.decode(token1, options={"verify_signature": False})
         decoded2 = jwt.decode(token2, options={"verify_signature": False})
@@ -166,9 +161,7 @@ class TestValidateAccessToken:
         expires_delta = timedelta(hours=1)
         secret = "test-secret"
 
-        token, _ = generate_access_token(
-            device_id, game_id, account_id, expires_delta, secret
-        )
+        token, _ = generate_access_token(device_id, game_id, account_id, expires_delta, secret)
 
         claims = validate_access_token(token, secret)
 
@@ -185,9 +178,7 @@ class TestValidateAccessToken:
         expires_delta = timedelta(seconds=1)
         secret = "test-secret"
 
-        token, _ = generate_access_token(
-            device_id, game_id, account_id, expires_delta, secret
-        )
+        token, _ = generate_access_token(device_id, game_id, account_id, expires_delta, secret)
 
         # Wait for token to expire
         time.sleep(2)
@@ -202,9 +193,7 @@ class TestValidateAccessToken:
         account_id = uuid4()
         expires_delta = timedelta(hours=1)
 
-        token, _ = generate_access_token(
-            device_id, game_id, account_id, expires_delta, "secret1"
-        )
+        token, _ = generate_access_token(device_id, game_id, account_id, expires_delta, "secret1")
 
         claims = validate_access_token(token, "secret2")
         assert claims is None
@@ -222,9 +211,7 @@ class TestValidateAccessToken:
         expires_delta = timedelta(hours=1)
         secret = "test-secret"
 
-        token, _ = generate_access_token(
-            device_id, game_id, account_id, expires_delta, secret
-        )
+        token, _ = generate_access_token(device_id, game_id, account_id, expires_delta, secret)
 
         # Tamper with the token
         parts = token.split(".")
@@ -241,9 +228,7 @@ class TestValidateAccessToken:
         expires_delta = timedelta(hours=1)
         secret = "test-secret"
 
-        token, _ = generate_access_token(
-            device_id, game_id, account_id, expires_delta, secret
-        )
+        token, _ = generate_access_token(device_id, game_id, account_id, expires_delta, secret)
 
         claims = validate_access_token(token, secret)
 
@@ -342,12 +327,8 @@ class TestTokenGenerationAndValidation:
         expires_delta = timedelta(hours=1)
 
         # Generate tokens for different devices
-        token1, _ = generate_access_token(
-            str(uuid4()), uuid4(), uuid4(), expires_delta, secret
-        )
-        token2, _ = generate_access_token(
-            str(uuid4()), uuid4(), uuid4(), expires_delta, secret
-        )
+        token1, _ = generate_access_token(str(uuid4()), uuid4(), uuid4(), expires_delta, secret)
+        token2, _ = generate_access_token(str(uuid4()), uuid4(), uuid4(), expires_delta, secret)
 
         # Both should validate
         claims1 = validate_access_token(token1, secret)
