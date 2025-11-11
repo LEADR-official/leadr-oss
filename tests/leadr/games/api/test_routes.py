@@ -82,7 +82,8 @@ class TestGameRoutes:
     async def test_get_game_not_found(self, client: AsyncClient, test_api_key):
         """Test retrieving a non-existent game returns 404."""
         response = await client.get(
-            "/v1/games/00000000-0000-0000-0000-000000000000", headers={"leadr-api-key": test_api_key}
+            "/v1/games/00000000-0000-0000-0000-000000000000",
+            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 404
@@ -127,7 +128,9 @@ class TestGameRoutes:
 
         assert response.status_code == 422  # Validation error
 
-    async def test_list_games_filters_by_account(self, client: AsyncClient, db_session, test_api_key):
+    async def test_list_games_filters_by_account(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
         """Test that listing games filters by account."""
         # Create two accounts
         account_service = AccountService(db_session)
@@ -238,7 +241,9 @@ class TestGameRoutes:
         assert data["id"] == game_id
 
         # Verify it's not returned by get
-        get_response = await client.get(f"/v1/games/{game_id}", headers={"leadr-api-key": test_api_key})
+        get_response = await client.get(
+            f"/v1/games/{game_id}", headers={"leadr-api-key": test_api_key}
+        )
         assert get_response.status_code == 404
 
     async def test_list_games_excludes_deleted(self, client: AsyncClient, db_session, test_api_key):
