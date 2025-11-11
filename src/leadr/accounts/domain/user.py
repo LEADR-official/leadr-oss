@@ -13,16 +13,32 @@ class User(Entity):
     Represents a user within an account (organization/team).
     Users are scoped to a specific account and have an email
     address and display name.
+
+    Each user belongs to exactly one account, and users cannot be
+    transferred between accounts. The email must be unique within
+    an account.
     """
 
-    account_id: UUID = Field(frozen=True)
-    email: EmailStr
-    display_name: str
+    account_id: UUID = Field(
+        frozen=True, description="ID of the account this user belongs to (immutable)"
+    )
+    email: EmailStr = Field(description="User's email address (validated format)")
+    display_name: str = Field(description="User's display name (2-100 characters)")
 
     @field_validator("display_name")
     @classmethod
     def validate_display_name(cls, value: str) -> str:
-        """Validate display name length and format."""
+        """Validate display name length and format.
+
+        Args:
+            value: The display name to validate.
+
+        Returns:
+            The validated and trimmed display name.
+
+        Raises:
+            ValueError: If display name is empty, too short, or too long.
+        """
         if not value or not value.strip():
             raise ValueError("Display name cannot be empty")
         if len(value) < 2:
