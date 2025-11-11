@@ -1,6 +1,6 @@
 """Tests for Score domain entity."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -290,7 +290,7 @@ class TestScore:
         board_id = uuid4()
         user_id = uuid4()
         score_id = uuid4()
-        created_at = datetime.now(timezone.utc)
+        created_at = datetime.now(UTC)
 
         score1 = Score(
             id=score_id,
