@@ -326,9 +326,7 @@ class TestBoardTemplateRoutes:
         assert data["name"] == "Updated Template"
         assert data["is_active"] is False
 
-    async def test_soft_delete_board_template(
-        self, client: AsyncClient, db_session, test_api_key
-    ):
+    async def test_soft_delete_board_template(self, client: AsyncClient, db_session, test_api_key):
         """Test soft deleting a board template via API."""
         account_service = AccountService(db_session)
         account = await account_service.create_account(

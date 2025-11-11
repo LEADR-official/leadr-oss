@@ -12,6 +12,7 @@ from leadr.common.orm import Base
 
 if TYPE_CHECKING:
     from leadr.accounts.adapters.orm import AccountORM
+    from leadr.boards.domain.board_template import BoardTemplate
     from leadr.games.adapters.orm import GameORM
 
 
@@ -130,7 +131,6 @@ class BoardTemplateORM(Base):
         Returns:
             BoardTemplateORM model with all fields populated from domain entity.
         """
-        from leadr.boards.domain.board_template import BoardTemplate
 
         return cls(
             id=entity.id,

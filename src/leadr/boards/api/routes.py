@@ -231,8 +231,8 @@ async def get_board_template(
 @router.get("/board-templates", response_model=list[BoardTemplateResponse])
 async def list_board_templates(
     account_id: UUID,
+    service: BoardTemplateServiceDep,
     game_id: UUID | None = None,
-    service: BoardTemplateServiceDep = None,
 ) -> list[BoardTemplateResponse]:
     """List board templates for an account, optionally filtered by game.
 

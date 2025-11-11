@@ -86,7 +86,11 @@ class BoardTemplate(Entity):
         # PostgreSQL interval pattern:
         # Supports: "N unit" or "N unit M unit" format
         # Valid units: year(s), month(s), week(s), day(s), hour(s), minute(s), second(s)
-        pattern = r"^\d+\s+(year|years|month|months|week|weeks|day|days|hour|hours|minute|minutes|second|seconds)(\s+\d+\s+(year|years|month|months|week|weeks|day|days|hour|hours|minute|minutes|second|seconds))?$"
+        units = (
+            r"(year|years|month|months|week|weeks|day|days|"
+            r"hour|hours|minute|minutes|second|seconds)"
+        )
+        pattern = rf"^\d+\s+{units}(\s+\d+\s+{units})?$"
 
         if not re.match(pattern, value.strip(), re.IGNORECASE):
             raise ValueError(
