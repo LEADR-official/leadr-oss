@@ -59,6 +59,7 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         account_id: UUID,
         status: APIKeyStatus | None = None,
         active_only: bool = False,
+        **kwargs,
     ) -> list[APIKey]:
         """Filter API keys by account and optional criteria.
 
