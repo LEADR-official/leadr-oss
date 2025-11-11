@@ -23,19 +23,33 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
 
+      - name: Build documentation
+        env:
+          VERSION: ${{ github.event.release.tag_name || '' }}
+        run: ./scripts/build_docs.sh
+
+      - name: Verify docs bundle
+        run: |
+          if [ ! -d "site-md" ] || [ ! -f "site-md/reference.md" ] || [ ! -f "site-md/.api-version" ]; then
+            echo "Error: Documentation bundle was not generated correctly"
+            exit 1
+          fi
+          echo "Documentation bundle verified successfully"
+          echo "API Version: $(cat site-md/.api-version)"
+
       - name: Clone portal
-        run: git clone https://github.com/LEADR-official/leadr-oss.git portal
+        run: git clone https://github.com/LEADR-official/leadr-docs.git portal
 
       - name: Copy into portal tree
-        run: rsync -a --delete site-md docs/api/
+        run: rsync -a --delete site-md/ portal/docs/api/
 
       - name: Create PR
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.LEADR_DOCS_PAT }}   # fine-grained PAT for the portal repo
-          path: docs
+          path: portal
           add-paths: |
-            api/**
+            docs/api/**
           branch: docs/leadr-oss
           commit-message: "docs(py): automated update of leadr-oss docs bundle (${{ github.event.release.tag_name || github.sha }})"
           title: "docs(py): update Python Markdown bundle"
