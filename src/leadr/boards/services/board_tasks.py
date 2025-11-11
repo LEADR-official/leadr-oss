@@ -9,11 +9,11 @@ import logging
 from datetime import UTC, datetime
 
 from sqlalchemy import select
+from sqlalchemy.exc import DBAPIError, OperationalError
 
 from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM
 from leadr.boards.services.board_service import BoardService
 from leadr.boards.services.board_template_service import BoardTemplateService
-from leadr.boards.services.short_code_generator import generate_unique_short_code
 from leadr.common.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -27,10 +27,6 @@ async def process_due_templates() -> None:
 
     This task is designed to be called periodically (e.g., every minute).
     """
-    from datetime import timedelta
-
-    from sqlalchemy.exc import DBAPIError, OperationalError
-
     logger.debug("Checking for due board templates...")
 
     # Get database session
@@ -68,104 +64,33 @@ async def process_due_templates() -> None:
                 logger.exception("Failed to convert template %s to domain", template_orm.id)
                 continue
 
-            # Generate unique short code - skip template on failure
+            # Create board from template - skip on any error
+            # (short_code is generated automatically by the service)
             try:
-                short_code = await generate_unique_short_code(session)
-            except RuntimeError:
-                logger.exception(
-                    "Failed to generate unique short code for template %s", template.id
-                )
-                continue
-
-            # Parse interval and calculate time range - skip on parse error
-            try:
-                starts_at = template.next_run_at
-                interval_parts = template.repeat_interval.split()
-
-                if len(interval_parts) >= 2:
-                    amount = int(interval_parts[0])
-                    unit = interval_parts[1].lower().rstrip("s")
-
-                    if unit == "day":
-                        duration = timedelta(days=amount)
-                    elif unit == "week":
-                        duration = timedelta(weeks=amount)
-                    elif unit == "hour":
-                        duration = timedelta(hours=amount)
-                    elif unit == "minute":
-                        duration = timedelta(minutes=amount)
-                    else:
-                        duration = timedelta(days=amount)
-
-                    ends_at = starts_at + duration
-                    next_run = template.next_run_at + duration
-                else:
-                    # Invalid interval format
-                    logger.error(
-                        "Invalid repeat_interval format for template %s: %s",
-                        template.id,
-                        template.repeat_interval,
-                    )
-                    continue
-            except (ValueError, IndexError):
-                logger.exception(
-                    "Failed to parse repeat_interval for template %s: %s",
-                    template.id,
-                    template.repeat_interval,
-                )
-                continue
-
-            # Extract board config - use defaults on missing/invalid values
-            icon = template.config.get("icon", "trophy")
-            unit = template.config.get("unit", "points")
-            is_active = template.config.get("is_active", True)
-            sort_direction = template.config.get("sort_direction", "desc")
-            keep_strategy = template.config.get("keep_strategy", "best")
-            tags = template.config.get("tags", [])
-            if not isinstance(tags, list):
-                tags = []
-
-            # Create board - skip template on failure
-            try:
-                await board_service.create_board(
-                    account_id=template.account_id,
-                    game_id=template.game_id,
-                    name=template.name,
-                    icon=icon,
-                    short_code=short_code,
-                    unit=unit,
-                    is_active=is_active,
-                    sort_direction=sort_direction,
-                    keep_strategy=keep_strategy,
-                    template_id=template.id,
-                    template_name=template.name,
-                    starts_at=starts_at,
-                    ends_at=ends_at,
-                    tags=tags,
-                )
+                board = await board_service.create_board_from_template(template)
             except ValueError:
                 logger.exception("Validation error creating board from template %s", template.id)
+                continue
+            except RuntimeError:
+                logger.exception("Failed to generate short code for template %s", template.id)
                 continue
             except Exception:
                 logger.exception("Failed to create board from template %s", template.id)
                 continue
 
-            # Update template's next_run_at - skip on failure
+            # Advance template schedule - skip on failure
             try:
-                await template_service.update_board_template(
-                    template_id=template.id,
-                    next_run_at=next_run,
-                )
+                updated_template = await template_service.advance_template_schedule(template.id)
             except Exception:
-                logger.exception("Failed to update next_run_at for template %s", template.id)
+                logger.exception("Failed to advance schedule for template %s", template.id)
                 continue
 
             success_count += 1
             logger.info(
                 "Created board '%s' from template %s, next run at %s",
-                template.name,
+                board.name,
                 template.id,
-                next_run,
+                updated_template.next_run_at,
             )
 
         # Commit all successful template processing - fail fast on commit error
@@ -184,8 +109,6 @@ async def expire_boards() -> None:
 
     This task is designed to be called periodically (e.g., every minute).
     """
-    from sqlalchemy.exc import DBAPIError, OperationalError
-
     logger.debug("Checking for expired boards...")
 
     # Get database session

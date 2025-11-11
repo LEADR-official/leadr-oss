@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.boards.domain.board_template import BoardTemplate
+from leadr.boards.domain.interval_parser import parse_interval_to_timedelta
 from leadr.boards.services.repositories import BoardTemplateRepository
 from leadr.common.services import BaseService
 from leadr.games.services.game_service import GameService
@@ -172,5 +173,32 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             template.next_run_at = next_run_at
         if is_active is not None:
             template.is_active = is_active
+
+        return await self.repository.update(template)
+
+    async def advance_template_schedule(self, template_id: UUID) -> BoardTemplate:
+        """Advance a template's next_run_at by its repeat_interval.
+
+        This is typically called after successfully creating a board from the template.
+
+        Args:
+            template_id: The ID of the template to advance.
+
+        Returns:
+            The updated BoardTemplate with advanced next_run_at.
+
+        Raises:
+            EntityNotFoundError: If the template doesn't exist.
+            ValueError: If the repeat_interval cannot be parsed.
+
+        Example:
+            >>> template = await service.advance_template_schedule(template.id)
+            >>> # template.next_run_at is now advanced by repeat_interval
+        """
+        template = await self.get_by_id_or_raise(template_id)
+
+        # Parse interval and add to current next_run_at
+        duration = parse_interval_to_timedelta(template.repeat_interval)
+        template.next_run_at = template.next_run_at + duration
 
         return await self.repository.update(template)

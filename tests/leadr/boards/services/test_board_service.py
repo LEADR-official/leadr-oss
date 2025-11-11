@@ -1,6 +1,6 @@
 """Tests for Board service."""
 
-from datetime import UTC
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -934,3 +934,110 @@ class TestBoardService:
 
         assert updated_board.tags == ["speedrun", "glitchless"]
         assert updated_board.name == "Speed Run Board"  # Unchanged
+
+    async def test_create_board_from_template(self, db_session: AsyncSession):
+        """Test creating a board from a template."""
+        from datetime import timedelta
+
+        from leadr.boards.services.board_template_service import BoardTemplateService
+
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create a board template
+        template_service = BoardTemplateService(db_session)
+        next_run = datetime.now(UTC) + timedelta(days=1)
+        template = await template_service.create_board_template(
+            account_id=account.id,
+            game_id=game.id,
+            name="Weekly Challenge",
+            repeat_interval="7 days",
+            next_run_at=next_run,
+            is_active=True,
+            config={
+                "icon": "star",
+                "unit": "points",
+                "is_active": True,
+                "sort_direction": "desc",
+                "keep_strategy": "best",
+                "tags": ["weekly", "challenge"],
+            },
+        )
+
+        # Create board from template
+        board_service = BoardService(db_session)
+        board = await board_service.create_board_from_template(template)
+
+        # Assertions
+        assert board.id is not None
+        assert board.name == "Weekly Challenge"
+        assert board.account_id == account.id
+        assert board.game_id == game.id
+        assert board.icon == "star"
+        assert board.unit == "points"
+        assert board.is_active is True
+        assert board.sort_direction == SortDirection.DESCENDING
+        assert board.keep_strategy == KeepStrategy.BEST_ONLY
+        assert board.template_id == template.id
+        assert board.template_name == "Weekly Challenge"
+        assert board.starts_at == next_run
+        assert board.ends_at == next_run + timedelta(days=7)
+        assert board.tags == ["weekly", "challenge"]
+        assert board.short_code is not None  # Should be auto-generated
+        assert len(board.short_code) == 8  # Default short code length
+
+    async def test_create_board_from_template_with_defaults(self, db_session: AsyncSession):
+        """Test creating a board from a template with default config values."""
+        from datetime import timedelta
+
+        from leadr.boards.services.board_template_service import BoardTemplateService
+
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create a board template with minimal config (use defaults)
+        template_service = BoardTemplateService(db_session)
+        next_run = datetime.now(UTC) + timedelta(hours=1)
+        template = await template_service.create_board_template(
+            account_id=account.id,
+            game_id=game.id,
+            name="Hourly Event",
+            repeat_interval="1 hour",
+            next_run_at=next_run,
+            is_active=True,
+            config={},  # Empty config - should use defaults
+        )
+
+        # Create board from template
+        board_service = BoardService(db_session)
+        board = await board_service.create_board_from_template(template)
+
+        # Assertions - check defaults are applied
+        assert board.icon == "trophy"  # Default
+        assert board.unit == "points"  # Default
+        assert board.is_active is True  # Default
+        assert board.sort_direction == SortDirection.DESCENDING  # Default "desc"
+        assert board.keep_strategy == KeepStrategy.BEST_ONLY  # Default "best"
+        assert board.tags == []  # Default empty list
+        assert board.starts_at == next_run
+        assert board.ends_at == next_run + timedelta(hours=1)

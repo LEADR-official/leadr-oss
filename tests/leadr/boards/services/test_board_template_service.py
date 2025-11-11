@@ -465,3 +465,95 @@ class TestBoardTemplateService:
         # Verify not in list after deletion
         templates = await template_service.list_board_templates_by_account(account.id)
         assert len(templates) == 0
+
+    async def test_advance_template_schedule(self, db_session: AsyncSession):
+        """Test advancing a template's schedule."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create template with weekly interval
+        template_service = BoardTemplateService(db_session)
+        now = datetime.now(UTC)
+        original_next_run = now + timedelta(days=7)
+
+        template = await template_service.create_board_template(
+            account_id=account.id,
+            game_id=game.id,
+            name="Weekly Template",
+            repeat_interval="7 days",
+            next_run_at=original_next_run,
+            is_active=True,
+        )
+
+        # Advance schedule
+        updated = await template_service.advance_template_schedule(template.id)
+
+        # Should be advanced by 7 days
+        expected_next_run = original_next_run + timedelta(days=7)
+        assert updated.next_run_at == expected_next_run
+        assert updated.id == template.id
+        assert updated.name == "Weekly Template"
+
+    async def test_advance_template_schedule_different_intervals(self, db_session: AsyncSession):
+        """Test advancing schedules with different interval types."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        template_service = BoardTemplateService(db_session)
+        now = datetime.now(UTC)
+
+        # Test hourly interval
+        hourly_template = await template_service.create_board_template(
+            account_id=account.id,
+            game_id=game.id,
+            name="Hourly Template",
+            repeat_interval="1 hour",
+            next_run_at=now,
+            is_active=True,
+        )
+
+        advanced_hourly = await template_service.advance_template_schedule(hourly_template.id)
+        assert advanced_hourly.next_run_at == now + timedelta(hours=1)
+
+        # Test weekly interval
+        weekly_template = await template_service.create_board_template(
+            account_id=account.id,
+            game_id=game.id,
+            name="Weekly Template",
+            repeat_interval="2 weeks",
+            next_run_at=now,
+            is_active=True,
+        )
+
+        advanced_weekly = await template_service.advance_template_schedule(weekly_template.id)
+        assert advanced_weekly.next_run_at == now + timedelta(weeks=2)
+
+    async def test_advance_template_schedule_not_found(self, db_session: AsyncSession):
+        """Test advancing schedule for non-existent template raises error."""
+        from leadr.common.domain.exceptions import EntityNotFoundError
+
+        template_service = BoardTemplateService(db_session)
+        non_existent_id = uuid4()
+
+        with pytest.raises(EntityNotFoundError):
+            await template_service.advance_template_schedule(non_existent_id)
