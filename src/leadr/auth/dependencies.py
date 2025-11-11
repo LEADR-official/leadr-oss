@@ -5,12 +5,11 @@ from typing import Annotated
 from fastapi import Header, HTTPException
 
 from leadr.auth.domain.api_key import APIKey
-from leadr.auth.services.api_key_service import APIKeyService
-from leadr.common.dependencies import DatabaseSession
+from leadr.auth.services.dependencies import APIKeyServiceDep
 
 
 async def require_api_key(
-    db: DatabaseSession,
+    service: APIKeyServiceDep,
     api_key: Annotated[str | None, Header(alias="leadr-api-key")] = None,
 ) -> APIKey:
     """Require and validate API key authentication.
@@ -21,7 +20,7 @@ async def require_api_key(
 
     Args:
         api_key: The API key from the 'leadr-api-key' header.
-        db: Database session dependency.
+        service: APIKeyService dependency.
 
     Returns:
         The authenticated APIKey entity.
@@ -42,7 +41,6 @@ async def require_api_key(
             detail="API key required",
         )
 
-    service = APIKeyService(db)
     validated_key = await service.validate_api_key(api_key)
 
     if validated_key is None:

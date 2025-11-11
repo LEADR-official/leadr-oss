@@ -21,7 +21,7 @@ from leadr.accounts.adapters.orm import AccountORM, UserORM  # noqa: F401
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.auth.adapters.orm import APIKeyORM  # noqa: F401
-from leadr.auth.services.api_key_service import APIKeyService
+from leadr.auth.services.dependencies import get_api_key_service
 from leadr.common.database import get_db
 from leadr.common.orm import Base
 from leadr.config import settings
@@ -177,8 +177,8 @@ async def test_api_key(db_session: AsyncSession) -> str:
     )
     await account_repo.create(account)
 
-    # Create API key
-    service = APIKeyService(db_session)
+    # Create API key using dependency factory
+    service = await get_api_key_service(db_session)
     _, plain_key = await service.create_api_key(
         account_id=account_id,
         name="Test API Key",
