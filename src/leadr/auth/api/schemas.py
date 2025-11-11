@@ -1,11 +1,13 @@
-"""API schemas for API Key endpoints."""
+"""API schemas for Authentication endpoints."""
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
+from leadr.auth.domain.device import Device, DeviceStatus
 
 
 class CreateAPIKeyRequest(BaseModel):
@@ -116,3 +118,72 @@ class UpdateAPIKeyRequest(BaseModel):
         default=None, description="Updated status (use 'revoked' to disable key)"
     )
     deleted: bool | None = Field(default=None, description="Set to true to soft delete the key")
+
+
+# Client Session Schemas
+
+
+class StartSessionRequest(BaseModel):
+    """Request schema for starting a device session.
+
+    Used by game clients to authenticate and obtain an access token.
+    """
+
+    game_id: UUID = Field(description="ID of the game this device belongs to")
+    device_id: str = Field(
+        description="Client-generated unique device identifier (e.g., UUID, hardware ID)"
+    )
+    platform: str | None = Field(
+        default=None, description="Device platform (e.g., 'ios', 'android', 'pc', 'console')"
+    )
+    metadata: dict[str, Any] | None = Field(
+        default=None, description="Optional device metadata (e.g., OS version, device model)"
+    )
+
+
+class StartSessionResponse(BaseModel):
+    """Response schema for starting a device session.
+
+    Includes the access token which must be saved by the client.
+    The token should be sent in the Authorization header as: Bearer <access_token>
+    """
+
+    id: UUID = Field(description="Unique identifier for the device")
+    game_id: UUID = Field(description="ID of the game")
+    device_id: str = Field(description="Client-generated device identifier")
+    account_id: UUID = Field(description="ID of the account that owns the game")
+    platform: str | None = Field(default=None, description="Device platform")
+    status: DeviceStatus = Field(description="Device status (active, suspended, banned)")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Device metadata")
+    access_token: str = Field(description="JWT access token for authenticating API requests")
+    expires_in: int = Field(description="Token expiration time in seconds")
+    first_seen_at: datetime = Field(description="Timestamp when device was first seen (UTC)")
+    last_seen_at: datetime = Field(description="Timestamp when device was last seen (UTC)")
+
+    @classmethod
+    def from_domain(
+        cls, device: Device, access_token: str, expires_in: int
+    ) -> "StartSessionResponse":
+        """Convert domain entity to response model with access token.
+
+        Args:
+            device: The domain Device entity
+            access_token: The plain JWT access token
+            expires_in: Token expiration time in seconds
+
+        Returns:
+            StartSessionResponse with all fields populated
+        """
+        return cls(
+            id=device.id,
+            game_id=device.game_id,
+            device_id=device.device_id,
+            account_id=device.account_id,
+            platform=device.platform,
+            status=device.status,
+            metadata=device.metadata,
+            access_token=access_token,
+            expires_in=expires_in,
+            first_seen_at=device.first_seen_at,
+            last_seen_at=device.last_seen_at,
+        )
