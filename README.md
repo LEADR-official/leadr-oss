@@ -1,4 +1,4 @@
-# 🎮 LEADR - Lightweight Game Leaderboard API
+# 👑 LEADR - Lightweight Game Leaderboard API
 
 > **LEADR is the cross-platform leadboard backend for indie game devs that turns any game into a social experience**
 
@@ -139,3 +139,5 @@ We follow test-driven development:
 ______________________________________________________________________
 
 *Built with ❤️ for the indie game dev community*
+
+![Umami pixel](https://cloud.umami.is/p/5cIK2JMht "Umami pixel")
