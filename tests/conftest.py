@@ -22,6 +22,7 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.auth.adapters.orm import APIKeyORM  # noqa: F401
 from leadr.auth.services.api_key_service import APIKeyService
+from leadr.games.adapters.orm import GameORM  # noqa: F401
 from leadr.common.database import get_db
 from leadr.common.orm import Base
 from leadr.config import settings

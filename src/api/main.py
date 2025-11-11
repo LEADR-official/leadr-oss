@@ -11,6 +11,7 @@ from api.routes import router as api_router
 from leadr.accounts.api.routes import router as accounts_router
 from leadr.auth.api.routes import router as auth_router
 from leadr.auth.dependencies import require_api_key
+from leadr.games.api.routes import router as games_router
 from leadr.common.api.exceptions import entity_not_found_handler
 from leadr.common.database import engine
 from leadr.common.domain.exceptions import EntityNotFoundError
@@ -73,6 +74,7 @@ public_router.include_router(api_router)
 # Admin routes - require API key authentication
 admin_router.include_router(accounts_router, tags=["Accounts"])
 admin_router.include_router(auth_router, tags=["API Keys"])
+admin_router.include_router(games_router, tags=["Games"])
 
 # Include public router (always available)
 app.include_router(public_router, prefix=settings.API_PREFIX)

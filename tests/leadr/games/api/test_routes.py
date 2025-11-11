@@ -10,7 +10,7 @@ from leadr.accounts.services.account_service import AccountService
 class TestGameRoutes:
     """Test suite for Game API routes."""
 
-    async def test_create_game(self, client: AsyncClient, db_session):
+    async def test_create_game(self, client: AsyncClient, db_session, test_api_key):
         """Test creating a game via API."""
         # Create account first
         account_service = AccountService(db_session)
@@ -27,6 +27,7 @@ class TestGameRoutes:
                 "name": "Super Awesome Game",
                 "steam_app_id": "123456",
             },
+            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 201
@@ -37,7 +38,7 @@ class TestGameRoutes:
         assert "id" in data
         assert "created_at" in data
 
-    async def test_create_game_with_account_not_found(self, client: AsyncClient):
+    async def test_create_game_with_account_not_found(self, client: AsyncClient, test_api_key):
         """Test creating a game with non-existent account returns 404."""
         response = await client.post(
             "/v1/games",
@@ -45,12 +46,13 @@ class TestGameRoutes:
                 "account_id": "00000000-0000-0000-0000-000000000000",
                 "name": "Super Awesome Game",
             },
+            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 404
         assert "Account not found" in response.json()["detail"]
 
-    async def test_get_game(self, client: AsyncClient, db_session):
+    async def test_get_game(self, client: AsyncClient, db_session, test_api_key):
         """Test retrieving a game by ID via API."""
         # Create account and game
         account_service = AccountService(db_session)
@@ -65,25 +67,28 @@ class TestGameRoutes:
                 "account_id": str(account.id),
                 "name": "Super Awesome Game",
             },
+            headers={"leadr-api-key": test_api_key},
         )
         game_id = create_response.json()["id"]
 
         # Retrieve it
-        response = await client.get(f"/v1/games/{game_id}")
+        response = await client.get(f"/v1/games/{game_id}", headers={"leadr-api-key": test_api_key})
 
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == game_id
         assert data["name"] == "Super Awesome Game"
 
-    async def test_get_game_not_found(self, client: AsyncClient):
+    async def test_get_game_not_found(self, client: AsyncClient, test_api_key):
         """Test retrieving a non-existent game returns 404."""
-        response = await client.get("/v1/games/00000000-0000-0000-0000-000000000000")
+        response = await client.get(
+            "/v1/games/00000000-0000-0000-0000-000000000000", headers={"leadr-api-key": test_api_key}
+        )
 
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
 
-    async def test_list_games(self, client: AsyncClient, db_session):
+    async def test_list_games(self, client: AsyncClient, db_session, test_api_key):
         """Test listing games for an account via API."""
         # Create account
         account_service = AccountService(db_session)
@@ -96,14 +101,18 @@ class TestGameRoutes:
         await client.post(
             "/v1/games",
             json={"account_id": str(account.id), "name": "Game One"},
+            headers={"leadr-api-key": test_api_key},
         )
         await client.post(
             "/v1/games",
             json={"account_id": str(account.id), "name": "Game Two"},
+            headers={"leadr-api-key": test_api_key},
         )
 
         # List games
-        response = await client.get(f"/v1/games?account_id={account.id}")
+        response = await client.get(
+            f"/v1/games?account_id={account.id}", headers={"leadr-api-key": test_api_key}
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -112,13 +121,13 @@ class TestGameRoutes:
         assert "Game One" in names
         assert "Game Two" in names
 
-    async def test_list_games_requires_account_id(self, client: AsyncClient):
+    async def test_list_games_requires_account_id(self, client: AsyncClient, test_api_key):
         """Test that listing games requires account_id parameter."""
-        response = await client.get("/v1/games")
+        response = await client.get("/v1/games", headers={"leadr-api-key": test_api_key})
 
         assert response.status_code == 422  # Validation error
 
-    async def test_list_games_filters_by_account(self, client: AsyncClient, db_session):
+    async def test_list_games_filters_by_account(self, client: AsyncClient, db_session, test_api_key):
         """Test that listing games filters by account."""
         # Create two accounts
         account_service = AccountService(db_session)
@@ -135,21 +144,25 @@ class TestGameRoutes:
         await client.post(
             "/v1/games",
             json={"account_id": str(account1.id), "name": "Account 1 Game"},
+            headers={"leadr-api-key": test_api_key},
         )
         await client.post(
             "/v1/games",
             json={"account_id": str(account2.id), "name": "Account 2 Game"},
+            headers={"leadr-api-key": test_api_key},
         )
 
         # List games for account 1
-        response = await client.get(f"/v1/games?account_id={account1.id}")
+        response = await client.get(
+            f"/v1/games?account_id={account1.id}", headers={"leadr-api-key": test_api_key}
+        )
 
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 1
         assert data[0]["name"] == "Account 1 Game"
 
-    async def test_update_game(self, client: AsyncClient, db_session):
+    async def test_update_game(self, client: AsyncClient, db_session, test_api_key):
         """Test updating a game via API."""
         # Create account and game
         account_service = AccountService(db_session)
@@ -164,6 +177,7 @@ class TestGameRoutes:
                 "account_id": str(account.id),
                 "name": "Super Awesome Game",
             },
+            headers={"leadr-api-key": test_api_key},
         )
         game_id = create_response.json()["id"]
 
@@ -174,6 +188,7 @@ class TestGameRoutes:
                 "name": "Ultra Awesome Game",
                 "steam_app_id": "999999",
             },
+            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 200
@@ -181,17 +196,18 @@ class TestGameRoutes:
         assert data["name"] == "Ultra Awesome Game"
         assert data["steam_app_id"] == "999999"
 
-    async def test_update_game_not_found(self, client: AsyncClient):
+    async def test_update_game_not_found(self, client: AsyncClient, test_api_key):
         """Test updating a non-existent game returns 404."""
         response = await client.patch(
             "/v1/games/00000000-0000-0000-0000-000000000000",
             json={"name": "New Name"},
+            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
 
-    async def test_soft_delete_game(self, client: AsyncClient, db_session):
+    async def test_soft_delete_game(self, client: AsyncClient, db_session, test_api_key):
         """Test soft-deleting a game via API."""
         # Create account and game
         account_service = AccountService(db_session)
@@ -206,6 +222,7 @@ class TestGameRoutes:
                 "account_id": str(account.id),
                 "name": "Super Awesome Game",
             },
+            headers={"leadr-api-key": test_api_key},
         )
         game_id = create_response.json()["id"]
 
@@ -213,6 +230,7 @@ class TestGameRoutes:
         response = await client.patch(
             f"/v1/games/{game_id}",
             json={"deleted": True},
+            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 200
@@ -220,10 +238,10 @@ class TestGameRoutes:
         assert data["id"] == game_id
 
         # Verify it's not returned by get
-        get_response = await client.get(f"/v1/games/{game_id}")
+        get_response = await client.get(f"/v1/games/{game_id}", headers={"leadr-api-key": test_api_key})
         assert get_response.status_code == 404
 
-    async def test_list_games_excludes_deleted(self, client: AsyncClient, db_session):
+    async def test_list_games_excludes_deleted(self, client: AsyncClient, db_session, test_api_key):
         """Test that list endpoint excludes soft-deleted games."""
         # Create account
         account_service = AccountService(db_session)
@@ -236,19 +254,25 @@ class TestGameRoutes:
         game1_response = await client.post(
             "/v1/games",
             json={"account_id": str(account.id), "name": "Game One"},
+            headers={"leadr-api-key": test_api_key},
         )
         game1_id = game1_response.json()["id"]
 
         await client.post(
             "/v1/games",
             json={"account_id": str(account.id), "name": "Game Two"},
+            headers={"leadr-api-key": test_api_key},
         )
 
         # Soft-delete one
-        await client.patch(f"/v1/games/{game1_id}", json={"deleted": True})
+        await client.patch(
+            f"/v1/games/{game1_id}", json={"deleted": True}, headers={"leadr-api-key": test_api_key}
+        )
 
         # List should only return non-deleted
-        response = await client.get(f"/v1/games?account_id={account.id}")
+        response = await client.get(
+            f"/v1/games?account_id={account.id}", headers={"leadr-api-key": test_api_key}
+        )
 
         assert response.status_code == 200
         data = response.json()
