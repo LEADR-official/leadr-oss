@@ -79,7 +79,6 @@ class TestGenerateAccessToken:
             expires_delta=expires_delta,
             secret=secret,
         )
-        after = datetime.now(UTC)
 
         decoded = jwt.decode(token, options={"verify_signature": False})
         exp_timestamp = decoded["exp"]

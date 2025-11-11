@@ -196,9 +196,7 @@ class TestClientSessionRoutes:
 
         assert response.status_code == 422
 
-    async def test_start_session_with_invalid_game_id_format_returns_422(
-        self, client: AsyncClient
-    ):
+    async def test_start_session_with_invalid_game_id_format_returns_422(self, client: AsyncClient):
         """Test starting a session with invalid game_id format returns 422."""
         response = await client.post(
             "/client/sessions",

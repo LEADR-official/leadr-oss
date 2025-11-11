@@ -35,7 +35,9 @@ class TestRequireDeviceToken:
             await require_device_token(service=service, authorization="NotBearer token123")
 
         assert exc_info.value.status_code == 401
-        assert "format" in exc_info.value.detail.lower() or "invalid" in exc_info.value.detail.lower()
+        assert (
+            "format" in exc_info.value.detail.lower() or "invalid" in exc_info.value.detail.lower()
+        )
 
     async def test_invalid_token_raises_401(self, db_session: AsyncSession):
         """Test that an invalid/unknown token raises 401 Unauthorized."""
@@ -116,7 +118,9 @@ class TestRequireDeviceToken:
                 mock_hash.return_value = "test_hash"
 
                 # Use the dependency with Bearer token
-                result = await require_device_token(service=service, authorization=f"Bearer {plain_token}")
+                result = await require_device_token(
+                    service=service, authorization=f"Bearer {plain_token}"
+                )
 
         # Should return the Device entity
         assert result.id == device.id
@@ -309,7 +313,9 @@ class TestRequireDeviceToken:
                     await require_device_token(service=service, authorization="Bearer test_token")
 
         assert exc_info.value.status_code == 401
-        assert "invalid" in exc_info.value.detail.lower() or "banned" in exc_info.value.detail.lower()
+        assert (
+            "invalid" in exc_info.value.detail.lower() or "banned" in exc_info.value.detail.lower()
+        )
 
     async def test_soft_deleted_device_raises_401(self, db_session: AsyncSession):
         """Test that a token for soft-deleted device raises 401 Unauthorized."""

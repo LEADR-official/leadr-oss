@@ -4,7 +4,6 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from pydantic import UUID4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.auth.domain.device import Device, DeviceSession
@@ -142,7 +141,6 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         # Extract claims
         device_id = claims["sub"]
         game_id = UUID(claims["game_id"])
-        account_id = UUID(claims["account_id"])
 
         # Get device
         device = await self.repository.get_by_game_and_device_id(game_id, device_id)

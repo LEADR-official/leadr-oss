@@ -161,7 +161,9 @@ class StartSessionResponse(BaseModel):
     last_seen_at: datetime = Field(description="Timestamp when device was last seen (UTC)")
 
     @classmethod
-    def from_domain(cls, device: Device, access_token: str, expires_in: int) -> "StartSessionResponse":
+    def from_domain(
+        cls, device: Device, access_token: str, expires_in: int
+    ) -> "StartSessionResponse":
         """Convert domain entity to response model with access token.
 
         Args:
