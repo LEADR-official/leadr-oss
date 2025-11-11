@@ -1,0 +1,79 @@
+name: Publish docs bundle to docs repo
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., v1.2.3 or 0.1.0)'
+        required: true
+        type: string
+
+jobs:
+  build-and-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate VERSION
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+
+          if [ -z "$VERSION" ]; then
+            echo "Error: VERSION is required but not set"
+            echo "For releases: VERSION comes from release tag"
+            echo "For manual dispatch: VERSION must be provided as input"
+            exit 1
+          fi
+
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Validated VERSION: $VERSION"
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Build documentation
+        run: ./scripts/build_docs.sh
+
+      - name: Verify docs bundle
+        run: |
+          if [ ! -d "site-md" ] || [ ! -f "site-md/reference.md" ] || [ ! -f "site-md/.api-version" ]; then
+            echo "Error: Documentation bundle was not generated correctly"
+            exit 1
+          fi
+          echo "Documentation bundle verified successfully"
+          echo "API Version: $(cat site-md/.api-version)"
+
+      - name: Clone portal
+        run: git clone https://github.com/LEADR-official/leadr-docs.git portal
+
+      - name: Copy into portal tree
+        run: rsync -a --delete site-md/ portal/docs/api/
+
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.LEADR_DOCS_PAT }}   # fine-grained PAT for the portal repo
+          path: portal
+          add-paths: |
+            docs/api/**
+          branch: docs/leadr-oss
+          commit-message: "docs(py): automated update of leadr-oss docs bundle (${{ env.VERSION }})"
+          title: "docs(py): update Python Markdown bundle"
+          body: "Generated with griffe2md."
+          labels: docs, automated-pr
+

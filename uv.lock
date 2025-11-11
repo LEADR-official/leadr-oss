@@ -635,6 +635,32 @@ wheels = [
 ]
 
 [[package]]
+name = "griffe"
+version = "1.14.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ec/d7/6c09dd7ce4c7837e4cdb11dce980cb45ae3cd87677298dc3b781b6bce7d3/griffe-1.14.0.tar.gz", hash = "sha256:9d2a15c1eca966d68e00517de5d69dd1bc5c9f2335ef6c1775362ba5b8651a13", size = 424684, upload-time = "2025-09-05T15:02:29.167Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/b1/9ff6578d789a89812ff21e4e0f80ffae20a65d5dd84e7a17873fe3b365be/griffe-1.14.0-py3-none-any.whl", hash = "sha256:0e9d52832cccf0f7188cfe585ba962d2674b241c01916d780925df34873bceb0", size = 144439, upload-time = "2025-09-05T15:02:27.511Z" },
+]
+
+[[package]]
+name = "griffe2md"
+version = "1.2.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "griffe" },
+    { name = "jinja2" },
+    { name = "mdformat" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ff/17/fe5fc4d419fa4780e0ded38b624ba8c2e71172e5e320936b71f9dbcf610b/griffe2md-1.2.5.tar.gz", hash = "sha256:e543865be8cf95aef228b42710641da0b21fe1884ed577c670ed3dba9ad6d53c", size = 41771, upload-time = "2025-10-02T19:00:42.699Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b6/cd/7ed82d708c289aa8183795ce2d34d9ac1fb011e0156cf15abacc3c6d6b0b/griffe2md-1.2.5-py3-none-any.whl", hash = "sha256:f993a96a792d6619efd03b9899cbed4583085ff594e86fe96e0f66ef26ba8ddf", size = 29796, upload-time = "2025-10-02T19:00:41.227Z" },
+]
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -770,6 +796,7 @@ dependencies = [
 dev = [
     { name = "coverage" },
     { name = "greenlet" },
+    { name = "griffe2md" },
     { name = "httpx" },
     { name = "mdformat" },
     { name = "mdformat-gfm" },
@@ -801,6 +828,7 @@ requires-dist = [
 dev = [
     { name = "coverage", specifier = ">=7.10.6" },
     { name = "greenlet", specifier = ">=3.2.4" },
+    { name = "griffe2md", specifier = ">=1.2.5" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mdformat", specifier = ">=0.7.22" },
     { name = "mdformat-gfm", specifier = ">=0.4.1" },

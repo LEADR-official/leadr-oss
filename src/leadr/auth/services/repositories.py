@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -55,14 +54,19 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         """Get API key by prefix, returns None if not found or soft-deleted."""
         return await self._get_by_field("key_prefix", key_prefix)
 
-    async def filter(self, account_id: UUID, **kwargs: Any) -> list[APIKey]:
+    async def filter(
+        self,
+        account_id: UUID,
+        status: APIKeyStatus | None = None,
+        active_only: bool = False,
+        **kwargs,
+    ) -> list[APIKey]:
         """Filter API keys by account and optional criteria.
 
         Args:
             account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
             status: Optional APIKeyStatus to filter by
             active_only: If True, only return ACTIVE keys (bool)
-            **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
             List of API keys for the account matching the filter criteria
@@ -73,13 +77,11 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         )
 
         # Apply optional filters
-        if "status" in kwargs and kwargs["status"] is not None:
-            status_value = kwargs["status"]
-            if isinstance(status_value, APIKeyStatus):
-                status_value = status_value.value
+        if status is not None:
+            status_value = status.value if isinstance(status, APIKeyStatus) else status
             query = query.where(APIKeyORM.status == APIKeyStatusEnum(status_value))
 
-        if "active_only" in kwargs and kwargs["active_only"] is True:
+        if active_only:
             query = query.where(APIKeyORM.status == APIKeyStatusEnum.ACTIVE)
 
         result = await self.session.execute(query)
