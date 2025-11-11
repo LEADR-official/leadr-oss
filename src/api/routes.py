@@ -12,9 +12,7 @@ router = APIRouter()
 class HealthResponse(BaseModel):
     """Health check response model."""
 
-    status: str = Field(
-        description="Overall API health status (healthy, degraded, or unhealthy)"
-    )
+    status: str = Field(description="Overall API health status (healthy, degraded, or unhealthy)")
     database: str = Field(description="Database connection status")
 
 

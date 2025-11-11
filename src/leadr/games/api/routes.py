@@ -19,6 +19,16 @@ router = APIRouter()
 async def create_game(request: GameCreateRequest, service: GameServiceDep) -> GameResponse:
     """Create a new game.
 
+    Creates a new game associated with an existing account. Games can optionally
+    be configured with Steam integration and a default leaderboard.
+
+    Args:
+        request: Game creation details including account_id, name, and optional settings.
+        service: Injected game service dependency.
+
+    Returns:
+        GameResponse with the created game including auto-generated ID and timestamps.
+
     Raises:
         404: Account not found.
     """
@@ -37,7 +47,18 @@ async def create_game(request: GameCreateRequest, service: GameServiceDep) -> Ga
 
 @router.get("/games/{game_id}", response_model=GameResponse)
 async def get_game(game_id: UUID, service: GameServiceDep) -> GameResponse:
-    """Get a game by ID."""
+    """Get a game by ID.
+
+    Args:
+        game_id: Unique identifier for the game.
+        service: Injected game service dependency.
+
+    Returns:
+        GameResponse with full game details.
+
+    Raises:
+        404: Game not found.
+    """
     game = await service.get_by_id_or_raise(game_id)
     return GameResponse.from_domain(game)
 
@@ -47,7 +68,15 @@ async def list_games(
     account_id: UUID,
     service: GameServiceDep,
 ) -> list[GameResponse]:
-    """List all games for an account."""
+    """List all games for an account.
+
+    Args:
+        account_id: Account ID to filter games by.
+        service: Injected game service dependency.
+
+    Returns:
+        List of all active games for the specified account.
+    """
     games = await service.list_games(account_id)
     return [GameResponse.from_domain(game) for game in games]
 
@@ -56,7 +85,21 @@ async def list_games(
 async def update_game(
     game_id: UUID, request: GameUpdateRequest, service: GameServiceDep
 ) -> GameResponse:
-    """Update a game."""
+    """Update a game.
+
+    Supports updating name, Steam App ID, default board ID, or soft-deleting the game.
+
+    Args:
+        game_id: Unique identifier for the game.
+        request: Game update details (all fields optional).
+        service: Injected game service dependency.
+
+    Returns:
+        GameResponse with the updated game details.
+
+    Raises:
+        404: Game not found.
+    """
     # Handle soft delete first
     if request.deleted is True:
         game = await service.soft_delete(game_id)

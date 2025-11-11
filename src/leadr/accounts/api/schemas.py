@@ -27,9 +27,7 @@ class AccountUpdateRequest(BaseModel):
     status: AccountStatus | None = Field(
         default=None, description="Account status (active, suspended, deleted)"
     )
-    deleted: bool | None = Field(
-        default=None, description="Set to true to soft delete the account"
-    )
+    deleted: bool | None = Field(default=None, description="Set to true to soft delete the account")
 
 
 class AccountResponse(BaseModel):

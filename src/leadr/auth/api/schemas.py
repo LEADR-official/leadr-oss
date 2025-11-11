@@ -14,7 +14,8 @@ class CreateAPIKeyRequest(BaseModel):
     account_id: UUID = Field(description="ID of the account this API key belongs to")
     name: str = Field(description="Human-readable name for the API key (e.g., 'Production Server')")
     expires_at: datetime | None = Field(
-        default=None, description="Optional expiration timestamp (UTC). Key never expires if omitted"
+        default=None,
+        description="Optional expiration timestamp (UTC). Key never expires if omitted",
     )
 
 
