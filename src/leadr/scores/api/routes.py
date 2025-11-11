@@ -3,7 +3,6 @@
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import UUID4
 from sqlalchemy.exc import IntegrityError
 
 from leadr.scores.api.schemas import ScoreCreateRequest, ScoreResponse, ScoreUpdateRequest

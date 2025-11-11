@@ -22,10 +22,12 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.auth.adapters.orm import APIKeyORM  # noqa: F401
 from leadr.auth.services.dependencies import get_api_key_service
+from leadr.boards.adapters.orm import BoardORM  # noqa: F401
 from leadr.common.database import get_db
 from leadr.common.orm import Base
 from leadr.config import settings
 from leadr.games.adapters.orm import GameORM  # noqa: F401
+from leadr.scores.adapters.orm import ScoreORM  # noqa: F401
 
 
 @pytest.fixture(scope="session", autouse=True)

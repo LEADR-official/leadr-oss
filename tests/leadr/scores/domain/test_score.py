@@ -77,7 +77,7 @@ class TestScore:
         user_id = uuid4()
 
         with pytest.raises(ValidationError) as exc_info:
-            Score(
+            Score(  # type: ignore[call-arg]
                 account_id=account_id,
                 game_id=game_id,
                 board_id=board_id,
@@ -95,7 +95,7 @@ class TestScore:
         user_id = uuid4()
 
         with pytest.raises(ValidationError) as exc_info:
-            Score(
+            Score(  # type: ignore[call-arg]
                 account_id=account_id,
                 game_id=game_id,
                 board_id=board_id,
@@ -338,7 +338,7 @@ class TestScore:
         hash(score)
 
         # Test in set
-        score_set = {score}
+        score_set = {score}  # type: ignore[var-annotated]
         assert score in score_set
 
     def test_soft_delete_score(self):

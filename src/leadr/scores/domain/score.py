@@ -30,7 +30,8 @@ class Score(Entity):
     player_name: str = Field(description="Display name of the player")
     value: float = Field(description="Numeric value of the score for sorting/comparison")
     value_display: str | None = Field(
-        default=None, description="Optional formatted display string (e.g., '1:23.45', '1,234 points')"
+        default=None,
+        description="Optional formatted display string (e.g., '1:23.45', '1,234 points')",
     )
     filter_timezone: str | None = Field(
         default=None, description="Optional timezone filter for score categorization"
