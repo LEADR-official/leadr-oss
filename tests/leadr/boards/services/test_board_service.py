@@ -1,5 +1,6 @@
 """Tests for Board service."""
 
+from datetime import UTC
 from uuid import uuid4
 
 import pytest
@@ -844,9 +845,9 @@ class TestBoardService:
         )
 
         # Update starts_at
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        new_starts_at = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        new_starts_at = datetime(2025, 1, 1, 0, 0, 0, tzinfo=UTC)
         updated_board = await board_service.update_board(
             board_id=created_board.id,
             starts_at=new_starts_at,
@@ -885,9 +886,9 @@ class TestBoardService:
         )
 
         # Update ends_at
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        new_ends_at = datetime(2025, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+        new_ends_at = datetime(2025, 12, 31, 23, 59, 59, tzinfo=UTC)
         updated_board = await board_service.update_board(
             board_id=created_board.id,
             ends_at=new_ends_at,

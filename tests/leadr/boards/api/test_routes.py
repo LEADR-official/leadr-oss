@@ -93,7 +93,9 @@ class TestBoardRoutes:
         assert data["tags"] == ["speedrun", "no-damage"]
         assert data["template_name"] == "Speed Run Template"
 
-    async def test_create_board_with_game_not_found(self, client: AsyncClient, db_session, test_api_key):
+    async def test_create_board_with_game_not_found(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
         """Test creating a board with non-existent game returns 404."""
         # Create account
         account_service = AccountService(db_session)
@@ -246,7 +248,9 @@ class TestBoardRoutes:
         board_id = create_response.json()["id"]
 
         # Retrieve by short code
-        response = await client.get("/boards/by-code/SR2025", headers={"leadr-api-key": test_api_key})
+        response = await client.get(
+            "/boards/by-code/SR2025", headers={"leadr-api-key": test_api_key}
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -503,7 +507,9 @@ class TestBoardRoutes:
         )
         assert get_response.status_code == 404
 
-    async def test_list_boards_excludes_deleted(self, client: AsyncClient, db_session, test_api_key):
+    async def test_list_boards_excludes_deleted(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
         """Test that list endpoint excludes soft-deleted boards."""
         # Create account and game
         account_service = AccountService(db_session)
