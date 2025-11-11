@@ -3,9 +3,9 @@
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
+from pydantic import UUID4
 from sqlalchemy.exc import IntegrityError
 
-from leadr.common.domain.models import EntityID
 from leadr.scores.api.schemas import ScoreCreateRequest, ScoreResponse, ScoreUpdateRequest
 from leadr.scores.services.dependencies import ScoreServiceDep
 
@@ -54,7 +54,7 @@ async def get_score(
     service: ScoreServiceDep,
 ) -> ScoreResponse:
     """Get a score by ID."""
-    score = await service.get_by_id_or_raise(EntityID(value=score_id))
+    score = await service.get_by_id_or_raise(score_id)
     return ScoreResponse.from_domain(score)
 
 
@@ -94,16 +94,14 @@ async def update_score(
     Supports partial updates. Any field not provided will remain unchanged.
     Set `deleted: true` to soft delete the score.
     """
-    entity_id = EntityID(value=score_id)
-
     # Handle soft delete
     if request.deleted is True:
-        score = await service.soft_delete(entity_id)
+        score = await service.soft_delete(score_id)
         return ScoreResponse.from_domain(score)
 
     # Update other fields
     score = await service.update_score(
-        score_id=entity_id.value,
+        score_id=score_id,
         player_name=request.player_name,
         value=request.value,
         value_display=request.value_display,
