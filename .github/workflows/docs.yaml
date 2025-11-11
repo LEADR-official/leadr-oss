@@ -86,7 +86,7 @@ jobs:
             docs/api/**
           branch: docs/leadr-oss
           commit-message: "docs(py): automated update of leadr-oss docs bundle (${{ env.VERSION }})"
-          title: "docs(py): update Python Markdown bundle"
-          body: "Generated with griffe2md."
+          title: "docs(py): update Python docs (${{ env.VERSION }})"
+          body: "Generated with griffe2md & widdershins."
           labels: docs, automated-pr
 
