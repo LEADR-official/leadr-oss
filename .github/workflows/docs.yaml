@@ -64,7 +64,7 @@ jobs:
 
       - name: Verify docs bundle
         run: |
-          if [ ! -d "site-md" ] || [ ! -f "site-md/reference.md" ] || [ ! -f "site-md/.api-version" ]; then
+          if [ ! -d "site-md" ] || [ ! -f "site-md/reference/index.md"  || [ ! -f "site-md/http-api/index.md" ]] || [ ! -f "site-md/.api-version" ]; then
             echo "Error: Documentation bundle was not generated correctly"
             exit 1
           fi
