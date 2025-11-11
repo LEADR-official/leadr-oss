@@ -32,29 +32,31 @@ fi
 echo "Generating Python API reference..."
 uv run griffe2md src/leadr -o site-md/reference.md
 
-# TODO: Generate OpenAPI specification
-# Uncomment and implement when ready:
-#
-# echo "Generating OpenAPI specification..."
-# # Option 1: Extract from running FastAPI app
-# # python -c "from src.api.main import app; import json; print(json.dumps(app.openapi()))" > site-md/openapi.json
-#
-# # Option 2: Start server temporarily and fetch
-# # uvicorn src.api.main:app --host 0.0.0.0 --port 8000 &
-# # SERVER_PID=$!
-# # sleep 2  # Wait for server to start
-# # curl http://localhost:8000/openapi.json > site-md/openapi.json
-# # kill $SERVER_PID
+echo "Generating OpenAPI specification..."
+uv run --directory src python -c "from api.main import app; import json; print(json.dumps(app.openapi(), indent=2))" > site-md/openapi.json
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to generate OpenAPI specification"
+  exit 1
+fi
+echo "Generated site-md/openapi.json"
 
-# TODO: Generate REST API documentation from OpenAPI spec
-# Uncomment and implement when ready:
-#
-# echo "Generating REST API documentation..."
-# # Convert OpenAPI spec to markdown using your preferred tool
-# # Examples:
-# # - widdershins: npx widdershins site-md/openapi.json -o site-md/api-reference.md
-# # - openapi-markdown: npx openapi-markdown -i site-md/openapi.json -o site-md/api-reference.md
-# # - custom Python script using pydantic-openapi-schema
+echo "Generating HTTP API documentation..."
+widdershins site-md/openapi.json -o site-md/http-api.md --language_tabs 'curl:curl' 'python:Python' 'javascript:Javascript' --summary
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to convert OpenAPI spec to markdown"
+  echo "Make sure widdershins is installed: npm install -g widdershins"
+  exit 1
+fi
+echo "Generated site-md/http-api.md"
+
+echo "Transforming API docs to MkDocs format..."
+uv run python scripts/transform_api_docs.py site-md/http-api.md site-md/http-api.md.tmp
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to transform API documentation"
+  exit 1
+fi
+mv site-md/http-api.md.tmp site-md/http-api.md
+echo "Transformed site-md/http-api.md for MkDocs compatibility"
 
 echo "Documentation build complete!"
 echo "Output directory: site-md/"

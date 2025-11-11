@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
 
@@ -11,9 +11,12 @@ from leadr.auth.domain.api_key import APIKey, APIKeyStatus
 class CreateAPIKeyRequest(BaseModel):
     """Request schema for creating an API key."""
 
-    account_id: UUID
-    name: str
-    expires_at: datetime | None = None
+    account_id: UUID = Field(description="ID of the account this API key belongs to")
+    name: str = Field(description="Human-readable name for the API key (e.g., 'Production Server')")
+    expires_at: datetime | None = Field(
+        default=None,
+        description="Optional expiration timestamp (UTC). Key never expires if omitted",
+    )
 
 
 class CreateAPIKeyResponse(BaseModel):
@@ -23,13 +26,17 @@ class CreateAPIKeyResponse(BaseModel):
     The client must save this key as it cannot be retrieved later.
     """
 
-    id: UUID
-    name: str
-    key: str  # Plain API key, only returned once
-    prefix: str
-    status: APIKeyStatus
-    expires_at: datetime | None = None
-    created_at: datetime
+    id: UUID = Field(description="Unique identifier for the API key")
+    name: str = Field(description="Human-readable name for the API key")
+    key: str = Field(
+        description="Plain text API key. ONLY returned at creation - save this securely!"
+    )
+    prefix: str = Field(description="Key prefix for identification (first 8 characters)")
+    status: APIKeyStatus = Field(description="Current status of the API key")
+    expires_at: datetime | None = Field(
+        default=None, description="Expiration timestamp (UTC), or null if never expires"
+    )
+    created_at: datetime = Field(description="Timestamp when the key was created (UTC)")
 
     @classmethod
     def from_domain(cls, api_key: APIKey, plain_key: str) -> "CreateAPIKeyResponse":
@@ -62,15 +69,19 @@ class APIKeyResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: UUID
-    account_id: UUID
-    name: str
-    prefix: str
-    status: APIKeyStatus
-    last_used_at: datetime | None = None
-    expires_at: datetime | None = None
-    created_at: datetime
-    updated_at: datetime
+    id: UUID = Field(description="Unique identifier for the API key")
+    account_id: UUID = Field(description="ID of the account this key belongs to")
+    name: str = Field(description="Human-readable name for the API key")
+    prefix: str = Field(description="Key prefix for identification (first 8 characters)")
+    status: APIKeyStatus = Field(description="Current status (active, revoked, expired)")
+    last_used_at: datetime | None = Field(
+        default=None, description="Timestamp of last successful authentication (UTC)"
+    )
+    expires_at: datetime | None = Field(
+        default=None, description="Expiration timestamp (UTC), or null if never expires"
+    )
+    created_at: datetime = Field(description="Timestamp when the key was created (UTC)")
+    updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
     @classmethod
     def from_domain(cls, api_key: APIKey) -> "APIKeyResponse":
@@ -101,5 +112,7 @@ class UpdateAPIKeyRequest(BaseModel):
     Can update status (e.g., to revoke) or set deleted flag for soft delete.
     """
 
-    status: APIKeyStatus | None = None
-    deleted: bool | None = None
+    status: APIKeyStatus | None = Field(
+        default=None, description="Updated status (use 'revoked' to disable key)"
+    )
+    deleted: bool | None = Field(default=None, description="Set to true to soft delete the key")

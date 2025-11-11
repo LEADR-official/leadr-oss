@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from leadr.games.domain.game import Game
 
@@ -11,35 +11,52 @@ from leadr.games.domain.game import Game
 class GameCreateRequest(BaseModel):
     """Request model for creating a game."""
 
-    account_id: UUID
-    name: str
-    steam_app_id: str | None = None
-    default_board_id: UUID | None = None
+    account_id: UUID = Field(description="ID of the account this game belongs to")
+    name: str = Field(description="Name of the game")
+    steam_app_id: str | None = Field(
+        default=None, description="Optional Steam App ID for Steam integration"
+    )
+    default_board_id: UUID | None = Field(
+        default=None, description="Optional ID of the default leaderboard for this game"
+    )
 
 
 class GameUpdateRequest(BaseModel):
     """Request model for updating a game."""
 
-    name: str | None = None
-    steam_app_id: str | None = None
-    default_board_id: UUID | None = None
-    deleted: bool | None = None
+    name: str | None = Field(default=None, description="Updated game name")
+    steam_app_id: str | None = Field(default=None, description="Updated Steam App ID")
+    default_board_id: UUID | None = Field(
+        default=None, description="Updated default leaderboard ID"
+    )
+    deleted: bool | None = Field(default=None, description="Set to true to soft delete the game")
 
 
 class GameResponse(BaseModel):
     """Response model for a game."""
 
-    id: UUID
-    account_id: UUID
-    name: str
-    steam_app_id: str | None
-    default_board_id: UUID | None
-    created_at: datetime
-    updated_at: datetime
+    id: UUID = Field(description="Unique identifier for the game")
+    account_id: UUID = Field(description="ID of the account this game belongs to")
+    name: str = Field(description="Name of the game")
+    steam_app_id: str | None = Field(
+        default=None, description="Steam App ID if Steam integration is configured"
+    )
+    default_board_id: UUID | None = Field(
+        default=None, description="ID of the default leaderboard, or null if not set"
+    )
+    created_at: datetime = Field(description="Timestamp when the game was created (UTC)")
+    updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
     @classmethod
     def from_domain(cls, game: Game) -> "GameResponse":
-        """Convert domain entity to response model."""
+        """Convert domain entity to response model.
+
+        Args:
+            game: The domain Game entity to convert.
+
+        Returns:
+            GameResponse with all fields populated from the domain entity.
+        """
         return cls(
             id=game.id,
             account_id=game.account_id,

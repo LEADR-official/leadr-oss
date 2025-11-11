@@ -25,7 +25,15 @@ router = APIRouter()
 async def create_account(
     request: AccountCreateRequest, service: AccountServiceDep
 ) -> AccountResponse:
-    """Create a new account."""
+    """Create a new account.
+
+    Args:
+        request: Account creation details including name and slug.
+        service: Injected account service dependency.
+
+    Returns:
+        AccountResponse with the created account including auto-generated ID and timestamps.
+    """
     account = await service.create_account(
         name=request.name,
         slug=request.slug,
@@ -36,14 +44,32 @@ async def create_account(
 
 @router.get("/accounts/{account_id}", response_model=AccountResponse)
 async def get_account(account_id: UUID4, service: AccountServiceDep) -> AccountResponse:
-    """Get an account by ID."""
+    """Get an account by ID.
+
+    Args:
+        account_id: Unique identifier for the account.
+        service: Injected account service dependency.
+
+    Returns:
+        AccountResponse with full account details.
+
+    Raises:
+        404: Account not found.
+    """
     account = await service.get_by_id_or_raise(account_id)
     return AccountResponse.from_domain(account)
 
 
 @router.get("/accounts", response_model=list[AccountResponse])
 async def list_accounts(service: AccountServiceDep) -> list[AccountResponse]:
-    """List all accounts."""
+    """List all accounts.
+
+    Args:
+        service: Injected account service dependency.
+
+    Returns:
+        List of all active accounts.
+    """
     accounts = await service.list_accounts()
     return [AccountResponse.from_domain(acc) for acc in accounts]
 
@@ -52,7 +78,22 @@ async def list_accounts(service: AccountServiceDep) -> list[AccountResponse]:
 async def update_account(
     account_id: UUID4, request: AccountUpdateRequest, service: AccountServiceDep
 ) -> AccountResponse:
-    """Update an account."""
+    """Update an account.
+
+    Supports updating name, slug, status, or soft-deleting the account.
+    Status changes (active/suspended) are handled through dedicated service methods.
+
+    Args:
+        account_id: Unique identifier for the account.
+        request: Account update details (all fields optional).
+        service: Injected account service dependency.
+
+    Returns:
+        AccountResponse with the updated account details.
+
+    Raises:
+        404: Account not found.
+    """
 
     # Handle soft delete first
     if request.deleted is True:
@@ -84,6 +125,15 @@ async def update_account(
 async def create_user(request: UserCreateRequest, service: UserServiceDep) -> UserResponse:
     """Create a new user.
 
+    Creates a new user associated with an existing account.
+
+    Args:
+        request: User creation details including account_id, email, and display name.
+        service: Injected user service dependency.
+
+    Returns:
+        UserResponse with the created user including auto-generated ID and timestamps.
+
     Raises:
         404: Account not found.
     """
@@ -105,7 +155,18 @@ async def create_user(request: UserCreateRequest, service: UserServiceDep) -> Us
 
 @router.get("/users/{user_id}", response_model=UserResponse)
 async def get_user(user_id: UUID4, service: UserServiceDep) -> UserResponse:
-    """Get a user by ID."""
+    """Get a user by ID.
+
+    Args:
+        user_id: Unique identifier for the user.
+        service: Injected user service dependency.
+
+    Returns:
+        UserResponse with full user details.
+
+    Raises:
+        404: User not found.
+    """
     user = await service.get_by_id_or_raise(user_id)
     return UserResponse.from_domain(user)
 
@@ -120,6 +181,7 @@ async def list_users(
     TODO: Replace account_id query param with account_id from auth token.
 
     Args:
+        service: Injected user service dependency.
         account_id: Account ID to filter results (REQUIRED for multi-tenant safety).
 
     Returns:
@@ -134,7 +196,21 @@ async def list_users(
 async def update_user(
     user_id: UUID4, request: UserUpdateRequest, service: UserServiceDep
 ) -> UserResponse:
-    """Update a user."""
+    """Update a user.
+
+    Supports updating email, display name, or soft-deleting the user.
+
+    Args:
+        user_id: Unique identifier for the user.
+        request: User update details (all fields optional).
+        service: Injected user service dependency.
+
+    Returns:
+        UserResponse with the updated user details.
+
+    Raises:
+        404: User not found.
+    """
 
     # Handle soft delete first
     if request.deleted is True:
