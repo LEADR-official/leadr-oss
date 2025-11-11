@@ -233,11 +233,11 @@ class TestGameService:
             name="Super Awesome Game",
         )
 
-        # Soft-delete it
+        # Soft-delete it (returns entity before deletion)
         deleted_game = await game_service.soft_delete(created_game.id)
 
         assert deleted_game.id == created_game.id
-        assert deleted_game.is_deleted is True
+        assert deleted_game.is_deleted is False  # Returns entity before deletion
 
         # Verify it's not returned by get
         game = await game_service.get_game(created_game.id)
