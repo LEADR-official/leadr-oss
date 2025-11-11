@@ -19,6 +19,7 @@ from leadr.accounts.adapters.orm import AccountORM, UserORM  # noqa: F401
 from leadr.auth.adapters.orm import APIKeyORM  # noqa: F401
 from leadr.boards.adapters.orm import BoardORM  # noqa: F401
 from leadr.games.adapters.orm import GameORM  # noqa: F401
+from leadr.scores.adapters.orm import ScoreORM  # noqa: F401
 
 # Import for database configuration
 from leadr.common.database import build_database_url
