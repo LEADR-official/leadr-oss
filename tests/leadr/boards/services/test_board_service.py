@@ -546,3 +546,390 @@ class TestBoardService:
             await board_service.soft_delete(non_existent_id)
 
         assert "Board not found" in str(exc_info.value)
+
+    async def test_update_board_icon(self, db_session: AsyncSession):
+        """Test updating board icon."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        created_board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speed Run Board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Update icon
+        updated_board = await board_service.update_board(
+            board_id=created_board.id,
+            icon="star",
+        )
+
+        assert updated_board.icon == "star"
+        assert updated_board.name == "Speed Run Board"  # Unchanged
+
+    async def test_update_board_short_code(self, db_session: AsyncSession):
+        """Test updating board short_code."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        created_board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speed Run Board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Update short_code
+        updated_board = await board_service.update_board(
+            board_id=created_board.id,
+            short_code="SR2026",
+        )
+
+        assert updated_board.short_code == "SR2026"
+        assert updated_board.name == "Speed Run Board"  # Unchanged
+
+    async def test_update_board_unit(self, db_session: AsyncSession):
+        """Test updating board unit."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        created_board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speed Run Board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Update unit
+        updated_board = await board_service.update_board(
+            board_id=created_board.id,
+            unit="milliseconds",
+        )
+
+        assert updated_board.unit == "milliseconds"
+        assert updated_board.name == "Speed Run Board"  # Unchanged
+
+    async def test_update_board_sort_direction(self, db_session: AsyncSession):
+        """Test updating board sort_direction."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        created_board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speed Run Board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Update sort_direction
+        updated_board = await board_service.update_board(
+            board_id=created_board.id,
+            sort_direction=SortDirection.DESCENDING,
+        )
+
+        assert updated_board.sort_direction == SortDirection.DESCENDING
+        assert updated_board.name == "Speed Run Board"  # Unchanged
+
+    async def test_update_board_keep_strategy(self, db_session: AsyncSession):
+        """Test updating board keep_strategy."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        created_board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speed Run Board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Update keep_strategy
+        updated_board = await board_service.update_board(
+            board_id=created_board.id,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        assert updated_board.keep_strategy == KeepStrategy.ALL
+        assert updated_board.name == "Speed Run Board"  # Unchanged
+
+    async def test_update_board_template_id(self, db_session: AsyncSession):
+        """Test updating board template_id."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        created_board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speed Run Board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Update template_id
+        new_template_id = uuid4()
+        updated_board = await board_service.update_board(
+            board_id=created_board.id,
+            template_id=new_template_id,
+        )
+
+        assert updated_board.template_id == new_template_id
+        assert updated_board.name == "Speed Run Board"  # Unchanged
+
+    async def test_update_board_template_name(self, db_session: AsyncSession):
+        """Test updating board template_name."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        created_board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speed Run Board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Update template_name
+        updated_board = await board_service.update_board(
+            board_id=created_board.id,
+            template_name="New Template",
+        )
+
+        assert updated_board.template_name == "New Template"
+        assert updated_board.name == "Speed Run Board"  # Unchanged
+
+    async def test_update_board_starts_at(self, db_session: AsyncSession):
+        """Test updating board starts_at."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        created_board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speed Run Board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Update starts_at
+        from datetime import datetime, timezone
+
+        new_starts_at = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        updated_board = await board_service.update_board(
+            board_id=created_board.id,
+            starts_at=new_starts_at,
+        )
+
+        assert updated_board.starts_at == new_starts_at
+        assert updated_board.name == "Speed Run Board"  # Unchanged
+
+    async def test_update_board_ends_at(self, db_session: AsyncSession):
+        """Test updating board ends_at."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        created_board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speed Run Board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Update ends_at
+        from datetime import datetime, timezone
+
+        new_ends_at = datetime(2025, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+        updated_board = await board_service.update_board(
+            board_id=created_board.id,
+            ends_at=new_ends_at,
+        )
+
+        assert updated_board.ends_at == new_ends_at
+        assert updated_board.name == "Speed Run Board"  # Unchanged
+
+    async def test_update_board_tags(self, db_session: AsyncSession):
+        """Test updating board tags."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        created_board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speed Run Board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Update tags
+        updated_board = await board_service.update_board(
+            board_id=created_board.id,
+            tags=["speedrun", "glitchless"],
+        )
+
+        assert updated_board.tags == ["speedrun", "glitchless"]
+        assert updated_board.name == "Speed Run Board"  # Unchanged

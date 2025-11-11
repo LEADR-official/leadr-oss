@@ -39,23 +39,35 @@ class Board(Entity):
     account_id: UUID = Field(
         frozen=True, description="ID of the account this board belongs to (immutable)"
     )
-    game_id: UUID = Field(frozen=True, description="ID of the game this board belongs to (immutable)")
+    game_id: UUID = Field(
+        frozen=True, description="ID of the game this board belongs to (immutable)"
+    )
     name: str = Field(description="Name of the board")
     icon: str = Field(description="Icon identifier for the board")
     short_code: str = Field(description="Globally unique short code for direct board sharing")
     unit: str = Field(description="Unit of measurement for scores (e.g., 'seconds', 'points')")
     is_active: bool = Field(description="Whether the board is currently active")
-    sort_direction: SortDirection = Field(description="Direction to sort scores (ascending/descending)")
+    sort_direction: SortDirection = Field(
+        description="Direction to sort scores (ascending/descending)"
+    )
     keep_strategy: KeepStrategy = Field(
         description="Strategy for keeping multiple scores from the same user"
     )
-    template_id: UUID | None = Field(default=None, description="Optional template ID this board was created from")
+    template_id: UUID | None = Field(
+        default=None, description="Optional template ID this board was created from"
+    )
     template_name: str | None = Field(
         default=None, description="Optional name of the template this board was created from"
     )
-    starts_at: datetime | None = Field(default=None, description="Optional start time for time-bounded boards")
-    ends_at: datetime | None = Field(default=None, description="Optional end time for time-bounded boards")
-    tags: list[str] = Field(default_factory=list, description="List of tags for categorizing the board")
+    starts_at: datetime | None = Field(
+        default=None, description="Optional start time for time-bounded boards"
+    )
+    ends_at: datetime | None = Field(
+        default=None, description="Optional end time for time-bounded boards"
+    )
+    tags: list[str] = Field(
+        default_factory=list, description="List of tags for categorizing the board"
+    )
 
     @field_validator("name")
     @classmethod

@@ -34,7 +34,9 @@ class BoardCreateRequest(BaseModel):
     ends_at: datetime | None = Field(
         default=None, description="Optional end time for time-bounded boards (UTC)"
     )
-    tags: list[str] | None = Field(default=None, description="Optional list of tags for categorization")
+    tags: list[str] | None = Field(
+        default=None, description="Optional list of tags for categorization"
+    )
 
 
 class BoardUpdateRequest(BaseModel):
@@ -74,8 +76,12 @@ class BoardResponse(BaseModel):
     template_name: str | None = Field(
         default=None, description="Template name this board was created from, or null"
     )
-    starts_at: datetime | None = Field(default=None, description="Start time for time-bounded boards (UTC)")
-    ends_at: datetime | None = Field(default=None, description="End time for time-bounded boards (UTC)")
+    starts_at: datetime | None = Field(
+        default=None, description="Start time for time-bounded boards (UTC)"
+    )
+    ends_at: datetime | None = Field(
+        default=None, description="End time for time-bounded boards (UTC)"
+    )
     tags: list[str] = Field(default_factory=list, description="List of tags for categorization")
     created_at: datetime = Field(description="Timestamp when the board was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
