@@ -9,6 +9,9 @@ on:
         required: true
         type: string
 
+env:
+  ENV: CI
+
 jobs:
   build-and-pr:
     runs-on: ubuntu-latest
