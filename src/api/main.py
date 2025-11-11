@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, FastAPI
 
 from api.routes import router as api_router
 from leadr.accounts.api.routes import router as accounts_router
+from leadr.auth.api.client_routes import router as client_auth_router
 from leadr.auth.api.routes import router as auth_router
 from leadr.auth.dependencies import require_api_key
 from leadr.boards.api.routes import router as boards_router
@@ -72,6 +73,7 @@ admin_router = APIRouter(dependencies=[Depends(require_api_key)])
 
 # Public routes - accessible without authentication
 public_router.include_router(api_router)
+public_router.include_router(client_auth_router, tags=["Client Authentication"])
 
 # Admin routes - require API key authentication
 admin_router.include_router(accounts_router, tags=["Accounts"])
