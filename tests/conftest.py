@@ -2,6 +2,7 @@
 
 import sys
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -17,7 +18,10 @@ from sqlalchemy.ext.asyncio import (
 
 # Import all ORM models to register them with SQLAlchemy metadata
 from leadr.accounts.adapters.orm import AccountORM, UserORM  # noqa: F401
+from leadr.accounts.domain.account import Account, AccountStatus
+from leadr.accounts.services.repositories import AccountRepository
 from leadr.auth.adapters.orm import APIKeyORM  # noqa: F401
+from leadr.auth.services.api_key_service import APIKeyService
 from leadr.common.database import get_db
 from leadr.common.orm import Base
 from leadr.config import settings
@@ -141,6 +145,70 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url=f"http://testserver{settings.API_PREFIX}",
+    ) as client:
+        yield client
+
+    # Clean up overrides
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def test_api_key(db_session: AsyncSession) -> str:
+    """Create a test account and API key, return the plain key.
+
+    This fixture provides a valid API key that can be used to authenticate
+    requests to protected endpoints during testing.
+
+    Returns:
+        The plain API key string that can be used in the leadr-api-key header.
+    """
+    # Create test account with unique slug to avoid conflicts
+    account_repo = AccountRepository(db_session)
+    account_id = uuid4()
+    now = datetime.now(UTC)
+
+    account = Account(
+        id=account_id,
+        name="Test Account for Auth",
+        slug=f"test-auth-{str(account_id)[:8]}",  # Unique slug using UUID prefix
+        status=AccountStatus.ACTIVE,
+        created_at=now,
+        updated_at=now,
+    )
+    await account_repo.create(account)
+
+    # Create API key
+    service = APIKeyService(db_session)
+    _, plain_key = await service.create_api_key(
+        account_id=account_id,
+        name="Test API Key",
+        expires_at=None,
+    )
+
+    return plain_key
+
+
+@pytest_asyncio.fixture
+async def authenticated_client(
+    db_session: AsyncSession, test_api_key: str
+) -> AsyncGenerator[AsyncClient, None]:
+    """Create an async test client with API key authentication.
+
+    This client automatically includes the API key in all requests,
+    allowing tests to easily access protected endpoints.
+    """
+    from api.main import app
+
+    # Override the get_db dependency to use our test session
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url=f"http://testserver{settings.API_PREFIX}",
+        headers={"leadr-api-key": test_api_key},
     ) as client:
         yield client
 
