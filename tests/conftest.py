@@ -25,6 +25,7 @@ from leadr.auth.services.dependencies import get_api_key_service
 from leadr.common.database import get_db
 from leadr.common.orm import Base
 from leadr.config import settings
+from leadr.games.adapters.orm import GameORM  # noqa: F401
 
 
 @pytest.fixture(scope="session", autouse=True)

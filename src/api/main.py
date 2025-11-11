@@ -15,6 +15,7 @@ from leadr.common.api.exceptions import entity_not_found_handler
 from leadr.common.database import engine
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.config import settings
+from leadr.games.api.routes import router as games_router
 
 # Configure logging from YAML file
 log_config_path = Path(__file__).parent / "logging.yaml"
@@ -73,6 +74,7 @@ public_router.include_router(api_router)
 # Admin routes - require API key authentication
 admin_router.include_router(accounts_router, tags=["Accounts"])
 admin_router.include_router(auth_router, tags=["API Keys"])
+admin_router.include_router(games_router, tags=["Games"])
 
 # Include public router (always available)
 app.include_router(public_router, prefix=settings.API_PREFIX)
