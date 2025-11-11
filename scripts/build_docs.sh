@@ -20,30 +20,17 @@ fi
 echo "API Version: $API_VERSION"
 echo "$API_VERSION" > site-md/.api-version
 
+echo "Copying static documentation from docs/..."
+if [ -d "docs" ]; then
+  cp -r docs/* site-md/
+  echo "Copied static documentation files"
+else
+  echo "Warning: docs/ directory not found"
+  exit 1
+fi
+
 echo "Generating Python API reference..."
 uv run griffe2md src/leadr -o site-md/reference.md
-
-echo "Creating documentation index..."
-cat > site-md/index.md <<'EOF'
-# LEADR API Documentation
-
-Welcome to the LEADR API documentation.
-
-## Documentation Sections
-
-### [Python API Reference](reference.md)
-Complete reference for all Python modules, classes, and functions in the LEADR codebase.
-
-<!-- TODO: Add OpenAPI/REST API documentation section once implemented -->
-
-## Quick Links
-
-- [GitHub Repository](https://github.com/LEADR-official/leadr-oss)
-- [Getting Started Guide](https://github.com/LEADR-official/leadr-oss#readme)
-
-<!-- TODO: Add more navigation links as documentation grows -->
-
-EOF
 
 # TODO: Generate OpenAPI specification
 # Uncomment and implement when ready:

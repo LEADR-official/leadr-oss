@@ -2,13 +2,36 @@ name: Publish docs bundle to docs repo
 on:
   release:
     types: [published]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., v1.2.3 or 0.1.0)'
+        required: true
+        type: string
 
 jobs:
   build-and-pr:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate VERSION
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+
+          if [ -z "$VERSION" ]; then
+            echo "Error: VERSION is required but not set"
+            echo "For releases: VERSION comes from release tag"
+            echo "For manual dispatch: VERSION must be provided as input"
+            exit 1
+          fi
+
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Validated VERSION: $VERSION"
 
       - name: "Set up Python"
         uses: actions/setup-python@v5
@@ -24,8 +47,6 @@ jobs:
         run: uv sync --dev
 
       - name: Build documentation
-        env:
-          VERSION: ${{ github.event.release.tag_name || '' }}
         run: ./scripts/build_docs.sh
 
       - name: Verify docs bundle
@@ -51,7 +72,7 @@ jobs:
           add-paths: |
             docs/api/**
           branch: docs/leadr-oss
-          commit-message: "docs(py): automated update of leadr-oss docs bundle (${{ github.event.release.tag_name || github.sha }})"
+          commit-message: "docs(py): automated update of leadr-oss docs bundle (${{ env.VERSION }})"
           title: "docs(py): update Python Markdown bundle"
           body: "Generated with griffe2md."
           labels: docs, automated-pr
