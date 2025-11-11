@@ -27,6 +27,7 @@ class Device(Entity):
     game_id: UUID
     device_id: str
     account_id: UUID
+    platform: str | None = None
     status: DeviceStatus = DeviceStatus.ACTIVE
     first_seen_at: datetime
     last_seen_at: datetime
