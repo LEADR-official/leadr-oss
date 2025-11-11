@@ -17,6 +17,21 @@ else
   API_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
 fi
 
+# Ensure version has "v" prefix (unless it's "dev")
+if [ "$API_VERSION" != "dev" ] && [[ ! "$API_VERSION" =~ ^v ]]; then
+  API_VERSION="v$API_VERSION"
+  echo "Normalized version to include 'v' prefix"
+fi
+
+# Validate semver format (unless it's "dev")
+SEMVER_PATTERN="^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$"
+if [ "$API_VERSION" != "dev" ] && [[ ! "$API_VERSION" =~ $SEMVER_PATTERN ]]; then
+  echo "Error: Invalid version format: $API_VERSION"
+  echo "Expected format: v<major>.<minor>.<patch> (e.g., v1.2.3, v1.2.3-beta.1)"
+  echo "Or use 'dev' for development builds"
+  exit 1
+fi
+
 echo "API Version: $API_VERSION"
 echo "$API_VERSION" > site-md/.api-version
 
