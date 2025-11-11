@@ -15,19 +15,17 @@ from leadr.accounts.api.schemas import (
     UserUpdateRequest,
 )
 from leadr.accounts.domain.account import AccountStatus
-from leadr.accounts.services.account_service import AccountService
-from leadr.accounts.services.user_service import UserService
-from leadr.common.dependencies import DatabaseSession
+from leadr.accounts.services.dependencies import AccountServiceDep, UserServiceDep
 
 router = APIRouter()
 
 
 # Account routes
 @router.post("/accounts", status_code=status.HTTP_201_CREATED, response_model=AccountResponse)
-async def create_account(request: AccountCreateRequest, db: DatabaseSession) -> AccountResponse:
+async def create_account(
+    request: AccountCreateRequest, service: AccountServiceDep
+) -> AccountResponse:
     """Create a new account."""
-    service = AccountService(db)
-
     account = await service.create_account(
         name=request.name,
         slug=request.slug,
@@ -37,27 +35,24 @@ async def create_account(request: AccountCreateRequest, db: DatabaseSession) -> 
 
 
 @router.get("/accounts/{account_id}", response_model=AccountResponse)
-async def get_account(account_id: UUID4, db: DatabaseSession) -> AccountResponse:
+async def get_account(account_id: UUID4, service: AccountServiceDep) -> AccountResponse:
     """Get an account by ID."""
-    service = AccountService(db)
     account = await service.get_by_id_or_raise(account_id)
     return AccountResponse.from_domain(account)
 
 
 @router.get("/accounts", response_model=list[AccountResponse])
-async def list_accounts(db: DatabaseSession) -> list[AccountResponse]:
+async def list_accounts(service: AccountServiceDep) -> list[AccountResponse]:
     """List all accounts."""
-    service = AccountService(db)
     accounts = await service.list_accounts()
     return [AccountResponse.from_domain(acc) for acc in accounts]
 
 
 @router.patch("/accounts/{account_id}", response_model=AccountResponse)
 async def update_account(
-    account_id: UUID4, request: AccountUpdateRequest, db: DatabaseSession
+    account_id: UUID4, request: AccountUpdateRequest, service: AccountServiceDep
 ) -> AccountResponse:
     """Update an account."""
-    service = AccountService(db)
 
     # Handle soft delete first
     if request.deleted is True:
@@ -86,14 +81,12 @@ async def update_account(
 
 # User routes
 @router.post("/users", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
-async def create_user(request: UserCreateRequest, db: DatabaseSession) -> UserResponse:
+async def create_user(request: UserCreateRequest, service: UserServiceDep) -> UserResponse:
     """Create a new user.
 
     Raises:
         404: Account not found.
     """
-    service = UserService(db)
-
     try:
         user = await service.create_user(
             account_id=request.account_id,
@@ -111,16 +104,15 @@ async def create_user(request: UserCreateRequest, db: DatabaseSession) -> UserRe
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
-async def get_user(user_id: UUID4, db: DatabaseSession) -> UserResponse:
+async def get_user(user_id: UUID4, service: UserServiceDep) -> UserResponse:
     """Get a user by ID."""
-    service = UserService(db)
     user = await service.get_by_id_or_raise(user_id)
     return UserResponse.from_domain(user)
 
 
 @router.get("/users", response_model=list[UserResponse])
 async def list_users(
-    db: DatabaseSession,
+    service: UserServiceDep,
     account_id: Annotated[UUID4, Query(description="Account ID to filter by")],
 ) -> list[UserResponse]:
     """List users for an account.
@@ -133,8 +125,6 @@ async def list_users(
     Returns:
         List of users for the account.
     """
-    service = UserService(db)
-
     # TODO: Replace with account_id from authenticated user's token
     users = await service.list_users_by_account(account_id)
     return [UserResponse.from_domain(user) for user in users]
@@ -142,10 +132,9 @@ async def list_users(
 
 @router.patch("/users/{user_id}", response_model=UserResponse)
 async def update_user(
-    user_id: UUID4, request: UserUpdateRequest, db: DatabaseSession
+    user_id: UUID4, request: UserUpdateRequest, service: UserServiceDep
 ) -> UserResponse:
     """Update a user."""
-    service = UserService(db)
 
     # Handle soft delete first
     if request.deleted is True:

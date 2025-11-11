@@ -13,8 +13,7 @@ from leadr.auth.api.schemas import (
     UpdateAPIKeyRequest,
 )
 from leadr.auth.domain.api_key import APIKeyStatus
-from leadr.auth.services.api_key_service import APIKeyService
-from leadr.common.dependencies import DatabaseSession
+from leadr.auth.services.dependencies import APIKeyServiceDep
 
 router = APIRouter()
 
@@ -26,7 +25,7 @@ router = APIRouter()
 )
 async def create_api_key(
     request: CreateAPIKeyRequest,
-    db: DatabaseSession,
+    service: APIKeyServiceDep,
 ) -> CreateAPIKeyResponse:
     """Create a new API key for an account.
 
@@ -39,8 +38,6 @@ async def create_api_key(
     Raises:
         404: Account not found.
     """
-    service = APIKeyService(db)
-
     try:
         # Create API key
         api_key, plain_key = await service.create_api_key(
@@ -63,7 +60,7 @@ async def create_api_key(
     response_model=list[APIKeyResponse],
 )
 async def list_api_keys(
-    db: DatabaseSession,
+    service: APIKeyServiceDep,
     account_id: Annotated[UUID4, Query(description="Account ID to filter by")],
     status: Annotated[APIKeyStatus | None, Query(description="Filter by status")] = None,
 ) -> list[APIKeyResponse]:
@@ -78,8 +75,6 @@ async def list_api_keys(
     Returns:
         List of API keys matching the filters.
     """
-    service = APIKeyService(db)
-
     # TODO: Replace with account_id from authenticated user's token
     # Get filtered list from service
     api_keys = await service.list_api_keys(
@@ -96,7 +91,7 @@ async def list_api_keys(
 )
 async def get_api_key(
     key_id: UUID4,
-    db: DatabaseSession,
+    service: APIKeyServiceDep,
 ) -> APIKeyResponse:
     """Get a single API key by ID.
 
@@ -109,7 +104,6 @@ async def get_api_key(
     Raises:
         404: API key not found.
     """
-    service = APIKeyService(db)
     api_key = await service.get_by_id_or_raise(key_id)
     return APIKeyResponse.from_domain(api_key)
 
@@ -121,7 +115,7 @@ async def get_api_key(
 async def update_api_key(
     key_id: UUID4,
     request: UpdateAPIKeyRequest,
-    db: DatabaseSession,
+    service: APIKeyServiceDep,
 ) -> APIKeyResponse:
     """Update an API key.
 
@@ -139,7 +133,6 @@ async def update_api_key(
     Raises:
         404: API key not found.
     """
-    service = APIKeyService(db)
 
     # Update status if provided
     if request.status is not None:
