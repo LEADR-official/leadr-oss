@@ -35,6 +35,7 @@ class CommonSettings(BaseSettings):
     All settings can be configured via environment variables matching the
     field names (case-sensitive).
     """
+
     model_config = SettingsConfigDict(case_sensitive=True, extra="ignore")
 
     APP: str = Field(
@@ -172,7 +173,6 @@ class Settings(CommonSettings):
     This is the default settings class used when ENV != 'TEST'.
     """
 
-    pass
 
 
 class TestSettings(CommonSettings):
@@ -185,7 +185,6 @@ class TestSettings(CommonSettings):
     Test-specific overrides can be added here.
     """
 
-    pass
 
 
 settings = (
