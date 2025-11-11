@@ -11,6 +11,8 @@ on:
 
 env:
   ENV: CI
+  ENABLE_ADMIN_API: true
+  ENABLE_CLIENT_API: true
 
 jobs:
   build-and-pr:
