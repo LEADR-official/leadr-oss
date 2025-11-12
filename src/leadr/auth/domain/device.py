@@ -63,22 +63,34 @@ class DeviceSession(Entity):
 
     Represents an active authentication session for a device.
     Sessions have an expiration time and can be revoked manually.
+    Includes both access and refresh tokens with token rotation support.
     """
 
     device_id: UUID
     access_token_hash: str
+    refresh_token_hash: str
+    token_version: int = 1
     expires_at: datetime
+    refresh_expires_at: datetime
     ip_address: str | None = None
     user_agent: str | None = None
     revoked_at: datetime | None = None
 
     def is_expired(self) -> bool:
-        """Check if the session has expired.
+        """Check if the access token has expired.
 
         Returns:
             True if the current time is past the expiration time.
         """
         return datetime.now(UTC) >= self.expires_at
+
+    def is_refresh_expired(self) -> bool:
+        """Check if the refresh token has expired.
+
+        Returns:
+            True if the current time is past the refresh expiration time.
+        """
+        return datetime.now(UTC) >= self.refresh_expires_at
 
     def is_revoked(self) -> bool:
         """Check if the session has been manually revoked.
@@ -101,3 +113,10 @@ class DeviceSession(Entity):
     def revoke(self) -> None:
         """Revoke the session, preventing further use."""
         self.revoked_at = datetime.now(UTC)
+
+    def rotate_tokens(self) -> None:
+        """Increment token version for token rotation.
+
+        Called when refreshing tokens to invalidate old refresh tokens.
+        """
+        self.token_version += 1

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, String
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
@@ -177,7 +177,7 @@ class DeviceSessionORM(Base):
 
     Represents an active authentication session for a device in the database.
     Maps to the device_sessions table with foreign key to devices.
-    Sessions have an expiration time and can be manually revoked.
+    Sessions include both access and refresh tokens with token rotation support.
     """
 
     __tablename__ = "device_sessions"
@@ -192,7 +192,23 @@ class DeviceSessionORM(Base):
         nullable=False,
         index=True,
     )
+    refresh_token_hash: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        index=True,
+    )
+    token_version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
     expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    refresh_expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         index=True,
@@ -223,7 +239,10 @@ class DeviceSessionORM(Base):
             deleted_at=session.deleted_at,
             device_id=session.device_id,
             access_token_hash=session.access_token_hash,
+            refresh_token_hash=session.refresh_token_hash,
+            token_version=session.token_version,
             expires_at=session.expires_at,
+            refresh_expires_at=session.refresh_expires_at,
             ip_address=session.ip_address,
             user_agent=session.user_agent,
             revoked_at=session.revoked_at,
@@ -238,7 +257,10 @@ class DeviceSessionORM(Base):
             deleted_at=self.deleted_at,
             device_id=self.device_id,
             access_token_hash=self.access_token_hash,
+            refresh_token_hash=self.refresh_token_hash,
+            token_version=self.token_version,
             expires_at=self.expires_at,
+            refresh_expires_at=self.refresh_expires_at,
             ip_address=self.ip_address,
             user_agent=self.user_agent,
             revoked_at=self.revoked_at,

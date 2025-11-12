@@ -380,12 +380,15 @@ class TestDeviceSession:
         device_id = uuid4()
         now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
+        refresh_expires_at = now + timedelta(days=30)
 
         session = DeviceSession(
             id=session_id,
             device_id=device_id,
             access_token_hash="hashed_token_value",
+            refresh_token_hash="refresh_hash",
             expires_at=expires_at,
+            refresh_expires_at=refresh_expires_at,
             ip_address="192.168.1.1",
             user_agent="Mozilla/5.0",
             revoked_at=None,
@@ -413,6 +416,8 @@ class TestDeviceSession:
             device_id=device_id,
             access_token_hash="hashed_token_value",
             expires_at=expires_at,
+            refresh_token_hash="refresh_hash",
+            refresh_expires_at=now + timedelta(days=30),
             ip_address=None,
             user_agent=None,
             revoked_at=None,
@@ -435,6 +440,8 @@ class TestDeviceSession:
                 id=session_id,
                 access_token_hash="hashed_token_value",
                 expires_at=expires_at,
+            refresh_token_hash="refresh_hash",
+            refresh_expires_at=now + timedelta(days=30),
                 created_at=now,
                 updated_at=now,
             )
@@ -488,6 +495,8 @@ class TestDeviceSession:
             device_id=device_id,
             access_token_hash="hashed_token_value",
             expires_at=past_date,
+            refresh_token_hash="refresh_hash",
+            refresh_expires_at=now + timedelta(days=30),
             created_at=now,
             updated_at=now,
         )
@@ -506,6 +515,8 @@ class TestDeviceSession:
             device_id=device_id,
             access_token_hash="hashed_token_value",
             expires_at=future_date,
+            refresh_token_hash="refresh_hash",
+            refresh_expires_at=now + timedelta(days=30),
             created_at=now,
             updated_at=now,
         )
@@ -524,6 +535,8 @@ class TestDeviceSession:
             device_id=device_id,
             access_token_hash="hashed_token_value",
             expires_at=expires_at,
+            refresh_token_hash="refresh_hash",
+            refresh_expires_at=now + timedelta(days=30),
             revoked_at=now,
             created_at=now,
             updated_at=now,
@@ -543,6 +556,8 @@ class TestDeviceSession:
             device_id=device_id,
             access_token_hash="hashed_token_value",
             expires_at=expires_at,
+            refresh_token_hash="refresh_hash",
+            refresh_expires_at=now + timedelta(days=30),
             revoked_at=None,
             created_at=now,
             updated_at=now,
@@ -562,6 +577,8 @@ class TestDeviceSession:
             device_id=device_id,
             access_token_hash="hashed_token_value",
             expires_at=future_date,
+            refresh_token_hash="refresh_hash",
+            refresh_expires_at=now + timedelta(days=30),
             revoked_at=None,
             created_at=now,
             updated_at=now,
@@ -581,6 +598,8 @@ class TestDeviceSession:
             device_id=device_id,
             access_token_hash="hashed_token_value",
             expires_at=past_date,
+            refresh_token_hash="refresh_hash",
+            refresh_expires_at=now + timedelta(days=30),
             revoked_at=None,
             created_at=now,
             updated_at=now,
@@ -600,6 +619,8 @@ class TestDeviceSession:
             device_id=device_id,
             access_token_hash="hashed_token_value",
             expires_at=future_date,
+            refresh_token_hash="refresh_hash",
+            refresh_expires_at=now + timedelta(days=30),
             revoked_at=now,
             created_at=now,
             updated_at=now,
@@ -619,6 +640,8 @@ class TestDeviceSession:
             device_id=device_id,
             access_token_hash="hashed_token_value",
             expires_at=future_date,
+            refresh_token_hash="refresh_hash",
+            refresh_expires_at=now + timedelta(days=30),
             revoked_at=None,
             created_at=now,
             updated_at=now,
@@ -644,6 +667,8 @@ class TestDeviceSession:
             device_id=device_id,
             access_token_hash="hash1",
             expires_at=expires_at,
+            refresh_token_hash="refresh_hash",
+            refresh_expires_at=now + timedelta(days=30),
             created_at=now,
             updated_at=now,
         )
@@ -653,8 +678,190 @@ class TestDeviceSession:
             device_id=device_id,
             access_token_hash="hash2",
             expires_at=expires_at,
+            refresh_token_hash="refresh_hash",
+            refresh_expires_at=now + timedelta(days=30),
             created_at=now,
             updated_at=now,
         )
 
         assert session1 == session2
+
+    def test_create_device_session_with_refresh_token_fields(self):
+        """Test creating a device session with refresh token fields."""
+        session_id = uuid4()
+        device_id = uuid4()
+        now = datetime.now(UTC)
+        access_expires_at = now + timedelta(minutes=15)
+        refresh_expires_at = now + timedelta(days=30)
+
+        session = DeviceSession(
+            id=session_id,
+            device_id=device_id,
+            access_token_hash="access_hash",
+            refresh_token_hash="refresh_hash",
+            token_version=1,
+            expires_at=access_expires_at,
+            refresh_expires_at=refresh_expires_at,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert session.refresh_token_hash == "refresh_hash"
+        assert session.token_version == 1
+        assert session.refresh_expires_at == refresh_expires_at
+
+    def test_token_version_defaults_to_one(self):
+        """Test that token_version defaults to 1."""
+        session_id = uuid4()
+        device_id = uuid4()
+        now = datetime.now(UTC)
+        access_expires_at = now + timedelta(minutes=15)
+        refresh_expires_at = now + timedelta(days=30)
+
+        session = DeviceSession(
+            id=session_id,
+            device_id=device_id,
+            access_token_hash="access_hash",
+            refresh_token_hash="refresh_hash",
+            expires_at=access_expires_at,
+            refresh_expires_at=refresh_expires_at,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert session.token_version == 1
+
+    def test_refresh_token_hash_required(self):
+        """Test that refresh_token_hash is required."""
+        session_id = uuid4()
+        device_id = uuid4()
+        now = datetime.now(UTC)
+        access_expires_at = now + timedelta(minutes=15)
+        refresh_expires_at = now + timedelta(days=30)
+
+        with pytest.raises(ValidationError) as exc_info:
+            DeviceSession(  # type: ignore[call-arg]
+                id=session_id,
+                device_id=device_id,
+                access_token_hash="access_hash",
+                expires_at=access_expires_at,
+                refresh_expires_at=refresh_expires_at,
+                created_at=now,
+                updated_at=now,
+            )
+
+        assert "refresh_token_hash" in str(exc_info.value)
+
+    def test_refresh_expires_at_required(self):
+        """Test that refresh_expires_at is required."""
+        session_id = uuid4()
+        device_id = uuid4()
+        now = datetime.now(UTC)
+        access_expires_at = now + timedelta(minutes=15)
+
+        with pytest.raises(ValidationError) as exc_info:
+            DeviceSession(  # type: ignore[call-arg]
+                id=session_id,
+                device_id=device_id,
+                access_token_hash="access_hash",
+                refresh_token_hash="refresh_hash",
+                expires_at=access_expires_at,
+                created_at=now,
+                updated_at=now,
+            )
+
+        assert "refresh_expires_at" in str(exc_info.value)
+
+    def test_is_refresh_expired_when_refresh_expiration_in_past(self):
+        """Test that session refresh token is expired when refresh_expires_at is in the past."""
+        session_id = uuid4()
+        device_id = uuid4()
+        now = datetime.now(UTC)
+        access_expires_at = now + timedelta(minutes=15)
+        past_date = now - timedelta(days=1)
+
+        session = DeviceSession(
+            id=session_id,
+            device_id=device_id,
+            access_token_hash="access_hash",
+            refresh_token_hash="refresh_hash",
+            expires_at=access_expires_at,
+            refresh_expires_at=past_date,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert session.is_refresh_expired() is True
+
+    def test_is_refresh_not_expired_when_refresh_expiration_in_future(self):
+        """Test that session refresh token is not expired when refresh_expires_at is in the future."""
+        session_id = uuid4()
+        device_id = uuid4()
+        now = datetime.now(UTC)
+        access_expires_at = now + timedelta(minutes=15)
+        future_date = now + timedelta(days=30)
+
+        session = DeviceSession(
+            id=session_id,
+            device_id=device_id,
+            access_token_hash="access_hash",
+            refresh_token_hash="refresh_hash",
+            expires_at=access_expires_at,
+            refresh_expires_at=future_date,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert session.is_refresh_expired() is False
+
+    def test_rotate_tokens_increments_version(self):
+        """Test that rotate_tokens increments token_version."""
+        session_id = uuid4()
+        device_id = uuid4()
+        now = datetime.now(UTC)
+        access_expires_at = now + timedelta(minutes=15)
+        refresh_expires_at = now + timedelta(days=30)
+
+        session = DeviceSession(
+            id=session_id,
+            device_id=device_id,
+            access_token_hash="access_hash",
+            refresh_token_hash="refresh_hash",
+            token_version=1,
+            expires_at=access_expires_at,
+            refresh_expires_at=refresh_expires_at,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert session.token_version == 1
+
+        session.rotate_tokens()
+
+        assert session.token_version == 2
+
+    def test_rotate_tokens_multiple_times(self):
+        """Test that rotate_tokens can be called multiple times."""
+        session_id = uuid4()
+        device_id = uuid4()
+        now = datetime.now(UTC)
+        access_expires_at = now + timedelta(minutes=15)
+        refresh_expires_at = now + timedelta(days=30)
+
+        session = DeviceSession(
+            id=session_id,
+            device_id=device_id,
+            access_token_hash="access_hash",
+            refresh_token_hash="refresh_hash",
+            token_version=1,
+            expires_at=access_expires_at,
+            refresh_expires_at=refresh_expires_at,
+            created_at=now,
+            updated_at=now,
+        )
+
+        session.rotate_tokens()
+        session.rotate_tokens()
+        session.rotate_tokens()
+
+        assert session.token_version == 4
