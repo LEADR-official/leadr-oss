@@ -282,3 +282,124 @@ class TestAntiCheatServiceRateLimiting:
 
         assert result.action == FlagAction.ACCEPT
         assert result.flag_type is None
+
+
+@pytest.mark.asyncio
+class TestAntiCheatServiceDuplicateDetection:
+    """Test suite for duplicate score detection."""
+
+    async def test_duplicate_within_window_flagged(
+        self, db_session: AsyncSession, test_score: Score, test_board
+    ):
+        """Test that duplicate score within 5 minutes is flagged."""
+        from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
+        from leadr.scores.services.anti_cheat_repositories import ScoreSubmissionMetaRepository
+
+        service = AntiCheatService(db_session)
+        meta_repo = ScoreSubmissionMetaRepository(db_session)
+        device_id = uuid4()
+        now = datetime.now(UTC)
+
+        # Create metadata simulating a previous submission with value 1000.0
+        meta = ScoreSubmissionMeta(
+            score_id=test_score.id,
+            device_id=device_id,
+            board_id=test_board.id,
+            submission_count=1,
+            last_submission_at=now - timedelta(seconds=30),
+            last_score_value=1000.0,  # Previous score value
+        )
+        await meta_repo.create(meta)
+
+        # Submit same score value again (duplicate within window)
+        result = await service.check_submission(
+            score=test_score,  # Same value 1000.0
+            trust_tier=TrustTier.A,
+            device_id=device_id,
+            board_id=test_board.id,
+        )
+
+        assert result.action == FlagAction.FLAG
+        assert result.flag_type == FlagType.DUPLICATE
+        assert result.confidence == FlagConfidence.MEDIUM
+        assert "duplicate" in result.reason.lower()
+
+    async def test_duplicate_outside_window_accepted(
+        self, db_session: AsyncSession, test_score: Score, test_board
+    ):
+        """Test that duplicate score outside 5-minute window is accepted."""
+        from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
+        from leadr.scores.services.anti_cheat_repositories import ScoreSubmissionMetaRepository
+
+        service = AntiCheatService(db_session)
+        meta_repo = ScoreSubmissionMetaRepository(db_session)
+        device_id = uuid4()
+        now = datetime.now(UTC)
+
+        # Create metadata with last submission 6 minutes ago (outside window)
+        meta = ScoreSubmissionMeta(
+            score_id=test_score.id,
+            device_id=device_id,
+            board_id=test_board.id,
+            submission_count=1,
+            last_submission_at=now - timedelta(minutes=6),
+            last_score_value=1000.0,  # Previous score value
+        )
+        await meta_repo.create(meta)
+
+        # Submit same score value - should accept (window expired)
+        result = await service.check_submission(
+            score=test_score,
+            trust_tier=TrustTier.A,
+            device_id=device_id,
+            board_id=test_board.id,
+        )
+
+        assert result.action == FlagAction.ACCEPT
+
+    async def test_different_score_not_flagged(
+        self, db_session: AsyncSession, test_board
+    ):
+        """Test that different score values are not flagged as duplicates."""
+        from leadr.scores.domain.score import Score
+
+        service = AntiCheatService(db_session)
+        device_id = uuid4()
+
+        # First score with value 1000.0
+        score1 = Score(
+            account_id=test_board.account_id,
+            game_id=test_board.game_id,
+            board_id=test_board.id,
+            user_id=uuid4(),
+            player_name="Test Player",
+            value=1000.0,
+        )
+
+        result = await service.check_submission(
+            score=score1,
+            trust_tier=TrustTier.A,
+            device_id=device_id,
+            board_id=test_board.id,
+        )
+        assert result.action == FlagAction.ACCEPT
+
+        # Second score with different value 2000.0
+        score2 = Score(
+            account_id=test_board.account_id,
+            game_id=test_board.game_id,
+            board_id=test_board.id,
+            user_id=uuid4(),
+            player_name="Test Player",
+            value=2000.0,
+        )
+
+        result = await service.check_submission(
+            score=score2,
+            trust_tier=TrustTier.A,
+            device_id=device_id,
+            board_id=test_board.id,
+        )
+
+        assert result.action == FlagAction.ACCEPT
+        assert result.flag_type is None

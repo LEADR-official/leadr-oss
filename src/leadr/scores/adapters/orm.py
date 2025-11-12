@@ -80,6 +80,7 @@ class ScoreSubmissionMetaORM(Base):
     last_submission_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+    last_score_value: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
 
     def to_domain(self) -> "ScoreSubmissionMeta":
         """Convert ORM model to domain entity."""
@@ -92,6 +93,7 @@ class ScoreSubmissionMetaORM(Base):
             board_id=self.board_id,
             submission_count=self.submission_count,
             last_submission_at=self.last_submission_at,
+            last_score_value=self.last_score_value,
             created_at=self.created_at,
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
@@ -107,6 +109,7 @@ class ScoreSubmissionMetaORM(Base):
             board_id=entity.board_id,
             submission_count=entity.submission_count,
             last_submission_at=entity.last_submission_at,
+            last_score_value=entity.last_score_value,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,

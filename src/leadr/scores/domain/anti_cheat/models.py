@@ -52,6 +52,9 @@ class ScoreSubmissionMeta(Entity):
     last_submission_at: datetime = Field(
         description="Timestamp of the most recent submission"
     )
+    last_score_value: float | None = Field(
+        default=None, description="Value of the most recent score submission for duplicate detection"
+    )
 
 
 

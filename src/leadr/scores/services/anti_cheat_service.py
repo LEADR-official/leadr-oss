@@ -60,6 +60,16 @@ class AntiCheatService:
         if rate_limit_result.action != FlagAction.ACCEPT:
             return rate_limit_result
 
+        # Check for duplicate scores
+        duplicate_result = await self._check_duplicate(
+            score=score,
+            device_id=device_id,
+            board_id=board_id,
+        )
+
+        if duplicate_result.action != FlagAction.ACCEPT:
+            return duplicate_result
+
         # All checks passed
         return AntiCheatResult(action=FlagAction.ACCEPT)
 
@@ -118,4 +128,51 @@ class AntiCheatService:
             )
 
         # Under limit - accept
+        return AntiCheatResult(action=FlagAction.ACCEPT)
+
+    async def _check_duplicate(
+        self,
+        score: Score,
+        device_id: UUID,
+        board_id: UUID,
+    ) -> AntiCheatResult:
+        """Check if score is a duplicate of recently submitted score.
+
+        Args:
+            score: Score being submitted
+            device_id: ID of the device submitting the score
+            board_id: ID of the board being submitted to
+
+        Returns:
+            AntiCheatResult with ACCEPT or FLAG action
+        """
+        # Get submission metadata for this device/board
+        meta = await self.meta_repo.get_by_device_and_board(device_id, board_id)
+
+        # First submission - always accept
+        if meta is None or meta.last_score_value is None:
+            return AntiCheatResult(action=FlagAction.ACCEPT)
+
+        # Check if score value matches last submission
+        if score.value == meta.last_score_value:
+            # Check if within duplicate detection window
+            now = datetime.now(UTC)
+            window_seconds = settings.ANTICHEAT_DUPLICATE_WINDOW_SECONDS
+            window_start = now - timedelta(seconds=window_seconds)
+
+            if meta.last_submission_at >= window_start:
+                # Duplicate within window - flag for review
+                return AntiCheatResult(
+                    action=FlagAction.FLAG,
+                    flag_type=FlagType.DUPLICATE,
+                    confidence=FlagConfidence.MEDIUM,
+                    reason=f"Duplicate score value ({score.value}) submitted within {window_seconds} seconds",
+                    metadata={
+                        "score_value": score.value,
+                        "previous_submission_at": meta.last_submission_at.isoformat(),
+                        "window_seconds": window_seconds,
+                    },
+                )
+
+        # Not a duplicate or outside window - accept
         return AntiCheatResult(action=FlagAction.ACCEPT)
