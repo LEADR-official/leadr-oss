@@ -79,41 +79,32 @@ async def get_board(board_id: UUID, service: BoardServiceDep) -> BoardResponse:
     return BoardResponse.from_domain(board)
 
 
-@router.get("/boards/by-code/{short_code}", response_model=BoardResponse)
-async def get_board_by_short_code(short_code: str, service: BoardServiceDep) -> BoardResponse:
-    """Get a board by its short code.
-
-    Args:
-        short_code: Globally unique short code for the board.
-        service: Injected board service dependency.
-
-    Returns:
-        BoardResponse with full board details.
-
-    Raises:
-        404: Board not found.
-    """
-    board = await service.get_board_by_short_code(short_code)
-    if board is None:
-        raise HTTPException(status_code=404, detail="Board not found")
-    return BoardResponse.from_domain(board)
-
-
 @router.get("/boards", response_model=list[BoardResponse])
 async def list_boards(
-    account_id: UUID,
     service: BoardServiceDep,
+    account_id: UUID | None = None,
+    code: str | None = None,
 ) -> list[BoardResponse]:
-    """List all boards for an account.
+    """List boards filtered by account_id and/or short code.
 
     Args:
-        account_id: Account ID to filter boards by.
         service: Injected board service dependency.
+        account_id: Optional account ID to filter boards by.
+        code: Optional short code to filter boards by.
 
     Returns:
-        List of all active boards for the specified account.
+        List of boards matching the filter criteria.
+
+    Raises:
+        422: Neither account_id nor code parameter provided.
     """
-    boards = await service.list_boards_by_account(account_id)
+    if account_id is None and code is None:
+        raise HTTPException(
+            status_code=422,
+            detail="At least one of account_id or code parameter is required",
+        )
+
+    boards = await service.list_boards(account_id=account_id, code=code)
     return [BoardResponse.from_domain(board) for board in boards]
 
 

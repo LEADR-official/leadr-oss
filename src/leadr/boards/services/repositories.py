@@ -99,6 +99,30 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         """
         return await self._get_by_field("short_code", short_code)
 
+    async def list_boards(
+        self, account_id: UUID4 | None = None, code: str | None = None
+    ) -> list[Board]:
+        """List boards with optional filtering by account_id and/or code.
+
+        Args:
+            account_id: Optional account ID to filter by
+            code: Optional short code to filter by
+
+        Returns:
+            List of boards matching the filter criteria (excludes soft-deleted)
+        """
+        query = select(BoardORM).where(BoardORM.deleted_at.is_(None))
+
+        if account_id is not None:
+            query = query.where(BoardORM.account_id == account_id)
+
+        if code is not None:
+            query = query.where(BoardORM.short_code == code)
+
+        result = await self.session.execute(query)
+        orms = result.scalars().all()
+        return [self._to_domain(orm) for orm in orms]
+
 
 class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
     """BoardTemplate repository for managing board template persistence."""
