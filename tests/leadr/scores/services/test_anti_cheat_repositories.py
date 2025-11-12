@@ -22,10 +22,11 @@ class TestScoreSubmissionMetaRepository:
         """Test creating a submission meta via repository."""
         repo = ScoreSubmissionMetaRepository(db_session)
         now = datetime.now(UTC)
+        device_id = uuid4()
 
         meta = ScoreSubmissionMeta(
             score_id=test_score.id,
-            user_id=test_score.user_id,
+            device_id=device_id,
             board_id=test_score.board_id,
             submission_count=1,
             last_submission_at=now,
@@ -35,7 +36,7 @@ class TestScoreSubmissionMetaRepository:
 
         assert created.id == meta.id
         assert created.score_id == test_score.id
-        assert created.user_id == test_score.user_id
+        assert created.device_id == device_id
         assert created.board_id == test_score.board_id
         assert created.submission_count == 1
         assert created.last_submission_at == now
@@ -44,10 +45,11 @@ class TestScoreSubmissionMetaRepository:
         """Test retrieving a submission meta by ID."""
         repo = ScoreSubmissionMetaRepository(db_session)
         now = datetime.now(UTC)
+        device_id = uuid4()
 
         meta = ScoreSubmissionMeta(
             score_id=test_score.id,
-            user_id=test_score.user_id,
+            device_id=device_id,
             board_id=test_score.board_id,
             submission_count=5,
             last_submission_at=now,
@@ -73,10 +75,11 @@ class TestScoreSubmissionMetaRepository:
         """Test updating a submission meta."""
         repo = ScoreSubmissionMetaRepository(db_session)
         now = datetime.now(UTC)
+        device_id = uuid4()
 
         meta = ScoreSubmissionMeta(
             score_id=test_score.id,
-            user_id=test_score.user_id,
+            device_id=device_id,
             board_id=test_score.board_id,
             submission_count=1,
             last_submission_at=now,
@@ -92,32 +95,33 @@ class TestScoreSubmissionMetaRepository:
         assert updated.submission_count == 10
         assert updated.last_submission_at == new_time
 
-    async def test_get_by_user_and_board(self, db_session: AsyncSession, test_score, test_user, test_board):
-        """Test retrieving submission meta by user and board IDs."""
+    async def test_get_by_device_and_board(self, db_session: AsyncSession, test_score, test_board):
+        """Test retrieving submission meta by device and board IDs."""
         repo = ScoreSubmissionMetaRepository(db_session)
         now = datetime.now(UTC)
+        device_id = uuid4()
 
         meta = ScoreSubmissionMeta(
             score_id=test_score.id,
-            user_id=test_user.id,
+            device_id=device_id,
             board_id=test_board.id,
             submission_count=3,
             last_submission_at=now,
         )
         await repo.create(meta)
 
-        retrieved = await repo.get_by_user_and_board(test_user.id, test_board.id)
+        retrieved = await repo.get_by_device_and_board(device_id, test_board.id)
 
         assert retrieved is not None
-        assert retrieved.user_id == test_user.id
+        assert retrieved.device_id == device_id
         assert retrieved.board_id == test_board.id
         assert retrieved.submission_count == 3
 
-    async def test_get_by_user_and_board_not_found(self, db_session: AsyncSession):
-        """Test that get_by_user_and_board returns None when not found."""
+    async def test_get_by_device_and_board_not_found(self, db_session: AsyncSession):
+        """Test that get_by_device_and_board returns None when not found."""
         repo = ScoreSubmissionMetaRepository(db_session)
 
-        result = await repo.get_by_user_and_board(uuid4(), uuid4())
+        result = await repo.get_by_device_and_board(uuid4(), uuid4())
 
         assert result is None
 

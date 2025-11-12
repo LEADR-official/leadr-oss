@@ -19,7 +19,7 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
         return ScoreSubmissionMeta(
             id=orm.id,
             score_id=orm.score_id,
-            user_id=orm.user_id,
+            device_id=orm.device_id,
             board_id=orm.board_id,
             submission_count=orm.submission_count,
             last_submission_at=orm.last_submission_at,
@@ -33,7 +33,7 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
         return ScoreSubmissionMetaORM(
             id=entity.id,
             score_id=entity.score_id,
-            user_id=entity.user_id,
+            device_id=entity.device_id,
             board_id=entity.board_id,
             submission_count=entity.submission_count,
             last_submission_at=entity.last_submission_at,
@@ -54,26 +54,26 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            Empty list (this entity uses specialized queries like get_by_user_and_board)
+            Empty list (this entity uses specialized queries like get_by_device_and_board)
         """
-        # This entity is typically queried via get_by_user_and_board
+        # This entity is typically queried via get_by_device_and_board
         # rather than filtered by account
         return []
 
-    async def get_by_user_and_board(
-        self, user_id: UUID, board_id: UUID
+    async def get_by_device_and_board(
+        self, device_id: UUID, board_id: UUID
     ) -> ScoreSubmissionMeta | None:
-        """Get submission metadata for a user/board combination.
+        """Get submission metadata for a device/board combination.
 
         Args:
-            user_id: ID of the user who submitted scores
+            device_id: ID of the device submitting scores
             board_id: ID of the board being submitted to
 
         Returns:
             ScoreSubmissionMeta if found, None otherwise
         """
         query = select(ScoreSubmissionMetaORM).where(
-            ScoreSubmissionMetaORM.user_id == user_id,
+            ScoreSubmissionMetaORM.device_id == device_id,
             ScoreSubmissionMetaORM.board_id == board_id,
             ScoreSubmissionMetaORM.deleted_at.is_(None),
         )
