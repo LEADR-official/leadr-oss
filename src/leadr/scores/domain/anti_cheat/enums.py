@@ -54,7 +54,7 @@ class FlagConfidence(str, Enum):
     """High confidence detection - reject submission."""
 
 
-class AntiCheatAction(str, Enum):
+class FlagAction(str, Enum):
     """Action to take based on anti-cheat analysis.
 
     Determines how the score submission should be handled.

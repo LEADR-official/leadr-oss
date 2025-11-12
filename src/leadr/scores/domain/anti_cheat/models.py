@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from leadr.common.domain.models import Entity
-from leadr.scores.domain.anti_cheat.enums import AntiCheatAction, FlagConfidence, FlagType
+from leadr.scores.domain.anti_cheat.enums import FlagAction, FlagConfidence, FlagType
 
 
 class AntiCheatResult(BaseModel):
@@ -20,7 +20,7 @@ class AntiCheatResult(BaseModel):
 
     model_config = {"frozen": True}
 
-    action: AntiCheatAction = Field(description="Action to take (ACCEPT/FLAG/REJECT)")
+    action: FlagAction = Field(description="Action to take (ACCEPT/FLAG/REJECT)")
     confidence: FlagConfidence | None = Field(
         default=None, description="Confidence level of detection (if flagged/rejected)"
     )
