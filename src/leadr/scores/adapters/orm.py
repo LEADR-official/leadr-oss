@@ -63,7 +63,7 @@ class ScoreORM(Base):
 class ScoreSubmissionMetaORM(Base):
     """Score submission metadata ORM model for anti-cheat tracking.
 
-    Tracks submission history per user/board combination to enable
+    Tracks submission history per device/board combination to enable
     detection of suspicious patterns like rapid-fire submissions.
     """
 
@@ -74,7 +74,7 @@ class ScoreSubmissionMetaORM(Base):
         nullable=False,
         index=True,
     )
-    user_id: Mapped[UUID] = mapped_column(nullable=False, index=True)
+    device_id: Mapped[UUID] = mapped_column(nullable=False, index=True)
     board_id: Mapped[UUID] = mapped_column(nullable=False, index=True)
     submission_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     last_submission_at: Mapped[datetime] = mapped_column(
@@ -88,7 +88,7 @@ class ScoreSubmissionMetaORM(Base):
         return ScoreSubmissionMeta(
             id=self.id,
             score_id=self.score_id,
-            user_id=self.user_id,
+            device_id=self.device_id,
             board_id=self.board_id,
             submission_count=self.submission_count,
             last_submission_at=self.last_submission_at,
@@ -103,7 +103,7 @@ class ScoreSubmissionMetaORM(Base):
         return ScoreSubmissionMetaORM(
             id=entity.id,
             score_id=entity.score_id,
-            user_id=entity.user_id,
+            device_id=entity.device_id,
             board_id=entity.board_id,
             submission_count=entity.submission_count,
             last_submission_at=entity.last_submission_at,

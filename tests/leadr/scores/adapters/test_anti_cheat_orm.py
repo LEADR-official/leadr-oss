@@ -17,10 +17,11 @@ class TestScoreSubmissionMetaORM:
     async def test_create_submission_meta_orm(self, db_session, test_score):
         """Test creating a ScoreSubmissionMetaORM instance."""
         now = datetime.now(UTC)
+        device_id = uuid4()
 
         orm = ScoreSubmissionMetaORM(
             score_id=test_score.id,
-            user_id=test_score.user_id,
+            device_id=device_id,
             board_id=test_score.board_id,
             submission_count=1,
             last_submission_at=now,
@@ -31,7 +32,7 @@ class TestScoreSubmissionMetaORM:
 
         assert orm.id is not None
         assert orm.score_id == test_score.id
-        assert orm.user_id == test_score.user_id
+        assert orm.device_id == device_id
         assert orm.board_id == test_score.board_id
         assert orm.submission_count == 1
         assert orm.last_submission_at == now
@@ -39,10 +40,11 @@ class TestScoreSubmissionMetaORM:
     async def test_submission_meta_to_domain(self, db_session, test_score):
         """Test converting ORM to domain entity."""
         now = datetime.now(UTC)
+        device_id = uuid4()
 
         orm = ScoreSubmissionMetaORM(
             score_id=test_score.id,
-            user_id=test_score.user_id,
+            device_id=device_id,
             board_id=test_score.board_id,
             submission_count=5,
             last_submission_at=now,
@@ -56,7 +58,7 @@ class TestScoreSubmissionMetaORM:
         assert isinstance(domain, ScoreSubmissionMeta)
         assert domain.id == orm.id
         assert domain.score_id == test_score.id
-        assert domain.user_id == test_score.user_id
+        assert domain.device_id == device_id
         assert domain.board_id == test_score.board_id
         assert domain.submission_count == 5
         assert domain.last_submission_at == now
@@ -66,10 +68,11 @@ class TestScoreSubmissionMetaORM:
     async def test_submission_meta_from_domain(self, db_session, test_score):
         """Test converting domain entity to ORM."""
         now = datetime.now(UTC)
+        device_id = uuid4()
 
         domain = ScoreSubmissionMeta(
             score_id=test_score.id,
-            user_id=test_score.user_id,
+            device_id=device_id,
             board_id=test_score.board_id,
             submission_count=3,
             last_submission_at=now,
@@ -79,7 +82,7 @@ class TestScoreSubmissionMetaORM:
 
         assert orm.id == domain.id
         assert orm.score_id == test_score.id
-        assert orm.user_id == test_score.user_id
+        assert orm.device_id == device_id
         assert orm.board_id == test_score.board_id
         assert orm.submission_count == 3
         assert orm.last_submission_at == now
