@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.config import settings
 from leadr.scores.domain.anti_cheat.enums import FlagAction, FlagConfidence, FlagType, TrustTier
-from leadr.scores.domain.anti_cheat.models import AntiCheatResult
+from leadr.scores.domain.anti_cheat.models import AntiCheatResult, ScoreSubmissionMeta
 from leadr.scores.domain.score import Score
 from leadr.scores.services.anti_cheat_repositories import ScoreSubmissionMetaRepository
 
@@ -50,10 +50,12 @@ class AntiCheatService:
         Returns:
             AntiCheatResult indicating action to take (ACCEPT/FLAG/REJECT)
         """
+        # Fetch submission metadata once for all checks
+        submission_meta = await self.meta_repo.get_by_device_and_board(device_id, board_id)
+
         # Check rate limiting
         rate_limit_result = await self._check_rate_limit(
-            device_id=device_id,
-            board_id=board_id,
+            submission_meta=submission_meta,
             trust_tier=trust_tier,
         )
 
@@ -63,8 +65,7 @@ class AntiCheatService:
         # Check for duplicate scores
         duplicate_result = await self._check_duplicate(
             score=score,
-            device_id=device_id,
-            board_id=board_id,
+            submission_meta=submission_meta,
         )
 
         if duplicate_result.action != FlagAction.ACCEPT:
@@ -72,8 +73,7 @@ class AntiCheatService:
 
         # Check for velocity (rapid-fire submissions)
         velocity_result = await self._check_velocity(
-            device_id=device_id,
-            board_id=board_id,
+            submission_meta=submission_meta,
         )
 
         if velocity_result.action != FlagAction.ACCEPT:
@@ -84,15 +84,13 @@ class AntiCheatService:
 
     async def _check_rate_limit(
         self,
-        device_id: UUID,
-        board_id: UUID,
+        submission_meta: ScoreSubmissionMeta | None,
         trust_tier: TrustTier,
     ) -> AntiCheatResult:
         """Check if device exceeds rate limit for this board.
 
         Args:
-            device_id: ID of the device submitting scores
-            board_id: ID of the board being submitted to
+            submission_meta: Pre-fetched submission metadata (or None for first submission)
             trust_tier: Trust tier determining rate limit threshold
 
         Returns:
@@ -106,11 +104,8 @@ class AntiCheatService:
         }
         limit = rate_limits[trust_tier]
 
-        # Get submission metadata for this device/board
-        meta = await self.meta_repo.get_by_device_and_board(device_id, board_id)
-
         # First submission - always accept
-        if meta is None:
+        if submission_meta is None:
             return AntiCheatResult(action=FlagAction.ACCEPT)
 
         # Check if last submission was within 1 hour (sliding window)
@@ -118,11 +113,11 @@ class AntiCheatService:
         one_hour_ago = now - timedelta(hours=1)
 
         # If last submission was > 1 hour ago, window expired - accept
-        if meta.last_submission_at < one_hour_ago:
+        if submission_meta.last_submission_at < one_hour_ago:
             return AntiCheatResult(action=FlagAction.ACCEPT)
 
         # Check if submission count within window exceeds limit
-        if meta.submission_count >= limit:
+        if submission_meta.submission_count >= limit:
             return AntiCheatResult(
                 action=FlagAction.REJECT,
                 flag_type=FlagType.RATE_LIMIT,
@@ -130,9 +125,9 @@ class AntiCheatService:
                 reason=f"Device exceeded rate limit of {limit} submissions per hour for this board",
                 metadata={
                     "limit": limit,
-                    "submissions_count": meta.submission_count,
+                    "submissions_count": submission_meta.submission_count,
                     "trust_tier": trust_tier.value,
-                    "window_start": meta.last_submission_at.isoformat(),
+                    "window_start": submission_meta.last_submission_at.isoformat(),
                 },
             )
 
@@ -142,34 +137,29 @@ class AntiCheatService:
     async def _check_duplicate(
         self,
         score: Score,
-        device_id: UUID,
-        board_id: UUID,
+        submission_meta: ScoreSubmissionMeta | None,
     ) -> AntiCheatResult:
         """Check if score is a duplicate of recently submitted score.
 
         Args:
             score: Score being submitted
-            device_id: ID of the device submitting the score
-            board_id: ID of the board being submitted to
+            submission_meta: Pre-fetched submission metadata (or None for first submission)
 
         Returns:
             AntiCheatResult with ACCEPT or FLAG action
         """
-        # Get submission metadata for this device/board
-        meta = await self.meta_repo.get_by_device_and_board(device_id, board_id)
-
         # First submission - always accept
-        if meta is None or meta.last_score_value is None:
+        if submission_meta is None or submission_meta.last_score_value is None:
             return AntiCheatResult(action=FlagAction.ACCEPT)
 
         # Check if score value matches last submission
-        if score.value == meta.last_score_value:
+        if score.value == submission_meta.last_score_value:
             # Check if within duplicate detection window
             now = datetime.now(UTC)
             window_seconds = settings.ANTICHEAT_DUPLICATE_WINDOW_SECONDS
             window_start = now - timedelta(seconds=window_seconds)
 
-            if meta.last_submission_at >= window_start:
+            if submission_meta.last_submission_at >= window_start:
                 # Duplicate within window - flag for review
                 return AntiCheatResult(
                     action=FlagAction.FLAG,
@@ -181,7 +171,7 @@ class AntiCheatService:
                     ),
                     metadata={
                         "score_value": score.value,
-                        "previous_submission_at": meta.last_submission_at.isoformat(),
+                        "previous_submission_at": submission_meta.last_submission_at.isoformat(),
                         "window_seconds": window_seconds,
                     },
                 )
@@ -191,28 +181,23 @@ class AntiCheatService:
 
     async def _check_velocity(
         self,
-        device_id: UUID,
-        board_id: UUID,
+        submission_meta: ScoreSubmissionMeta | None,
     ) -> AntiCheatResult:
         """Check if submissions are happening too rapidly (rapid-fire detection).
 
         Args:
-            device_id: ID of the device submitting scores
-            board_id: ID of the board being submitted to
+            submission_meta: Pre-fetched submission metadata (or None for first submission)
 
         Returns:
             AntiCheatResult with ACCEPT or FLAG action
         """
-        # Get submission metadata for this device/board
-        meta = await self.meta_repo.get_by_device_and_board(device_id, board_id)
-
         # First submission - always accept
-        if meta is None:
+        if submission_meta is None:
             return AntiCheatResult(action=FlagAction.ACCEPT)
 
         # Check time since last submission
         now = datetime.now(UTC)
-        time_since_last = (now - meta.last_submission_at).total_seconds()
+        time_since_last = (now - submission_meta.last_submission_at).total_seconds()
         velocity_threshold = settings.ANTICHEAT_VELOCITY_THRESHOLD_SECONDS
 
         # If submitting too quickly - flag as suspicious
@@ -228,7 +213,7 @@ class AntiCheatService:
                 metadata={
                     "time_since_last_submission": time_since_last,
                     "velocity_threshold": velocity_threshold,
-                    "last_submission_at": meta.last_submission_at.isoformat(),
+                    "last_submission_at": submission_meta.last_submission_at.isoformat(),
                 },
             )
 

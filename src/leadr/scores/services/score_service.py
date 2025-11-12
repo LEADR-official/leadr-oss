@@ -9,7 +9,7 @@ from leadr.boards.services.board_service import BoardService
 from leadr.common.services import BaseService
 from leadr.games.services.game_service import GameService
 from leadr.scores.domain.anti_cheat.enums import FlagAction, TrustTier
-from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
+from leadr.scores.domain.anti_cheat.models import AntiCheatResult, ScoreFlag, ScoreSubmissionMeta
 from leadr.scores.domain.score import Score
 from leadr.scores.services.anti_cheat_repositories import (
     ScoreFlagRepository,
@@ -48,7 +48,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         filter_country: str | None = None,
         filter_city: str | None = None,
         trust_tier: TrustTier = TrustTier.B,
-    ) -> Score:
+    ) -> tuple[Score, AntiCheatResult | None]:
         """Create a new score.
 
         Args:
@@ -65,7 +65,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             trust_tier: Trust tier of the device (defaults to B/medium trust).
 
         Returns:
-            The created Score domain entity.
+            Tuple of (created Score domain entity, AntiCheatResult or None).
 
         Raises:
             EntityNotFoundError: If the board doesn't exist.
@@ -135,47 +135,65 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         # Save score to database
         saved_score = await self.repository.create(score)
 
-        # Post-creation: Update submission metadata and create flags if needed
-        # TODO: Make this async so the client gets a response quicker
-        if device_id is not None and anti_cheat_result is not None:
-            meta_repo = ScoreSubmissionMetaRepository(self.repository.session)
-            now = datetime.now(UTC)
+        return saved_score, anti_cheat_result
 
-            # Get or create submission metadata
-            meta = await meta_repo.get_by_device_and_board(device_id, board_id)
+    async def update_submission_metadata(
+        self,
+        saved_score: Score,
+        device_id: UUID,
+        board_id: UUID,
+        anti_cheat_result: AntiCheatResult | None,
+    ) -> None:
+        """Update submission metadata and create flags if needed.
 
-            if meta is None:
-                # Create new metadata
-                meta = ScoreSubmissionMeta(
-                    score_id=saved_score.id,
-                    device_id=device_id,
-                    board_id=board_id,
-                    submission_count=1,
-                    last_submission_at=now,
-                    last_score_value=score.value,
-                )
-                await meta_repo.create(meta)
-            else:
-                # Update existing metadata
-                meta.score_id = saved_score.id
-                meta.submission_count += 1
-                meta.last_submission_at = now
-                meta.last_score_value = score.value
-                await meta_repo.update(meta)
+        This method is designed to be called as a background task after score creation
+        to avoid blocking the HTTP response.
 
-            # Create flag if score was flagged
-            if anti_cheat_result.action == FlagAction.FLAG:
-                flag_repo = ScoreFlagRepository(self.repository.session)
-                flag = ScoreFlag(
-                    score_id=saved_score.id,
-                    flag_type=anti_cheat_result.flag_type,  # type: ignore[arg-type]
-                    confidence=anti_cheat_result.confidence,  # type: ignore[arg-type]
-                    metadata=anti_cheat_result.metadata or {},
-                    status="PENDING",
-                )
-                await flag_repo.create(flag)
+        Args:
+            saved_score: The score that was created
+            device_id: ID of the device that submitted the score
+            board_id: ID of the board the score was submitted to
+            anti_cheat_result: Result from anti-cheat check (or None)
+        """
+        if anti_cheat_result is None:
+            return
 
-        return saved_score
+        meta_repo = ScoreSubmissionMetaRepository(self.repository.session)
+        now = datetime.now(UTC)
+
+        # Get or create submission metadata
+        meta = await meta_repo.get_by_device_and_board(device_id, board_id)
+
+        if meta is None:
+            # Create new metadata
+            meta = ScoreSubmissionMeta(
+                score_id=saved_score.id,
+                device_id=device_id,
+                board_id=board_id,
+                submission_count=1,
+                last_submission_at=now,
+                last_score_value=saved_score.value,
+            )
+            await meta_repo.create(meta)
+        else:
+            # Update existing metadata
+            meta.score_id = saved_score.id
+            meta.submission_count += 1
+            meta.last_submission_at = now
+            meta.last_score_value = saved_score.value
+            await meta_repo.update(meta)
+
+        # Create flag if score was flagged
+        if anti_cheat_result.action == FlagAction.FLAG:
+            flag_repo = ScoreFlagRepository(self.repository.session)
+            flag = ScoreFlag(
+                score_id=saved_score.id,
+                flag_type=anti_cheat_result.flag_type,  # type: ignore[arg-type]
+                confidence=anti_cheat_result.confidence,  # type: ignore[arg-type]
+                metadata=anti_cheat_result.metadata or {},
+                status="PENDING",
+            )
+            await flag_repo.create(flag)
 
     async def get_score(self, score_id: UUID) -> Score | None:
         """Get a score by its ID.

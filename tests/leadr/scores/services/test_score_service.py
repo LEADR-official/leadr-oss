@@ -57,7 +57,7 @@ class TestScoreService:
 
         # Create score
         score_service = ScoreService(db_session)
-        score = await score_service.create_score(
+        score, _ = await score_service.create_score(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
@@ -113,7 +113,7 @@ class TestScoreService:
 
         # Create score with optional fields
         score_service = ScoreService(db_session)
-        score = await score_service.create_score(
+        score, _ = await score_service.create_score(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
@@ -327,7 +327,7 @@ class TestScoreService:
 
         # Create score
         score_service = ScoreService(db_session)
-        created_score = await score_service.create_score(
+        created_score, _ = await score_service.create_score(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
@@ -519,7 +519,7 @@ class TestScoreService:
 
         # Create score
         score_service = ScoreService(db_session)
-        created_score = await score_service.create_score(
+        created_score, _ = await score_service.create_score(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
@@ -574,7 +574,7 @@ class TestScoreService:
 
         # Create score
         score_service = ScoreService(db_session)
-        created_score = await score_service.create_score(
+        created_score, _ = await score_service.create_score(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
