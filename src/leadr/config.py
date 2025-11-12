@@ -175,6 +175,10 @@ class CommonSettings(BaseSettings):
         default=60,
         description="Interval in seconds for expiring boards (default: 60s)",
     )
+    BACKGROUND_TASK_NONCE_CLEANUP_INTERVAL: int = Field(
+        default=3600,
+        description="Interval in seconds for cleaning up expired nonces (default: 3600s / 1 hour)",
+    )
 
     # Anti-Cheat Configuration
     ANTICHEAT_ENABLED: bool = Field(
