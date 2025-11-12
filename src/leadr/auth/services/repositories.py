@@ -211,6 +211,23 @@ class DeviceSessionRepository(BaseRepository[DeviceSession, DeviceSessionORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
+    async def get_by_refresh_token_hash(self, refresh_token_hash: str) -> DeviceSession | None:
+        """Get session by refresh token hash, returns None if not found or soft-deleted.
+
+        Args:
+            refresh_token_hash: The hashed refresh token
+
+        Returns:
+            DeviceSession if found and not deleted, None otherwise
+        """
+        query = select(DeviceSessionORM).where(
+            DeviceSessionORM.refresh_token_hash == refresh_token_hash,
+            DeviceSessionORM.deleted_at.is_(None),
+        )
+        result = await self.session.execute(query)
+        orm = result.scalar_one_or_none()
+        return self._to_domain(orm) if orm else None
+
     async def filter(
         self,
         account_id: UUID,
