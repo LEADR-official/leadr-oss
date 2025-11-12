@@ -144,8 +144,9 @@ class StartSessionRequest(BaseModel):
 class StartSessionResponse(BaseModel):
     """Response schema for starting a device session.
 
-    Includes the access token which must be saved by the client.
-    The token should be sent in the Authorization header as: Bearer <access_token>
+    Includes both access and refresh tokens which must be saved by the client.
+    - Access token: Short-lived, used for API requests in Authorization header
+    - Refresh token: Long-lived, used to obtain new access tokens when expired
     """
 
     id: UUID = Field(description="Unique identifier for the device")
@@ -156,20 +157,22 @@ class StartSessionResponse(BaseModel):
     status: DeviceStatus = Field(description="Device status (active, suspended, banned)")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Device metadata")
     access_token: str = Field(description="JWT access token for authenticating API requests")
-    expires_in: int = Field(description="Token expiration time in seconds")
+    refresh_token: str = Field(description="JWT refresh token for obtaining new access tokens")
+    expires_in: int = Field(description="Access token expiration time in seconds")
     first_seen_at: datetime = Field(description="Timestamp when device was first seen (UTC)")
     last_seen_at: datetime = Field(description="Timestamp when device was last seen (UTC)")
 
     @classmethod
     def from_domain(
-        cls, device: Device, access_token: str, expires_in: int
+        cls, device: Device, access_token: str, refresh_token: str, expires_in: int
     ) -> "StartSessionResponse":
-        """Convert domain entity to response model with access token.
+        """Convert domain entity to response model with tokens.
 
         Args:
             device: The domain Device entity
             access_token: The plain JWT access token
-            expires_in: Token expiration time in seconds
+            refresh_token: The plain JWT refresh token
+            expires_in: Access token expiration time in seconds
 
         Returns:
             StartSessionResponse with all fields populated
@@ -183,7 +186,29 @@ class StartSessionResponse(BaseModel):
             status=device.status,
             metadata=device.metadata,
             access_token=access_token,
+            refresh_token=refresh_token,
             expires_in=expires_in,
             first_seen_at=device.first_seen_at,
             last_seen_at=device.last_seen_at,
         )
+
+
+class RefreshTokenRequest(BaseModel):
+    """Request schema for refreshing an access token.
+
+    Used by clients when their access token has expired.
+    """
+
+    refresh_token: str = Field(description="JWT refresh token obtained from start_session")
+
+
+class RefreshTokenResponse(BaseModel):
+    """Response schema for token refresh.
+
+    Returns new access and refresh tokens with incremented version.
+    The old refresh token is invalidated and cannot be reused.
+    """
+
+    access_token: str = Field(description="New JWT access token")
+    refresh_token: str = Field(description="New JWT refresh token (old token is invalidated)")
+    expires_in: int = Field(description="Access token expiration time in seconds")
