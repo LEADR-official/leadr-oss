@@ -195,7 +195,6 @@ async def test_game(db_session: AsyncSession, test_account: Account):
         id=game_id,
         account_id=test_account.id,
         name="Test Game",
-        slug=f"test-game-{str(game_id)[:8]}",
         created_at=now,
         updated_at=now,
     )

@@ -135,7 +135,9 @@ class TestProcessDueTemplates:
 
         async def mock_get_db_with_error():
             mock_session = MagicMock()
-            mock_session.execute = AsyncMock(side_effect=OperationalError("DB error", None, None))
+            mock_session.execute = AsyncMock(
+                side_effect=OperationalError("DB error", {}, Exception())
+            )
             yield mock_session
 
         with patch("leadr.boards.services.board_tasks.get_db", mock_get_db_with_error):
@@ -227,7 +229,7 @@ class TestProcessDueTemplates:
             mock_session = MagicMock()
             mock_session.execute = db_session.execute
             mock_session.commit = AsyncMock(
-                side_effect=OperationalError("Commit failed", None, None)
+                side_effect=OperationalError("Commit failed", {}, Exception())
             )
             mock_session.rollback = AsyncMock()
             yield mock_session
@@ -337,7 +339,7 @@ class TestExpireBoards:
 
         async def mock_get_db_with_error():
             mock_session = MagicMock()
-            mock_session.execute = AsyncMock(side_effect=DBAPIError("DB error", None, None))
+            mock_session.execute = AsyncMock(side_effect=DBAPIError("DB error", {}, Exception()))
             yield mock_session
 
         with patch("leadr.boards.services.board_tasks.get_db", mock_get_db_with_error):
@@ -382,7 +384,7 @@ class TestExpireBoards:
         async def mock_get_db_with_commit_error():
             mock_session = MagicMock()
             mock_session.execute = db_session.execute
-            mock_session.commit = AsyncMock(side_effect=DBAPIError("Commit failed", None, None))
+            mock_session.commit = AsyncMock(side_effect=DBAPIError("Commit failed", {}, Exception()))
             mock_session.rollback = AsyncMock()
             yield mock_session
 

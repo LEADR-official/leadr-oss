@@ -1,7 +1,7 @@
 """add board_templates table
 
 Revision ID: bc1ad0d69fd6
-Revises: e39a80493d94
+Revises: 4de10168f638
 Create Date: 2025-11-11 17:33:35.833836
 
 """
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = 'bc1ad0d69fd6'
-down_revision: Union[str, Sequence[str], None] = 'e39a80493d94'
+down_revision: Union[str, Sequence[str], None] = '4de10168f638'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

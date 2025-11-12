@@ -159,10 +159,8 @@ class BoardService(BaseService[Board, BoardRepository]):
         else:  # Default to descending
             sort_direction = SortDirection.DESCENDING
 
-        if keep_strategy_str.lower() == "first" or keep_strategy_str.upper() == "FIRST_ONLY":
-            keep_strategy = KeepStrategy.FIRST_ONLY
-        elif keep_strategy_str.lower() == "last" or keep_strategy_str.upper() == "LAST_ONLY":
-            keep_strategy = KeepStrategy.LAST_ONLY
+        if keep_strategy_str.lower() == "latest" or keep_strategy_str.upper() == "LATEST_ONLY":
+            keep_strategy = KeepStrategy.LATEST_ONLY
         elif keep_strategy_str.lower() == "all" or keep_strategy_str.upper() == "ALL":
             keep_strategy = KeepStrategy.ALL
         else:  # Default to best only
