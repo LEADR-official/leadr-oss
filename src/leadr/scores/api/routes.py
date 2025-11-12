@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.scores.api.schemas import ScoreCreateRequest, ScoreResponse, ScoreUpdateRequest
@@ -15,6 +15,7 @@ router = APIRouter()
 async def create_score(
     request: ScoreCreateRequest,
     service: ScoreServiceDep,
+    background_tasks: BackgroundTasks,
 ) -> ScoreResponse:
     """Create a new score.
 
@@ -26,6 +27,7 @@ async def create_score(
         request: Score creation details including account_id, game_id, board_id,
                 device_id, player_name, value, and optional filters.
         service: Injected score service dependency.
+        background_tasks: FastAPI background tasks for async metadata updates.
 
     Returns:
         ScoreResponse with the created score including auto-generated ID and timestamps.
@@ -36,7 +38,7 @@ async def create_score(
             match board's game).
     """
     try:
-        score = await service.create_score(
+        score, anti_cheat_result = await service.create_score(
             account_id=request.account_id,
             game_id=request.game_id,
             board_id=request.board_id,
@@ -55,6 +57,16 @@ async def create_score(
         ) from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
+
+    # Schedule metadata update as background task (non-blocking)
+    if request.device_id is not None:
+        background_tasks.add_task(
+            service.update_submission_metadata,
+            score,
+            request.device_id,
+            request.board_id,
+            anti_cheat_result,
+        )
 
     return ScoreResponse.from_domain(score)
 

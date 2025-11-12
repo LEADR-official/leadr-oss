@@ -335,7 +335,7 @@ class TestScoreRoutes:
 
         # Create score
         score_service = ScoreService(db_session)
-        score = await score_service.create_score(
+        score, _ = await score_service.create_score(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
@@ -543,7 +543,7 @@ class TestScoreRoutes:
 
         # Create score
         score_service = ScoreService(db_session)
-        score = await score_service.create_score(
+        score, _ = await score_service.create_score(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
@@ -613,7 +613,7 @@ class TestScoreRoutes:
 
         # Create score
         score_service = ScoreService(db_session)
-        score = await score_service.create_score(
+        score, _ = await score_service.create_score(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
@@ -678,7 +678,7 @@ class TestScoreRoutes:
 
         # Create two scores
         score_service = ScoreService(db_session)
-        score1 = await score_service.create_score(
+        score1, _ = await score_service.create_score(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
