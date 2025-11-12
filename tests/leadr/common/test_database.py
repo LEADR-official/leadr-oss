@@ -117,6 +117,8 @@ class TestGetDb:
     @pytest.mark.asyncio
     async def test_get_db_yields_session(self) -> None:
         """Test that get_db yields an AsyncSession."""
+        from leadr.common import database
+
         generator = get_db()
         assert isinstance(generator, AsyncGenerator)
 
@@ -128,10 +130,14 @@ class TestGetDb:
             await generator.__anext__()
         except StopAsyncIteration:
             pass
+        finally:
+            await database.engine.dispose()
 
     @pytest.mark.asyncio
     async def test_get_db_session_cleanup(self) -> None:
         """Test that get_db properly cleans up the session."""
+        from leadr.common import database
+
         generator = get_db()
         session = await generator.__anext__()
 
@@ -146,19 +152,38 @@ class TestGetDb:
         # Session should be closed after generator exits
         assert not session.in_transaction()
 
+        # Dispose engine to avoid event loop issues
+        await database.engine.dispose()
+
     @pytest.mark.asyncio
     async def test_get_db_as_context_manager(self) -> None:
         """Test using get_db in async context manager style."""
-        async for session in get_db():
-            assert isinstance(session, AsyncSession)
-            # Only one iteration should occur
-            break
+        from leadr.common import database
+
+        generator = get_db()
+        try:
+            async for session in generator:
+                assert isinstance(session, AsyncSession)
+                # Only one iteration should occur
+                break
+        finally:
+            await generator.aclose()
+            # Dispose engine to avoid event loop issues
+            await database.engine.dispose()
 
     @pytest.mark.asyncio
     async def test_get_db_session_is_usable(self) -> None:
         """Test that the yielded session can be used for database operations."""
-        async for session in get_db():
-            # Should be able to execute a simple query
-            result = await session.execute(text("SELECT 1"))
-            assert result is not None
-            break
+        from leadr.common import database
+
+        generator = get_db()
+        try:
+            async for session in generator:
+                # Should be able to execute a simple query
+                result = await session.execute(text("SELECT 1"))
+                assert result is not None
+                break
+        finally:
+            await generator.aclose()
+            # Dispose engine to avoid event loop issues
+            await database.engine.dispose()

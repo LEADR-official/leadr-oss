@@ -1,6 +1,6 @@
 """Tests for Device and DeviceSession repository services."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import DeviceORM
-from leadr.auth.domain.device import Device, DeviceStatus
+from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
 from leadr.auth.services.repositories import DeviceRepository
 from leadr.games.adapters.orm import GameORM
 
@@ -251,3 +251,159 @@ class TestDeviceRepository:
         assert len(devices) == 1
         assert devices[0].account_id == account1.id
         assert devices[0].device_id == "device1"
+
+
+@pytest.mark.asyncio
+class TestDeviceSessionRepository:
+    """Test suite for DeviceSessionRepository."""
+
+    async def test_get_by_token_hash(self, db_session: AsyncSession):
+        """Test retrieving a session by access token hash."""
+        # Setup account, game, and device
+        account = AccountORM(id=uuid4(), name="Test Account", slug="test-account")
+        db_session.add(account)
+        await db_session.commit()
+
+        game = GameORM(id=uuid4(), account_id=account.id, name="Test Game")
+        db_session.add(game)
+        await db_session.commit()
+
+        device_orm = DeviceORM(
+            id=uuid4(),
+            game_id=game.id,
+            device_id="test-device",
+            account_id=account.id,
+            first_seen_at=datetime.now(UTC),
+            last_seen_at=datetime.now(UTC),
+        )
+        db_session.add(device_orm)
+        await db_session.commit()
+
+        # Create session
+        now = datetime.now(UTC)
+        from leadr.auth.services.repositories import DeviceSessionRepository
+
+        repository = DeviceSessionRepository(db_session)
+        session = DeviceSession(
+            device_id=device_orm.id,
+            access_token_hash="test_access_hash",
+            refresh_token_hash="test_refresh_hash",
+            expires_at=now + timedelta(hours=1),
+            refresh_expires_at=now + timedelta(days=30),
+        )
+        created_session = await repository.create(session)
+
+        # Retrieve by access token hash
+        retrieved = await repository.get_by_token_hash("test_access_hash")
+
+        assert retrieved is not None
+        assert retrieved.id == created_session.id
+        assert retrieved.access_token_hash == "test_access_hash"
+
+    async def test_get_by_token_hash_not_found(self, db_session: AsyncSession):
+        """Test that get_by_token_hash returns None for non-existent hash."""
+        from leadr.auth.services.repositories import DeviceSessionRepository
+
+        repository = DeviceSessionRepository(db_session)
+        session = await repository.get_by_token_hash("nonexistent_hash")
+
+        assert session is None
+
+    async def test_get_by_refresh_token_hash(self, db_session: AsyncSession):
+        """Test retrieving a session by refresh token hash."""
+        # Setup account, game, and device
+        account = AccountORM(id=uuid4(), name="Test Account", slug="test-account")
+        db_session.add(account)
+        await db_session.commit()
+
+        game = GameORM(id=uuid4(), account_id=account.id, name="Test Game")
+        db_session.add(game)
+        await db_session.commit()
+
+        device_orm = DeviceORM(
+            id=uuid4(),
+            game_id=game.id,
+            device_id="test-device",
+            account_id=account.id,
+            first_seen_at=datetime.now(UTC),
+            last_seen_at=datetime.now(UTC),
+        )
+        db_session.add(device_orm)
+        await db_session.commit()
+
+        # Create session with refresh token
+        now = datetime.now(UTC)
+        from leadr.auth.services.repositories import DeviceSessionRepository
+
+        repository = DeviceSessionRepository(db_session)
+        session = DeviceSession(
+            device_id=device_orm.id,
+            access_token_hash="test_access_hash",
+            refresh_token_hash="unique_refresh_hash",
+            token_version=1,
+            expires_at=now + timedelta(hours=1),
+            refresh_expires_at=now + timedelta(days=30),
+        )
+        created_session = await repository.create(session)
+
+        # Retrieve by refresh token hash
+        retrieved = await repository.get_by_refresh_token_hash("unique_refresh_hash")
+
+        assert retrieved is not None
+        assert retrieved.id == created_session.id
+        assert retrieved.refresh_token_hash == "unique_refresh_hash"
+        assert retrieved.token_version == 1
+
+    async def test_get_by_refresh_token_hash_not_found(self, db_session: AsyncSession):
+        """Test that get_by_refresh_token_hash returns None for non-existent hash."""
+        from leadr.auth.services.repositories import DeviceSessionRepository
+
+        repository = DeviceSessionRepository(db_session)
+        session = await repository.get_by_refresh_token_hash("nonexistent_refresh_hash")
+
+        assert session is None
+
+    async def test_get_by_refresh_token_hash_excludes_soft_deleted(self, db_session: AsyncSession):
+        """Test that get_by_refresh_token_hash excludes soft-deleted sessions."""
+        # Setup account, game, and device
+        account = AccountORM(id=uuid4(), name="Test Account", slug="test-account")
+        db_session.add(account)
+        await db_session.commit()
+
+        game = GameORM(id=uuid4(), account_id=account.id, name="Test Game")
+        db_session.add(game)
+        await db_session.commit()
+
+        device_orm = DeviceORM(
+            id=uuid4(),
+            game_id=game.id,
+            device_id="test-device",
+            account_id=account.id,
+            first_seen_at=datetime.now(UTC),
+            last_seen_at=datetime.now(UTC),
+        )
+        db_session.add(device_orm)
+        await db_session.commit()
+
+        # Create and then soft-delete session
+        now = datetime.now(UTC)
+        from leadr.auth.services.repositories import DeviceSessionRepository
+
+        repository = DeviceSessionRepository(db_session)
+        session = DeviceSession(
+            device_id=device_orm.id,
+            access_token_hash="test_access_hash",
+            refresh_token_hash="deleted_refresh_hash",
+            expires_at=now + timedelta(hours=1),
+            refresh_expires_at=now + timedelta(days=30),
+        )
+        created_session = await repository.create(session)
+
+        # Soft delete
+        created_session.deleted_at = datetime.now(UTC)
+        await repository.update(created_session)
+
+        # Try to retrieve - should return None
+        retrieved = await repository.get_by_refresh_token_hash("deleted_refresh_hash")
+
+        assert retrieved is None

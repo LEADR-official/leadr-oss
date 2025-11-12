@@ -227,6 +227,33 @@ async def test_game(db_session: AsyncSession, test_account: Account):
 
 
 @pytest_asyncio.fixture
+async def test_device(db_session: AsyncSession, test_account: Account, test_game):
+    """Create a test device for use in tests.
+
+    Returns:
+        The created Device domain entity.
+    """
+    from leadr.auth.domain.device import Device
+    from leadr.auth.services.repositories import DeviceRepository
+
+    device_repo = DeviceRepository(db_session)
+    device_id = uuid4()
+    now = datetime.now(UTC)
+
+    device = Device(
+        id=device_id,
+        account_id=test_account.id,
+        game_id=test_game.id,
+        device_id="test-device-001",
+        first_seen_at=now,
+        last_seen_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    return await device_repo.create(device)
+
+
+@pytest_asyncio.fixture
 async def test_board(db_session: AsyncSession, test_account: Account, test_game):
     """Create a test board for use in tests.
 
@@ -259,7 +286,7 @@ async def test_board(db_session: AsyncSession, test_account: Account, test_game)
 
 @pytest_asyncio.fixture
 async def test_score(
-    db_session: AsyncSession, test_account: Account, test_game, test_board, test_user
+    db_session: AsyncSession, test_account: Account, test_game, test_board, test_device
 ):
     """Create a test score for use in tests.
 
@@ -278,8 +305,8 @@ async def test_score(
         account_id=test_account.id,
         game_id=test_game.id,
         board_id=test_board.id,
-        user_id=test_user.id,
-        player_name=test_user.display_name,
+        device_id=test_device.id,
+        player_name="Test Player",
         value=1000.0,
         created_at=now,
         updated_at=now,

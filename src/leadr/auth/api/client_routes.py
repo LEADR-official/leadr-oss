@@ -2,8 +2,15 @@
 
 from fastapi import APIRouter, HTTPException, status
 
-from leadr.auth.api.schemas import StartSessionRequest, StartSessionResponse
-from leadr.auth.services.dependencies import DeviceServiceDep
+from leadr.auth.api.schemas import (
+    NonceResponse,
+    RefreshTokenRequest,
+    RefreshTokenResponse,
+    StartSessionRequest,
+    StartSessionResponse,
+)
+from leadr.auth.dependencies import DeviceTokenDep
+from leadr.auth.services.dependencies import DeviceServiceDep, NonceServiceDep
 from leadr.common.domain.exceptions import EntityNotFoundError
 
 router = APIRouter()
@@ -38,7 +45,7 @@ async def start_session(
         422: Invalid request (missing required fields, invalid UUID format)
     """
     try:
-        device, access_token, expires_in = await service.start_session(
+        device, access_token, refresh_token, expires_in = await service.start_session(
             game_id=request.game_id,
             device_id=request.device_id,
             platform=request.platform,
@@ -50,4 +57,91 @@ async def start_session(
             detail=str(e),
         ) from None
 
-    return StartSessionResponse.from_domain(device, access_token, expires_in)
+    return StartSessionResponse.from_domain(device, access_token, refresh_token, expires_in)
+
+
+@router.post(
+    "/client/sessions/refresh",
+    response_model=RefreshTokenResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def refresh_session(
+    request: RefreshTokenRequest,
+    service: DeviceServiceDep,
+) -> RefreshTokenResponse:
+    """Refresh an expired access token using a valid refresh token.
+
+    This endpoint implements token rotation for security:
+    - Returns new access and refresh tokens
+    - Increments the token version
+    - Invalidates the old refresh token (prevents replay attacks)
+
+    No authentication is required (the refresh token itself is the credential).
+
+    Args:
+        request: Refresh token request
+        service: DeviceService dependency
+
+    Returns:
+        RefreshTokenResponse with new tokens
+
+    Raises:
+        401: Invalid or expired refresh token
+        422: Invalid request (missing refresh_token)
+    """
+    result = await service.refresh_access_token(request.refresh_token)
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    access_token, refresh_token, expires_in = result
+
+    return RefreshTokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=expires_in,
+    )
+
+
+@router.get(
+    "/client/nonce",
+    response_model=NonceResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def generate_nonce(
+    device: DeviceTokenDep,
+    service: NonceServiceDep,
+) -> NonceResponse:
+    """Generate a fresh nonce for replay protection.
+
+    Nonces are single-use tokens with short TTL (60 seconds) that clients must
+    obtain before making mutating requests (POST, PATCH, DELETE). This prevents
+    replay attacks by ensuring each request is fresh and authorized.
+
+    Requires device authentication via access token.
+
+    Args:
+        device: Authenticated device from require_device_token dependency
+        service: NonceService dependency
+
+    Returns:
+        NonceResponse with nonce_value and expires_at
+
+    Raises:
+        401: Invalid or missing device token
+
+    Example:
+        1. Client calls GET /client/nonce with Authorization header
+        2. Server returns nonce_value and expires_at
+        3. Client includes nonce in leadr-client-nonce header for mutations
+        4. Server validates and consumes nonce (single-use)
+    """
+    nonce_value, expires_at = await service.generate_nonce(device_id=device.id)
+
+    return NonceResponse(
+        nonce_value=nonce_value,
+        expires_at=expires_at,
+    )

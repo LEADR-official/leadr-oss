@@ -11,7 +11,7 @@ class Score(Entity):
     """
     Score represents a player's score submission for a board.
 
-    Scores are immutable in terms of their associations (account, game, board, user)
+    Scores are immutable in terms of their associations (account, game, board, device)
     but mutable in terms of their value and metadata for corrections/updates.
     """
 
@@ -24,8 +24,8 @@ class Score(Entity):
     board_id: UUID = Field(
         frozen=True, description="ID of the board this score belongs to (immutable)"
     )
-    user_id: UUID = Field(
-        frozen=True, description="ID of the user who submitted this score (immutable)"
+    device_id: UUID = Field(
+        frozen=True, description="ID of the device that submitted this score (immutable)"
     )
     player_name: str = Field(description="Display name of the player")
     value: float = Field(description="Numeric value of the score for sorting/comparison")

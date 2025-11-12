@@ -2,11 +2,15 @@
 
 from typing import Annotated
 
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 
 from leadr.auth.domain.api_key import APIKey
 from leadr.auth.domain.device import Device
-from leadr.auth.services.dependencies import APIKeyServiceDep, DeviceServiceDep
+from leadr.auth.services.dependencies import (
+    APIKeyServiceDep,
+    DeviceServiceDep,
+    NonceServiceDep,
+)
 
 
 async def require_api_key(
@@ -105,3 +109,69 @@ async def require_device_token(
         )
 
     return validated_device
+
+
+async def require_nonce(
+    device: Device,
+    service: NonceServiceDep,
+    leadr_client_nonce: Annotated[str | None, Header(alias="leadr-client-nonce")] = None,
+) -> bool:
+    """Require and validate nonce for replay protection.
+
+    This dependency validates the nonce from the 'leadr-client-nonce' header
+    and consumes it (marks as used). Each nonce can only be used once.
+
+    Args:
+        device: The authenticated device entity.
+        service: NonceService dependency.
+        leadr_client_nonce: The nonce value from the 'leadr-client-nonce' header.
+
+    Returns:
+        True if nonce is valid and was successfully consumed.
+
+    Raises:
+        HTTPException: 412 Precondition Failed if nonce is missing, invalid,
+            expired, already used, or belongs to a different device.
+
+    Example:
+        >>> @router.post("/protected")
+        >>> async def protected_endpoint(
+        >>>     device: DeviceTokenDep,
+        >>>     nonce_valid: Annotated[bool, Depends(require_nonce)]
+        >>> ):
+        >>>     return {"status": "success"}
+    """
+    if leadr_client_nonce is None:
+        raise HTTPException(
+            status_code=412,
+            detail="Nonce required",
+        )
+
+    try:
+        await service.validate_and_consume_nonce(
+            nonce_value=leadr_client_nonce,
+            device_id=device.id,
+        )
+        return True
+    except ValueError as e:
+        error_msg = str(e).lower()
+
+        if "not found" in error_msg:
+            detail = "Invalid nonce"
+        elif "does not belong" in error_msg:
+            detail = "Nonce does not belong to this device"
+        elif "already used" in error_msg:
+            detail = "Nonce already used"
+        elif "expired" in error_msg:
+            detail = "Nonce expired"
+        else:
+            detail = "Invalid nonce"
+
+        raise HTTPException(
+            status_code=412,
+            detail=detail,
+        ) from None
+
+
+# Type aliases for dependency injection
+DeviceTokenDep = Annotated[Device, Depends(require_device_token)]

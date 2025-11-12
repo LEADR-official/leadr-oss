@@ -17,13 +17,13 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -32,7 +32,7 @@ class TestScore:
         assert score.account_id == account_id
         assert score.game_id == game_id
         assert score.board_id == board_id
-        assert score.user_id == user_id
+        assert score.device_id == device_id
         assert score.player_name == "SpeedRunner99"
         assert score.value == 123.45
         assert score.value_display is None
@@ -49,13 +49,13 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
             value_display="2:03.45",
@@ -74,14 +74,14 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         with pytest.raises(ValidationError) as exc_info:
             Score(  # type: ignore[call-arg]
                 account_id=account_id,
                 game_id=game_id,
                 board_id=board_id,
-                user_id=user_id,
+                device_id=device_id,
                 value=123.45,
             )
 
@@ -92,14 +92,14 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         with pytest.raises(ValidationError) as exc_info:
             Score(  # type: ignore[call-arg]
                 account_id=account_id,
                 game_id=game_id,
                 board_id=board_id,
-                user_id=user_id,
+                device_id=device_id,
                 player_name="SpeedRunner99",
             )
 
@@ -110,14 +110,14 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         with pytest.raises(ValidationError) as exc_info:
             Score(
                 account_id=account_id,
                 game_id=game_id,
                 board_id=board_id,
-                user_id=user_id,
+                device_id=device_id,
                 player_name="",
                 value=123.45,
             )
@@ -129,14 +129,14 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         with pytest.raises(ValidationError) as exc_info:
             Score(
                 account_id=account_id,
                 game_id=game_id,
                 board_id=board_id,
-                user_id=user_id,
+                device_id=device_id,
                 player_name="   ",
                 value=123.45,
             )
@@ -148,13 +148,13 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="  SpeedRunner99  ",
             value=123.45,
         )
@@ -166,13 +166,13 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -187,13 +187,13 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -208,13 +208,13 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -224,24 +224,24 @@ class TestScore:
 
         assert "frozen" in str(exc_info.value).lower()
 
-    def test_user_id_is_immutable(self):
-        """Test that user_id cannot be modified after creation."""
+    def test_device_id_is_immutable(self):
+        """Test that device_id cannot be modified after creation."""
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
         )
 
         with pytest.raises(ValidationError) as exc_info:
-            score.user_id = uuid4()
+            score.device_id = uuid4()
 
         assert "frozen" in str(exc_info.value).lower()
 
@@ -250,13 +250,13 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -269,13 +269,13 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -288,7 +288,7 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
         score_id = uuid4()
         created_at = datetime.now(UTC)
 
@@ -297,7 +297,7 @@ class TestScore:
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
             created_at=created_at,
@@ -309,7 +309,7 @@ class TestScore:
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="DifferentName",
             value=999.99,
             created_at=created_at,
@@ -323,13 +323,13 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -346,13 +346,13 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -371,13 +371,13 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -395,13 +395,13 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=100,
         )
@@ -414,13 +414,13 @@ class TestScore:
         account_id = uuid4()
         game_id = uuid4()
         board_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
 
         score = Score(
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=-50.5,
         )

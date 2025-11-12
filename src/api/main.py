@@ -12,6 +12,7 @@ from leadr.accounts.api.routes import router as accounts_router
 from leadr.auth.api.client_routes import router as client_auth_router
 from leadr.auth.api.routes import router as auth_router
 from leadr.auth.dependencies import require_api_key
+from leadr.auth.services.nonce_tasks import cleanup_expired_nonces
 from leadr.boards.api.routes import router as boards_router
 from leadr.boards.services.board_tasks import expire_boards, process_due_templates
 from leadr.common.api.exceptions import entity_not_found_handler
@@ -53,6 +54,11 @@ async def lifespan(app: FastAPI):
         "expire-boards",
         expire_boards,
         interval_seconds=settings.BACKGROUND_TASK_EXPIRE_INTERVAL,
+    )
+    scheduler.add_task(
+        "cleanup-expired-nonces",
+        cleanup_expired_nonces,
+        interval_seconds=settings.BACKGROUND_TASK_NONCE_CLEANUP_INTERVAL,
     )
     await scheduler.start()
 

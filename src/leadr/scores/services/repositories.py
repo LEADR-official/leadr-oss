@@ -21,7 +21,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             account_id=orm.account_id,
             game_id=orm.game_id,
             board_id=orm.board_id,
-            user_id=orm.user_id,
+            device_id=orm.device_id,
             player_name=orm.player_name,
             value=orm.value,
             value_display=orm.value_display,
@@ -40,7 +40,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             account_id=entity.account_id,
             game_id=entity.game_id,
             board_id=entity.board_id,
-            user_id=entity.user_id,
+            device_id=entity.device_id,
             player_name=entity.player_name,
             value=entity.value,
             value_display=entity.value_display,
@@ -61,7 +61,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         account_id: UUID4,
         board_id: UUID | None = None,
         game_id: UUID | None = None,
-        user_id: UUID | None = None,
+        device_id: UUID | None = None,
         **kwargs: Any,
     ) -> list[Score]:
         """Filter scores by account and optional criteria.
@@ -70,7 +70,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
             board_id: Optional board ID to filter by
             game_id: Optional game ID to filter by
-            user_id: Optional user ID to filter by
+            device_id: Optional device ID to filter by
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
@@ -88,8 +88,8 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         if game_id is not None:
             query = query.where(ScoreORM.game_id == game_id)
 
-        if user_id is not None:
-            query = query.where(ScoreORM.user_id == user_id)
+        if device_id is not None:
+            query = query.where(ScoreORM.device_id == device_id)
 
         result = await self.session.execute(query)
         orms = result.scalars().all()

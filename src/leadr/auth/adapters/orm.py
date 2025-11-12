@@ -5,10 +5,11 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, String
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
+from leadr.auth.domain.nonce import Nonce, NonceStatus
 from leadr.common.orm import Base
 
 if TYPE_CHECKING:
@@ -129,6 +130,10 @@ class DeviceORM(Base):
         back_populates="device",
         cascade="all, delete-orphan",
     )
+    nonces: Mapped[list["NonceORM"]] = relationship(
+        "NonceORM",
+        cascade="all, delete-orphan",
+    )
 
     # Indexes
     __table_args__ = (
@@ -177,7 +182,7 @@ class DeviceSessionORM(Base):
 
     Represents an active authentication session for a device in the database.
     Maps to the device_sessions table with foreign key to devices.
-    Sessions have an expiration time and can be manually revoked.
+    Sessions include both access and refresh tokens with token rotation support.
     """
 
     __tablename__ = "device_sessions"
@@ -192,7 +197,23 @@ class DeviceSessionORM(Base):
         nullable=False,
         index=True,
     )
+    refresh_token_hash: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        index=True,
+    )
+    token_version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
     expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    refresh_expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         index=True,
@@ -223,7 +244,10 @@ class DeviceSessionORM(Base):
             deleted_at=session.deleted_at,
             device_id=session.device_id,
             access_token_hash=session.access_token_hash,
+            refresh_token_hash=session.refresh_token_hash,
+            token_version=session.token_version,
             expires_at=session.expires_at,
+            refresh_expires_at=session.refresh_expires_at,
             ip_address=session.ip_address,
             user_agent=session.user_agent,
             revoked_at=session.revoked_at,
@@ -238,8 +262,99 @@ class DeviceSessionORM(Base):
             deleted_at=self.deleted_at,
             device_id=self.device_id,
             access_token_hash=self.access_token_hash,
+            refresh_token_hash=self.refresh_token_hash,
+            token_version=self.token_version,
             expires_at=self.expires_at,
+            refresh_expires_at=self.refresh_expires_at,
             ip_address=self.ip_address,
             user_agent=self.user_agent,
             revoked_at=self.revoked_at,
+        )
+
+
+class NonceStatusEnum(str, enum.Enum):
+    """Nonce status enum for database."""
+
+    PENDING = "pending"
+    USED = "used"
+    EXPIRED = "expired"
+
+
+class NonceORM(Base):
+    """Nonce ORM model.
+
+    Represents a single-use nonce for replay protection in the database.
+    Maps to the nonces table with foreign key to devices.
+    Nonces are short-lived tokens (typically 60 seconds) that must be
+    obtained before making mutating requests.
+    """
+
+    __tablename__ = "nonces"
+
+    device_id: Mapped[UUID] = mapped_column(
+        ForeignKey("devices.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    nonce_value: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    status: Mapped[NonceStatusEnum] = mapped_column(
+        Enum(
+            NonceStatusEnum,
+            name="nonce_status",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=NonceStatusEnum.PENDING,
+        server_default="pending",
+    )
+
+    # Relationships
+    device: Mapped["DeviceORM"] = relationship("DeviceORM", overlaps="nonces")
+
+    @classmethod
+    def from_domain(cls, nonce: Nonce) -> "NonceORM":
+        """Convert Nonce domain entity to ORM model."""
+        return cls(
+            id=nonce.id,
+            created_at=nonce.created_at,
+            updated_at=nonce.updated_at,
+            deleted_at=nonce.deleted_at,
+            device_id=nonce.device_id,
+            nonce_value=nonce.nonce_value,
+            expires_at=nonce.expires_at,
+            used_at=nonce.used_at,
+            status=NonceStatusEnum(nonce.status.value),
+        )
+
+    def to_domain(self) -> Nonce:
+        """Convert ORM model to Nonce domain entity."""
+        # Handle both string and enum status values
+        status_value = (
+            self.status.value if isinstance(self.status, NonceStatusEnum) else self.status
+        )
+        return Nonce(
+            id=self.id,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+            deleted_at=self.deleted_at,
+            device_id=self.device_id,
+            nonce_value=self.nonce_value,
+            expires_at=self.expires_at,
+            used_at=self.used_at,
+            status=NonceStatus(status_value),
         )
