@@ -61,6 +61,7 @@ class UserORM(Base):
     )
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String, nullable=False)
+    super_admin: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
 
     # Relationships
     account: Mapped["AccountORM"] = relationship(back_populates="users")

@@ -222,6 +222,7 @@ async def update_user(
         user_id=user_id,
         email=request.email,
         display_name=request.display_name,
+        super_admin=request.super_admin,
     )
 
     return UserResponse.from_domain(user)

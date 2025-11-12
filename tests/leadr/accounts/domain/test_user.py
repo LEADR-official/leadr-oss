@@ -242,3 +242,63 @@ class TestUser:
         user.restore()
         assert user.is_deleted is False
         assert user.deleted_at is None
+
+    def test_user_super_admin_defaults_to_false(self):
+        """Test that super_admin defaults to False when not specified."""
+        user_id = uuid4()
+        account_id = uuid4()
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.super_admin is False
+
+    def test_user_can_be_created_as_super_admin(self):
+        """Test that super_admin can be set to True."""
+        user_id = uuid4()
+        account_id = uuid4()
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="admin@example.com",
+            display_name="Super Admin",
+            super_admin=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.super_admin is True
+
+    def test_user_super_admin_can_be_updated(self):
+        """Test that super_admin flag can be updated after creation."""
+        user_id = uuid4()
+        account_id = uuid4()
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.super_admin is False
+
+        # Update to superadmin
+        user.super_admin = True
+        assert user.super_admin is True
+
+        # Can be revoked
+        user.super_admin = False
+        assert user.super_admin is False

@@ -89,6 +89,7 @@ class UserRepository(BaseRepository[User, UserORM]):
             account_id=orm.account_id,
             email=orm.email,
             display_name=orm.display_name,
+            super_admin=orm.super_admin,
             created_at=orm.created_at,
             updated_at=orm.updated_at,
             deleted_at=orm.deleted_at,
@@ -101,6 +102,7 @@ class UserRepository(BaseRepository[User, UserORM]):
             account_id=entity.account_id,
             email=entity.email,
             display_name=entity.display_name,
+            super_admin=entity.super_admin,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,
@@ -132,6 +134,21 @@ class UserRepository(BaseRepository[User, UserORM]):
         # Future: Add additional filters here as needed
         # if "status" in kwargs:
         #     query = query.where(UserORM.status == kwargs["status"])
+
+        result = await self.session.execute(query)
+        orms = result.scalars().all()
+        return [self._to_domain(orm) for orm in orms]
+
+    async def find_superadmins(self) -> list[User]:
+        """Find all superadmin users.
+
+        Returns:
+            List of all users with super_admin=True (not deleted).
+        """
+        query = select(UserORM).where(
+            UserORM.super_admin.is_(True),
+            UserORM.deleted_at.is_(None),
+        )
 
         result = await self.session.execute(query)
         orms = result.scalars().all()

@@ -333,3 +333,148 @@ class TestUserService:
             await service.delete_user(non_existent_id)
 
         assert "User not found" in str(exc_info.value)
+
+    async def test_create_superadmin_user(self, db_session: AsyncSession):
+        """Test creating a user with superadmin privileges."""
+        # Create account first
+        account_repo = AccountRepository(db_session)
+        account_id = uuid4()
+
+        account = Account(
+            id=account_id,
+            name="LEADR",
+            slug="leadr",
+            status=AccountStatus.ACTIVE,
+        )
+        await account_repo.create(account)
+
+        # Create superadmin user
+        service = UserService(db_session)
+        user = await service.create_user(
+            account_id=account_id,
+            email="admin@leadr.gg",
+            display_name="LEADR Admin",
+            super_admin=True,
+        )
+
+        assert user.account_id == account_id
+        assert user.email == "admin@leadr.gg"
+        assert user.super_admin is True
+
+    async def test_find_superadmins(self, db_session: AsyncSession):
+        """Test finding all superadmin users."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = uuid4()
+
+        account = Account(
+            id=account_id,
+            name="LEADR",
+            slug="leadr",
+            status=AccountStatus.ACTIVE,
+        )
+        await account_repo.create(account)
+
+        service = UserService(db_session)
+
+        # Create regular user
+        await service.create_user(
+            account_id=account_id,
+            email="user@example.com",
+            display_name="Regular User",
+            super_admin=False,
+        )
+
+        # Create superadmin users
+        superadmin1 = await service.create_user(
+            account_id=account_id,
+            email="admin1@leadr.gg",
+            display_name="Admin 1",
+            super_admin=True,
+        )
+
+        superadmin2 = await service.create_user(
+            account_id=account_id,
+            email="admin2@leadr.gg",
+            display_name="Admin 2",
+            super_admin=True,
+        )
+
+        # Find all superadmins
+        superadmins = await service.find_superadmins()
+
+        assert len(superadmins) == 2
+        superadmin_ids = {sa.id for sa in superadmins}
+        assert superadmin1.id in superadmin_ids
+        assert superadmin2.id in superadmin_ids
+
+    async def test_superadmin_exists_true(self, db_session: AsyncSession):
+        """Test that superadmin_exists returns True when superadmin exists."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = uuid4()
+
+        account = Account(
+            id=account_id,
+            name="LEADR",
+            slug="leadr",
+            status=AccountStatus.ACTIVE,
+        )
+        await account_repo.create(account)
+
+        service = UserService(db_session)
+
+        # Create superadmin
+        await service.create_user(
+            account_id=account_id,
+            email="admin@leadr.gg",
+            display_name="LEADR Admin",
+            super_admin=True,
+        )
+
+        # Check if superadmin exists
+        exists = await service.superadmin_exists()
+        assert exists is True
+
+    async def test_superadmin_exists_false(self, db_session: AsyncSession):
+        """Test that superadmin_exists returns False when no superadmin exists."""
+        service = UserService(db_session)
+
+        # Check if superadmin exists (should be False)
+        exists = await service.superadmin_exists()
+        assert exists is False
+
+    async def test_find_superadmins_excludes_deleted(self, db_session: AsyncSession):
+        """Test that find_superadmins excludes soft-deleted users."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = uuid4()
+
+        account = Account(
+            id=account_id,
+            name="LEADR",
+            slug="leadr",
+            status=AccountStatus.ACTIVE,
+        )
+        await account_repo.create(account)
+
+        service = UserService(db_session)
+
+        # Create superadmin
+        superadmin = await service.create_user(
+            account_id=account_id,
+            email="admin@leadr.gg",
+            display_name="LEADR Admin",
+            super_admin=True,
+        )
+
+        # Delete the superadmin
+        await service.delete_user(superadmin.id)
+
+        # Find superadmins (should be empty)
+        superadmins = await service.find_superadmins()
+        assert len(superadmins) == 0
+
+        # superadmin_exists should return False
+        exists = await service.superadmin_exists()
+        assert exists is False

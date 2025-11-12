@@ -132,6 +132,32 @@ class CommonSettings(BaseSettings):
         description="Secret pepper for API key hashing. MUST be changed in production.",
     )
 
+    # Superadmin Bootstrap Configuration
+    SUPERADMIN_ACCOUNT_NAME: str = Field(
+        default="LEADR",
+        description="Name of the system account for superadmin users",
+    )
+    SUPERADMIN_ACCOUNT_SLUG: str = Field(
+        default="leadr",
+        description="URL-friendly slug for the superadmin system account",
+    )
+    SUPERADMIN_EMAIL: str = Field(
+        default="admin@leadr.gg",
+        description="Email address for the superadmin user",
+    )
+    SUPERADMIN_DISPLAY_NAME: str = Field(
+        default="LEADR Admin",
+        description="Display name for the superadmin user",
+    )
+    SUPERADMIN_API_KEY: str = Field(
+        default=...,
+        description="API key for the superadmin user. REQUIRED for bootstrap.",
+    )
+    SUPERADMIN_API_KEY_NAME: str = Field(
+        default="Superadmin Key",
+        description="Display name for the superadmin API key",
+    )
+
     # Crypto/Keys Configuration
     KEYS_PATH: Path = Field(
         default=PROJ_ROOT / ".keys",
@@ -263,6 +289,11 @@ class TestSettings(CommonSettings):
     Used automatically when ENV='TEST' (set by test.sh script).
     Test-specific overrides can be added here.
     """
+
+    SUPERADMIN_API_KEY: str = Field(
+        default="ldr_test_superadmin_key_for_testing_12345678",
+        description="Test superadmin API key (must start with ldr_)",
+    )
 
 
 settings = (
