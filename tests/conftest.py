@@ -27,7 +27,7 @@ from leadr.common.database import get_db
 from leadr.common.orm import Base
 from leadr.config import settings
 from leadr.games.adapters.orm import GameORM  # noqa: F401
-from leadr.scores.adapters.orm import ScoreORM  # noqa: F401
+from leadr.scores.adapters.orm import ScoreFlagORM, ScoreORM, ScoreSubmissionMetaORM  # noqa: F401
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -178,6 +178,31 @@ async def test_account(db_session: AsyncSession) -> Account:
 
 
 @pytest_asyncio.fixture
+async def test_user(db_session: AsyncSession, test_account: Account):
+    """Create a test user for use in tests.
+
+    Returns:
+        The created User domain entity.
+    """
+    from leadr.accounts.domain.user import User
+    from leadr.accounts.services.repositories import UserRepository
+
+    user_repo = UserRepository(db_session)
+    user_id = uuid4()
+    now = datetime.now(UTC)
+
+    user = User(
+        id=user_id,
+        account_id=test_account.id,
+        email=f"test-user-{str(user_id)[:8]}@example.com",
+        display_name="Test User",
+        created_at=now,
+        updated_at=now,
+    )
+    return await user_repo.create(user)
+
+
+@pytest_asyncio.fixture
 async def test_game(db_session: AsyncSession, test_account: Account):
     """Create a test game for use in tests.
 
@@ -199,6 +224,67 @@ async def test_game(db_session: AsyncSession, test_account: Account):
         updated_at=now,
     )
     return await game_repo.create(game)
+
+
+@pytest_asyncio.fixture
+async def test_board(db_session: AsyncSession, test_account: Account, test_game):
+    """Create a test board for use in tests.
+
+    Returns:
+        The created Board domain entity.
+    """
+    from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+    from leadr.boards.services.repositories import BoardRepository
+
+    board_repo = BoardRepository(db_session)
+    board_id = uuid4()
+    now = datetime.now(UTC)
+
+    board = Board(
+        id=board_id,
+        account_id=test_account.id,
+        game_id=test_game.id,
+        name="Test Board",
+        icon="trophy",
+        short_code=f"TEST{str(board_id)[:6]}".upper(),
+        unit="points",
+        is_active=True,
+        sort_direction=SortDirection.DESCENDING,
+        keep_strategy=KeepStrategy.BEST_ONLY,
+        created_at=now,
+        updated_at=now,
+    )
+    return await board_repo.create(board)
+
+
+@pytest_asyncio.fixture
+async def test_score(
+    db_session: AsyncSession, test_account: Account, test_game, test_board, test_user
+):
+    """Create a test score for use in tests.
+
+    Returns:
+        The created Score domain entity.
+    """
+    from leadr.scores.domain.score import Score
+    from leadr.scores.services.repositories import ScoreRepository
+
+    score_repo = ScoreRepository(db_session)
+    score_id = uuid4()
+    now = datetime.now(UTC)
+
+    score = Score(
+        id=score_id,
+        account_id=test_account.id,
+        game_id=test_game.id,
+        board_id=test_board.id,
+        user_id=test_user.id,
+        player_name=test_user.display_name,
+        value=1000.0,
+        created_at=now,
+        updated_at=now,
+    )
+    return await score_repo.create(score)
 
 
 @pytest_asyncio.fixture

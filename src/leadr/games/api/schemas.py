@@ -19,6 +19,9 @@ class GameCreateRequest(BaseModel):
     default_board_id: UUID | None = Field(
         default=None, description="Optional ID of the default leaderboard for this game"
     )
+    anti_cheat_enabled: bool = Field(
+        default=True, description="Whether anti-cheat is enabled for this game (defaults to True)"
+    )
 
 
 class GameUpdateRequest(BaseModel):
@@ -28,6 +31,9 @@ class GameUpdateRequest(BaseModel):
     steam_app_id: str | None = Field(default=None, description="Updated Steam App ID")
     default_board_id: UUID | None = Field(
         default=None, description="Updated default leaderboard ID"
+    )
+    anti_cheat_enabled: bool | None = Field(
+        default=None, description="Whether anti-cheat is enabled for this game"
     )
     deleted: bool | None = Field(default=None, description="Set to true to soft delete the game")
 
@@ -44,6 +50,7 @@ class GameResponse(BaseModel):
     default_board_id: UUID | None = Field(
         default=None, description="ID of the default leaderboard, or null if not set"
     )
+    anti_cheat_enabled: bool = Field(description="Whether anti-cheat is enabled for this game")
     created_at: datetime = Field(description="Timestamp when the game was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -63,6 +70,7 @@ class GameResponse(BaseModel):
             name=game.name,
             steam_app_id=game.steam_app_id,
             default_board_id=game.default_board_id,
+            anti_cheat_enabled=game.anti_cheat_enabled,
             created_at=game.created_at,
             updated_at=game.updated_at,
         )

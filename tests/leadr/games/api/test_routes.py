@@ -283,3 +283,127 @@ class TestGameRoutes:
         data = response.json()
         assert len(data) == 1
         assert data[0]["name"] == "Game Two"
+
+    async def test_create_game_with_anti_cheat_enabled_default(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that anti_cheat_enabled defaults to True when creating a game."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        response = await client.post(
+            "/games",
+            json={
+                "account_id": str(account.id),
+                "name": "Super Awesome Game",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["anti_cheat_enabled"] is True
+
+    async def test_create_game_with_anti_cheat_disabled(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating a game with anti_cheat_enabled explicitly set to False."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        response = await client.post(
+            "/games",
+            json={
+                "account_id": str(account.id),
+                "name": "Custom Anti-Cheat Game",
+                "anti_cheat_enabled": False,
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "Custom Anti-Cheat Game"
+        assert data["anti_cheat_enabled"] is False
+
+    async def test_update_game_anti_cheat_enabled(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test updating a game's anti_cheat_enabled field."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        # Create game with anti-cheat enabled (default)
+        create_response = await client.post(
+            "/games",
+            json={
+                "account_id": str(account.id),
+                "name": "Game to Update",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+        game_id = create_response.json()["id"]
+        assert create_response.json()["anti_cheat_enabled"] is True
+
+        # Disable anti-cheat
+        update_response = await client.patch(
+            f"/games/{game_id}",
+            json={"anti_cheat_enabled": False},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert update_response.status_code == 200
+        data = update_response.json()
+        assert data["anti_cheat_enabled"] is False
+
+        # Re-enable anti-cheat
+        update_response2 = await client.patch(
+            f"/games/{game_id}",
+            json={"anti_cheat_enabled": True},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert update_response2.status_code == 200
+        data2 = update_response2.json()
+        assert data2["anti_cheat_enabled"] is True
+
+    async def test_get_game_includes_anti_cheat_enabled(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that retrieving a game includes the anti_cheat_enabled field."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        # Create game with anti-cheat disabled
+        create_response = await client.post(
+            "/games",
+            json={
+                "account_id": str(account.id),
+                "name": "Test Game",
+                "anti_cheat_enabled": False,
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+        game_id = create_response.json()["id"]
+
+        # Retrieve game
+        get_response = await client.get(
+            f"/games/{game_id}", headers={"leadr-api-key": test_api_key}
+        )
+
+        assert get_response.status_code == 200
+        data = get_response.json()
+        assert "anti_cheat_enabled" in data
+        assert data["anti_cheat_enabled"] is False

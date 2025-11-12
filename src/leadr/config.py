@@ -166,6 +166,62 @@ class CommonSettings(BaseSettings):
         description="Interval in seconds for expiring boards (default: 60s)",
     )
 
+    # Anti-Cheat Configuration
+    ANTICHEAT_ENABLED: bool = Field(
+        default=False,
+        description="Enable anti-cheat checks on score submissions",
+    )
+    ANTICHEAT_LOGGING_ONLY: bool = Field(
+        default=True,
+        description="Log anti-cheat detections but don't reject/flag submissions (dry-run mode)",
+    )
+
+    # Rate Limit Tiers (submissions per hour)
+    ANTICHEAT_RATE_LIMIT_TIER_A: int = Field(
+        default=100,
+        description="Rate limit for Tier A (trusted) devices: submissions per hour",
+    )
+    ANTICHEAT_RATE_LIMIT_TIER_B: int = Field(
+        default=50,
+        description="Rate limit for Tier B (verified) devices: submissions per hour",
+    )
+    ANTICHEAT_RATE_LIMIT_TIER_C: int = Field(
+        default=20,
+        description="Rate limit for Tier C (unverified) devices: submissions per hour",
+    )
+
+    # Outlier Detection Thresholds (standard deviations)
+    ANTICHEAT_OUTLIER_THRESHOLD_TIER_A: float = Field(
+        default=4.0,
+        description="Outlier threshold for Tier A devices: standard deviations from mean",
+    )
+    ANTICHEAT_OUTLIER_THRESHOLD_TIER_B: float = Field(
+        default=3.0,
+        description="Outlier threshold for Tier B devices: standard deviations from mean",
+    )
+    ANTICHEAT_OUTLIER_THRESHOLD_TIER_C: float = Field(
+        default=2.5,
+        description="Outlier threshold for Tier C devices: standard deviations from mean",
+    )
+
+    # Other Anti-Cheat Thresholds
+    ANTICHEAT_MIN_SAMPLES_FOR_STATS: int = Field(
+        default=10,
+        description=(
+            "Minimum number of scores required before statistical outlier detection is enabled"
+        ),
+    )
+    ANTICHEAT_DUPLICATE_WINDOW_SECONDS: int = Field(
+        default=300,
+        description=(
+            "Time window in seconds for detecting duplicate score submissions (default: 5 minutes)"
+        ),
+    )
+    ANTICHEAT_VELOCITY_THRESHOLD_SECONDS: float = Field(
+        default=2.0,
+        description="Minimum time between submissions to avoid velocity detection (in seconds)",
+    )
+
     @model_validator(mode="after")
     def validate_api_enabled(self):
         """Ensure at least one API (Admin or Client) is enabled."""

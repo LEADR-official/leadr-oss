@@ -28,6 +28,10 @@ class Game(Entity):
     default_board_id: UUID | None = Field(
         default=None, description="Optional default leaderboard ID for this game"
     )
+    anti_cheat_enabled: bool = Field(
+        default=True,
+        description="Whether anti-cheat is enabled for this game (defaults to enabled)",
+    )
 
     @field_validator("name")
     @classmethod
