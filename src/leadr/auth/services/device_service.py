@@ -50,11 +50,12 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         ip_address: str | None = None,
         user_agent: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> tuple[Device, str, int]:
+    ) -> tuple[Device, str, str, int]:
         """Start a new device session.
 
-        Creates or updates device, generates JWT access token, and creates session record.
-        This is idempotent - calling multiple times updates last_seen_at.
+        Creates or updates device, generates JWT access and refresh tokens,
+        and creates session record. This is idempotent - calling multiple times
+        updates last_seen_at.
 
         Args:
             game_id: Game UUID
@@ -65,7 +66,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             metadata: Additional device metadata
 
         Returns:
-            tuple[Device, str, int]: (device, access_token_plain, expires_in_seconds)
+            tuple[Device, str, str, int]: (device, access_token_plain, refresh_token_plain, expires_in_seconds)
 
         Raises:
             EntityNotFoundError: If game doesn't exist
@@ -101,27 +102,42 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             device = await self.repository.create(device)
 
         # Generate access token
-        expires_delta = timedelta(hours=24)  # TODO: Make configurable
-        token_plain, token_hash = generate_access_token(
+        access_expires_delta = timedelta(hours=24)  # TODO: Make configurable
+        access_token_plain, access_token_hash = generate_access_token(
             device_id=device_id,
             game_id=game_id,
             account_id=account_id,
-            expires_delta=expires_delta,
+            expires_delta=access_expires_delta,
             secret=settings.JWT_SECRET,
         )
 
-        # Create session
+        # Generate refresh token
+        refresh_expires_delta = timedelta(days=30)  # TODO: Make configurable
+        refresh_token_plain, refresh_token_hash = generate_refresh_token(
+            device_id=device_id,
+            game_id=game_id,
+            account_id=account_id,
+            token_version=1,  # Initial version
+            expires_delta=refresh_expires_delta,
+            secret=settings.JWT_SECRET,
+        )
+
+        # Create session with both access and refresh tokens
+        now = datetime.now(UTC)
         session = DeviceSession(
             device_id=device.id,
-            access_token_hash=token_hash,
-            expires_at=datetime.now(UTC) + expires_delta,
+            access_token_hash=access_token_hash,
+            refresh_token_hash=refresh_token_hash,
+            token_version=1,
+            expires_at=now + access_expires_delta,
+            refresh_expires_at=now + refresh_expires_delta,
             ip_address=ip_address,
             user_agent=user_agent,
         )
         await self.session_repo.create(session)
 
-        expires_in_seconds = int(expires_delta.total_seconds())
-        return device, token_plain, expires_in_seconds
+        expires_in_seconds = int(access_expires_delta.total_seconds())
+        return device, access_token_plain, refresh_token_plain, expires_in_seconds
 
     async def validate_device_token(self, token: str) -> Device | None:
         """Validate access token and return associated device.

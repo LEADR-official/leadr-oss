@@ -41,16 +41,18 @@ class TestDeviceService:
         service = DeviceService(db_session)
         device_id = str(uuid4())
 
-        with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen:
-            mock_gen.return_value = ("mock_token", "mock_hash")
+        with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
+            mock_gen_access.return_value = ("mock_token", "mock_hash")
+            with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+                mock_gen_refresh.return_value = ("mock_refresh_token", "mock_refresh_hash")
 
-            device, token, expires_in = await service.start_session(
-                game_id=game.id,
-                device_id=device_id,
-                platform="ios",
-                ip_address="192.168.1.1",
-                user_agent="TestApp/1.0",
-            )
+                device, access_token, refresh_token, expires_in = await service.start_session(
+                    game_id=game.id,
+                    device_id=device_id,
+                    platform="ios",
+                    ip_address="192.168.1.1",
+                    user_agent="TestApp/1.0",
+                )
 
         assert device is not None
         assert device.device_id == device_id
@@ -58,7 +60,8 @@ class TestDeviceService:
         assert device.account_id == account.id
         assert device.platform == "ios"
         assert device.status == DeviceStatus.ACTIVE
-        assert token == "mock_token"
+        assert access_token == "mock_token"
+        assert refresh_token == "mock_refresh_token"
         assert expires_in > 0
 
     async def test_start_session_updates_existing_device(self, db_session: AsyncSession):
@@ -84,20 +87,24 @@ class TestDeviceService:
         service = DeviceService(db_session)
         device_id = str(uuid4())
 
-        with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen:
-            mock_gen.return_value = ("token1", "hash1")
-            device1, _, _ = await service.start_session(
-                game_id=game.id,
-                device_id=device_id,
-                platform="ios",
-            )
-            first_seen = device1.last_seen_at
+        with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
+            mock_gen_access.return_value = ("token1", "hash1")
+            with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+                mock_gen_refresh.return_value = ("refresh1", "refresh_hash1")
+                device1, _, _, _ = await service.start_session(
+                    game_id=game.id,
+                    device_id=device_id,
+                    platform="ios",
+                )
+                first_seen = device1.last_seen_at
 
         # Start another session for same device
-        with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen:
-            mock_gen.return_value = ("token2", "hash2")
-            device2, _, _ = await service.start_session(
-                game_id=game.id,
+        with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
+            mock_gen_access.return_value = ("token2", "hash2")
+            with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+                mock_gen_refresh.return_value = ("refresh2", "refresh_hash2")
+                device2, _, _, _ = await service.start_session(
+                    game_id=game.id,
                 device_id=device_id,
                 platform="ios",
             )
@@ -127,16 +134,18 @@ class TestDeviceService:
         service = DeviceService(db_session)
         device_id = str(uuid4())
 
-        with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen:
-            mock_gen.return_value = ("test_token", "test_hash")
+        with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
+            mock_gen_access.return_value = ("test_token", "test_hash")
+            with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+                mock_gen_refresh.return_value = ("test_refresh", "test_refresh_hash")
 
-            device, token, expires_in = await service.start_session(
-                game_id=game.id,
-                device_id=device_id,
-                platform="android",
-                ip_address="10.0.0.1",
-                user_agent="TestApp/2.0",
-            )
+                device, access_token, refresh_token, expires_in = await service.start_session(
+                    game_id=game.id,
+                    device_id=device_id,
+                    platform="android",
+                    ip_address="10.0.0.1",
+                    user_agent="TestApp/2.0",
+                )
 
         # Verify session was created
         from leadr.auth.services.repositories import DeviceSessionRepository
@@ -181,21 +190,23 @@ class TestDeviceService:
 
         service = DeviceService(db_session)
 
-        with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen:
-            mock_gen.return_value = ("token", "hash")
+        with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
+            mock_gen_access.return_value = ("token", "hash")
+            with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+                mock_gen_refresh.return_value = ("refresh", "refresh_hash")
 
-            _, _, expires_in = await service.start_session(
-                game_id=game.id,
-                device_id=str(uuid4()),
-                platform="ios",
-            )
+                _, _, _, expires_in = await service.start_session(
+                    game_id=game.id,
+                    device_id=str(uuid4()),
+                    platform="ios",
+                )
 
-            # Verify generate_access_token was called with correct expiration
-            assert mock_gen.called
-            call_args = mock_gen.call_args[1]
-            assert "expires_delta" in call_args
-            # Default should be 24 hours
-            assert call_args["expires_delta"] == timedelta(hours=24)
+                # Verify generate_access_token was called with correct expiration
+                assert mock_gen_access.called
+                call_args = mock_gen_access.call_args[1]
+                assert "expires_delta" in call_args
+                # Default should be 24 hours
+                assert call_args["expires_delta"] == timedelta(hours=24)
 
     async def test_validate_device_token_returns_device_for_valid_token(
         self, db_session: AsyncSession
@@ -222,13 +233,15 @@ class TestDeviceService:
         service = DeviceService(db_session)
         device_id = str(uuid4())
 
-        with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen:
-            mock_gen.return_value = ("test_token", "test_hash")
-            created_device, token, _ = await service.start_session(
-                game_id=game.id,
-                device_id=device_id,
-                platform="ios",
-            )
+        with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
+            mock_gen_access.return_value = ("test_token", "test_hash")
+            with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+                mock_gen_refresh.return_value = ("test_refresh", "test_refresh_hash")
+                created_device, access_token, refresh_token, _ = await service.start_session(
+                    game_id=game.id,
+                    device_id=device_id,
+                    platform="ios",
+                )
 
         # Validate token
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
@@ -300,7 +313,10 @@ class TestDeviceService:
             id=uuid4(),
             device_id=device_orm.id,
             access_token_hash="hash",
+            refresh_token_hash="refresh_hash",
+            token_version=1,
             expires_at=datetime.now(UTC) - timedelta(hours=1),  # Expired
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=30),
         )
         db_session.add(expired_session)
         await db_session.commit()
@@ -361,7 +377,10 @@ class TestDeviceService:
             id=uuid4(),
             device_id=device_orm.id,
             access_token_hash="hash",
+            refresh_token_hash="refresh_hash",
+            token_version=1,
             expires_at=datetime.now(UTC) + timedelta(hours=1),
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=30),
             revoked_at=datetime.now(UTC),  # Revoked
         )
         db_session.add(revoked_session)
