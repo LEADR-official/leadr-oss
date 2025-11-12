@@ -32,6 +32,7 @@ class GameORM(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     steam_app_id: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     default_board_id: Mapped[UUID | None] = mapped_column(nullable=True, default=None)
+    anti_cheat_enabled: Mapped[bool] = mapped_column(nullable=False, default=True)
 
     # Relationships
     account: Mapped["AccountORM"] = relationship("AccountORM")  # type: ignore[name-defined]

@@ -30,6 +30,7 @@ class GameService(BaseService[Game, GameRepository]):
         name: str,
         steam_app_id: str | None = None,
         default_board_id: UUID | None = None,
+        anti_cheat_enabled: bool = True,
     ) -> Game:
         """Create a new game.
 
@@ -38,6 +39,7 @@ class GameService(BaseService[Game, GameRepository]):
             name: The game name.
             steam_app_id: Optional Steam application ID.
             default_board_id: Optional default leaderboard ID.
+            anti_cheat_enabled: Whether anti-cheat is enabled (defaults to True).
 
         Returns:
             The created Game domain entity.
@@ -54,6 +56,7 @@ class GameService(BaseService[Game, GameRepository]):
             name=name,
             steam_app_id=steam_app_id,
             default_board_id=default_board_id,
+            anti_cheat_enabled=anti_cheat_enabled,
         )
 
         return await self.repository.create(game)
@@ -86,6 +89,7 @@ class GameService(BaseService[Game, GameRepository]):
         name: str | None = None,
         steam_app_id: str | None = None,
         default_board_id: UUID | None = None,
+        anti_cheat_enabled: bool | None = None,
     ) -> Game:
         """Update game fields.
 
@@ -94,6 +98,7 @@ class GameService(BaseService[Game, GameRepository]):
             name: New game name, if provided
             steam_app_id: New Steam app ID, if provided
             default_board_id: New default board ID, if provided
+            anti_cheat_enabled: Whether anti-cheat is enabled, if provided
 
         Returns:
             The updated Game domain entity
@@ -109,5 +114,7 @@ class GameService(BaseService[Game, GameRepository]):
             game.steam_app_id = steam_app_id
         if default_board_id is not None:
             game.default_board_id = default_board_id
+        if anti_cheat_enabled is not None:
+            game.anti_cheat_enabled = anti_cheat_enabled
 
         return await self.repository.update(game)
