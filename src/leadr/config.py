@@ -116,6 +116,16 @@ class CommonSettings(BaseSettings):
         description="JWT token lifetime in seconds (default: 1 hour)",
     )
 
+    # Device Token Configuration (Phase 1: Short-lived tokens + refresh)
+    ACCESS_TOKEN_EXPIRY_HOURS: int = Field(
+        default=24,
+        description="Device access token expiration time in hours (default: 24 hours)",
+    )
+    REFRESH_TOKEN_EXPIRY_DAYS: int = Field(
+        default=30,
+        description="Device refresh token expiration time in days (default: 30 days)",
+    )
+
     # API Key Configuration
     API_KEY_SECRET: str = Field(
         default="your-super-secret-api-key-pepper-change-in-production",

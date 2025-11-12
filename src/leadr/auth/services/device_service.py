@@ -102,7 +102,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             device = await self.repository.create(device)
 
         # Generate access token
-        access_expires_delta = timedelta(hours=24)  # TODO: Make configurable
+        access_expires_delta = timedelta(hours=settings.ACCESS_TOKEN_EXPIRY_HOURS)
         access_token_plain, access_token_hash = generate_access_token(
             device_id=device_id,
             game_id=game_id,
@@ -112,7 +112,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         )
 
         # Generate refresh token
-        refresh_expires_delta = timedelta(days=30)  # TODO: Make configurable
+        refresh_expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRY_DAYS)
         refresh_token_plain, refresh_token_hash = generate_refresh_token(
             device_id=device_id,
             game_id=game_id,
@@ -232,7 +232,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         account_id = UUID(claims["account_id"])
 
         # Generate new access token
-        access_expires_delta = timedelta(hours=24)  # TODO: Make configurable
+        access_expires_delta = timedelta(hours=settings.ACCESS_TOKEN_EXPIRY_HOURS)
         access_token_plain, access_token_hash = generate_access_token(
             device_id=device_id,
             game_id=game_id,
@@ -242,7 +242,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         )
 
         # Generate new refresh token with incremented version
-        refresh_expires_delta = timedelta(days=30)  # TODO: Make configurable
+        refresh_expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRY_DAYS)
         new_refresh_token_plain, new_refresh_token_hash = generate_refresh_token(
             device_id=device_id,
             game_id=game_id,
