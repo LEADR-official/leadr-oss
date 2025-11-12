@@ -212,3 +212,14 @@ class RefreshTokenResponse(BaseModel):
     access_token: str = Field(description="New JWT access token")
     refresh_token: str = Field(description="New JWT refresh token (old token is invalidated)")
     expires_in: int = Field(description="Access token expiration time in seconds")
+
+
+class NonceResponse(BaseModel):
+    """Response schema for nonce generation.
+
+    Nonces are single-use tokens with short TTL (60 seconds) that clients must
+    obtain before making mutating requests. This prevents replay attacks.
+    """
+
+    nonce_value: str = Field(description="Unique nonce value (UUID)")
+    expires_at: datetime = Field(description="Nonce expiration timestamp (UTC)")

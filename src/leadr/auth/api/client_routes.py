@@ -3,12 +3,14 @@
 from fastapi import APIRouter, HTTPException, status
 
 from leadr.auth.api.schemas import (
+    NonceResponse,
     RefreshTokenRequest,
     RefreshTokenResponse,
     StartSessionRequest,
     StartSessionResponse,
 )
-from leadr.auth.services.dependencies import DeviceServiceDep
+from leadr.auth.dependencies import DeviceTokenDep
+from leadr.auth.services.dependencies import DeviceServiceDep, NonceServiceDep
 from leadr.common.domain.exceptions import EntityNotFoundError
 
 router = APIRouter()
@@ -101,4 +103,45 @@ async def refresh_session(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_in=expires_in,
+    )
+
+
+@router.get(
+    "/client/nonce",
+    response_model=NonceResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def generate_nonce(
+    device: DeviceTokenDep,
+    service: NonceServiceDep,
+) -> NonceResponse:
+    """Generate a fresh nonce for replay protection.
+
+    Nonces are single-use tokens with short TTL (60 seconds) that clients must
+    obtain before making mutating requests (POST, PATCH, DELETE). This prevents
+    replay attacks by ensuring each request is fresh and authorized.
+
+    Requires device authentication via access token.
+
+    Args:
+        device: Authenticated device from require_device_token dependency
+        service: NonceService dependency
+
+    Returns:
+        NonceResponse with nonce_value and expires_at
+
+    Raises:
+        401: Invalid or missing device token
+
+    Example:
+        1. Client calls GET /client/nonce with Authorization header
+        2. Server returns nonce_value and expires_at
+        3. Client includes nonce in leadr-client-nonce header for mutations
+        4. Server validates and consumes nonce (single-use)
+    """
+    nonce_value, expires_at = await service.generate_nonce(device_id=device.id)
+
+    return NonceResponse(
+        nonce_value=nonce_value,
+        expires_at=expires_at,
     )

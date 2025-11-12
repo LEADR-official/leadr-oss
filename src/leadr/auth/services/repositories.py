@@ -1,10 +1,11 @@
-"""API Key and Device repository services."""
+"""API Key, Device, and Nonce repository services."""
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from leadr.auth.adapters.orm import (
     APIKeyORM,
@@ -12,9 +13,11 @@ from leadr.auth.adapters.orm import (
     DeviceORM,
     DeviceSessionORM,
     DeviceStatusEnum,
+    NonceORM,
 )
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
 from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
+from leadr.auth.domain.nonce import Nonce
 from leadr.common.repositories import BaseRepository
 
 
@@ -261,3 +264,91 @@ class DeviceSessionRepository(BaseRepository[DeviceSession, DeviceSessionORM]):
         result = await self.session.execute(query)
         orms = result.scalars().all()
         return [self._to_domain(orm) for orm in orms]
+
+
+class NonceRepository(BaseRepository[Nonce, NonceORM]):
+    """Nonce repository for managing nonce persistence."""
+
+    def _to_domain(self, orm: NonceORM) -> Nonce:
+        """Convert ORM model to domain entity."""
+        return orm.to_domain()
+
+    def _to_orm(self, entity: Nonce) -> NonceORM:
+        """Convert domain entity to ORM model."""
+        return NonceORM.from_domain(entity)
+
+    def _get_orm_class(self) -> type[NonceORM]:
+        """Get the ORM model class."""
+        return NonceORM
+
+    async def get_by_nonce_value(self, nonce_value: str) -> Nonce | None:
+        """Get nonce by nonce_value, returns None if not found or soft-deleted.
+
+        Args:
+            nonce_value: The unique nonce value to search for
+
+        Returns:
+            Nonce if found and not deleted, None otherwise
+        """
+        query = select(NonceORM).where(
+            NonceORM.nonce_value == nonce_value,
+            NonceORM.deleted_at.is_(None),
+        )
+        result = await self.session.execute(query)
+        orm = result.scalar_one_or_none()
+        return self._to_domain(orm) if orm else None
+
+    async def filter(
+        self,
+        account_id: UUID,
+        device_id: UUID | None = None,
+        **kwargs,
+    ) -> list[Nonce]:
+        """Filter nonces by account and optional criteria.
+
+        Note: account_id is used for multi-tenant safety via JOIN with devices table.
+
+        Args:
+            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            device_id: Optional device ID to filter by
+
+        Returns:
+            List of nonces matching the filter criteria
+        """
+        # Join with devices table to filter by account_id
+        query = (
+            select(NonceORM)
+            .join(DeviceORM, NonceORM.device_id == DeviceORM.id)
+            .where(
+                DeviceORM.account_id == account_id,
+                NonceORM.deleted_at.is_(None),
+            )
+        )
+
+        if device_id is not None:
+            query = query.where(NonceORM.device_id == device_id)
+
+        result = await self.session.execute(query)
+        orms = result.scalars().all()
+        return [self._to_domain(orm) for orm in orms]
+
+    async def cleanup_expired_nonces(self, before: datetime) -> int:
+        """Delete expired nonces older than specified time.
+
+        Only deletes nonces with PENDING status. Used and expired nonces
+        are kept for audit/debugging purposes.
+
+        Args:
+            before: Delete nonces that expired before this datetime
+
+        Returns:
+            Number of nonces deleted
+        """
+        stmt = delete(NonceORM).where(
+            NonceORM.expires_at < before,
+            NonceORM.status == "pending",
+        )
+        result = await self.session.execute(stmt)
+        await self.session.commit()
+        # rowcount is available on CursorResult from DELETE statements
+        return int(result.rowcount) if result.rowcount else 0  # type: ignore[attr-defined]

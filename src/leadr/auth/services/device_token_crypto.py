@@ -175,7 +175,9 @@ def validate_refresh_token(token: str, secret: str) -> dict[str, Any] | None:
             token,
             secret,
             algorithms=["HS256"],
-            options={"require": ["sub", "game_id", "account_id", "token_version", "exp", "iat", "jti"]},
+            options={
+                "require": ["sub", "game_id", "account_id", "token_version", "exp", "iat", "jti"]
+            },
         )
         return claims
     except jwt.InvalidTokenError:

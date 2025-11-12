@@ -455,10 +455,20 @@ class TestGenerateRefreshToken:
         secret = "test-secret"
 
         token1, _ = generate_refresh_token(
-            device_id, game_id, account_id, token_version=1, expires_delta=expires_delta, secret=secret
+            device_id,
+            game_id,
+            account_id,
+            token_version=1,
+            expires_delta=expires_delta,
+            secret=secret,
         )
         token2, _ = generate_refresh_token(
-            device_id, game_id, account_id, token_version=2, expires_delta=expires_delta, secret=secret
+            device_id,
+            game_id,
+            account_id,
+            token_version=2,
+            expires_delta=expires_delta,
+            secret=secret,
         )
 
         decoded1 = jwt.decode(token1, options={"verify_signature": False})

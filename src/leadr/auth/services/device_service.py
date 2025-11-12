@@ -66,7 +66,8 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             metadata: Additional device metadata
 
         Returns:
-            tuple[Device, str, str, int]: (device, access_token_plain, refresh_token_plain, expires_in_seconds)
+            tuple[Device, str, str, int]: (device, access_token_plain, refresh_token_plain,
+                expires_in_seconds)
 
         Raises:
             EntityNotFoundError: If game doesn't exist
@@ -181,9 +182,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
 
         return device
 
-    async def refresh_access_token(
-        self, refresh_token: str
-    ) -> tuple[str, str, int] | None:
+    async def refresh_access_token(self, refresh_token: str) -> tuple[str, str, int] | None:
         """Refresh access token using a valid refresh token.
 
         Validates the refresh token, checks token version for replay attack detection,

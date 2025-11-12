@@ -43,7 +43,9 @@ class TestDeviceService:
 
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
             mock_gen_access.return_value = ("mock_token", "mock_hash")
-            with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+            with patch(
+                "leadr.auth.services.device_service.generate_refresh_token"
+            ) as mock_gen_refresh:
                 mock_gen_refresh.return_value = ("mock_refresh_token", "mock_refresh_hash")
 
                 device, access_token, refresh_token, expires_in = await service.start_session(
@@ -89,7 +91,9 @@ class TestDeviceService:
 
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
             mock_gen_access.return_value = ("token1", "hash1")
-            with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+            with patch(
+                "leadr.auth.services.device_service.generate_refresh_token"
+            ) as mock_gen_refresh:
                 mock_gen_refresh.return_value = ("refresh1", "refresh_hash1")
                 device1, _, _, _ = await service.start_session(
                     game_id=game.id,
@@ -101,13 +105,15 @@ class TestDeviceService:
         # Start another session for same device
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
             mock_gen_access.return_value = ("token2", "hash2")
-            with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+            with patch(
+                "leadr.auth.services.device_service.generate_refresh_token"
+            ) as mock_gen_refresh:
                 mock_gen_refresh.return_value = ("refresh2", "refresh_hash2")
                 device2, _, _, _ = await service.start_session(
                     game_id=game.id,
-                device_id=device_id,
-                platform="ios",
-            )
+                    device_id=device_id,
+                    platform="ios",
+                )
 
         assert device2.id == device1.id
         assert device2.last_seen_at > first_seen
@@ -136,7 +142,9 @@ class TestDeviceService:
 
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
             mock_gen_access.return_value = ("test_token", "test_hash")
-            with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+            with patch(
+                "leadr.auth.services.device_service.generate_refresh_token"
+            ) as mock_gen_refresh:
                 mock_gen_refresh.return_value = ("test_refresh", "test_refresh_hash")
 
                 device, access_token, refresh_token, expires_in = await service.start_session(
@@ -192,7 +200,9 @@ class TestDeviceService:
 
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
             mock_gen_access.return_value = ("token", "hash")
-            with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+            with patch(
+                "leadr.auth.services.device_service.generate_refresh_token"
+            ) as mock_gen_refresh:
                 mock_gen_refresh.return_value = ("refresh", "refresh_hash")
 
                 _, _, _, expires_in = await service.start_session(
@@ -235,7 +245,9 @@ class TestDeviceService:
 
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
             mock_gen_access.return_value = ("test_token", "test_hash")
-            with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+            with patch(
+                "leadr.auth.services.device_service.generate_refresh_token"
+            ) as mock_gen_refresh:
                 mock_gen_refresh.return_value = ("test_refresh", "test_refresh_hash")
                 created_device, access_token, refresh_token, _ = await service.start_session(
                     game_id=game.id,
@@ -525,14 +537,18 @@ class TestDeviceService:
             }
             with patch("leadr.auth.services.device_service.hash_token") as mock_hash:
                 mock_hash.return_value = "refresh_hash"
-                with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
+                with patch(
+                    "leadr.auth.services.device_service.generate_access_token"
+                ) as mock_gen_access:
                     mock_gen_access.return_value = ("new_access_token", "new_access_hash")
-                    with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+                    with patch(
+                        "leadr.auth.services.device_service.generate_refresh_token"
+                    ) as mock_gen_refresh:
                         mock_gen_refresh.return_value = ("new_refresh_token", "new_refresh_hash")
 
-                        access_token, refresh_token, expires_in = await service.refresh_access_token(
-                            "old_refresh_token"
-                        )
+                        result = await service.refresh_access_token("old_refresh_token")
+                        assert result is not None
+                        access_token, refresh_token, expires_in = result
 
         # Verify tokens returned
         assert access_token == "new_access_token"
@@ -620,7 +636,9 @@ class TestDeviceService:
 
         assert result is None
 
-    async def test_refresh_access_token_rejects_expired_refresh_token(self, db_session: AsyncSession):
+    async def test_refresh_access_token_rejects_expired_refresh_token(
+        self, db_session: AsyncSession
+    ):
         """Test that expired refresh token is rejected."""
         # Create account and game
         account = AccountORM(

@@ -101,11 +101,15 @@ class TestRequireDeviceToken:
 
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen:
             mock_gen.return_value = ("test_token", "test_hash")
-            device, plain_token, _ = await service.start_session(
-                game_id=game.id,
-                device_id=device_id,
-                platform="android",
-            )
+            with patch(
+                "leadr.auth.services.device_service.generate_refresh_token"
+            ) as mock_gen_refresh:
+                mock_gen_refresh.return_value = ("test_refresh_token", "test_refresh_hash")
+                device, plain_token, _, _ = await service.start_session(
+                    game_id=game.id,
+                    device_id=device_id,
+                    platform="android",
+                )
 
         # Mock token validation for the require_device_token call
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
@@ -165,7 +169,10 @@ class TestRequireDeviceToken:
             id=uuid4(),
             device_id=device_orm.id,
             access_token_hash="test_hash",
+            refresh_token_hash="refresh_hash",
+            token_version=1,
             expires_at=datetime.now(UTC) - timedelta(hours=1),  # Expired
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=30),
         )
         db_session.add(expired_session)
         await db_session.commit()
@@ -228,7 +235,10 @@ class TestRequireDeviceToken:
             id=uuid4(),
             device_id=device_orm.id,
             access_token_hash="test_hash",
+            refresh_token_hash="refresh_hash",
+            token_version=1,
             expires_at=datetime.now(UTC) + timedelta(hours=1),
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=30),
             revoked_at=datetime.now(UTC),  # Revoked
         )
         db_session.add(revoked_session)
@@ -292,7 +302,10 @@ class TestRequireDeviceToken:
             id=uuid4(),
             device_id=device_orm.id,
             access_token_hash="test_hash",
+            refresh_token_hash="refresh_hash",
+            token_version=1,
             expires_at=datetime.now(UTC) + timedelta(hours=1),
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=30),
         )
         db_session.add(valid_session)
         await db_session.commit()

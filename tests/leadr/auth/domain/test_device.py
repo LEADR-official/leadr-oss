@@ -794,7 +794,7 @@ class TestDeviceSession:
         assert session.is_refresh_expired() is True
 
     def test_is_refresh_not_expired_when_refresh_expiration_in_future(self):
-        """Test that session refresh token is not expired when refresh_expires_at is in the future."""
+        """Test that session refresh token is not expired when refresh_expires_at is in future."""
         session_id = uuid4()
         device_id = uuid4()
         now = datetime.now(UTC)
