@@ -440,8 +440,8 @@ class TestDeviceSession:
                 id=session_id,
                 access_token_hash="hashed_token_value",
                 expires_at=expires_at,
-            refresh_token_hash="refresh_hash",
-            refresh_expires_at=now + timedelta(days=30),
+                refresh_token_hash="refresh_hash",
+                refresh_expires_at=now + timedelta(days=30),
                 created_at=now,
                 updated_at=now,
             )
