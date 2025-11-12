@@ -40,14 +40,13 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         account_id: UUID,
         game_id: UUID,
         board_id: UUID,
-        user_id: UUID,
+        device_id: UUID,
         player_name: str,
         value: float,
         value_display: str | None = None,
         filter_timezone: str | None = None,
         filter_country: str | None = None,
         filter_city: str | None = None,
-        device_id: UUID | None = None,
         trust_tier: TrustTier = TrustTier.B,
     ) -> Score:
         """Create a new score.
@@ -56,14 +55,13 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             account_id: The ID of the account this score belongs to.
             game_id: The ID of the game this score belongs to.
             board_id: The ID of the board this score belongs to.
-            user_id: The ID of the user who submitted this score.
+            device_id: The ID of the device that submitted this score.
             player_name: Display name of the player.
             value: Numeric value of the score for sorting/comparison.
             value_display: Optional formatted display string.
             filter_timezone: Optional timezone filter for categorization.
             filter_country: Optional country filter for categorization.
             filter_city: Optional city filter for categorization.
-            device_id: Optional ID of the device submitting the score (for anti-cheat).
             trust_tier: Trust tier of the device (defaults to B/medium trust).
 
         Returns:
@@ -79,10 +77,9 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             ...     account_id=account.id,
             ...     game_id=game.id,
             ...     board_id=board.id,
-            ...     user_id=user.id,
+            ...     device_id=device.id,
             ...     player_name="SpeedRunner99",
             ...     value=123.45,
-            ...     device_id=device.id,
             ... )
         """
         # Three-level validation:
@@ -103,7 +100,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name=player_name,
             value=value,
             value_display=value_display,
@@ -196,7 +193,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         account_id: UUID,
         board_id: UUID | None = None,
         game_id: UUID | None = None,
-        user_id: UUID | None = None,
+        device_id: UUID | None = None,
     ) -> list[Score]:
         """List scores for an account with optional filters.
 
@@ -204,7 +201,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             account_id: REQUIRED - Account ID to filter by (multi-tenant safety).
             board_id: Optional board ID to filter by.
             game_id: Optional game ID to filter by.
-            user_id: Optional user ID to filter by.
+            device_id: Optional device ID to filter by.
 
         Returns:
             List of Score entities matching the filter criteria.
@@ -213,7 +210,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             account_id=account_id,
             board_id=board_id,
             game_id=game_id,
-            user_id=user_id,
+            device_id=device_id,
         )
 
     async def update_score(

@@ -374,7 +374,7 @@ class TestAntiCheatServiceDuplicateDetection:
             account_id=test_board.account_id,
             game_id=test_board.game_id,
             board_id=test_board.id,
-            user_id=uuid4(),
+            device_id=uuid4(),
             player_name="Test Player",
             value=1000.0,
         )
@@ -392,7 +392,7 @@ class TestAntiCheatServiceDuplicateDetection:
             account_id=test_board.account_id,
             game_id=test_board.game_id,
             board_id=test_board.id,
-            user_id=uuid4(),
+            device_id=uuid4(),
             player_name="Test Player",
             value=2000.0,
         )

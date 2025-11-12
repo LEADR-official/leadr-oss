@@ -24,14 +24,14 @@ async def create_score(
 
     Args:
         request: Score creation details including account_id, game_id, board_id,
-                user_id, player_name, value, and optional filters.
+                device_id, player_name, value, and optional filters.
         service: Injected score service dependency.
 
     Returns:
         ScoreResponse with the created score including auto-generated ID and timestamps.
 
     Raises:
-        404: Account, game, board, or user not found.
+        404: Account, game, board, or device not found.
         400: Validation failed (board doesn't belong to account, or game doesn't
             match board's game).
     """
@@ -40,7 +40,7 @@ async def create_score(
             account_id=request.account_id,
             game_id=request.game_id,
             board_id=request.board_id,
-            user_id=request.user_id,
+            device_id=request.device_id,
             player_name=request.player_name,
             value=request.value,
             value_display=request.value_display,
@@ -51,7 +51,7 @@ async def create_score(
     except IntegrityError:
         raise HTTPException(
             status_code=404,
-            detail="Account, game, board, or user not found",
+            detail="Account, game, board, or device not found",
         ) from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
@@ -85,20 +85,20 @@ async def list_scores(
     account_id: UUID,
     board_id: UUID | None = None,
     game_id: UUID | None = None,
-    user_id: UUID | None = None,
+    device_id: UUID | None = None,
     service: ScoreServiceDep = None,  # type: ignore[assignment]
 ) -> list[ScoreResponse]:
     """List scores for an account with optional filters.
 
     Returns all non-deleted scores for the specified account, with optional
-    filtering by board, game, or user. Enforces multi-tenant safety by
+    filtering by board, game, or device. Enforces multi-tenant safety by
     requiring account_id.
 
     Args:
         account_id: REQUIRED - Account ID to filter by (multi-tenant safety).
         board_id: Optional board ID to filter by.
         game_id: Optional game ID to filter by.
-        user_id: Optional user ID to filter by.
+        device_id: Optional device ID to filter by.
         service: Injected score service dependency.
 
     Returns:
@@ -108,7 +108,7 @@ async def list_scores(
         account_id=account_id,
         board_id=board_id,
         game_id=game_id,
-        user_id=user_id,
+        device_id=device_id,
     )
     return [ScoreResponse.from_domain(score) for score in scores]
 

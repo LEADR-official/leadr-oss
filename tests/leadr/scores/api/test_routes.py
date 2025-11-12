@@ -4,7 +4,7 @@ import pytest
 from httpx import AsyncClient
 
 from leadr.accounts.services.account_service import AccountService
-from leadr.accounts.services.user_service import UserService
+from leadr.auth.services.device_service import DeviceService
 from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
 from leadr.games.services.game_service import GameService
@@ -24,17 +24,16 @@ class TestScoreRoutes:
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         board_service = BoardService(db_session)
@@ -57,7 +56,7 @@ class TestScoreRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game.id),
                 "board_id": str(board.id),
-                "user_id": str(user.id),
+                "device_id": str(device.id),
                 "player_name": "SpeedRunner99",
                 "value": 123.45,
             },
@@ -71,7 +70,7 @@ class TestScoreRoutes:
         assert data["account_id"] == str(account.id)
         assert data["game_id"] == str(game.id)
         assert data["board_id"] == str(board.id)
-        assert data["user_id"] == str(user.id)
+        assert data["device_id"] == str(device.id)
         assert "id" in data
         assert "created_at" in data
 
@@ -86,17 +85,16 @@ class TestScoreRoutes:
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         board_service = BoardService(db_session)
@@ -119,7 +117,7 @@ class TestScoreRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game.id),
                 "board_id": str(board.id),
-                "user_id": str(user.id),
+                "device_id": str(device.id),
                 "player_name": "SpeedRunner99",
                 "value": 123.45,
                 "value_display": "2:03.45",
@@ -141,24 +139,23 @@ class TestScoreRoutes:
         self, client: AsyncClient, db_session, test_api_key
     ):
         """Test creating a score with non-existent board returns 404."""
-        # Create account, user, and game
+        # Create account, device, and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
             name="Acme Corporation",
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         # Try to create score with non-existent board
@@ -168,7 +165,7 @@ class TestScoreRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game.id),
                 "board_id": "00000000-0000-0000-0000-000000000000",
-                "user_id": str(user.id),
+                "device_id": str(device.id),
                 "player_name": "SpeedRunner99",
                 "value": 123.45,
             },
@@ -193,14 +190,6 @@ class TestScoreRoutes:
             slug="account-2",
         )
 
-        # Create user for account1
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account1.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         # Create games for both accounts
         game_service = GameService(db_session)
         game1 = await game_service.create_game(
@@ -210,6 +199,13 @@ class TestScoreRoutes:
         game2 = await game_service.create_game(
             account_id=account2.id,
             name="Game 2",
+        )
+
+        # Create device for account1
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game1.id,
+            device_id="test-device-001",
         )
 
         # Create board for account2
@@ -233,7 +229,7 @@ class TestScoreRoutes:
                 "account_id": str(account1.id),
                 "game_id": str(game1.id),
                 "board_id": str(board2.id),
-                "user_id": str(user.id),
+                "device_id": str(device.id),
                 "player_name": "SpeedRunner99",
                 "value": 123.45,
             },
@@ -247,18 +243,11 @@ class TestScoreRoutes:
         self, client: AsyncClient, db_session, test_api_key
     ):
         """Test creating a score with mismatched game_id returns 400."""
-        # Create account and user
+        # Create account and games
         account_service = AccountService(db_session)
         account = await account_service.create_account(
             name="Acme Corporation",
             slug="acme-corp",
-        )
-
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
         )
 
         # Create two games
@@ -270,6 +259,13 @@ class TestScoreRoutes:
         game2 = await game_service.create_game(
             account_id=account.id,
             name="Game 2",
+        )
+
+        # Create device
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game1.id,
+            device_id="test-device-001",
         )
 
         # Create board for game1
@@ -293,7 +289,7 @@ class TestScoreRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game2.id),
                 "board_id": str(board.id),
-                "user_id": str(user.id),
+                "device_id": str(device.id),
                 "player_name": "SpeedRunner99",
                 "value": 123.45,
             },
@@ -312,17 +308,16 @@ class TestScoreRoutes:
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         board_service = BoardService(db_session)
@@ -344,7 +339,7 @@ class TestScoreRoutes:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -378,17 +373,16 @@ class TestScoreRoutes:
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         board_service = BoardService(db_session)
@@ -410,7 +404,7 @@ class TestScoreRoutes:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="Player1",
             value=100.0,
         )
@@ -418,7 +412,7 @@ class TestScoreRoutes:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="Player2",
             value=200.0,
         )
@@ -447,17 +441,16 @@ class TestScoreRoutes:
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         board_service = BoardService(db_session)
@@ -490,7 +483,7 @@ class TestScoreRoutes:
             account_id=account.id,
             game_id=game.id,
             board_id=board1.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="Board1Score",
             value=100.0,
         )
@@ -498,7 +491,7 @@ class TestScoreRoutes:
             account_id=account.id,
             game_id=game.id,
             board_id=board2.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="Board2Score",
             value=200.0,
         )
@@ -523,17 +516,16 @@ class TestScoreRoutes:
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         board_service = BoardService(db_session)
@@ -555,7 +547,7 @@ class TestScoreRoutes:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -594,17 +586,16 @@ class TestScoreRoutes:
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         board_service = BoardService(db_session)
@@ -626,7 +617,7 @@ class TestScoreRoutes:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -660,17 +651,16 @@ class TestScoreRoutes:
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         board_service = BoardService(db_session)
@@ -692,7 +682,7 @@ class TestScoreRoutes:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="Score1",
             value=100.0,
         )
@@ -700,7 +690,7 @@ class TestScoreRoutes:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="Score2",
             value=200.0,
         )

@@ -7,8 +7,9 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
-from leadr.accounts.domain.user import User
-from leadr.accounts.services.repositories import AccountRepository, UserRepository
+from leadr.accounts.services.repositories import AccountRepository
+from leadr.auth.domain.device import Device
+from leadr.auth.services.repositories import DeviceRepository
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
 from leadr.boards.services.repositories import BoardRepository
 from leadr.games.domain.game import Game
@@ -38,20 +39,6 @@ class TestScoreRepository:
         )
         await account_repo.create(account)
 
-        # Create user
-        user_repo = UserRepository(db_session)
-        user_id = uuid4()
-
-        user = User(
-            id=user_id,
-            account_id=account_id,
-            email="player@example.com",
-            display_name="Test Player",
-            created_at=now,
-            updated_at=now,
-        )
-        await user_repo.create(user)
-
         # Create game
         game_repo = GameRepository(db_session)
         game_id = uuid4()
@@ -64,6 +51,22 @@ class TestScoreRepository:
             updated_at=now,
         )
         await game_repo.create(game)
+
+        # Create device
+        device_repo = DeviceRepository(db_session)
+        device_id = uuid4()  # This is the device's primary key (UUID)
+
+        device = Device(
+            id=device_id,
+            account_id=account_id,
+            game_id=game_id,
+            device_id="test-device-001",  # This is the client's device identifier (string)
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device)
 
         # Create board
         board_repo = BoardRepository(db_session)
@@ -94,7 +97,7 @@ class TestScoreRepository:
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
             value_display="2:03.45",
@@ -111,7 +114,7 @@ class TestScoreRepository:
         assert created.account_id == account_id
         assert created.game_id == game_id
         assert created.board_id == board_id
-        assert created.user_id == user_id
+        assert created.device_id == device_id
         assert created.player_name == "SpeedRunner99"
         assert created.value == 123.45
         assert created.value_display == "2:03.45"
@@ -136,19 +139,6 @@ class TestScoreRepository:
         )
         await account_repo.create(account)
 
-        user_repo = UserRepository(db_session)
-        user_id = uuid4()
-
-        user = User(
-            id=user_id,
-            account_id=account_id,
-            email="player@example.com",
-            display_name="Test Player",
-            created_at=now,
-            updated_at=now,
-        )
-        await user_repo.create(user)
-
         game_repo = GameRepository(db_session)
         game_id = uuid4()
 
@@ -160,6 +150,21 @@ class TestScoreRepository:
             updated_at=now,
         )
         await game_repo.create(game)
+
+        device_repo = DeviceRepository(db_session)
+        device_id = uuid4()
+
+        device = Device(
+            id=device_id,
+            account_id=account_id,
+            game_id=game_id,
+            device_id="test-device-001",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device)
 
         board_repo = BoardRepository(db_session)
         board_id = uuid4()
@@ -189,7 +194,7 @@ class TestScoreRepository:
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
             created_at=now,
@@ -231,19 +236,6 @@ class TestScoreRepository:
         )
         await account_repo.create(account)
 
-        user_repo = UserRepository(db_session)
-        user_id = uuid4()
-
-        user = User(
-            id=user_id,
-            account_id=account_id,
-            email="player@example.com",
-            display_name="Test Player",
-            created_at=now,
-            updated_at=now,
-        )
-        await user_repo.create(user)
-
         game_repo = GameRepository(db_session)
         game_id = uuid4()
 
@@ -255,6 +247,21 @@ class TestScoreRepository:
             updated_at=now,
         )
         await game_repo.create(game)
+
+        device_repo = DeviceRepository(db_session)
+        device_id = uuid4()
+
+        device = Device(
+            id=device_id,
+            account_id=account_id,
+            game_id=game_id,
+            device_id="test-device-001",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device)
 
         board_repo = BoardRepository(db_session)
         board_id = uuid4()
@@ -284,7 +291,7 @@ class TestScoreRepository:
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
             created_at=now,
@@ -328,31 +335,6 @@ class TestScoreRepository:
         )
         await account_repo.create(account2)
 
-        # Create users for each account
-        user_repo = UserRepository(db_session)
-
-        user1_id = uuid4()
-        user1 = User(
-            id=user1_id,
-            account_id=account1_id,
-            email="player1@example.com",
-            display_name="Player 1",
-            created_at=now,
-            updated_at=now,
-        )
-        await user_repo.create(user1)
-
-        user2_id = uuid4()
-        user2 = User(
-            id=user2_id,
-            account_id=account2_id,
-            email="player2@example.com",
-            display_name="Player 2",
-            created_at=now,
-            updated_at=now,
-        )
-        await user_repo.create(user2)
-
         # Create games for each account
         game_repo = GameRepository(db_session)
 
@@ -375,6 +357,35 @@ class TestScoreRepository:
             updated_at=now,
         )
         await game_repo.create(game2)
+
+        # Create devices for each account
+        device_repo = DeviceRepository(db_session)
+
+        device1_id = uuid4()
+        device1 = Device(
+            id=device1_id,
+            account_id=account1_id,
+            game_id=game1_id,
+            device_id="test-device-001",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device1)
+
+        device2_id = uuid4()
+        device2 = Device(
+            id=device2_id,
+            account_id=account2_id,
+            game_id=game2_id,
+            device_id="test-device-002",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device2)
 
         # Create boards for each game
         board_repo = BoardRepository(db_session)
@@ -421,7 +432,7 @@ class TestScoreRepository:
             account_id=account1_id,
             game_id=game1_id,
             board_id=board1_id,
-            user_id=user1_id,
+            device_id=device1_id,
             player_name="Player1Score",
             value=100.0,
             created_at=now,
@@ -434,7 +445,7 @@ class TestScoreRepository:
             account_id=account2_id,
             game_id=game2_id,
             board_id=board2_id,
-            user_id=user2_id,
+            device_id=device2_id,
             player_name="Player2Score",
             value=200.0,
             created_at=now,
@@ -450,7 +461,7 @@ class TestScoreRepository:
         assert scores[0].account_id == account1_id
 
     async def test_filter_with_optional_parameters(self, db_session: AsyncSession):
-        """Test filtering scores with optional board_id, game_id, user_id."""
+        """Test filtering scores with optional board_id, game_id, device_id."""
         # Create account
         account_repo = AccountRepository(db_session)
         account_id = uuid4()
@@ -466,31 +477,6 @@ class TestScoreRepository:
         )
         await account_repo.create(account)
 
-        # Create two users
-        user_repo = UserRepository(db_session)
-
-        user1_id = uuid4()
-        user1 = User(
-            id=user1_id,
-            account_id=account_id,
-            email="player1@example.com",
-            display_name="Player 1",
-            created_at=now,
-            updated_at=now,
-        )
-        await user_repo.create(user1)
-
-        user2_id = uuid4()
-        user2 = User(
-            id=user2_id,
-            account_id=account_id,
-            email="player2@example.com",
-            display_name="Player 2",
-            created_at=now,
-            updated_at=now,
-        )
-        await user_repo.create(user2)
-
         # Create game
         game_repo = GameRepository(db_session)
         game_id = uuid4()
@@ -503,6 +489,35 @@ class TestScoreRepository:
             updated_at=now,
         )
         await game_repo.create(game)
+
+        # Create two devices
+        device_repo = DeviceRepository(db_session)
+
+        device1_id = uuid4()
+        device1 = Device(
+            id=device1_id,
+            account_id=account_id,
+            game_id=game_id,
+            device_id="test-device-001",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device1)
+
+        device2_id = uuid4()
+        device2 = Device(
+            id=device2_id,
+            account_id=account_id,
+            game_id=game_id,
+            device_id="test-device-002",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device2)
 
         # Create two boards
         board_repo = BoardRepository(db_session)
@@ -549,7 +564,7 @@ class TestScoreRepository:
             account_id=account_id,
             game_id=game_id,
             board_id=board1_id,
-            user_id=user1_id,
+            device_id=device1_id,
             player_name="Score1",
             value=100.0,
             created_at=now,
@@ -562,7 +577,7 @@ class TestScoreRepository:
             account_id=account_id,
             game_id=game_id,
             board_id=board1_id,
-            user_id=user2_id,
+            device_id=device2_id,
             player_name="Score2",
             value=200.0,
             created_at=now,
@@ -575,7 +590,7 @@ class TestScoreRepository:
             account_id=account_id,
             game_id=game_id,
             board_id=board2_id,
-            user_id=user1_id,
+            device_id=device1_id,
             player_name="Score3",
             value=300.0,
             created_at=now,
@@ -590,16 +605,16 @@ class TestScoreRepository:
         assert "Score1" in names
         assert "Score2" in names
 
-        # Filter by user_id
-        scores = await score_repo.filter(account_id=account_id, user_id=user1_id)
+        # Filter by device_id
+        scores = await score_repo.filter(account_id=account_id, device_id=device1_id)
         assert len(scores) == 2
         names = {s.player_name for s in scores}
         assert "Score1" in names
         assert "Score3" in names
 
-        # Filter by board_id and user_id
+        # Filter by board_id and device_id
         scores = await score_repo.filter(
-            account_id=account_id, board_id=board1_id, user_id=user1_id
+            account_id=account_id, board_id=board1_id, device_id=device1_id
         )
         assert len(scores) == 1
         assert scores[0].player_name == "Score1"
@@ -621,19 +636,6 @@ class TestScoreRepository:
         )
         await account_repo.create(account)
 
-        user_repo = UserRepository(db_session)
-        user_id = uuid4()
-
-        user = User(
-            id=user_id,
-            account_id=account_id,
-            email="player@example.com",
-            display_name="Test Player",
-            created_at=now,
-            updated_at=now,
-        )
-        await user_repo.create(user)
-
         game_repo = GameRepository(db_session)
         game_id = uuid4()
 
@@ -645,6 +647,21 @@ class TestScoreRepository:
             updated_at=now,
         )
         await game_repo.create(game)
+
+        device_repo = DeviceRepository(db_session)
+        device_id = uuid4()
+
+        device = Device(
+            id=device_id,
+            account_id=account_id,
+            game_id=game_id,
+            device_id="test-device-001",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device)
 
         board_repo = BoardRepository(db_session)
         board_id = uuid4()
@@ -673,7 +690,7 @@ class TestScoreRepository:
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="Score1",
             value=100.0,
             created_at=now,
@@ -686,7 +703,7 @@ class TestScoreRepository:
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="Score2",
             value=200.0,
             created_at=now,
@@ -721,19 +738,6 @@ class TestScoreRepository:
         )
         await account_repo.create(account)
 
-        user_repo = UserRepository(db_session)
-        user_id = uuid4()
-
-        user = User(
-            id=user_id,
-            account_id=account_id,
-            email="player@example.com",
-            display_name="Test Player",
-            created_at=now,
-            updated_at=now,
-        )
-        await user_repo.create(user)
-
         game_repo = GameRepository(db_session)
         game_id = uuid4()
 
@@ -745,6 +749,21 @@ class TestScoreRepository:
             updated_at=now,
         )
         await game_repo.create(game)
+
+        device_repo = DeviceRepository(db_session)
+        device_id = uuid4()
+
+        device = Device(
+            id=device_id,
+            account_id=account_id,
+            game_id=game_id,
+            device_id="test-device-001",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device)
 
         board_repo = BoardRepository(db_session)
         board_id = uuid4()
@@ -774,7 +793,7 @@ class TestScoreRepository:
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
-            user_id=user_id,
+            device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
             created_at=now,

@@ -14,7 +14,7 @@ class ScoreCreateRequest(BaseModel):
     account_id: UUID = Field(description="ID of the account this score belongs to")
     game_id: UUID = Field(description="ID of the game this score belongs to")
     board_id: UUID = Field(description="ID of the board this score belongs to")
-    user_id: UUID = Field(description="ID of the user who submitted this score")
+    device_id: UUID = Field(description="ID of the device that submitted this score")
     player_name: str = Field(description="Display name of the player")
     value: float = Field(description="Numeric value of the score for sorting/comparison")
     value_display: str | None = Field(
@@ -51,7 +51,7 @@ class ScoreResponse(BaseModel):
     account_id: UUID = Field(description="ID of the account this score belongs to")
     game_id: UUID = Field(description="ID of the game this score belongs to")
     board_id: UUID = Field(description="ID of the board this score belongs to")
-    user_id: UUID = Field(description="ID of the user who submitted this score")
+    device_id: UUID = Field(description="ID of the device that submitted this score")
     player_name: str = Field(description="Display name of the player")
     value: float = Field(description="Numeric value of the score")
     value_display: str | None = Field(default=None, description="Formatted display string, or null")
@@ -82,7 +82,7 @@ class ScoreResponse(BaseModel):
             account_id=score.account_id,
             game_id=score.game_id,
             board_id=score.board_id,
-            user_id=score.user_id,
+            device_id=score.device_id,
             player_name=score.player_name,
             value=score.value,
             value_display=score.value_display,

@@ -2,9 +2,12 @@
 
 ## Overview
 
-LEADR provides secure authentication for game clients without requiring players to create accounts or remember passwords. Your game clients authenticate anonymously using device IDs, making it frictionless for players while maintaining security.
+LEADR provides secure authentication for game clients without requiring players to create accounts or remember passwords. If you use a LEADR SDK, then your game clients automatically authenticate anonymously using generated device IDs, so you don't need to worry about nonces and handshakes.
 
-This guide explains how the authentication system works and how to integrate it into your game.
+In case your interested, this guide explains how the authentication system works and how you could integrate it directly into your game without an SDKs help.
+
+> [!TIP]
+> 99% of users do not need to understand this process. This information is provided for transparency and to aid in SDK development.
 
 ---
 
@@ -367,28 +370,28 @@ Here's a typical game session from start to finish:
 
 ```
 00:00  |  Game Start
-       |   > POST /client/sessions ’ Get access + refresh tokens
+       |   > POST /client/sessions - Get access + refresh tokens
        |
 00:05  |  Fetch Leaderboard
-       |   > GET /boards/weekly (with access_token) ’ Success
+       |   > GET /boards/weekly (with access_token) - Success
        |
 00:10  |  Submit Score
-       |   > GET /client/nonce (with access_token) ’ Get nonce
-       |   > POST /scores (with access_token + nonce) ’ Success
+       |   > GET /client/nonce (with access_token) - Get nonce
+       |   > POST /scores (with access_token + nonce) - Success
        |
 00:15  |  Fetch Leaderboard Again
-       |   > GET /boards/weekly (with access_token) ’ Success
+       |   > GET /boards/weekly (with access_token) - Success
        |
 00:16  |  Access Token Expires ð
        |
 00:17  |  Fetch Leaderboard
-       |   > GET /boards/weekly (with expired access_token) ’ 401 Error
-       |   > POST /sessions/refresh (with refresh_token) ’ New tokens
-       |   > GET /boards/weekly (with NEW access_token) ’ Success
+       |   > GET /boards/weekly (with expired access_token) - 401 Error
+       |   > POST /sessions/refresh (with refresh_token) - New tokens
+       |   > GET /boards/weekly (with NEW access_token) - Success
        |
 00:25  |  Submit Another Score
-       |   > GET /client/nonce (with access_token) ’ Get nonce
-       |   > POST /scores (with access_token + nonce) ’ Success
+       |   > GET /client/nonce (with access_token) - Get nonce
+       |   > POST /scores (with access_token + nonce) - Success
        |
 00:30  |  Game Exit
        |   > Tokens saved for next session
@@ -439,50 +442,6 @@ Here's a typical game session from start to finish:
 | "Nonce required" | Mutation request missing nonce header | Get nonce, add to header |
 | "Nonce expired" | Nonce older than 60 seconds | Get fresh nonce |
 | "Nonce already used" | Trying to replay a request | Get fresh nonce, check for duplicate submissions |
-
----
-
-## Best Practices Summary
-
-### Token Management
-
-1. **Store tokens securely**: Use platform-specific secure storage (Keychain on iOS, EncryptedSharedPreferences on Android)
-
-2. **Refresh proactively**: Check expiration before each request, refresh if < 2 minutes remaining
-
-3. **Handle refresh failures gracefully**: If refresh fails, start new session seamlessly
-
-4. **Save refresh tokens**: Store refresh tokens between game sessions for seamless restarts
-
-### Nonce Management
-
-1. **Get nonces just-in-time**: Request nonce immediately before using it, not in advance
-
-2. **One nonce per operation**: Each mutation needs its own fresh nonce
-
-3. **Never cache or reuse nonces**: Always get a fresh nonce for each request
-
-4. **Handle failures by getting fresh nonces**: If nonce validation fails, get a new one
-
-### Security
-
-1. **Never log tokens or nonces**: Don't send them to analytics or crash reporters
-
-2. **Use HTTPS**: Always use secure connections to LEADR
-
-3. **Handle token theft scenarios**: If refresh fails unexpectedly, consider it a security event
-
-4. **Implement retry limits**: Don't retry failed nonce requests infinitely
-
-### Performance
-
-1. **Batch read operations**: Fetch multiple leaderboards at once (no nonces needed)
-
-2. **Separate write operations**: Each score submission needs its own nonce
-
-3. **Implement request queuing**: Queue requests that need nonces to avoid overwhelming the nonce endpoint
-
-4. **Monitor token expiration**: Set timers to refresh proactively rather than reactively
 
 ---
 
@@ -558,17 +517,6 @@ leadr-client-nonce: <nonce_value>
 | `/v1/client/sessions/refresh` | POST | Refresh tokens | Yes (refresh token) |
 | `/v1/client/nonce` | GET | Get nonce | Yes (access token) |
 
-### When to Use What
-
-| Operation | Access Token | Nonce | Example |
-|-----------|--------------|-------|---------|
-| Read data |  | L | GET /boards |
-| Write data |  |  | POST /scores |
-| Update data |  |  | PATCH /profile |
-| Delete data |  |  | DELETE /account |
-| Refresh tokens |  (refresh) | L | POST /sessions/refresh |
-| Get nonce |  (access) | L | GET /nonce |
-
 ---
 
 ## Support
@@ -578,7 +526,8 @@ If you encounter issues not covered in this guide:
 1. Check the main API documentation for endpoint details
 2. Review your authentication implementation against this guide
 3. Contact LEADR support with:
-   - Your game ID
-   - Device ID experiencing issues
-   - Timestamps of failed requests
-   - HTTP status codes and error messages (never send actual tokens!)
+   - Your account ID & game ID
+   - Device details (Steam + Windows 11, itch.io + Linux, Android, etc.)
+   - Which LEADR SDK your game is using
+   - Timestamps of failed requests (approximate is better than nothing)
+   - Any HTTP status codes and error messages (never send actual tokens!)

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from leadr.common.orm import Base
 
 if TYPE_CHECKING:
-    from leadr.accounts.adapters.orm import AccountORM, UserORM
+    from leadr.accounts.adapters.orm import AccountORM
     from leadr.boards.adapters.orm import BoardORM
     from leadr.games.adapters.orm import GameORM
     from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
@@ -21,7 +21,7 @@ class ScoreORM(Base):
     """Score ORM model.
 
     Represents a player's score submission for a board in the database.
-    Maps to the scores table with foreign keys to accounts, users, games, and boards.
+    Maps to the scores table with foreign keys to accounts, devices, games, and boards.
     """
 
     __tablename__ = "scores"
@@ -41,8 +41,7 @@ class ScoreORM(Base):
         nullable=False,
         index=True,
     )
-    user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
+    device_id: Mapped[UUID] = mapped_column(
         nullable=False,
         index=True,
     )
@@ -57,7 +56,7 @@ class ScoreORM(Base):
     account: Mapped["AccountORM"] = relationship("AccountORM")  # type: ignore[name-defined]
     game: Mapped["GameORM"] = relationship("GameORM")  # type: ignore[name-defined]
     board: Mapped["BoardORM"] = relationship("BoardORM")  # type: ignore[name-defined]
-    user: Mapped["UserORM"] = relationship("UserORM")  # type: ignore[name-defined]
+    # Note: No relationship to DeviceORM as device_id has no FK constraint
 
 
 class ScoreSubmissionMetaORM(Base):

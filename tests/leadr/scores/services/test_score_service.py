@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.services.account_service import AccountService
-from leadr.accounts.services.user_service import UserService
+from leadr.auth.services.device_service import DeviceService
 from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
 from leadr.common.domain.exceptions import EntityNotFoundError
@@ -27,19 +27,18 @@ class TestScoreService:
             slug="acme-corp",
         )
 
-        # Create user
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         # Create game
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        # Create device
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         # Create board
@@ -62,7 +61,7 @@ class TestScoreService:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -71,7 +70,7 @@ class TestScoreService:
         assert score.account_id == account.id
         assert score.game_id == game.id
         assert score.board_id == board.id
-        assert score.user_id == user.id
+        assert score.device_id == device.id
         assert score.player_name == "SpeedRunner99"
         assert score.value == 123.45
 
@@ -84,19 +83,18 @@ class TestScoreService:
             slug="acme-corp",
         )
 
-        # Create user
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         # Create game
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        # Create device
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         # Create board
@@ -119,7 +117,7 @@ class TestScoreService:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="SpeedRunner99",
             value=123.45,
             value_display="2:03.45",
@@ -142,19 +140,18 @@ class TestScoreService:
             slug="acme-corp",
         )
 
-        # Create user
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         # Create game
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        # Create device
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         # Try to create score with non-existent board
@@ -166,7 +163,7 @@ class TestScoreService:
                 account_id=account.id,
                 game_id=game.id,
                 board_id=non_existent_board_id,
-                user_id=user.id,
+                device_id=device.id,
                 player_name="SpeedRunner99",
                 value=123.45,
             )
@@ -186,13 +183,8 @@ class TestScoreService:
             slug="account-2",
         )
 
-        # Create user for account1
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account1.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
+        # Create games for both accounts
+        game_service = GameService(db_session)
 
         # Create game for account1
         game_service = GameService(db_session)
@@ -205,6 +197,13 @@ class TestScoreService:
         game2 = await game_service.create_game(
             account_id=account2.id,
             name="Game 2",
+        )
+
+        # Create device for account1/game1
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game1.id,
+            device_id="test-device-001",
         )
 
         # Create board for account2
@@ -229,7 +228,7 @@ class TestScoreService:
                 account_id=account1.id,
                 game_id=game1.id,
                 board_id=board2.id,
-                user_id=user.id,
+                device_id=device.id,
                 player_name="SpeedRunner99",
                 value=123.45,
             )
@@ -245,14 +244,6 @@ class TestScoreService:
             slug="acme-corp",
         )
 
-        # Create user
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         # Create two games
         game_service = GameService(db_session)
         game1 = await game_service.create_game(
@@ -262,6 +253,13 @@ class TestScoreService:
         game2 = await game_service.create_game(
             account_id=account.id,
             name="Game 2",
+        )
+
+        # Create device
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game1.id,
+            device_id="test-device-001",
         )
 
         # Create board for game1
@@ -286,7 +284,7 @@ class TestScoreService:
                 account_id=account.id,
                 game_id=game2.id,
                 board_id=board.id,
-                user_id=user.id,
+                device_id=device.id,
                 player_name="SpeedRunner99",
                 value=123.45,
             )
@@ -302,17 +300,16 @@ class TestScoreService:
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         board_service = BoardService(db_session)
@@ -334,7 +331,7 @@ class TestScoreService:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -364,17 +361,16 @@ class TestScoreService:
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         board_service = BoardService(db_session)
@@ -396,7 +392,7 @@ class TestScoreService:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="Player1",
             value=100.0,
         )
@@ -404,7 +400,7 @@ class TestScoreService:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="Player2",
             value=200.0,
         )
@@ -426,17 +422,16 @@ class TestScoreService:
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         board_service = BoardService(db_session)
@@ -469,7 +464,7 @@ class TestScoreService:
             account_id=account.id,
             game_id=game.id,
             board_id=board1.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="Board1Score",
             value=100.0,
         )
@@ -477,7 +472,7 @@ class TestScoreService:
             account_id=account.id,
             game_id=game.id,
             board_id=board2.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="Board2Score",
             value=200.0,
         )
@@ -497,17 +492,16 @@ class TestScoreService:
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         board_service = BoardService(db_session)
@@ -529,7 +523,7 @@ class TestScoreService:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="SpeedRunner99",
             value=123.45,
         )
@@ -553,17 +547,16 @@ class TestScoreService:
             slug="acme-corp",
         )
 
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account.id,
-            email="player@example.com",
-            display_name="Test Player",
-        )
-
         game_service = GameService(db_session)
         game = await game_service.create_game(
             account_id=account.id,
             name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
         )
 
         board_service = BoardService(db_session)
@@ -585,7 +578,7 @@ class TestScoreService:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            user_id=user.id,
+            device_id=device.id,
             player_name="SpeedRunner99",
             value=123.45,
         )
