@@ -93,7 +93,9 @@ class TestAntiCheatServiceRateLimiting:
         assert result.action == FlagAction.REJECT
         assert result.flag_type == FlagType.RATE_LIMIT
         assert result.confidence == FlagConfidence.HIGH
+        assert result.reason is not None
         assert "rate limit" in result.reason.lower()
+        assert result.metadata is not None
         assert result.metadata["limit"] == 100
         assert result.metadata["submissions_count"] == 100
 
@@ -126,6 +128,7 @@ class TestAntiCheatServiceRateLimiting:
         assert result.action == FlagAction.REJECT
         assert result.flag_type == FlagType.RATE_LIMIT
         assert result.confidence == FlagConfidence.HIGH
+        assert result.metadata is not None
         assert result.metadata["limit"] == 50
 
     async def test_rate_limit_tier_c_limit(
@@ -157,6 +160,7 @@ class TestAntiCheatServiceRateLimiting:
         assert result.action == FlagAction.REJECT
         assert result.flag_type == FlagType.RATE_LIMIT
         assert result.confidence == FlagConfidence.HIGH
+        assert result.metadata is not None
         assert result.metadata["limit"] == 20
 
     async def test_rate_limit_per_board_isolation(
@@ -322,6 +326,7 @@ class TestAntiCheatServiceDuplicateDetection:
         assert result.action == FlagAction.FLAG
         assert result.flag_type == FlagType.DUPLICATE
         assert result.confidence == FlagConfidence.MEDIUM
+        assert result.reason is not None
         assert "duplicate" in result.reason.lower()
 
     async def test_duplicate_outside_window_accepted(
@@ -441,6 +446,7 @@ class TestAntiCheatServiceVelocityDetection:
         assert result.action == FlagAction.FLAG
         assert result.flag_type == FlagType.VELOCITY
         assert result.confidence == FlagConfidence.HIGH
+        assert result.reason is not None
         assert "rapid" in result.reason.lower() or "velocity" in result.reason.lower()
 
     async def test_normal_pace_accepted(

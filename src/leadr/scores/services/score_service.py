@@ -139,6 +139,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         saved_score = await self.repository.create(score)
 
         # Post-creation: Update submission metadata and create flags if needed
+        # TODO: Make this async so the client gets a response quicker
         if device_id is not None and anti_cheat_result is not None:
             meta_repo = ScoreSubmissionMetaRepository(self.repository.session)
             now = datetime.now(UTC)

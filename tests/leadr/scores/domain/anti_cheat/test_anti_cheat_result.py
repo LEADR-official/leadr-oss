@@ -52,7 +52,9 @@ class TestAntiCheatResult:
         assert result.action == FlagAction.REJECT
         assert result.confidence == FlagConfidence.HIGH
         assert result.flag_type == FlagType.RATE_LIMIT
+        assert result.reason is not None
         assert "Rate limit exceeded" in result.reason
+        assert result.metadata is not None
         assert result.metadata["submissions_count"] == 101
 
     def test_immutability(self):
@@ -103,5 +105,6 @@ class TestAntiCheatResult:
             },
         )
 
+        assert result.metadata is not None
         assert result.metadata["z_score"] == 4.2
         assert result.metadata["board_stats"]["mean"] == 1000.0
