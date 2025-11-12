@@ -156,6 +156,52 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
 
 @pytest_asyncio.fixture
+async def test_account(db_session: AsyncSession) -> Account:
+    """Create a test account for use in tests.
+
+    Returns:
+        The created Account domain entity.
+    """
+    account_repo = AccountRepository(db_session)
+    account_id = uuid4()
+    now = datetime.now(UTC)
+
+    account = Account(
+        id=account_id,
+        name="Test Account",
+        slug=f"test-{str(account_id)[:8]}",  # Unique slug using UUID prefix
+        status=AccountStatus.ACTIVE,
+        created_at=now,
+        updated_at=now,
+    )
+    return await account_repo.create(account)
+
+
+@pytest_asyncio.fixture
+async def test_game(db_session: AsyncSession, test_account: Account):
+    """Create a test game for use in tests.
+
+    Returns:
+        The created Game domain entity.
+    """
+    from leadr.games.domain.game import Game
+    from leadr.games.services.repositories import GameRepository
+
+    game_repo = GameRepository(db_session)
+    game_id = uuid4()
+    now = datetime.now(UTC)
+
+    game = Game(
+        id=game_id,
+        account_id=test_account.id,
+        name="Test Game",
+        created_at=now,
+        updated_at=now,
+    )
+    return await game_repo.create(game)
+
+
+@pytest_asyncio.fixture
 async def test_api_key(db_session: AsyncSession) -> str:
     """Create a test account and API key, return the plain key.
 

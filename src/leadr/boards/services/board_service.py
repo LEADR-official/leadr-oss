@@ -1,14 +1,20 @@
 """Board service for managing board operations."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.boards.domain.interval_parser import parse_interval_to_timedelta
 from leadr.boards.services.repositories import BoardRepository
+from leadr.boards.services.short_code_generator import generate_unique_short_code
 from leadr.common.services import BaseService
 from leadr.games.services.game_service import GameService
+
+if TYPE_CHECKING:
+    from leadr.boards.domain.board_template import BoardTemplate
 
 
 class BoardService(BaseService[Board, BoardRepository]):
@@ -33,11 +39,11 @@ class BoardService(BaseService[Board, BoardRepository]):
         game_id: UUID,
         name: str,
         icon: str,
-        short_code: str,
         unit: str,
         is_active: bool,
         sort_direction: SortDirection,
         keep_strategy: KeepStrategy,
+        short_code: str | None = None,
         template_id: UUID | None = None,
         template_name: str | None = None,
         starts_at: datetime | None = None,
@@ -51,11 +57,11 @@ class BoardService(BaseService[Board, BoardRepository]):
             game_id: The ID of the game this board belongs to.
             name: The board name.
             icon: Icon identifier for the board.
-            short_code: Globally unique short code for direct sharing.
             unit: Unit of measurement for scores.
             is_active: Whether the board is currently active.
             sort_direction: Direction to sort scores.
             keep_strategy: Strategy for keeping multiple scores from same user.
+            short_code: Globally unique short code for direct sharing.
             template_id: Optional template ID this board was created from.
             template_name: Optional template name.
             starts_at: Optional start time for time-bounded boards.
@@ -75,7 +81,6 @@ class BoardService(BaseService[Board, BoardRepository]):
             ...     game_id=game.id,
             ...     name="Speed Run Board",
             ...     icon="trophy",
-            ...     short_code="SR2025",
             ...     unit="seconds",
             ...     is_active=True,
             ...     sort_direction=SortDirection.ASCENDING,
@@ -88,6 +93,10 @@ class BoardService(BaseService[Board, BoardRepository]):
 
         if game.account_id != account_id:
             raise ValueError(f"Game {game_id} does not belong to account {account_id}")
+
+        # Generate unique short code if not provided
+        if short_code is None:
+            short_code = await generate_unique_short_code(self.repository.session)
 
         board = Board(
             account_id=account_id,
@@ -107,6 +116,72 @@ class BoardService(BaseService[Board, BoardRepository]):
         )
 
         return await self.repository.create(board)
+
+    async def create_board_from_template(self, template: "BoardTemplate") -> Board:
+        """Create a new board from a board template.
+
+        Extracts configuration from the template and calculates time boundaries
+        based on the template's repeat_interval. Automatically generates a unique
+        short code for the board.
+
+        Args:
+            template: The BoardTemplate to create a board from.
+
+        Returns:
+            The created Board domain entity.
+
+        Raises:
+            ValueError: If interval parsing fails or game doesn't belong to account.
+
+        Example:
+            >>> board = await service.create_board_from_template(template)
+        """
+        # Parse interval to calculate time boundaries
+        duration = parse_interval_to_timedelta(template.repeat_interval)
+        starts_at = template.next_run_at
+        ends_at = starts_at + duration
+
+        # Extract board configuration from template with defaults
+        icon = template.config.get("icon", "trophy")
+        unit = template.config.get("unit", "points")
+        is_active = template.config.get("is_active", True)
+        sort_direction_str = template.config.get("sort_direction", "desc")
+        keep_strategy_str = template.config.get("keep_strategy", "best")
+        tags = template.config.get("tags", [])
+
+        # Ensure tags is a list
+        if not isinstance(tags, list):
+            tags = []
+
+        # Convert string enums to domain types (handle both lowercase and uppercase)
+        if sort_direction_str.lower() == "asc" or sort_direction_str.upper() == "ASCENDING":
+            sort_direction = SortDirection.ASCENDING
+        else:  # Default to descending
+            sort_direction = SortDirection.DESCENDING
+
+        if keep_strategy_str.lower() == "latest" or keep_strategy_str.upper() == "LATEST_ONLY":
+            keep_strategy = KeepStrategy.LATEST_ONLY
+        elif keep_strategy_str.lower() == "all" or keep_strategy_str.upper() == "ALL":
+            keep_strategy = KeepStrategy.ALL
+        else:  # Default to best only
+            keep_strategy = KeepStrategy.BEST_ONLY
+
+        # Create board using standard creation method (short_code generated automatically)
+        return await self.create_board(
+            account_id=template.account_id,
+            game_id=template.game_id,
+            name=template.name,
+            icon=icon,
+            unit=unit,
+            is_active=is_active,
+            sort_direction=sort_direction,
+            keep_strategy=keep_strategy,
+            template_id=template.id,
+            template_name=template.name,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            tags=tags,
+        )
 
     async def get_board(self, board_id: UUID) -> Board | None:
         """Get a board by its ID.

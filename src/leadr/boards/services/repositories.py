@@ -1,12 +1,14 @@
 """Board repository services."""
 
 from typing import Any
+from uuid import UUID
 
 from pydantic import UUID4
 from sqlalchemy import select
 
-from leadr.boards.adapters.orm import BoardORM
+from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.boards.domain.board_template import BoardTemplate
 from leadr.common.repositories import BaseRepository
 
 
@@ -96,3 +98,44 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             Board entity if found, None otherwise
         """
         return await self._get_by_field("short_code", short_code)
+
+
+class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
+    """BoardTemplate repository for managing board template persistence."""
+
+    def _to_domain(self, orm: BoardTemplateORM) -> BoardTemplate:
+        """Convert ORM model to domain entity."""
+        return orm.to_domain()
+
+    def _to_orm(self, entity: BoardTemplate) -> BoardTemplateORM:
+        """Convert domain entity to ORM model."""
+        return BoardTemplateORM.from_domain(entity)
+
+    def _get_orm_class(self) -> type[BoardTemplateORM]:
+        """Get the ORM model class."""
+        return BoardTemplateORM
+
+    async def filter(
+        self, account_id: UUID, game_id: UUID | None = None, **kwargs: Any
+    ) -> list[BoardTemplate]:
+        """Filter board templates by account and optional game.
+
+        Args:
+            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            game_id: OPTIONAL - Game ID to filter by
+            **kwargs: Additional filter parameters (reserved for future use)
+
+        Returns:
+            List of board templates for the account matching the filter criteria
+        """
+        query = select(BoardTemplateORM).where(
+            BoardTemplateORM.account_id == account_id,
+            BoardTemplateORM.deleted_at.is_(None),
+        )
+
+        if game_id is not None:
+            query = query.where(BoardTemplateORM.game_id == game_id)
+
+        result = await self.session.execute(query)
+        orms = result.scalars().all()
+        return [self._to_domain(orm) for orm in orms]

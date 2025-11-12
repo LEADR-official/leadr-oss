@@ -13,7 +13,9 @@ from leadr.auth.api.client_routes import router as client_auth_router
 from leadr.auth.api.routes import router as auth_router
 from leadr.auth.dependencies import require_api_key
 from leadr.boards.api.routes import router as boards_router
+from leadr.boards.services.board_tasks import expire_boards, process_due_templates
 from leadr.common.api.exceptions import entity_not_found_handler
+from leadr.common.background_tasks import get_scheduler
 from leadr.common.database import engine
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.config import settings
@@ -39,8 +41,25 @@ async def lifespan(app: FastAPI):
     """Manage application lifespan events."""
     # Startup: Database engine is already created at module import
     # The engine will establish connections as needed from the pool
+
+    # Register and start background tasks
+    scheduler = get_scheduler()
+    scheduler.add_task(
+        "process-due-templates",
+        process_due_templates,
+        interval_seconds=settings.BACKGROUND_TASK_TEMPLATE_INTERVAL,
+    )
+    scheduler.add_task(
+        "expire-boards",
+        expire_boards,
+        interval_seconds=settings.BACKGROUND_TASK_EXPIRE_INTERVAL,
+    )
+    await scheduler.start()
+
     yield
-    # Shutdown: Dispose of the database engine and close all connections
+
+    # Shutdown: Stop background tasks and dispose of the database engine
+    await scheduler.stop()
     await engine.dispose()
 
 
