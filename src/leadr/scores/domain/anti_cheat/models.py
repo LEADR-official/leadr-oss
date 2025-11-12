@@ -27,9 +27,7 @@ class AntiCheatResult(BaseModel):
     flag_type: FlagType | None = Field(
         default=None, description="Type of flag detected (if flagged/rejected)"
     )
-    reason: str | None = Field(
-        default=None, description="Human-readable reason for the action"
-    )
+    reason: str | None = Field(default=None, description="Human-readable reason for the action")
     metadata: dict[str, Any] | None = Field(
         default=None, description="Additional context and data supporting the decision"
     )
@@ -49,14 +47,11 @@ class ScoreSubmissionMeta(Entity):
     submission_count: int = Field(
         default=1, description="Total number of submissions by this device to this board"
     )
-    last_submission_at: datetime = Field(
-        description="Timestamp of the most recent submission"
-    )
+    last_submission_at: datetime = Field(description="Timestamp of the most recent submission")
     last_score_value: float | None = Field(
-        default=None, description="Value of the most recent score submission for duplicate detection"
+        default=None,
+        description="Value of the most recent score submission for duplicate detection",
     )
-
-
 
 
 class ScoreFlag(Entity):
@@ -73,7 +68,8 @@ class ScoreFlag(Entity):
         default_factory=dict, description="Supporting data for the detection"
     )
     status: str = Field(
-        default="PENDING", description="Review status (PENDING/CONFIRMED_CHEAT/FALSE_POSITIVE/DISMISSED)"
+        default="PENDING",
+        description="Review status (PENDING/CONFIRMED_CHEAT/FALSE_POSITIVE/DISMISSED)",
     )
     reviewed_at: datetime | None = Field(
         default=None, description="When the flag was reviewed by an admin"

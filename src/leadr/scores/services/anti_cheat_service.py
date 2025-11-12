@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.config import settings
 from leadr.scores.domain.anti_cheat.enums import FlagAction, FlagConfidence, FlagType, TrustTier
-from leadr.scores.domain.anti_cheat.models import AntiCheatResult, ScoreSubmissionMeta
+from leadr.scores.domain.anti_cheat.models import AntiCheatResult
 from leadr.scores.domain.score import Score
 from leadr.scores.services.anti_cheat_repositories import ScoreSubmissionMetaRepository
 
@@ -175,7 +175,10 @@ class AntiCheatService:
                     action=FlagAction.FLAG,
                     flag_type=FlagType.DUPLICATE,
                     confidence=FlagConfidence.MEDIUM,
-                    reason=f"Duplicate score value ({score.value}) submitted within {window_seconds} seconds",
+                    reason=(
+                        f"Duplicate score value ({score.value}) submitted "
+                        f"within {window_seconds} seconds"
+                    ),
                     metadata={
                         "score_value": score.value,
                         "previous_submission_at": meta.last_submission_at.isoformat(),
@@ -218,7 +221,10 @@ class AntiCheatService:
                 action=FlagAction.FLAG,
                 flag_type=FlagType.VELOCITY,
                 confidence=FlagConfidence.HIGH,
-                reason=f"Rapid-fire submission detected: {time_since_last:.2f}s between submissions (threshold: {velocity_threshold}s)",
+                reason=(
+                    f"Rapid-fire submission detected: {time_since_last:.2f}s "
+                    f"between submissions (threshold: {velocity_threshold}s)"
+                ),
                 metadata={
                     "time_since_last_submission": time_since_last,
                     "velocity_threshold": velocity_threshold,

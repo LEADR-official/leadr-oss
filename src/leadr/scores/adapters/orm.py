@@ -77,9 +77,7 @@ class ScoreSubmissionMetaORM(Base):
     device_id: Mapped[UUID] = mapped_column(nullable=False, index=True)
     board_id: Mapped[UUID] = mapped_column(nullable=False, index=True)
     submission_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    last_submission_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    last_submission_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_score_value: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
 
     def to_domain(self) -> "ScoreSubmissionMeta":
@@ -135,9 +133,7 @@ class ScoreFlagORM(Base):
     flag_metadata: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=False, default=dict, server_default="{}"
     )
-    status: Mapped[str] = mapped_column(
-        String, nullable=False, default="PENDING", index=True
-    )
+    status: Mapped[str] = mapped_column(String, nullable=False, default="PENDING", index=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )

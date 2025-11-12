@@ -48,15 +48,19 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
         """Get the ORM model class."""
         return ScoreSubmissionMetaORM
 
-    async def filter(self, account_id: UUID4 | None = None, **kwargs: Any) -> list[ScoreSubmissionMeta]:
+    async def filter(
+        self, account_id: UUID4 | None = None, **kwargs: Any
+    ) -> list[ScoreSubmissionMeta]:
         """Filter submission metadata (not typically used for this entity).
 
         Args:
-            account_id: Optional account ID (unused - submission meta doesn't have direct account relation)
+            account_id: Optional account ID (unused - submission meta doesn't
+                have direct account relation)
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            Empty list (this entity uses specialized queries like get_by_device_and_board)
+            Empty list (this entity uses specialized queries like
+                get_by_device_and_board)
         """
         # This entity is typically queried via get_by_device_and_board
         # rather than filtered by account
@@ -133,11 +137,13 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
         """Filter flags (not typically used for this entity).
 
         Args:
-            account_id: Optional account ID (unused - flags don't have direct account relation)
+            account_id: Optional account ID (unused - flags don't have direct
+                account relation)
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            Empty list (this entity uses specialized queries like get_flags_by_score_id, get_pending_flags)
+            Empty list (this entity uses specialized queries like
+                get_flags_by_score_id, get_pending_flags)
         """
         # This entity is typically queried via get_flags_by_score_id or get_pending_flags
         # rather than filtered by account

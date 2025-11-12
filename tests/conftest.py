@@ -258,7 +258,9 @@ async def test_board(db_session: AsyncSession, test_account: Account, test_game)
 
 
 @pytest_asyncio.fixture
-async def test_score(db_session: AsyncSession, test_account: Account, test_game, test_board, test_user):
+async def test_score(
+    db_session: AsyncSession, test_account: Account, test_game, test_board, test_user
+):
     """Create a test score for use in tests.
 
     Returns:

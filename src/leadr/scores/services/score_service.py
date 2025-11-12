@@ -11,7 +11,10 @@ from leadr.games.services.game_service import GameService
 from leadr.scores.domain.anti_cheat.enums import FlagAction, TrustTier
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
 from leadr.scores.domain.score import Score
-from leadr.scores.services.anti_cheat_repositories import ScoreFlagRepository, ScoreSubmissionMetaRepository
+from leadr.scores.services.anti_cheat_repositories import (
+    ScoreFlagRepository,
+    ScoreSubmissionMetaRepository,
+)
 from leadr.scores.services.anti_cheat_service import AntiCheatService
 from leadr.scores.services.repositories import ScoreRepository
 

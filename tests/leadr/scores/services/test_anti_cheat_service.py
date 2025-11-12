@@ -357,9 +357,7 @@ class TestAntiCheatServiceDuplicateDetection:
 
         assert result.action == FlagAction.ACCEPT
 
-    async def test_different_score_not_flagged(
-        self, db_session: AsyncSession, test_board
-    ):
+    async def test_different_score_not_flagged(self, db_session: AsyncSession, test_board):
         """Test that different score values are not flagged as duplicates."""
         from leadr.scores.domain.score import Score
 

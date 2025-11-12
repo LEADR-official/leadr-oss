@@ -3,8 +3,6 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-import pytest
-
 from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
 

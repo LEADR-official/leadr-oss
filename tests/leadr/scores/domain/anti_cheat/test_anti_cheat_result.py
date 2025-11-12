@@ -68,7 +68,7 @@ class TestAntiCheatResult:
         # Should not be able to modify fields
         try:
             result.action = FlagAction.REJECT  # type: ignore[misc]
-            assert False, "Should not be able to modify frozen field"
+            raise AssertionError("Should not be able to modify frozen field")
         except (AttributeError, ValueError):
             pass  # Expected
 

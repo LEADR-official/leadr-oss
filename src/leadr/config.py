@@ -207,11 +207,15 @@ class CommonSettings(BaseSettings):
     # Other Anti-Cheat Thresholds
     ANTICHEAT_MIN_SAMPLES_FOR_STATS: int = Field(
         default=10,
-        description="Minimum number of scores required before statistical outlier detection is enabled",
+        description=(
+            "Minimum number of scores required before statistical outlier detection is enabled"
+        ),
     )
     ANTICHEAT_DUPLICATE_WINDOW_SECONDS: int = Field(
         default=300,
-        description="Time window in seconds for detecting duplicate score submissions (default: 5 minutes)",
+        description=(
+            "Time window in seconds for detecting duplicate score submissions (default: 5 minutes)"
+        ),
     )
     ANTICHEAT_VELOCITY_THRESHOLD_SECONDS: float = Field(
         default=2.0,
