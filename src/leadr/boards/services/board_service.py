@@ -216,6 +216,20 @@ class BoardService(BaseService[Board, BoardRepository]):
         """
         return await self.repository.filter(account_id)
 
+    async def list_boards(
+        self, account_id: UUID | None = None, code: str | None = None
+    ) -> list[Board]:
+        """List boards with optional filtering by account_id and/or code.
+
+        Args:
+            account_id: Optional account ID to filter by
+            code: Optional short code to filter by
+
+        Returns:
+            List of Board domain entities matching the filter criteria.
+        """
+        return await self.repository.list_boards(account_id=account_id, code=code)
+
     async def update_board(
         self,
         board_id: UUID,

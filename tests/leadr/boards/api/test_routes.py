@@ -215,8 +215,8 @@ class TestBoardRoutes:
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
 
-    async def test_get_board_by_short_code(self, client: AsyncClient, db_session, test_api_key):
-        """Test retrieving a board by short code via API."""
+    async def test_list_boards_by_code(self, client: AsyncClient, db_session, test_api_key):
+        """Test listing boards filtered by short code via API."""
         # Create account, game, and board
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -247,24 +247,97 @@ class TestBoardRoutes:
         )
         board_id = create_response.json()["id"]
 
-        # Retrieve by short code
+        # Retrieve by short code using query parameter
+        response = await client.get("/boards?code=SR2025", headers={"leadr-api-key": test_api_key})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 1
+        assert data[0]["id"] == board_id
+        assert data[0]["short_code"] == "SR2025"
+
+    async def test_list_boards_by_code_not_found(self, client: AsyncClient, test_api_key):
+        """Test listing boards by non-existent short code returns empty list."""
         response = await client.get(
-            "/boards/by-code/SR2025", headers={"leadr-api-key": test_api_key}
+            "/boards?code=NONEXISTENT", headers={"leadr-api-key": test_api_key}
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert data["id"] == board_id
-        assert data["short_code"] == "SR2025"
+        assert isinstance(data, list)
+        assert len(data) == 0
 
-    async def test_get_board_by_short_code_not_found(self, client: AsyncClient, test_api_key):
-        """Test retrieving a board by non-existent short code returns 404."""
-        response = await client.get(
-            "/boards/by-code/NONEXISTENT", headers={"leadr-api-key": test_api_key}
+    async def test_list_boards_by_account_and_code(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test listing boards filtered by both account_id and code."""
+        # Create two accounts
+        account_service = AccountService(db_session)
+        account1 = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+        account2 = await account_service.create_account(
+            name="Beta Industries",
+            slug="beta-industries",
         )
 
-        assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        # Create games for each account
+        game_service = GameService(db_session)
+        game1 = await game_service.create_game(
+            account_id=account1.id,
+            name="Game 1",
+        )
+        game2 = await game_service.create_game(
+            account_id=account2.id,
+            name="Game 2",
+        )
+
+        # Create boards with different short codes for each account
+        await client.post(
+            "/boards",
+            json={
+                "account_id": str(account1.id),
+                "game_id": str(game1.id),
+                "name": "Account 1 Board",
+                "icon": "star",
+                "short_code": "CODE1",
+                "unit": "points",
+                "is_active": True,
+                "sort_direction": "DESCENDING",
+                "keep_strategy": "ALL",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+        board2_response = await client.post(
+            "/boards",
+            json={
+                "account_id": str(account2.id),
+                "game_id": str(game2.id),
+                "name": "Account 2 Board",
+                "icon": "trophy",
+                "short_code": "CODE2",
+                "unit": "seconds",
+                "is_active": True,
+                "sort_direction": "ASCENDING",
+                "keep_strategy": "BEST_ONLY",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+        board2_id = board2_response.json()["id"]
+
+        # List boards filtering by both account2 and CODE2
+        response = await client.get(
+            f"/boards?account_id={account2.id}&code=CODE2",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["id"] == board2_id
+        assert data[0]["name"] == "Account 2 Board"
 
     async def test_list_boards(self, client: AsyncClient, db_session, test_api_key):
         """Test listing boards for an account via API."""
@@ -325,11 +398,12 @@ class TestBoardRoutes:
         assert "Board One" in names
         assert "Board Two" in names
 
-    async def test_list_boards_requires_account_id(self, client: AsyncClient, test_api_key):
-        """Test that listing boards requires account_id parameter."""
+    async def test_list_boards_requires_account_id_or_code(self, client: AsyncClient, test_api_key):
+        """Test that listing boards requires either account_id or code parameter."""
         response = await client.get("/boards", headers={"leadr-api-key": test_api_key})
 
         assert response.status_code == 422  # Validation error
+        assert "account_id" in response.json()["detail"].lower()
 
     async def test_list_boards_filters_by_account(
         self, client: AsyncClient, db_session, test_api_key
