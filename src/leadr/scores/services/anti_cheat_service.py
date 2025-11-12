@@ -70,6 +70,15 @@ class AntiCheatService:
         if duplicate_result.action != FlagAction.ACCEPT:
             return duplicate_result
 
+        # Check for velocity (rapid-fire submissions)
+        velocity_result = await self._check_velocity(
+            device_id=device_id,
+            board_id=board_id,
+        )
+
+        if velocity_result.action != FlagAction.ACCEPT:
+            return velocity_result
+
         # All checks passed
         return AntiCheatResult(action=FlagAction.ACCEPT)
 
@@ -175,4 +184,47 @@ class AntiCheatService:
                 )
 
         # Not a duplicate or outside window - accept
+        return AntiCheatResult(action=FlagAction.ACCEPT)
+
+    async def _check_velocity(
+        self,
+        device_id: UUID,
+        board_id: UUID,
+    ) -> AntiCheatResult:
+        """Check if submissions are happening too rapidly (rapid-fire detection).
+
+        Args:
+            device_id: ID of the device submitting scores
+            board_id: ID of the board being submitted to
+
+        Returns:
+            AntiCheatResult with ACCEPT or FLAG action
+        """
+        # Get submission metadata for this device/board
+        meta = await self.meta_repo.get_by_device_and_board(device_id, board_id)
+
+        # First submission - always accept
+        if meta is None:
+            return AntiCheatResult(action=FlagAction.ACCEPT)
+
+        # Check time since last submission
+        now = datetime.now(UTC)
+        time_since_last = (now - meta.last_submission_at).total_seconds()
+        velocity_threshold = settings.ANTICHEAT_VELOCITY_THRESHOLD_SECONDS
+
+        # If submitting too quickly - flag as suspicious
+        if time_since_last < velocity_threshold:
+            return AntiCheatResult(
+                action=FlagAction.FLAG,
+                flag_type=FlagType.VELOCITY,
+                confidence=FlagConfidence.HIGH,
+                reason=f"Rapid-fire submission detected: {time_since_last:.2f}s between submissions (threshold: {velocity_threshold}s)",
+                metadata={
+                    "time_since_last_submission": time_since_last,
+                    "velocity_threshold": velocity_threshold,
+                    "last_submission_at": meta.last_submission_at.isoformat(),
+                },
+            )
+
+        # Normal pace - accept
         return AntiCheatResult(action=FlagAction.ACCEPT)

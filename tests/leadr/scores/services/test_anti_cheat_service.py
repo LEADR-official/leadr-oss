@@ -403,3 +403,95 @@ class TestAntiCheatServiceDuplicateDetection:
 
         assert result.action == FlagAction.ACCEPT
         assert result.flag_type is None
+
+
+@pytest.mark.asyncio
+class TestAntiCheatServiceVelocityDetection:
+    """Test suite for velocity detection (rapid-fire submissions)."""
+
+    async def test_rapid_submission_flagged(
+        self, db_session: AsyncSession, test_score: Score, test_board
+    ):
+        """Test that submission within 2 seconds is flagged."""
+        from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
+        from leadr.scores.services.anti_cheat_repositories import ScoreSubmissionMetaRepository
+
+        service = AntiCheatService(db_session)
+        meta_repo = ScoreSubmissionMetaRepository(db_session)
+        device_id = uuid4()
+        now = datetime.now(UTC)
+
+        # Create metadata simulating a submission 1 second ago
+        meta = ScoreSubmissionMeta(
+            score_id=test_score.id,
+            device_id=device_id,
+            board_id=test_board.id,
+            submission_count=1,
+            last_submission_at=now - timedelta(seconds=1),
+            last_score_value=500.0,
+        )
+        await meta_repo.create(meta)
+
+        # Submit again within velocity threshold
+        result = await service.check_submission(
+            score=test_score,
+            trust_tier=TrustTier.A,
+            device_id=device_id,
+            board_id=test_board.id,
+        )
+
+        assert result.action == FlagAction.FLAG
+        assert result.flag_type == FlagType.VELOCITY
+        assert result.confidence == FlagConfidence.HIGH
+        assert "rapid" in result.reason.lower() or "velocity" in result.reason.lower()
+
+    async def test_normal_pace_accepted(
+        self, db_session: AsyncSession, test_score: Score, test_board
+    ):
+        """Test that submission after 2+ seconds is accepted."""
+        from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
+        from leadr.scores.services.anti_cheat_repositories import ScoreSubmissionMetaRepository
+
+        service = AntiCheatService(db_session)
+        meta_repo = ScoreSubmissionMetaRepository(db_session)
+        device_id = uuid4()
+        now = datetime.now(UTC)
+
+        # Create metadata simulating a submission 3 seconds ago (above threshold)
+        meta = ScoreSubmissionMeta(
+            score_id=test_score.id,
+            device_id=device_id,
+            board_id=test_board.id,
+            submission_count=1,
+            last_submission_at=now - timedelta(seconds=3),
+            last_score_value=500.0,
+        )
+        await meta_repo.create(meta)
+
+        # Submit again after threshold - should accept
+        result = await service.check_submission(
+            score=test_score,
+            trust_tier=TrustTier.A,
+            device_id=device_id,
+            board_id=test_board.id,
+        )
+
+        assert result.action == FlagAction.ACCEPT
+
+    async def test_first_submission_velocity_check_accepted(
+        self, db_session: AsyncSession, test_score: Score, test_board
+    ):
+        """Test that first submission always passes velocity check."""
+        service = AntiCheatService(db_session)
+        device_id = uuid4()
+
+        # No metadata exists - first submission
+        result = await service.check_submission(
+            score=test_score,
+            trust_tier=TrustTier.A,
+            device_id=device_id,
+            board_id=test_board.id,
+        )
+
+        assert result.action == FlagAction.ACCEPT
+        assert result.flag_type is None
