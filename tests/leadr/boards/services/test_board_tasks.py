@@ -384,7 +384,9 @@ class TestExpireBoards:
         async def mock_get_db_with_commit_error():
             mock_session = MagicMock()
             mock_session.execute = db_session.execute
-            mock_session.commit = AsyncMock(side_effect=DBAPIError("Commit failed", {}, Exception()))
+            mock_session.commit = AsyncMock(
+                side_effect=DBAPIError("Commit failed", {}, Exception())
+            )
             mock_session.rollback = AsyncMock()
             yield mock_session
 
