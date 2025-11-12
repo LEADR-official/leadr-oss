@@ -156,6 +156,16 @@ class CommonSettings(BaseSettings):
         description="Mailgun domain for email sending",
     )
 
+    # Background Task Configuration
+    BACKGROUND_TASK_TEMPLATE_INTERVAL: int = Field(
+        default=60,
+        description="Interval in seconds for processing due board templates (default: 60s)",
+    )
+    BACKGROUND_TASK_EXPIRE_INTERVAL: int = Field(
+        default=60,
+        description="Interval in seconds for expiring boards (default: 60s)",
+    )
+
     @model_validator(mode="after")
     def validate_api_enabled(self):
         """Ensure at least one API (Admin or Client) is enabled."""

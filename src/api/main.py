@@ -44,8 +44,16 @@ async def lifespan(app: FastAPI):
 
     # Register and start background tasks
     scheduler = get_scheduler()
-    scheduler.add_task("process-due-templates", process_due_templates, interval_seconds=60)
-    scheduler.add_task("expire-boards", expire_boards, interval_seconds=60)
+    scheduler.add_task(
+        "process-due-templates",
+        process_due_templates,
+        interval_seconds=settings.BACKGROUND_TASK_TEMPLATE_INTERVAL,
+    )
+    scheduler.add_task(
+        "expire-boards",
+        expire_boards,
+        interval_seconds=settings.BACKGROUND_TASK_EXPIRE_INTERVAL,
+    )
     await scheduler.start()
 
     yield
