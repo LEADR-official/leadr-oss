@@ -3,6 +3,25 @@
 from enum import Enum
 
 
+class TrustTier(str, Enum):
+    """Trust tier for devices/users, determining anti-cheat thresholds.
+
+    Different tiers have different rate limits and detection thresholds:
+    - Tier A (Trusted): Most lenient thresholds, highest rate limits
+    - Tier B (Verified): Moderate thresholds and rate limits
+    - Tier C (Unverified): Strictest thresholds, lowest rate limits
+    """
+
+    A = "A"
+    """Tier A - Trusted devices with verified attestation."""
+
+    B = "B"
+    """Tier B - Verified devices without full attestation."""
+
+    C = "C"
+    """Tier C - Unverified or new devices."""
+
+
 class FlagType(str, Enum):
     """Type of anti-cheat flag detected.
 
