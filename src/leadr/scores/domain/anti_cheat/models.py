@@ -38,16 +38,16 @@ class AntiCheatResult(BaseModel):
 class ScoreSubmissionMeta(Entity):
     """Metadata tracking submission history for anti-cheat analysis.
 
-    Tracks the number and timing of score submissions per user/board combination
+    Tracks the number and timing of score submissions per device/board combination
     to enable detection of suspicious patterns like rapid-fire submissions or
     excessive submission rates.
     """
 
     score_id: UUID = Field(description="ID of the most recent score submission")
-    user_id: UUID = Field(description="ID of the user submitting scores")
+    device_id: UUID = Field(description="ID of the device submitting scores")
     board_id: UUID = Field(description="ID of the board being submitted to")
     submission_count: int = Field(
-        default=1, description="Total number of submissions by this user to this board"
+        default=1, description="Total number of submissions by this device to this board"
     )
     last_submission_at: datetime = Field(
         description="Timestamp of the most recent submission"

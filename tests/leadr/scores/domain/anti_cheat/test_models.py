@@ -15,20 +15,20 @@ class TestScoreSubmissionMeta:
     def test_create_submission_meta(self):
         """Test creating a ScoreSubmissionMeta entity."""
         score_id = uuid4()
-        user_id = uuid4()
+        device_id = uuid4()
         board_id = uuid4()
         now = datetime.now(UTC)
 
         meta = ScoreSubmissionMeta(
             score_id=score_id,
-            user_id=user_id,
+            device_id=device_id,
             board_id=board_id,
             submission_count=1,
             last_submission_at=now,
         )
 
         assert meta.score_id == score_id
-        assert meta.user_id == user_id
+        assert meta.device_id == device_id
         assert meta.board_id == board_id
         assert meta.submission_count == 1
         assert meta.last_submission_at == now
@@ -40,7 +40,7 @@ class TestScoreSubmissionMeta:
         """Test that submission_count defaults to 1."""
         meta = ScoreSubmissionMeta(
             score_id=uuid4(),
-            user_id=uuid4(),
+            device_id=uuid4(),
             board_id=uuid4(),
             last_submission_at=datetime.now(UTC),
         )
@@ -51,7 +51,7 @@ class TestScoreSubmissionMeta:
         """Test updating submission count."""
         meta = ScoreSubmissionMeta(
             score_id=uuid4(),
-            user_id=uuid4(),
+            device_id=uuid4(),
             board_id=uuid4(),
             submission_count=1,
             last_submission_at=datetime.now(UTC),
@@ -66,7 +66,7 @@ class TestScoreSubmissionMeta:
         old_time = datetime.now(UTC)
         meta = ScoreSubmissionMeta(
             score_id=uuid4(),
-            user_id=uuid4(),
+            device_id=uuid4(),
             board_id=uuid4(),
             last_submission_at=old_time,
         )
