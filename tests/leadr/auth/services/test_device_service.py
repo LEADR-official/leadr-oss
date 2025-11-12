@@ -424,7 +424,10 @@ class TestDeviceService:
             id=uuid4(),
             device_id=device_orm.id,
             access_token_hash="hash",
+            refresh_token_hash="refresh_hash",
+            token_version=1,
             expires_at=datetime.now(UTC) + timedelta(hours=1),
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=30),
         )
         db_session.add(valid_session)
         await db_session.commit()
@@ -443,3 +446,284 @@ class TestDeviceService:
                 device = await service.validate_device_token("token")
 
         assert device is None
+
+    async def test_refresh_access_token_success(self, db_session: AsyncSession):
+        """Test successfully refreshing an access token with valid refresh token."""
+        # Create account and game
+        account = AccountORM(
+            id=uuid4(),
+            name="Test Account",
+            slug="test-account",
+        )
+        db_session.add(account)
+        await db_session.commit()
+
+        game = GameORM(
+            id=uuid4(),
+            account_id=account.id,
+            name="Test Game",
+        )
+        db_session.add(game)
+        await db_session.commit()
+
+        # Create device
+        from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM
+
+        device_orm = DeviceORM(
+            id=uuid4(),
+            game_id=game.id,
+            device_id=str(uuid4()),
+            account_id=account.id,
+            first_seen_at=datetime.now(UTC),
+            last_seen_at=datetime.now(UTC),
+        )
+        db_session.add(device_orm)
+        await db_session.commit()
+
+        # Create session with refresh token
+        now = datetime.now(UTC)
+        session = DeviceSessionORM(
+            id=uuid4(),
+            device_id=device_orm.id,
+            access_token_hash="old_access_hash",
+            refresh_token_hash="refresh_hash",
+            token_version=1,
+            expires_at=now + timedelta(hours=1),
+            refresh_expires_at=now + timedelta(days=30),
+        )
+        db_session.add(session)
+        await db_session.commit()
+
+        service = DeviceService(db_session)
+
+        # Mock crypto functions
+        with patch("leadr.auth.services.device_service.validate_refresh_token") as mock_val:
+            mock_val.return_value = {
+                "sub": device_orm.device_id,
+                "game_id": str(game.id),
+                "account_id": str(account.id),
+                "token_version": 1,
+            }
+            with patch("leadr.auth.services.device_service.hash_token") as mock_hash:
+                mock_hash.return_value = "refresh_hash"
+                with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
+                    mock_gen_access.return_value = ("new_access_token", "new_access_hash")
+                    with patch("leadr.auth.services.device_service.generate_refresh_token") as mock_gen_refresh:
+                        mock_gen_refresh.return_value = ("new_refresh_token", "new_refresh_hash")
+
+                        access_token, refresh_token, expires_in = await service.refresh_access_token(
+                            "old_refresh_token"
+                        )
+
+        # Verify tokens returned
+        assert access_token == "new_access_token"
+        assert refresh_token == "new_refresh_token"
+        assert expires_in > 0
+
+        # Verify session was updated with new hashes and incremented version
+        await db_session.refresh(session)
+        assert session.access_token_hash == "new_access_hash"
+        assert session.refresh_token_hash == "new_refresh_hash"
+        assert session.token_version == 2
+
+    async def test_refresh_access_token_rejects_invalid_jwt(self, db_session: AsyncSession):
+        """Test that invalid refresh JWT is rejected."""
+        service = DeviceService(db_session)
+
+        with patch("leadr.auth.services.device_service.validate_refresh_token") as mock_val:
+            mock_val.return_value = None  # Invalid JWT
+
+            result = await service.refresh_access_token("invalid_token")
+
+        assert result is None
+
+    async def test_refresh_access_token_rejects_mismatched_version(self, db_session: AsyncSession):
+        """Test that refresh token with mismatched version is rejected (replay attack)."""
+        # Create account and game
+        account = AccountORM(
+            id=uuid4(),
+            name="Test Account",
+            slug="test-account",
+        )
+        db_session.add(account)
+        await db_session.commit()
+
+        game = GameORM(
+            id=uuid4(),
+            account_id=account.id,
+            name="Test Game",
+        )
+        db_session.add(game)
+        await db_session.commit()
+
+        # Create device
+        from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM
+
+        device_orm = DeviceORM(
+            id=uuid4(),
+            game_id=game.id,
+            device_id=str(uuid4()),
+            account_id=account.id,
+            first_seen_at=datetime.now(UTC),
+            last_seen_at=datetime.now(UTC),
+        )
+        db_session.add(device_orm)
+        await db_session.commit()
+
+        # Create session with token_version=2
+        now = datetime.now(UTC)
+        session = DeviceSessionORM(
+            id=uuid4(),
+            device_id=device_orm.id,
+            access_token_hash="access_hash",
+            refresh_token_hash="refresh_hash",
+            token_version=2,
+            expires_at=now + timedelta(hours=1),
+            refresh_expires_at=now + timedelta(days=30),
+        )
+        db_session.add(session)
+        await db_session.commit()
+
+        service = DeviceService(db_session)
+
+        # JWT claims have token_version=1 (old token)
+        with patch("leadr.auth.services.device_service.validate_refresh_token") as mock_val:
+            mock_val.return_value = {
+                "sub": device_orm.device_id,
+                "game_id": str(game.id),
+                "account_id": str(account.id),
+                "token_version": 1,  # Mismatched version
+            }
+            with patch("leadr.auth.services.device_service.hash_token") as mock_hash:
+                mock_hash.return_value = "refresh_hash"
+
+                result = await service.refresh_access_token("old_refresh_token")
+
+        assert result is None
+
+    async def test_refresh_access_token_rejects_expired_refresh_token(self, db_session: AsyncSession):
+        """Test that expired refresh token is rejected."""
+        # Create account and game
+        account = AccountORM(
+            id=uuid4(),
+            name="Test Account",
+            slug="test-account",
+        )
+        db_session.add(account)
+        await db_session.commit()
+
+        game = GameORM(
+            id=uuid4(),
+            account_id=account.id,
+            name="Test Game",
+        )
+        db_session.add(game)
+        await db_session.commit()
+
+        # Create device
+        from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM
+
+        device_orm = DeviceORM(
+            id=uuid4(),
+            game_id=game.id,
+            device_id=str(uuid4()),
+            account_id=account.id,
+            first_seen_at=datetime.now(UTC),
+            last_seen_at=datetime.now(UTC),
+        )
+        db_session.add(device_orm)
+        await db_session.commit()
+
+        # Create session with expired refresh token
+        now = datetime.now(UTC)
+        session = DeviceSessionORM(
+            id=uuid4(),
+            device_id=device_orm.id,
+            access_token_hash="access_hash",
+            refresh_token_hash="refresh_hash",
+            token_version=1,
+            expires_at=now + timedelta(hours=1),
+            refresh_expires_at=now - timedelta(days=1),  # Expired
+        )
+        db_session.add(session)
+        await db_session.commit()
+
+        service = DeviceService(db_session)
+
+        with patch("leadr.auth.services.device_service.validate_refresh_token") as mock_val:
+            mock_val.return_value = {
+                "sub": device_orm.device_id,
+                "game_id": str(game.id),
+                "account_id": str(account.id),
+                "token_version": 1,
+            }
+            with patch("leadr.auth.services.device_service.hash_token") as mock_hash:
+                mock_hash.return_value = "refresh_hash"
+
+                result = await service.refresh_access_token("expired_refresh_token")
+
+        assert result is None
+
+    async def test_refresh_access_token_rejects_revoked_session(self, db_session: AsyncSession):
+        """Test that refresh token with revoked session is rejected."""
+        # Create account and game
+        account = AccountORM(
+            id=uuid4(),
+            name="Test Account",
+            slug="test-account",
+        )
+        db_session.add(account)
+        await db_session.commit()
+
+        game = GameORM(
+            id=uuid4(),
+            account_id=account.id,
+            name="Test Game",
+        )
+        db_session.add(game)
+        await db_session.commit()
+
+        # Create device
+        from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM
+
+        device_orm = DeviceORM(
+            id=uuid4(),
+            game_id=game.id,
+            device_id=str(uuid4()),
+            account_id=account.id,
+            first_seen_at=datetime.now(UTC),
+            last_seen_at=datetime.now(UTC),
+        )
+        db_session.add(device_orm)
+        await db_session.commit()
+
+        # Create revoked session
+        now = datetime.now(UTC)
+        session = DeviceSessionORM(
+            id=uuid4(),
+            device_id=device_orm.id,
+            access_token_hash="access_hash",
+            refresh_token_hash="refresh_hash",
+            token_version=1,
+            expires_at=now + timedelta(hours=1),
+            refresh_expires_at=now + timedelta(days=30),
+            revoked_at=now - timedelta(minutes=5),  # Revoked
+        )
+        db_session.add(session)
+        await db_session.commit()
+
+        service = DeviceService(db_session)
+
+        with patch("leadr.auth.services.device_service.validate_refresh_token") as mock_val:
+            mock_val.return_value = {
+                "sub": device_orm.device_id,
+                "game_id": str(game.id),
+                "account_id": str(account.id),
+                "token_version": 1,
+            }
+            with patch("leadr.auth.services.device_service.hash_token") as mock_hash:
+                mock_hash.return_value = "refresh_hash"
+
+                result = await service.refresh_access_token("revoked_token")
+
+        assert result is None
