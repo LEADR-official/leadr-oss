@@ -1,12 +1,18 @@
 """Score service for managing score operations."""
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.boards.services.board_service import BoardService
 from leadr.common.services import BaseService
+from leadr.games.services.game_service import GameService
+from leadr.scores.domain.anti_cheat.enums import FlagAction, TrustTier
+from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
 from leadr.scores.domain.score import Score
+from leadr.scores.services.anti_cheat_repositories import ScoreFlagRepository, ScoreSubmissionMetaRepository
+from leadr.scores.services.anti_cheat_service import AntiCheatService
 from leadr.scores.services.repositories import ScoreRepository
 
 
@@ -38,6 +44,8 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         filter_timezone: str | None = None,
         filter_country: str | None = None,
         filter_city: str | None = None,
+        device_id: UUID | None = None,
+        trust_tier: TrustTier = TrustTier.B,
     ) -> Score:
         """Create a new score.
 
@@ -52,6 +60,8 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             filter_timezone: Optional timezone filter for categorization.
             filter_country: Optional country filter for categorization.
             filter_city: Optional city filter for categorization.
+            device_id: Optional ID of the device submitting the score (for anti-cheat).
+            trust_tier: Trust tier of the device (defaults to B/medium trust).
 
         Returns:
             The created Score domain entity.
@@ -59,7 +69,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         Raises:
             EntityNotFoundError: If the board doesn't exist.
             ValueError: If validation fails (board doesn't belong to account,
-                       or game doesn't match board's game).
+                       game doesn't match board's game, or anti-cheat rejects submission).
 
         Example:
             >>> score = await service.create_score(
@@ -69,6 +79,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             ...     user_id=user.id,
             ...     player_name="SpeedRunner99",
             ...     value=123.45,
+            ...     device_id=device.id,
             ... )
         """
         # Three-level validation:
@@ -84,6 +95,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         if board.game_id != game_id:
             raise ValueError(f"Game {game_id} does not match board's game {board.game_id}")
 
+        # Create score entity (before anti-cheat so we can pass it for checking)
         score = Score(
             account_id=account_id,
             game_id=game_id,
@@ -97,7 +109,72 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             filter_city=filter_city,
         )
 
-        return await self.repository.create(score)
+        # Anti-cheat checking (if enabled and device_id provided)
+        anti_cheat_result = None
+        if device_id is not None:
+            # Fetch game to check if anti-cheat is enabled
+            game_service = GameService(self.repository.session)
+            game = await game_service.get_by_id_or_raise(game_id)
+
+            if game.anti_cheat_enabled:
+                # Run anti-cheat checks
+                anti_cheat_service = AntiCheatService(self.repository.session)
+                anti_cheat_result = await anti_cheat_service.check_submission(
+                    score=score,
+                    trust_tier=trust_tier,
+                    device_id=device_id,
+                    board_id=board_id,
+                )
+
+                # If rejected, don't create the score
+                if anti_cheat_result.action == FlagAction.REJECT:
+                    raise ValueError(
+                        f"Score submission rejected by anti-cheat: {anti_cheat_result.reason}"
+                    )
+
+        # Save score to database
+        saved_score = await self.repository.create(score)
+
+        # Post-creation: Update submission metadata and create flags if needed
+        if device_id is not None and anti_cheat_result is not None:
+            meta_repo = ScoreSubmissionMetaRepository(self.repository.session)
+            now = datetime.now(UTC)
+
+            # Get or create submission metadata
+            meta = await meta_repo.get_by_device_and_board(device_id, board_id)
+
+            if meta is None:
+                # Create new metadata
+                meta = ScoreSubmissionMeta(
+                    score_id=saved_score.id,
+                    device_id=device_id,
+                    board_id=board_id,
+                    submission_count=1,
+                    last_submission_at=now,
+                    last_score_value=score.value,
+                )
+                await meta_repo.create(meta)
+            else:
+                # Update existing metadata
+                meta.score_id = saved_score.id
+                meta.submission_count += 1
+                meta.last_submission_at = now
+                meta.last_score_value = score.value
+                await meta_repo.update(meta)
+
+            # Create flag if score was flagged
+            if anti_cheat_result.action == FlagAction.FLAG:
+                flag_repo = ScoreFlagRepository(self.repository.session)
+                flag = ScoreFlag(
+                    score_id=saved_score.id,
+                    flag_type=anti_cheat_result.flag_type,  # type: ignore[arg-type]
+                    confidence=anti_cheat_result.confidence,  # type: ignore[arg-type]
+                    metadata=anti_cheat_result.metadata or {},
+                    status="PENDING",
+                )
+                await flag_repo.create(flag)
+
+        return saved_score
 
     async def get_score(self, score_id: UUID) -> Score | None:
         """Get a score by its ID.
