@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.services.account_service import AccountService
 from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import GameID
 from leadr.games.services.game_service import GameService
 
 
@@ -86,7 +87,7 @@ class TestGameService:
         game_service = GameService(db_session)
         non_existent_id = uuid4()
 
-        game = await game_service.get_game(non_existent_id)
+        game = await game_service.get_game(GameID(non_existent_id))
 
         assert game is None
 
@@ -212,7 +213,7 @@ class TestGameService:
 
         with pytest.raises(EntityNotFoundError) as exc_info:
             await game_service.update_game(
-                game_id=non_existent_id,
+                game_id=GameID(non_existent_id),
                 name="New Name",
             )
 

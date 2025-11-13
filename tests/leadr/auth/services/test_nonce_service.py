@@ -10,6 +10,7 @@ from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import DeviceORM, NonceORM
 from leadr.auth.domain.nonce import NonceStatus
 from leadr.auth.services.nonce_service import NonceService
+from leadr.common.domain.ids import DeviceID
 from leadr.games.adapters.orm import GameORM
 
 
@@ -49,7 +50,7 @@ class TestNonceService:
 
         # Generate nonce
         service = NonceService(db_session)
-        nonce_value, expires_at = await service.generate_nonce(device_id=device.id)
+        nonce_value, expires_at = await service.generate_nonce(device_id=DeviceID(device.id))
 
         # Verify nonce was created
         assert nonce_value is not None
@@ -92,7 +93,9 @@ class TestNonceService:
 
         # Generate nonce with 120 second TTL
         service = NonceService(db_session)
-        nonce_value, expires_at = await service.generate_nonce(device_id=device.id, ttl_seconds=120)
+        nonce_value, expires_at = await service.generate_nonce(
+            device_id=DeviceID(device.id), ttl_seconds=120
+        )
 
         # Verify expiry is approximately 120 seconds from now
         expected_expiry = datetime.now(UTC) + timedelta(seconds=120)
@@ -131,7 +134,7 @@ class TestNonceService:
 
         # Generate nonce
         service = NonceService(db_session)
-        nonce_value, _ = await service.generate_nonce(device_id=device.id)
+        nonce_value, _ = await service.generate_nonce(device_id=DeviceID(device.id))
 
         # Verify nonce exists in database
         repository = service.repository
@@ -139,7 +142,7 @@ class TestNonceService:
 
         assert nonce is not None
         assert nonce.nonce_value == nonce_value
-        assert nonce.device_id == device.id
+        assert nonce.device_id == DeviceID(device.id)
         assert nonce.status == NonceStatus.PENDING
 
     async def test_validate_and_consume_nonce_success(self, db_session: AsyncSession):
@@ -174,10 +177,10 @@ class TestNonceService:
 
         # Generate nonce
         service = NonceService(db_session)
-        nonce_value, _ = await service.generate_nonce(device_id=device.id)
+        nonce_value, _ = await service.generate_nonce(device_id=DeviceID(device.id))
 
         # Validate and consume
-        result = await service.validate_and_consume_nonce(nonce_value, device.id)
+        result = await service.validate_and_consume_nonce(nonce_value, DeviceID(device.id))
 
         assert result is True
 
@@ -223,7 +226,7 @@ class TestNonceService:
         service = NonceService(db_session)
 
         with pytest.raises(ValueError, match="Nonce not found"):
-            await service.validate_and_consume_nonce("unknown-nonce", device.id)
+            await service.validate_and_consume_nonce("unknown-nonce", DeviceID(device.id))
 
     async def test_validate_and_consume_nonce_wrong_device(self, db_session: AsyncSession):
         """Test that using nonce from different device raises ValueError."""
@@ -267,11 +270,11 @@ class TestNonceService:
 
         # Generate nonce for device1
         service = NonceService(db_session)
-        nonce_value, _ = await service.generate_nonce(device_id=device1.id)
+        nonce_value, _ = await service.generate_nonce(device_id=DeviceID(device1.id))
 
         # Try to use nonce with device2
         with pytest.raises(ValueError, match="Nonce does not belong to this device"):
-            await service.validate_and_consume_nonce(nonce_value, device2.id)
+            await service.validate_and_consume_nonce(nonce_value, DeviceID(device2.id))
 
     async def test_validate_and_consume_nonce_already_used(self, db_session: AsyncSession):
         """Test that using nonce twice raises ValueError."""
@@ -305,12 +308,12 @@ class TestNonceService:
 
         # Generate and use nonce
         service = NonceService(db_session)
-        nonce_value, _ = await service.generate_nonce(device_id=device.id)
-        await service.validate_and_consume_nonce(nonce_value, device.id)
+        nonce_value, _ = await service.generate_nonce(device_id=DeviceID(device.id))
+        await service.validate_and_consume_nonce(nonce_value, DeviceID(device.id))
 
         # Try to use same nonce again
         with pytest.raises(ValueError, match="Nonce already used"):
-            await service.validate_and_consume_nonce(nonce_value, device.id)
+            await service.validate_and_consume_nonce(nonce_value, DeviceID(device.id))
 
     async def test_validate_and_consume_nonce_expired(self, db_session: AsyncSession):
         """Test that using expired nonce raises ValueError."""
@@ -345,7 +348,7 @@ class TestNonceService:
         # Create expired nonce directly in DB
         expired_nonce = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=DeviceID(device.id),
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(seconds=1),  # Expired
             status="pending",
@@ -357,7 +360,7 @@ class TestNonceService:
         service = NonceService(db_session)
 
         with pytest.raises(ValueError, match="Nonce expired"):
-            await service.validate_and_consume_nonce(expired_nonce.nonce_value, device.id)
+            await service.validate_and_consume_nonce(expired_nonce.nonce_value, DeviceID(device.id))
 
     async def test_cleanup_expired_nonces_deletes_old_nonces(self, db_session: AsyncSession):
         """Test that cleanup deletes old expired nonces."""
@@ -392,7 +395,7 @@ class TestNonceService:
         # Create old expired nonce (expired 25 hours ago)
         old_nonce = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=DeviceID(device.id),
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(hours=25),
             status="pending",
@@ -402,7 +405,7 @@ class TestNonceService:
         # Create recent expired nonce (expired 30 minutes ago)
         recent_nonce = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=DeviceID(device.id),
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(minutes=30),
             status="pending",
@@ -478,15 +481,15 @@ class TestNonceService:
 
         # Generate nonces for both devices
         service = NonceService(db_session)
-        nonce1, _ = await service.generate_nonce(device_id=device1.id)
-        nonce2, _ = await service.generate_nonce(device_id=device2.id)
+        nonce1, _ = await service.generate_nonce(device_id=DeviceID(device1.id))
+        nonce2, _ = await service.generate_nonce(device_id=DeviceID(device2.id))
 
         # Both nonces should be unique and valid
         assert nonce1 != nonce2
 
         # Each device can use its own nonce
-        result1 = await service.validate_and_consume_nonce(nonce1, device1.id)
-        result2 = await service.validate_and_consume_nonce(nonce2, device2.id)
+        result1 = await service.validate_and_consume_nonce(nonce1, DeviceID(device1.id))
+        result2 = await service.validate_and_consume_nonce(nonce2, DeviceID(device2.id))
 
         assert result1 is True
         assert result2 is True

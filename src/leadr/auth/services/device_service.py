@@ -16,6 +16,7 @@ from leadr.auth.services.device_token_crypto import (
 )
 from leadr.auth.services.repositories import DeviceRepository, DeviceSessionRepository
 from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import AccountID, GameID
 from leadr.common.services import BaseService
 from leadr.config import settings
 from leadr.games.adapters.orm import GameORM
@@ -44,7 +45,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
 
     async def start_session(
         self,
-        game_id: UUID,
+        game_id: GameID,
         device_id: str,
         platform: str | None = None,
         ip_address: str | None = None,
@@ -73,11 +74,13 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             EntityNotFoundError: If game doesn't exist
         """
         # Verify game exists and get account_id
-        game_orm = await self.session.get(GameORM, game_id)
+        # Extract UUID from GameID if needed, otherwise use plain UUID
+        game_uuid = game_id.uuid if hasattr(game_id, "uuid") else game_id
+        game_orm = await self.session.get(GameORM, game_uuid)
         if not game_orm:
             raise EntityNotFoundError("Game", str(game_id))
 
-        account_id = game_orm.account_id
+        account_id = AccountID(game_orm.account_id)
 
         # Get or create device
         device = await self.repository.get_by_game_and_device_id(game_id, device_id)
@@ -159,7 +162,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
 
         # Extract claims
         device_id = claims["sub"]
-        game_id = UUID(claims["game_id"])
+        game_id = GameID(UUID(claims["game_id"]))
 
         # Get device
         device = await self.repository.get_by_game_and_device_id(game_id, device_id)
@@ -227,8 +230,8 @@ class DeviceService(BaseService[Device, DeviceRepository]):
 
         # Extract claims for token generation
         device_id = claims["sub"]
-        game_id = UUID(claims["game_id"])
-        account_id = UUID(claims["account_id"])
+        game_id = GameID(UUID(claims["game_id"]))
+        account_id = AccountID(UUID(claims["account_id"]))
 
         # Generate new access token
         access_expires_delta = timedelta(hours=settings.ACCESS_TOKEN_EXPIRY_HOURS)

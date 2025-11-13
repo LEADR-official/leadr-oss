@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from leadr.common.domain.ids import DeviceID
 from leadr.scores.adapters.orm import ScoreFlagORM, ScoreSubmissionMetaORM
 from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
@@ -17,12 +18,12 @@ class TestScoreSubmissionMetaORM:
     async def test_create_submission_meta_orm(self, db_session, test_score):
         """Test creating a ScoreSubmissionMetaORM instance."""
         now = datetime.now(UTC)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
 
         orm = ScoreSubmissionMetaORM(
-            score_id=test_score.id,
+            score_id=test_score.id.uuid,
             device_id=device_id,
-            board_id=test_score.board_id,
+            board_id=test_score.board_id.uuid,
             submission_count=1,
             last_submission_at=now,
         )
@@ -31,21 +32,21 @@ class TestScoreSubmissionMetaORM:
         await db_session.commit()
 
         assert orm.id is not None
-        assert orm.score_id == test_score.id
+        assert orm.score_id == test_score.id.uuid
         assert orm.device_id == device_id
-        assert orm.board_id == test_score.board_id
+        assert orm.board_id == test_score.board_id.uuid
         assert orm.submission_count == 1
         assert orm.last_submission_at == now
 
     async def test_submission_meta_to_domain(self, db_session, test_score):
         """Test converting ORM to domain entity."""
         now = datetime.now(UTC)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
 
         orm = ScoreSubmissionMetaORM(
-            score_id=test_score.id,
+            score_id=test_score.id.uuid,
             device_id=device_id,
-            board_id=test_score.board_id,
+            board_id=test_score.board_id.uuid,
             submission_count=5,
             last_submission_at=now,
         )
@@ -68,7 +69,7 @@ class TestScoreSubmissionMetaORM:
     async def test_submission_meta_from_domain(self, db_session, test_score):
         """Test converting domain entity to ORM."""
         now = datetime.now(UTC)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
 
         domain = ScoreSubmissionMeta(
             score_id=test_score.id,
@@ -81,9 +82,9 @@ class TestScoreSubmissionMetaORM:
         orm = ScoreSubmissionMetaORM.from_domain(domain)
 
         assert orm.id == domain.id
-        assert orm.score_id == test_score.id
+        assert orm.score_id == test_score.id.uuid
         assert orm.device_id == device_id
-        assert orm.board_id == test_score.board_id
+        assert orm.board_id == test_score.board_id.uuid
         assert orm.submission_count == 3
         assert orm.last_submission_at == now
         assert orm.created_at == domain.created_at
@@ -97,7 +98,7 @@ class TestScoreFlagORM:
     async def test_create_score_flag_orm(self, db_session, test_score):
         """Test creating a ScoreFlagORM instance."""
         orm = ScoreFlagORM(
-            score_id=test_score.id,
+            score_id=test_score.id.uuid,
             flag_type=FlagType.RATE_LIMIT.value,
             confidence=FlagConfidence.HIGH.value,
             flag_metadata={"submissions_count": 101, "limit": 100},
@@ -108,7 +109,7 @@ class TestScoreFlagORM:
         await db_session.commit()
 
         assert orm.id is not None
-        assert orm.score_id == test_score.id
+        assert orm.score_id == test_score.id.uuid
         assert orm.flag_type == "RATE_LIMIT"
         assert orm.confidence == "HIGH"
         assert orm.flag_metadata == {"submissions_count": 101, "limit": 100}
@@ -120,7 +121,7 @@ class TestScoreFlagORM:
     async def test_score_flag_to_domain(self, db_session, test_score):
         """Test converting ORM to domain entity."""
         orm = ScoreFlagORM(
-            score_id=test_score.id,
+            score_id=test_score.id.uuid,
             flag_type=FlagType.DUPLICATE.value,
             confidence=FlagConfidence.MEDIUM.value,
             flag_metadata={"duplicate_count": 3},
@@ -154,7 +155,7 @@ class TestScoreFlagORM:
         orm = ScoreFlagORM.from_domain(domain)
 
         assert orm.id == domain.id
-        assert orm.score_id == test_score.id
+        assert orm.score_id == test_score.id.uuid
         assert orm.flag_type == "VELOCITY"
         assert orm.confidence == "HIGH"
         assert orm.flag_metadata == {"time_delta_seconds": 0.5}
@@ -166,13 +167,13 @@ class TestScoreFlagORM:
         reviewed_at = datetime.now(UTC)
 
         orm = ScoreFlagORM(
-            score_id=test_score.id,
+            score_id=test_score.id.uuid,
             flag_type=FlagType.OUTLIER.value,
             confidence=FlagConfidence.MEDIUM.value,
             flag_metadata={"z_score": 4.5},
             status="FALSE_POSITIVE",
             reviewed_at=reviewed_at,
-            reviewer_id=test_user.id,
+            reviewer_id=test_user.id.uuid,
             reviewer_decision="Legitimate exceptional performance",
         )
 
@@ -183,7 +184,8 @@ class TestScoreFlagORM:
 
         assert domain.status == "FALSE_POSITIVE"
         assert domain.reviewed_at == reviewed_at
-        assert domain.reviewer_id == test_user.id
+        assert domain.reviewer_id is not None
+        assert domain.reviewer_id.uuid == test_user.id.uuid
         assert domain.reviewer_decision == "Legitimate exceptional performance"
 
     async def test_metadata_persistence(self, db_session, test_score):
@@ -197,7 +199,7 @@ class TestScoreFlagORM:
         }
 
         orm = ScoreFlagORM(
-            score_id=test_score.id,
+            score_id=test_score.id.uuid,
             flag_type=FlagType.OUTLIER.value,
             confidence=FlagConfidence.MEDIUM.value,
             flag_metadata=complex_metadata,

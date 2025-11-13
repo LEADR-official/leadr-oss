@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +9,7 @@ from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
 from leadr.boards.domain.interval_parser import parse_interval_to_timedelta
 from leadr.boards.services.repositories import BoardRepository
 from leadr.boards.services.short_code_generator import generate_unique_short_code
+from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
 from leadr.common.services import BaseService
 from leadr.games.services.game_service import GameService
 
@@ -35,8 +35,8 @@ class BoardService(BaseService[Board, BoardRepository]):
 
     async def create_board(
         self,
-        account_id: UUID,
-        game_id: UUID,
+        account_id: AccountID,
+        game_id: GameID,
         name: str,
         icon: str,
         unit: str,
@@ -44,7 +44,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         sort_direction: SortDirection,
         keep_strategy: KeepStrategy,
         short_code: str | None = None,
-        template_id: UUID | None = None,
+        template_id: BoardTemplateID | None = None,
         template_name: str | None = None,
         starts_at: datetime | None = None,
         ends_at: datetime | None = None,
@@ -183,7 +183,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             tags=tags,
         )
 
-    async def get_board(self, board_id: UUID) -> Board | None:
+    async def get_board(self, board_id: BoardID) -> Board | None:
         """Get a board by its ID.
 
         Args:
@@ -205,7 +205,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         """
         return await self.repository.get_by_short_code(short_code)
 
-    async def list_boards_by_account(self, account_id: UUID) -> list[Board]:
+    async def list_boards_by_account(self, account_id: AccountID) -> list[Board]:
         """List all boards for an account.
 
         Args:
@@ -217,7 +217,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         return await self.repository.filter(account_id)
 
     async def list_boards(
-        self, account_id: UUID | None = None, code: str | None = None
+        self, account_id: AccountID | None = None, code: str | None = None
     ) -> list[Board]:
         """List boards with optional filtering by account_id and/or code.
 
@@ -232,7 +232,7 @@ class BoardService(BaseService[Board, BoardRepository]):
 
     async def update_board(
         self,
-        board_id: UUID,
+        board_id: BoardID,
         name: str | None = None,
         icon: str | None = None,
         short_code: str | None = None,
@@ -240,7 +240,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         is_active: bool | None = None,
         sort_direction: SortDirection | None = None,
         keep_strategy: KeepStrategy | None = None,
-        template_id: UUID | None = None,
+        template_id: BoardTemplateID | None = None,
         template_name: str | None = None,
         starts_at: datetime | None = None,
         ends_at: datetime | None = None,

@@ -2,11 +2,11 @@
 
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.boards.services.board_service import BoardService
+from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.common.services import BaseService
 from leadr.games.services.game_service import GameService
 from leadr.scores.domain.anti_cheat.enums import FlagAction, TrustTier
@@ -38,10 +38,10 @@ class ScoreService(BaseService[Score, ScoreRepository]):
 
     async def create_score(
         self,
-        account_id: UUID,
-        game_id: UUID,
-        board_id: UUID,
-        device_id: UUID,
+        account_id: AccountID,
+        game_id: GameID,
+        board_id: BoardID,
+        device_id: DeviceID,
         player_name: str,
         value: float,
         value_display: str | None = None,
@@ -144,8 +144,8 @@ class ScoreService(BaseService[Score, ScoreRepository]):
     async def update_submission_metadata(
         self,
         saved_score: Score,
-        device_id: UUID,
-        board_id: UUID,
+        device_id: DeviceID,
+        board_id: BoardID,
         anti_cheat_result: AntiCheatResult | None,
     ) -> None:
         """Update submission metadata and create flags if needed.
@@ -201,7 +201,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             )
             await flag_repo.create(flag)
 
-    async def get_score(self, score_id: UUID) -> Score | None:
+    async def get_score(self, score_id: ScoreID) -> Score | None:
         """Get a score by its ID.
 
         Args:
@@ -214,10 +214,10 @@ class ScoreService(BaseService[Score, ScoreRepository]):
 
     async def list_scores(
         self,
-        account_id: UUID,
-        board_id: UUID | None = None,
-        game_id: UUID | None = None,
-        device_id: UUID | None = None,
+        account_id: AccountID,
+        board_id: BoardID | None = None,
+        game_id: GameID | None = None,
+        device_id: DeviceID | None = None,
     ) -> list[Score]:
         """List scores for an account with optional filters.
 
@@ -239,7 +239,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
 
     async def update_score(
         self,
-        score_id: UUID,
+        score_id: ScoreID,
         player_name: str | None = None,
         value: float | None = None,
         value_display: str | None = None,

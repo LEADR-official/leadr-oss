@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
 from leadr.auth.domain.nonce import Nonce, NonceStatus
+from leadr.common.domain.ids import AccountID, DeviceID, DeviceSessionID, GameID, NonceID
 from leadr.common.orm import Base
 
 if TYPE_CHECKING:
@@ -151,13 +152,13 @@ class DeviceORM(Base):
     def from_domain(cls, device: Device) -> "DeviceORM":
         """Convert Device domain entity to ORM model."""
         return cls(
-            id=device.id,
+            id=device.id.uuid,
             created_at=device.created_at,
             updated_at=device.updated_at,
             deleted_at=device.deleted_at,
-            game_id=device.game_id,
+            game_id=device.game_id.uuid,
             device_id=device.device_id,
-            account_id=device.account_id,
+            account_id=device.account_id.uuid,
             platform=device.platform,
             status=DeviceStatusEnum(device.status.value),
             first_seen_at=device.first_seen_at,
@@ -168,13 +169,13 @@ class DeviceORM(Base):
     def to_domain(self) -> Device:
         """Convert ORM model to Device domain entity."""
         return Device(
-            id=self.id,
+            id=DeviceID(self.id),
             created_at=self.created_at,
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
-            game_id=self.game_id,
+            game_id=GameID(self.game_id),
             device_id=self.device_id,
-            account_id=self.account_id,
+            account_id=AccountID(self.account_id),
             platform=self.platform,
             status=DeviceStatus(self.status.value),
             first_seen_at=self.first_seen_at,
@@ -244,11 +245,11 @@ class DeviceSessionORM(Base):
     def from_domain(cls, session: DeviceSession) -> "DeviceSessionORM":
         """Convert DeviceSession domain entity to ORM model."""
         return cls(
-            id=session.id,
+            id=session.id.uuid,
             created_at=session.created_at,
             updated_at=session.updated_at,
             deleted_at=session.deleted_at,
-            device_id=session.device_id,
+            device_id=session.device_id.uuid,
             access_token_hash=session.access_token_hash,
             refresh_token_hash=session.refresh_token_hash,
             token_version=session.token_version,
@@ -262,11 +263,11 @@ class DeviceSessionORM(Base):
     def to_domain(self) -> DeviceSession:
         """Convert ORM model to DeviceSession domain entity."""
         return DeviceSession(
-            id=self.id,
+            id=DeviceSessionID(self.id),
             created_at=self.created_at,
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
-            device_id=self.device_id,
+            device_id=DeviceID(self.device_id),
             access_token_hash=self.access_token_hash,
             refresh_token_hash=self.refresh_token_hash,
             token_version=self.token_version,
@@ -336,11 +337,11 @@ class NonceORM(Base):
     def from_domain(cls, nonce: Nonce) -> "NonceORM":
         """Convert Nonce domain entity to ORM model."""
         return cls(
-            id=nonce.id,
+            id=nonce.id.uuid,
             created_at=nonce.created_at,
             updated_at=nonce.updated_at,
             deleted_at=nonce.deleted_at,
-            device_id=nonce.device_id,
+            device_id=nonce.device_id.uuid,
             nonce_value=nonce.nonce_value,
             expires_at=nonce.expires_at,
             used_at=nonce.used_at,
@@ -354,11 +355,11 @@ class NonceORM(Base):
             self.status.value if isinstance(self.status, NonceStatusEnum) else self.status
         )
         return Nonce(
-            id=self.id,
+            id=NonceID(self.id),
             created_at=self.created_at,
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
-            device_id=self.device_id,
+            device_id=DeviceID(self.device_id),
             nonce_value=self.nonce_value,
             expires_at=self.expires_at,
             used_at=self.used_at,

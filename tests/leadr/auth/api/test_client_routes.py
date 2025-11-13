@@ -167,7 +167,7 @@ class TestClientSessionRoutes:
         response = await client.post(
             "/client/sessions",
             json={
-                "game_id": "00000000-0000-0000-0000-000000000000",
+                "game_id": "gam_00000000-0000-0000-0000-000000000000",
                 "device_id": str(uuid4()),
             },
         )
@@ -586,7 +586,7 @@ class TestNonceIntegration:
         # Manually create an expired nonce
         expired_nonce = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=device.id.uuid,
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(seconds=1),  # Expired 1 second ago
             status="pending",

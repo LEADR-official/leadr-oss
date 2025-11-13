@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from leadr.boards.adapters.orm import BoardTemplateORM
 from leadr.boards.domain.board_template import BoardTemplate
+from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 
 
 class TestBoardTemplateORM:
@@ -12,9 +13,9 @@ class TestBoardTemplateORM:
 
     def test_board_template_orm_to_domain_with_all_fields(self):
         """Test converting ORM model to domain entity with all fields."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
         next_run_at = now + timedelta(days=7)
 
@@ -53,9 +54,9 @@ class TestBoardTemplateORM:
 
     def test_board_template_orm_to_domain_with_minimal_fields(self):
         """Test converting ORM model to domain entity with minimal fields."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
         next_run_at = now + timedelta(days=1)
 
@@ -84,9 +85,9 @@ class TestBoardTemplateORM:
 
     def test_board_template_domain_to_orm_with_all_fields(self):
         """Test converting domain entity to ORM model with all fields."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
         next_run_at = now + timedelta(days=7)
 
@@ -124,9 +125,9 @@ class TestBoardTemplateORM:
 
     def test_board_template_domain_to_orm_with_minimal_fields(self):
         """Test converting domain entity to ORM model with minimal fields."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
         next_run_at = now + timedelta(days=1)
 
@@ -152,9 +153,9 @@ class TestBoardTemplateORM:
 
     def test_board_template_orm_roundtrip_conversion(self):
         """Test that converting ORM -> Domain -> ORM preserves all data."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
         next_run_at = now + timedelta(days=30)
 
@@ -199,9 +200,9 @@ class TestBoardTemplateORM:
 
     def test_board_template_domain_roundtrip_conversion(self):
         """Test that converting Domain -> ORM -> Domain preserves all data."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
         next_run_at = now + timedelta(days=7)
         deleted_at = now - timedelta(days=1)
@@ -243,9 +244,9 @@ class TestBoardTemplateORM:
 
     def test_board_template_config_jsonb_serialization(self):
         """Test that config dict properly serializes to JSONB."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         # Complex nested config
@@ -277,9 +278,9 @@ class TestBoardTemplateORM:
 
     def test_board_template_config_template_jsonb_serialization(self):
         """Test that config_template dict properly serializes to JSONB."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         # Complex nested config_template

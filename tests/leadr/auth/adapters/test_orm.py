@@ -12,6 +12,7 @@ from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM, DeviceStatusEnum, NonceORM
 from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
 from leadr.auth.domain.nonce import Nonce, NonceStatus
+from leadr.common.domain.ids import AccountID, DeviceID, DeviceSessionID, GameID, NonceID
 from leadr.games.adapters.orm import GameORM
 
 
@@ -325,11 +326,11 @@ class TestDeviceORM:
         """Test converting Device domain to ORM model."""
         now = datetime.now(UTC)
         device_id_val = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
 
         device_domain = Device(
-            id=device_id_val,
+            id=DeviceID(device_id_val),
             game_id=game_id,
             device_id="test-device",
             account_id=account_id,
@@ -389,7 +390,7 @@ class TestDeviceSessionORM:
         await db_session.commit()
 
         # Create session
-        session_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
         now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
 
@@ -572,8 +573,8 @@ class TestDeviceSessionORM:
         """Test converting DeviceSession ORM to domain entity."""
         now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
 
         session_orm = DeviceSessionORM(
             id=session_id,
@@ -606,8 +607,8 @@ class TestDeviceSessionORM:
         """Test converting DeviceSession domain to ORM model."""
         now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         revoked_at = now + timedelta(minutes=30)
 
         session_domain = DeviceSession(
@@ -672,7 +673,7 @@ class TestNonceORM:
         await db_session.commit()
 
         # Create nonce
-        nonce_id = uuid4()
+        nonce_id = NonceID(uuid4())
         nonce_value = str(uuid4())
         expires_at = datetime.now(UTC) + timedelta(seconds=60)
 
@@ -850,8 +851,8 @@ class TestNonceORM:
         now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=60)
         used_at = now + timedelta(seconds=30)
-        nonce_id = uuid4()
-        device_id = uuid4()
+        nonce_id = NonceID(uuid4())
+        device_id = DeviceID(uuid4())
         nonce_value = str(uuid4())
 
         nonce_orm = NonceORM(
@@ -880,8 +881,8 @@ class TestNonceORM:
         """Test converting Nonce domain to ORM model."""
         now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=60)
-        nonce_id = uuid4()
-        device_id = uuid4()
+        nonce_id = NonceID(uuid4())
+        device_id = DeviceID(uuid4())
         nonce_value = str(uuid4())
 
         nonce_domain = Nonce(

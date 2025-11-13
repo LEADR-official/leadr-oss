@@ -13,6 +13,7 @@ from leadr.accounts.services.user_service import UserService
 from leadr.auth.dependencies import require_api_key
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.api_key_service import APIKeyService
+from leadr.common.domain.ids import AccountID
 
 
 @pytest.mark.asyncio
@@ -35,7 +36,7 @@ class TestRequireAPIKey:
         """Test that an invalid/unknown API key raises 401 Unauthorized."""
         # Create account and valid key first (to ensure DB works)
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -79,7 +80,7 @@ class TestRequireAPIKey:
         """Test that a valid API key returns the APIKey entity."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -125,7 +126,7 @@ class TestRequireAPIKey:
         """Test that an expired API key raises 401 Unauthorized."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -171,7 +172,7 @@ class TestRequireAPIKey:
         """Test that a revoked API key raises 401 Unauthorized."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -219,7 +220,7 @@ class TestRequireAPIKey:
         """Test that a soft-deleted API key raises 401 Unauthorized."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -265,7 +266,7 @@ class TestRequireAPIKey:
         """Test that using a valid API key updates the last_used_at timestamp."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(

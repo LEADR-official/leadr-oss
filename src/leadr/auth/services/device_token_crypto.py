@@ -4,15 +4,17 @@ import hashlib
 import hmac
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import jwt
+
+from leadr.common.domain.ids import AccountID, GameID
 
 
 def generate_access_token(
     device_id: str,
-    game_id: UUID,
-    account_id: UUID,
+    game_id: GameID,
+    account_id: AccountID,
     expires_delta: timedelta,
     secret: str,
 ) -> tuple[str, str]:
@@ -48,8 +50,8 @@ def generate_access_token(
 
     payload = {
         "sub": device_id,  # Subject: device_id
-        "game_id": str(game_id),
-        "account_id": str(account_id),
+        "game_id": str(game_id.uuid),
+        "account_id": str(account_id.uuid),
         "exp": int(exp.timestamp()),
         "iat": int(now.timestamp()),
         "jti": str(uuid4()),  # Unique token ID
@@ -95,8 +97,8 @@ def validate_access_token(token: str, secret: str) -> dict[str, Any] | None:
 
 def generate_refresh_token(
     device_id: str,
-    game_id: UUID,
-    account_id: UUID,
+    game_id: GameID,
+    account_id: AccountID,
     token_version: int,
     expires_delta: timedelta,
     secret: str,
@@ -137,8 +139,8 @@ def generate_refresh_token(
 
     payload = {
         "sub": device_id,  # Subject: device_id
-        "game_id": str(game_id),
-        "account_id": str(account_id),
+        "game_id": str(game_id.uuid),
+        "account_id": str(account_id.uuid),
         "token_version": token_version,  # For token rotation
         "exp": int(exp.timestamp()),
         "iat": int(now.timestamp()),

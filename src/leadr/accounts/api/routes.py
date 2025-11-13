@@ -1,7 +1,8 @@
 """Account and User API routes."""
 
-from fastapi import APIRouter, HTTPException, status
-from pydantic import UUID4
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.accounts.api.schemas import (
@@ -19,6 +20,7 @@ from leadr.auth.dependencies import (
     QueryAccountIDDep,
     validate_body_account_id,
 )
+from leadr.common.domain.ids import AccountID, UserID
 
 router = APIRouter()
 
@@ -62,7 +64,7 @@ async def create_account(
 
 @router.get("/accounts/{account_id}", response_model=AccountResponse)
 async def get_account(
-    account_id: UUID4,
+    account_id: AccountID,
     service: AccountServiceDep,
     auth: AuthContextDep,
 ) -> AccountResponse:
@@ -120,7 +122,7 @@ async def list_accounts(
 
 @router.patch("/accounts/{account_id}", response_model=AccountResponse)
 async def update_account(
-    account_id: UUID4,
+    account_id: AccountID,
     request: AccountUpdateRequest,
     service: AccountServiceDep,
     auth: AuthContextDep,
@@ -221,7 +223,7 @@ async def create_user(
 
 @router.get("/users/{user_id}", response_model=UserResponse)
 async def get_user(
-    user_id: UUID4,
+    user_id: UserID,
     service: UserServiceDep,
     auth: AuthContextDep,
 ) -> UserResponse:
@@ -278,7 +280,7 @@ async def list_users(
 
 @router.patch("/users/{user_id}", response_model=UserResponse)
 async def update_user(
-    user_id: UUID4,
+    user_id: UserID,
     request: UserUpdateRequest,
     service: UserServiceDep,
     auth: AuthContextDep,

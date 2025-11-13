@@ -8,6 +8,7 @@ from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSON, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from leadr.common.domain.ids import BoardID, DeviceID, ScoreID, UserID
 from leadr.common.orm import Base
 
 if TYPE_CHECKING:
@@ -84,13 +85,14 @@ class ScoreSubmissionMetaORM(Base):
 
     def to_domain(self) -> "ScoreSubmissionMeta":
         """Convert ORM model to domain entity."""
+        from leadr.common.domain.ids import ScoreSubmissionMetaID
         from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
 
         return ScoreSubmissionMeta(
-            id=self.id,
-            score_id=self.score_id,
-            device_id=self.device_id,
-            board_id=self.board_id,
+            id=ScoreSubmissionMetaID(self.id),
+            score_id=ScoreID(self.score_id),
+            device_id=DeviceID(self.device_id),
+            board_id=BoardID(self.board_id),
             submission_count=self.submission_count,
             last_submission_at=self.last_submission_at,
             last_score_value=self.last_score_value,
@@ -103,10 +105,10 @@ class ScoreSubmissionMetaORM(Base):
     def from_domain(entity: "ScoreSubmissionMeta") -> "ScoreSubmissionMetaORM":
         """Convert domain entity to ORM model."""
         return ScoreSubmissionMetaORM(
-            id=entity.id,
-            score_id=entity.score_id,
-            device_id=entity.device_id,
-            board_id=entity.board_id,
+            id=entity.id.uuid,
+            score_id=entity.score_id.uuid,
+            device_id=entity.device_id.uuid,
+            board_id=entity.board_id.uuid,
             submission_count=entity.submission_count,
             last_submission_at=entity.last_submission_at,
             last_score_value=entity.last_score_value,
@@ -144,6 +146,7 @@ class ScoreFlagORM(Base):
 
     def to_domain(self) -> "ScoreFlag":
         """Convert ORM model to domain entity."""
+        from leadr.common.domain.ids import ScoreFlagID
         from leadr.scores.domain.anti_cheat.enums import (
             FlagConfidence,
             FlagType,
@@ -152,14 +155,14 @@ class ScoreFlagORM(Base):
         from leadr.scores.domain.anti_cheat.models import ScoreFlag
 
         return ScoreFlag(
-            id=self.id,
-            score_id=self.score_id,
+            id=ScoreFlagID(self.id),
+            score_id=ScoreID(self.score_id),
             flag_type=FlagType(self.flag_type),
             confidence=FlagConfidence(self.confidence),
             metadata=self.flag_metadata,
             status=ScoreFlagStatus(self.status),
             reviewed_at=self.reviewed_at,
-            reviewer_id=self.reviewer_id,
+            reviewer_id=UserID(self.reviewer_id) if self.reviewer_id else None,
             reviewer_decision=self.reviewer_decision,
             created_at=self.created_at,
             updated_at=self.updated_at,
@@ -170,14 +173,14 @@ class ScoreFlagORM(Base):
     def from_domain(entity: "ScoreFlag") -> "ScoreFlagORM":
         """Convert domain entity to ORM model."""
         return ScoreFlagORM(
-            id=entity.id,
-            score_id=entity.score_id,
+            id=entity.id.uuid,
+            score_id=entity.score_id.uuid,
             flag_type=entity.flag_type.value,
             confidence=entity.confidence.value,
             flag_metadata=entity.metadata,
             status=entity.status.value,
             reviewed_at=entity.reviewed_at,
-            reviewer_id=entity.reviewer_id,
+            reviewer_id=entity.reviewer_id.uuid if entity.reviewer_id else None,
             reviewer_decision=entity.reviewer_decision,
             created_at=entity.created_at,
             updated_at=entity.updated_at,

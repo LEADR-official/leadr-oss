@@ -1,9 +1,8 @@
 """User domain model."""
 
-from uuid import UUID
-
 from pydantic import EmailStr, Field, field_validator
 
+from leadr.common.domain.ids import AccountID, UserID
 from leadr.common.domain.models import Entity
 
 
@@ -22,7 +21,12 @@ class User(Entity):
     across all accounts in the system.
     """
 
-    account_id: UUID = Field(
+    id: UserID = Field(
+        frozen=True,
+        default_factory=UserID,
+        description="Unique user identifier",
+    )
+    account_id: AccountID = Field(
         frozen=True, description="ID of the account this user belongs to (immutable)"
     )
     email: EmailStr = Field(description="User's email address (validated format)")

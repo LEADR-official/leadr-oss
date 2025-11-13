@@ -2,10 +2,10 @@
 
 from datetime import UTC, datetime
 from enum import Enum
-from uuid import UUID
 
 from pydantic import Field
 
+from leadr.common.domain.ids import DeviceID, NonceID
 from leadr.common.domain.models import Entity
 
 
@@ -28,7 +28,12 @@ class Nonce(Entity):
     is fresh and authorized by the server.
     """
 
-    device_id: UUID = Field(description="Device that owns this nonce")
+    id: NonceID = Field(
+        frozen=True,
+        default_factory=NonceID,
+        description="Unique nonce identifier",
+    )
+    device_id: DeviceID = Field(description="Device that owns this nonce")
     nonce_value: str = Field(description="Unique nonce value (UUID string)")
     expires_at: datetime = Field(description="Nonce expiration timestamp")
     used_at: datetime | None = Field(default=None, description="When nonce was consumed")

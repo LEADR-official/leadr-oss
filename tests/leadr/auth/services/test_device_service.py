@@ -11,6 +11,7 @@ from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.domain.device import DeviceStatus
 from leadr.auth.services.device_service import DeviceService
 from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import AccountID, GameID
 from leadr.games.adapters.orm import GameORM
 
 
@@ -49,7 +50,7 @@ class TestDeviceService:
                 mock_gen_refresh.return_value = ("mock_refresh_token", "mock_refresh_hash")
 
                 device, access_token, refresh_token, expires_in = await service.start_session(
-                    game_id=game.id,
+                    game_id=GameID(game.id),
                     device_id=device_id,
                     platform="ios",
                     ip_address="192.168.1.1",
@@ -96,7 +97,7 @@ class TestDeviceService:
             ) as mock_gen_refresh:
                 mock_gen_refresh.return_value = ("refresh1", "refresh_hash1")
                 device1, _, _, _ = await service.start_session(
-                    game_id=game.id,
+                    game_id=GameID(game.id),
                     device_id=device_id,
                     platform="ios",
                 )
@@ -110,7 +111,7 @@ class TestDeviceService:
             ) as mock_gen_refresh:
                 mock_gen_refresh.return_value = ("refresh2", "refresh_hash2")
                 device2, _, _, _ = await service.start_session(
-                    game_id=game.id,
+                    game_id=GameID(game.id),
                     device_id=device_id,
                     platform="ios",
                 )
@@ -148,7 +149,7 @@ class TestDeviceService:
                 mock_gen_refresh.return_value = ("test_refresh", "test_refresh_hash")
 
                 device, access_token, refresh_token, expires_in = await service.start_session(
-                    game_id=game.id,
+                    game_id=GameID(game.id),
                     device_id=device_id,
                     platform="android",
                     ip_address="10.0.0.1",
@@ -159,7 +160,7 @@ class TestDeviceService:
         from leadr.auth.services.repositories import DeviceSessionRepository
 
         session_repo = DeviceSessionRepository(db_session)
-        sessions = await session_repo.filter(account_id=account.id)
+        sessions = await session_repo.filter(account_id=AccountID(account.id))
         assert len(sessions) == 1
         assert sessions[0].device_id == device.id
         assert sessions[0].access_token_hash == "test_hash"
@@ -172,7 +173,7 @@ class TestDeviceService:
 
         with pytest.raises(EntityNotFoundError):
             await service.start_session(
-                game_id=uuid4(),
+                game_id=GameID(uuid4()),
                 device_id=str(uuid4()),
                 platform="ios",
             )
@@ -206,7 +207,7 @@ class TestDeviceService:
                 mock_gen_refresh.return_value = ("refresh", "refresh_hash")
 
                 _, _, _, expires_in = await service.start_session(
-                    game_id=game.id,
+                    game_id=GameID(game.id),
                     device_id=str(uuid4()),
                     platform="ios",
                 )
@@ -250,7 +251,7 @@ class TestDeviceService:
             ) as mock_gen_refresh:
                 mock_gen_refresh.return_value = ("test_refresh", "test_refresh_hash")
                 created_device, access_token, refresh_token, _ = await service.start_session(
-                    game_id=game.id,
+                    game_id=GameID(game.id),
                     device_id=device_id,
                     platform="ios",
                 )
@@ -310,7 +311,7 @@ class TestDeviceService:
 
         device_orm = DeviceORM(
             id=uuid4(),
-            game_id=game.id,
+            game_id=GameID(game.id),
             device_id=str(uuid4()),
             account_id=account.id,
             platform="ios",
@@ -374,7 +375,7 @@ class TestDeviceService:
 
         device_orm = DeviceORM(
             id=uuid4(),
-            game_id=game.id,
+            game_id=GameID(game.id),
             device_id=str(uuid4()),
             account_id=account.id,
             platform="android",
@@ -439,7 +440,7 @@ class TestDeviceService:
 
         device_orm = DeviceORM(
             id=uuid4(),
-            game_id=game.id,
+            game_id=GameID(game.id),
             device_id=str(uuid4()),
             account_id=account.id,
             platform="ios",
@@ -502,7 +503,7 @@ class TestDeviceService:
 
         device_orm = DeviceORM(
             id=uuid4(),
-            game_id=game.id,
+            game_id=GameID(game.id),
             device_id=str(uuid4()),
             account_id=account.id,
             first_seen_at=datetime.now(UTC),
@@ -596,7 +597,7 @@ class TestDeviceService:
 
         device_orm = DeviceORM(
             id=uuid4(),
-            game_id=game.id,
+            game_id=GameID(game.id),
             device_id=str(uuid4()),
             account_id=account.id,
             first_seen_at=datetime.now(UTC),
@@ -662,7 +663,7 @@ class TestDeviceService:
 
         device_orm = DeviceORM(
             id=uuid4(),
-            game_id=game.id,
+            game_id=GameID(game.id),
             device_id=str(uuid4()),
             account_id=account.id,
             first_seen_at=datetime.now(UTC),
@@ -725,7 +726,7 @@ class TestDeviceService:
 
         device_orm = DeviceORM(
             id=uuid4(),
-            game_id=game.id,
+            game_id=GameID(game.id),
             device_id=str(uuid4()),
             account_id=account.id,
             first_seen_at=datetime.now(UTC),

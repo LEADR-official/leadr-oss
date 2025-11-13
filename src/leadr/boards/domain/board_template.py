@@ -3,10 +3,10 @@
 import re
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
 from pydantic import Field, field_validator
 
+from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 from leadr.common.domain.models import Entity
 
 
@@ -22,10 +22,15 @@ class BoardTemplate(Entity):
     generation. Templates can be activated/deactivated and track the next scheduled run.
     """
 
-    account_id: UUID = Field(
+    id: BoardTemplateID = Field(
+        frozen=True,
+        default_factory=BoardTemplateID,
+        description="Unique board template identifier",
+    )
+    account_id: AccountID = Field(
         frozen=True, description="ID of the account this template belongs to (immutable)"
     )
-    game_id: UUID = Field(
+    game_id: GameID = Field(
         frozen=True, description="ID of the game this template belongs to (immutable)"
     )
     name: str = Field(description="Name of the template")

@@ -10,6 +10,7 @@ from leadr.auth.services.device_service import DeviceService
 from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
 from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import BoardID, ScoreID
 from leadr.games.services.game_service import GameService
 from leadr.scores.services.score_service import ScoreService
 
@@ -162,7 +163,7 @@ class TestScoreService:
             await score_service.create_score(
                 account_id=account.id,
                 game_id=game.id,
-                board_id=non_existent_board_id,
+                board_id=BoardID(non_existent_board_id),
                 device_id=device.id,
                 player_name="SpeedRunner99",
                 value=123.45,
@@ -348,7 +349,7 @@ class TestScoreService:
         score_service = ScoreService(db_session)
         non_existent_id = uuid4()
 
-        score = await score_service.get_score(non_existent_id)
+        score = await score_service.get_score(ScoreID(non_existent_id))
 
         assert score is None
 

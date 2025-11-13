@@ -1,7 +1,5 @@
 """Game API routes."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
@@ -10,6 +8,7 @@ from leadr.auth.dependencies import (
     QueryAccountIDDep,
     validate_body_account_id,
 )
+from leadr.common.domain.ids import AccountID, GameID
 from leadr.games.api.schemas import (
     GameCreateRequest,
     GameResponse,
@@ -61,7 +60,7 @@ async def create_game(
 
 
 @router.get("/games/{game_id}", response_model=GameResponse)
-async def get_game(game_id: UUID, service: GameServiceDep, auth: AuthContextDep) -> GameResponse:
+async def get_game(game_id: GameID, service: GameServiceDep, auth: AuthContextDep) -> GameResponse:
     """Get a game by ID.
 
     Args:
@@ -115,7 +114,7 @@ async def list_games(
 
 @router.patch("/games/{game_id}", response_model=GameResponse)
 async def update_game(
-    game_id: UUID, request: GameUpdateRequest, service: GameServiceDep, auth: AuthContextDep
+    game_id: GameID, request: GameUpdateRequest, service: GameServiceDep, auth: AuthContextDep
 ) -> GameResponse:
     """Update a game.
 

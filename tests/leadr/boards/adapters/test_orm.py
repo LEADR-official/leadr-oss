@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.adapters.orm import AccountORM
 from leadr.boards.adapters.orm import BoardORM
+from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 from leadr.games.adapters.orm import GameORM
 
 
@@ -39,7 +40,7 @@ class TestBoardORM:
         await db_session.commit()
 
         # Create board with all fields
-        template_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
         starts_at = datetime(2025, 1, 1, tzinfo=UTC)
         ends_at = datetime(2025, 12, 31, tzinfo=UTC)
 
@@ -181,12 +182,12 @@ class TestBoardORM:
     async def test_board_foreign_key_to_account(self, db_session: AsyncSession):
         """Test that board has foreign key constraint to account."""
         # Create game without account (for testing)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         # Try to create board without valid account
         board = BoardORM(
             id=uuid4(),
-            account_id=uuid4(),  # Non-existent account
+            account_id=AccountID(uuid4()),  # Non-existent account
             game_id=game_id,
             name="Board Without Account",
             icon="star",
@@ -212,7 +213,7 @@ class TestBoardORM:
         board = BoardORM(
             id=uuid4(),
             account_id=account.id,
-            game_id=uuid4(),  # Non-existent game
+            game_id=GameID(uuid4()),  # Non-existent game
             name="Board Without Game",
             icon="star",
             short_code="BWG01",

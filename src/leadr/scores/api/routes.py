@@ -1,7 +1,5 @@
 """API routes for score management."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
 
@@ -10,6 +8,7 @@ from leadr.auth.dependencies import (
     QueryAccountIDDep,
     validate_body_account_id,
 )
+from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.scores.api.schemas import ScoreCreateRequest, ScoreResponse, ScoreUpdateRequest
 from leadr.scores.services.dependencies import ScoreServiceDep
 
@@ -93,7 +92,7 @@ async def create_score(
 
 @router.get("/scores/{score_id}", response_model=ScoreResponse)
 async def get_score(
-    score_id: UUID,
+    score_id: ScoreID,
     service: ScoreServiceDep,
     auth: AuthContextDep,
 ) -> ScoreResponse:
@@ -127,9 +126,9 @@ async def get_score(
 async def list_scores(
     account_id: QueryAccountIDDep,
     service: ScoreServiceDep,
-    board_id: UUID | None = None,
-    game_id: UUID | None = None,
-    device_id: UUID | None = None,
+    board_id: BoardID | None = None,
+    game_id: GameID | None = None,
+    device_id: DeviceID | None = None,
 ) -> list[ScoreResponse]:
     """List scores for an account with optional filters.
 
@@ -164,7 +163,7 @@ async def list_scores(
 
 @router.patch("/scores/{score_id}", response_model=ScoreResponse)
 async def update_score(
-    score_id: UUID,
+    score_id: ScoreID,
     request: ScoreUpdateRequest,
     service: ScoreServiceDep,
     auth: AuthContextDep,

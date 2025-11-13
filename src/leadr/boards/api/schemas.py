@@ -2,19 +2,19 @@
 
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
+from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
 
 
 class BoardCreateRequest(BaseModel):
     """Request model for creating a board."""
 
-    account_id: UUID = Field(description="ID of the account this board belongs to")
-    game_id: UUID = Field(description="ID of the game this board belongs to")
+    account_id: AccountID = Field(description="ID of the account this board belongs to")
+    game_id: GameID = Field(description="ID of the game this board belongs to")
     name: str = Field(description="Name of the board")
     icon: str = Field(description="Icon identifier for the board")
     short_code: str = Field(description="Globally unique short code for direct sharing")
@@ -24,7 +24,7 @@ class BoardCreateRequest(BaseModel):
     keep_strategy: KeepStrategy = Field(
         description="Strategy for keeping multiple scores from the same user"
     )
-    template_id: UUID | None = Field(
+    template_id: BoardTemplateID | None = Field(
         default=None, description="Optional template ID this board was created from"
     )
     template_name: str | None = Field(
@@ -51,7 +51,7 @@ class BoardUpdateRequest(BaseModel):
     is_active: bool | None = Field(default=None, description="Updated active status")
     sort_direction: SortDirection | None = Field(default=None, description="Updated sort direction")
     keep_strategy: KeepStrategy | None = Field(default=None, description="Updated keep strategy")
-    template_id: UUID | None = Field(default=None, description="Updated template ID")
+    template_id: BoardTemplateID | None = Field(default=None, description="Updated template ID")
     template_name: str | None = Field(default=None, description="Updated template name")
     starts_at: datetime | None = Field(default=None, description="Updated start time")
     ends_at: datetime | None = Field(default=None, description="Updated end time")
@@ -62,9 +62,9 @@ class BoardUpdateRequest(BaseModel):
 class BoardResponse(BaseModel):
     """Response model for a board."""
 
-    id: UUID = Field(description="Unique identifier for the board")
-    account_id: UUID = Field(description="ID of the account this board belongs to")
-    game_id: UUID = Field(description="ID of the game this board belongs to")
+    id: BoardID = Field(description="Unique identifier for the board")
+    account_id: AccountID = Field(description="ID of the account this board belongs to")
+    game_id: GameID = Field(description="ID of the game this board belongs to")
     name: str = Field(description="Name of the board")
     icon: str = Field(description="Icon identifier for the board")
     short_code: str = Field(description="Globally unique short code for direct sharing")
@@ -72,7 +72,7 @@ class BoardResponse(BaseModel):
     is_active: bool = Field(description="Whether the board is currently active")
     sort_direction: SortDirection = Field(description="Direction to sort scores")
     keep_strategy: KeepStrategy = Field(description="Strategy for keeping scores from same user")
-    template_id: UUID | None = Field(
+    template_id: BoardTemplateID | None = Field(
         default=None, description="Template ID this board was created from, or null"
     )
     template_name: str | None = Field(
@@ -122,8 +122,8 @@ class BoardResponse(BaseModel):
 class BoardTemplateCreateRequest(BaseModel):
     """Request model for creating a board template."""
 
-    account_id: UUID = Field(description="ID of the account this template belongs to")
-    game_id: UUID = Field(description="ID of the game this template belongs to")
+    account_id: AccountID = Field(description="ID of the account this template belongs to")
+    game_id: GameID = Field(description="ID of the game this template belongs to")
     name: str = Field(description="Name of the template")
     repeat_interval: str = Field(
         description="PostgreSQL interval syntax for repeat frequency (e.g., '7 days', '1 month')"
@@ -163,9 +163,9 @@ class BoardTemplateUpdateRequest(BaseModel):
 class BoardTemplateResponse(BaseModel):
     """Response model for a board template."""
 
-    id: UUID = Field(description="Unique identifier for the template")
-    account_id: UUID = Field(description="ID of the account this template belongs to")
-    game_id: UUID = Field(description="ID of the game this template belongs to")
+    id: BoardTemplateID = Field(description="Unique identifier for the template")
+    account_id: AccountID = Field(description="ID of the account this template belongs to")
+    game_id: GameID = Field(description="ID of the game this template belongs to")
     name: str = Field(description="Name of the template")
     name_template: str | None = Field(
         default=None, description="Template string for generating board names, or null"

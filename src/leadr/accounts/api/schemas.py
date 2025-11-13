@@ -1,12 +1,12 @@
 """API request and response models for accounts."""
 
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
+from leadr.common.domain.ids import AccountID, UserID
 
 
 # Account models
@@ -33,7 +33,7 @@ class AccountUpdateRequest(BaseModel):
 class AccountResponse(BaseModel):
     """Response model for an account."""
 
-    id: UUID = Field(description="Unique identifier for the account")
+    id: AccountID = Field(description="Unique identifier for the account")
     name: str = Field(description="Account name")
     slug: str = Field(description="URL-friendly identifier")
     status: AccountStatus = Field(description="Current account status")
@@ -64,7 +64,7 @@ class AccountResponse(BaseModel):
 class UserCreateRequest(BaseModel):
     """Request model for creating a user."""
 
-    account_id: UUID = Field(description="ID of the account this user belongs to")
+    account_id: AccountID = Field(description="ID of the account this user belongs to")
     email: EmailStr = Field(description="User's email address (must be valid email format)")
     display_name: str = Field(description="User's display name (2-100 characters)")
 
@@ -83,8 +83,8 @@ class UserUpdateRequest(BaseModel):
 class UserResponse(BaseModel):
     """Response model for a user."""
 
-    id: UUID = Field(description="Unique identifier for the user")
-    account_id: UUID = Field(description="ID of the account this user belongs to")
+    id: UserID = Field(description="Unique identifier for the user")
+    account_id: AccountID = Field(description="ID of the account this user belongs to")
     email: str = Field(description="User's email address")
     display_name: str = Field(description="User's display name")
     super_admin: bool = Field(description="Whether this user has superadmin privileges")

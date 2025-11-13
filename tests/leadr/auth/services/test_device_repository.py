@@ -10,6 +10,7 @@ from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import DeviceORM
 from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
 from leadr.auth.services.repositories import DeviceRepository
+from leadr.common.domain.ids import AccountID, DeviceID, GameID
 from leadr.games.adapters.orm import GameORM
 
 
@@ -39,9 +40,9 @@ class TestDeviceRepository:
         # Create domain entity
         now = datetime.now(UTC)
         device = Device(
-            game_id=game.id,
+            game_id=GameID(game.id),
             device_id="test-device-123",
-            account_id=account.id,
+            account_id=AccountID(account.id),
             platform="ios",
             first_seen_at=now,
             last_seen_at=now,
@@ -139,7 +140,7 @@ class TestDeviceRepository:
 
         # Retrieve via repository
         repository = DeviceRepository(db_session)
-        device = await repository.get_by_game_and_device_id(game.id, "unique-device-123")
+        device = await repository.get_by_game_and_device_id(GameID(game.id), "unique-device-123")
 
         assert device is not None
         assert device.game_id == game.id
@@ -148,7 +149,7 @@ class TestDeviceRepository:
     async def test_get_device_by_game_and_device_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent device by game and device_id returns None."""
         repository = DeviceRepository(db_session)
-        device = await repository.get_by_game_and_device_id(uuid4(), "nonexistent")
+        device = await repository.get_by_game_and_device_id(GameID(uuid4()), "nonexistent")
         assert device is None
 
     async def test_update_device(self, db_session: AsyncSession):
@@ -173,9 +174,9 @@ class TestDeviceRepository:
         # Create device
         now = datetime.now(UTC)
         device = Device(
-            game_id=game.id,
+            game_id=GameID(game.id),
             device_id="test-device",
-            account_id=account.id,
+            account_id=AccountID(account.id),
             first_seen_at=now,
             last_seen_at=now,
         )
@@ -246,7 +247,7 @@ class TestDeviceRepository:
 
         # Filter by account1
         repository = DeviceRepository(db_session)
-        devices = await repository.filter(account_id=account1.id)
+        devices = await repository.filter(account_id=AccountID(account1.id))
 
         assert len(devices) == 1
         assert devices[0].account_id == account1.id
@@ -285,7 +286,7 @@ class TestDeviceSessionRepository:
 
         repository = DeviceSessionRepository(db_session)
         session = DeviceSession(
-            device_id=device_orm.id,
+            device_id=DeviceID(device_orm.id),
             access_token_hash="test_access_hash",
             refresh_token_hash="test_refresh_hash",
             expires_at=now + timedelta(hours=1),
@@ -337,7 +338,7 @@ class TestDeviceSessionRepository:
 
         repository = DeviceSessionRepository(db_session)
         session = DeviceSession(
-            device_id=device_orm.id,
+            device_id=DeviceID(device_orm.id),
             access_token_hash="test_access_hash",
             refresh_token_hash="unique_refresh_hash",
             token_version=1,
@@ -391,7 +392,7 @@ class TestDeviceSessionRepository:
 
         repository = DeviceSessionRepository(db_session)
         session = DeviceSession(
-            device_id=device_orm.id,
+            device_id=DeviceID(device_orm.id),
             access_token_hash="test_access_hash",
             refresh_token_hash="deleted_refresh_hash",
             expires_at=now + timedelta(hours=1),

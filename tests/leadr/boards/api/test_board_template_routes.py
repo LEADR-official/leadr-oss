@@ -107,7 +107,7 @@ class TestBoardTemplateRoutes:
             "/board-templates",
             json={
                 "account_id": str(account.id),
-                "game_id": "00000000-0000-0000-0000-000000000000",
+                "game_id": "gam_00000000-0000-0000-0000-000000000000",
                 "name": "Invalid Template",
                 "repeat_interval": "7 days",
                 "next_run_at": next_run_at,
@@ -164,7 +164,7 @@ class TestBoardTemplateRoutes:
     ):
         """Test retrieving a nonexistent board template returns 404."""
         response = await client.get(
-            "/board-templates/00000000-0000-0000-0000-000000000000",
+            "/board-templates/tpl_00000000-0000-0000-0000-000000000000",
             headers={"leadr-api-key": test_api_key},
         )
 

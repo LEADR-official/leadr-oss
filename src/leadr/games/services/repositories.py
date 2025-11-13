@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import UUID4
 from sqlalchemy import select
 
+from leadr.common.domain.ids import AccountID, BoardID, GameID, PrefixedID
 from leadr.common.repositories import BaseRepository
 from leadr.games.adapters.orm import GameORM
 from leadr.games.domain.game import Game
@@ -16,11 +17,11 @@ class GameRepository(BaseRepository[Game, GameORM]):
     def _to_domain(self, orm: GameORM) -> Game:
         """Convert ORM model to domain entity."""
         return Game(
-            id=orm.id,
-            account_id=orm.account_id,
+            id=GameID(orm.id),
+            account_id=AccountID(orm.account_id),
             name=orm.name,
             steam_app_id=orm.steam_app_id,
-            default_board_id=orm.default_board_id,
+            default_board_id=BoardID(orm.default_board_id) if orm.default_board_id else None,
             anti_cheat_enabled=orm.anti_cheat_enabled,
             created_at=orm.created_at,
             updated_at=orm.updated_at,
@@ -30,11 +31,11 @@ class GameRepository(BaseRepository[Game, GameORM]):
     def _to_orm(self, entity: Game) -> GameORM:
         """Convert domain entity to ORM model."""
         return GameORM(
-            id=entity.id,
-            account_id=entity.account_id,
+            id=entity.id.uuid,
+            account_id=entity.account_id.uuid,
             name=entity.name,
             steam_app_id=entity.steam_app_id,
-            default_board_id=entity.default_board_id,
+            default_board_id=entity.default_board_id.uuid if entity.default_board_id else None,
             anti_cheat_enabled=entity.anti_cheat_enabled,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
@@ -45,7 +46,9 @@ class GameRepository(BaseRepository[Game, GameORM]):
         """Get the ORM model class."""
         return GameORM
 
-    async def filter(self, account_id: UUID4, **kwargs: Any) -> list[Game]:
+    async def filter(
+        self, account_id: UUID4 | PrefixedID | None = None, **kwargs: Any
+    ) -> list[Game]:
         """Filter games by account and optional criteria.
 
         Args:
@@ -54,9 +57,15 @@ class GameRepository(BaseRepository[Game, GameORM]):
 
         Returns:
             List of games for the account matching the filter criteria
+
+        Raises:
+            ValueError: If account_id is None (required for multi-tenant safety)
         """
+        if account_id is None:
+            raise ValueError("account_id is required for filtering games")
+        account_uuid = self._extract_uuid(account_id)
         query = select(GameORM).where(
-            GameORM.account_id == account_id,
+            GameORM.account_id == account_uuid,
             GameORM.deleted_at.is_(None),
         )
 

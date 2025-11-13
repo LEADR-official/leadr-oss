@@ -3,8 +3,10 @@
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
-from uuid import UUID
 
+from pydantic import Field
+
+from leadr.common.domain.ids import AccountID, DeviceID, DeviceSessionID, GameID
 from leadr.common.domain.models import Entity
 
 
@@ -24,9 +26,14 @@ class Device(Entity):
     Each device is identified by a client-generated device_id.
     """
 
-    game_id: UUID
+    id: DeviceID = Field(
+        frozen=True,
+        default_factory=DeviceID,
+        description="Unique device identifier",
+    )
+    game_id: GameID
     device_id: str
-    account_id: UUID
+    account_id: AccountID
     platform: str | None = None
     status: DeviceStatus = DeviceStatus.ACTIVE
     first_seen_at: datetime
@@ -66,7 +73,12 @@ class DeviceSession(Entity):
     Includes both access and refresh tokens with token rotation support.
     """
 
-    device_id: UUID
+    id: DeviceSessionID = Field(
+        frozen=True,
+        default_factory=DeviceSessionID,
+        description="Unique device session identifier",
+    )
+    device_id: DeviceID
     access_token_hash: str
     refresh_token_hash: str
     token_version: int = 1

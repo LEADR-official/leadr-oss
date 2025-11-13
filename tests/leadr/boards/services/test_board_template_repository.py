@@ -10,6 +10,7 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.boards.services.repositories import BoardTemplateRepository
+from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
 
@@ -22,11 +23,11 @@ class TestBoardTemplateRepository:
         """Test creating a board template via repository."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -37,11 +38,11 @@ class TestBoardTemplateRepository:
 
         # Create game
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
-            id=game_id,
-            account_id=account_id,
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
             name="Test Game",
             created_at=now,
             updated_at=now,
@@ -50,13 +51,13 @@ class TestBoardTemplateRepository:
 
         # Create board template
         template_repo = BoardTemplateRepository(db_session)
-        template_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
         next_run_at = now + timedelta(days=7)
 
         template = BoardTemplate(
             id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Weekly Speed Run Template",
             name_template="Speed Run Week {week}",
             repeat_interval="7 days",
@@ -85,11 +86,11 @@ class TestBoardTemplateRepository:
         """Test retrieving a board template by ID."""
         # Create account and game
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -99,11 +100,11 @@ class TestBoardTemplateRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
-            id=game_id,
-            account_id=account_id,
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
             name="Test Game",
             created_at=now,
             updated_at=now,
@@ -112,13 +113,13 @@ class TestBoardTemplateRepository:
 
         # Create board template
         template_repo = BoardTemplateRepository(db_session)
-        template_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
         next_run_at = now + timedelta(days=1)
 
         template = BoardTemplate(
             id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Daily Template",
             repeat_interval="1 day",
             next_run_at=next_run_at,
@@ -153,7 +154,7 @@ class TestBoardTemplateRepository:
 
         account1_id = uuid4()
         account1 = Account(
-            id=account1_id,
+            id=AccountID(account1_id),
             name="Account 1",
             slug="account-1",
             status=AccountStatus.ACTIVE,
@@ -164,7 +165,7 @@ class TestBoardTemplateRepository:
 
         account2_id = uuid4()
         account2 = Account(
-            id=account2_id,
+            id=AccountID(account2_id),
             name="Account 2",
             slug="account-2",
             status=AccountStatus.ACTIVE,
@@ -177,8 +178,8 @@ class TestBoardTemplateRepository:
         game_repo = GameRepository(db_session)
         game1_id = uuid4()
         game1 = Game(
-            id=game1_id,
-            account_id=account1_id,
+            id=GameID(game1_id),
+            account_id=AccountID(account1_id),
             name="Game 1",
             created_at=now,
             updated_at=now,
@@ -187,8 +188,8 @@ class TestBoardTemplateRepository:
 
         game2_id = uuid4()
         game2 = Game(
-            id=game2_id,
-            account_id=account2_id,
+            id=GameID(game2_id),
+            account_id=AccountID(account2_id),
             name="Game 2",
             created_at=now,
             updated_at=now,
@@ -200,9 +201,9 @@ class TestBoardTemplateRepository:
 
         # Two templates for account 1
         template1 = BoardTemplate(
-            id=uuid4(),
-            account_id=account1_id,
-            game_id=game1_id,
+            id=BoardTemplateID(uuid4()),
+            account_id=AccountID(account1_id),
+            game_id=GameID(game1_id),
             name="Template 1",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -213,9 +214,9 @@ class TestBoardTemplateRepository:
         await template_repo.create(template1)
 
         template2 = BoardTemplate(
-            id=uuid4(),
-            account_id=account1_id,
-            game_id=game1_id,
+            id=BoardTemplateID(uuid4()),
+            account_id=AccountID(account1_id),
+            game_id=GameID(game1_id),
             name="Template 2",
             repeat_interval="1 month",
             next_run_at=now + timedelta(days=30),
@@ -227,9 +228,9 @@ class TestBoardTemplateRepository:
 
         # One template for account 2
         template3 = BoardTemplate(
-            id=uuid4(),
-            account_id=account2_id,
-            game_id=game2_id,
+            id=BoardTemplateID(uuid4()),
+            account_id=AccountID(account2_id),
+            game_id=GameID(game2_id),
             name="Template 3",
             repeat_interval="1 day",
             next_run_at=now + timedelta(days=1),
@@ -240,13 +241,13 @@ class TestBoardTemplateRepository:
         await template_repo.create(template3)
 
         # Filter by account 1
-        account1_templates = await template_repo.filter(account1_id)
+        account1_templates = await template_repo.filter(AccountID(account1_id))
 
         assert len(account1_templates) == 2
         assert all(t.account_id == account1_id for t in account1_templates)
 
         # Filter by account 2
-        account2_templates = await template_repo.filter(account2_id)
+        account2_templates = await template_repo.filter(AccountID(account2_id))
 
         assert len(account2_templates) == 1
         assert account2_templates[0].account_id == account2_id
@@ -255,11 +256,11 @@ class TestBoardTemplateRepository:
         """Test filtering board templates by account_id and game_id."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -272,8 +273,8 @@ class TestBoardTemplateRepository:
         game_repo = GameRepository(db_session)
         game1_id = uuid4()
         game1 = Game(
-            id=game1_id,
-            account_id=account_id,
+            id=GameID(game1_id),
+            account_id=AccountID(account_id),
             name="Game 1",
             created_at=now,
             updated_at=now,
@@ -282,8 +283,8 @@ class TestBoardTemplateRepository:
 
         game2_id = uuid4()
         game2 = Game(
-            id=game2_id,
-            account_id=account_id,
+            id=GameID(game2_id),
+            account_id=AccountID(account_id),
             name="Game 2",
             created_at=now,
             updated_at=now,
@@ -294,9 +295,9 @@ class TestBoardTemplateRepository:
         template_repo = BoardTemplateRepository(db_session)
 
         template1 = BoardTemplate(
-            id=uuid4(),
-            account_id=account_id,
-            game_id=game1_id,
+            id=BoardTemplateID(uuid4()),
+            account_id=AccountID(account_id),
+            game_id=GameID(game1_id),
             name="Game 1 Template 1",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -307,9 +308,9 @@ class TestBoardTemplateRepository:
         await template_repo.create(template1)
 
         template2 = BoardTemplate(
-            id=uuid4(),
-            account_id=account_id,
-            game_id=game1_id,
+            id=BoardTemplateID(uuid4()),
+            account_id=AccountID(account_id),
+            game_id=GameID(game1_id),
             name="Game 1 Template 2",
             repeat_interval="1 month",
             next_run_at=now + timedelta(days=30),
@@ -320,9 +321,9 @@ class TestBoardTemplateRepository:
         await template_repo.create(template2)
 
         template3 = BoardTemplate(
-            id=uuid4(),
-            account_id=account_id,
-            game_id=game2_id,
+            id=BoardTemplateID(uuid4()),
+            account_id=AccountID(account_id),
+            game_id=GameID(game2_id),
             name="Game 2 Template",
             repeat_interval="1 day",
             next_run_at=now + timedelta(days=1),
@@ -333,13 +334,13 @@ class TestBoardTemplateRepository:
         await template_repo.create(template3)
 
         # Filter by game 1
-        game1_templates = await template_repo.filter(account_id, game_id=game1_id)
+        game1_templates = await template_repo.filter(account_id, game_id=GameID(game1_id))
 
         assert len(game1_templates) == 2
         assert all(t.game_id == game1_id for t in game1_templates)
 
         # Filter by game 2
-        game2_templates = await template_repo.filter(account_id, game_id=game2_id)
+        game2_templates = await template_repo.filter(account_id, game_id=GameID(game2_id))
 
         assert len(game2_templates) == 1
         assert game2_templates[0].game_id == game2_id
@@ -348,11 +349,11 @@ class TestBoardTemplateRepository:
         """Test updating a board template."""
         # Create account and game
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -362,11 +363,11 @@ class TestBoardTemplateRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
-            id=game_id,
-            account_id=account_id,
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
             name="Test Game",
             created_at=now,
             updated_at=now,
@@ -375,13 +376,13 @@ class TestBoardTemplateRepository:
 
         # Create template
         template_repo = BoardTemplateRepository(db_session)
-        template_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
         next_run_at = now + timedelta(days=7)
 
         template = BoardTemplate(
             id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Original Template",
             repeat_interval="7 days",
             next_run_at=next_run_at,
@@ -411,11 +412,11 @@ class TestBoardTemplateRepository:
         """Test soft deleting a board template."""
         # Create account and game
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -425,11 +426,11 @@ class TestBoardTemplateRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
-            id=game_id,
-            account_id=account_id,
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
             name="Test Game",
             created_at=now,
             updated_at=now,
@@ -438,13 +439,13 @@ class TestBoardTemplateRepository:
 
         # Create template
         template_repo = BoardTemplateRepository(db_session)
-        template_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
         next_run_at = now + timedelta(days=7)
 
         template = BoardTemplate(
             id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Template to Delete",
             repeat_interval="7 days",
             next_run_at=next_run_at,
@@ -470,11 +471,11 @@ class TestBoardTemplateRepository:
         """Test that filter excludes soft-deleted templates."""
         # Create account and game
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -484,11 +485,11 @@ class TestBoardTemplateRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
-            id=game_id,
-            account_id=account_id,
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
             name="Test Game",
             created_at=now,
             updated_at=now,
@@ -499,9 +500,9 @@ class TestBoardTemplateRepository:
         template_repo = BoardTemplateRepository(db_session)
 
         template1 = BoardTemplate(
-            id=uuid4(),
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(uuid4()),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Active Template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -512,9 +513,9 @@ class TestBoardTemplateRepository:
         await template_repo.create(template1)
 
         template2 = BoardTemplate(
-            id=uuid4(),
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(uuid4()),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Deleted Template",
             repeat_interval="1 month",
             next_run_at=now + timedelta(days=30),

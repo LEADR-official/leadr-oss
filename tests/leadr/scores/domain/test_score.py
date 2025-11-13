@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.scores.domain.score import Score
 
 
@@ -14,10 +15,10 @@ class TestScore:
 
     def test_create_score_with_required_fields(self):
         """Test creating a score with only required fields."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -46,10 +47,10 @@ class TestScore:
 
     def test_create_score_with_all_fields(self):
         """Test creating a score with all optional fields."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -71,10 +72,10 @@ class TestScore:
 
     def test_create_score_requires_player_name(self):
         """Test that player_name is required."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         with pytest.raises(ValidationError) as exc_info:
             Score(  # type: ignore[call-arg]
@@ -89,10 +90,10 @@ class TestScore:
 
     def test_create_score_requires_value(self):
         """Test that value is required."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         with pytest.raises(ValidationError) as exc_info:
             Score(  # type: ignore[call-arg]
@@ -107,10 +108,10 @@ class TestScore:
 
     def test_create_score_rejects_empty_player_name(self):
         """Test that empty player_name is rejected."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         with pytest.raises(ValidationError) as exc_info:
             Score(
@@ -126,10 +127,10 @@ class TestScore:
 
     def test_create_score_rejects_whitespace_only_player_name(self):
         """Test that whitespace-only player_name is rejected."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         with pytest.raises(ValidationError) as exc_info:
             Score(
@@ -145,10 +146,10 @@ class TestScore:
 
     def test_create_score_strips_player_name_whitespace(self):
         """Test that player_name whitespace is stripped."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -163,10 +164,10 @@ class TestScore:
 
     def test_account_id_is_immutable(self):
         """Test that account_id cannot be modified after creation."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -178,16 +179,16 @@ class TestScore:
         )
 
         with pytest.raises(ValidationError) as exc_info:
-            score.account_id = uuid4()
+            score.account_id = AccountID(uuid4())
 
         assert "frozen" in str(exc_info.value).lower()
 
     def test_game_id_is_immutable(self):
         """Test that game_id cannot be modified after creation."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -199,16 +200,16 @@ class TestScore:
         )
 
         with pytest.raises(ValidationError) as exc_info:
-            score.game_id = uuid4()
+            score.game_id = GameID(uuid4())
 
         assert "frozen" in str(exc_info.value).lower()
 
     def test_board_id_is_immutable(self):
         """Test that board_id cannot be modified after creation."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -220,16 +221,16 @@ class TestScore:
         )
 
         with pytest.raises(ValidationError) as exc_info:
-            score.board_id = uuid4()
+            score.board_id = BoardID(uuid4())
 
         assert "frozen" in str(exc_info.value).lower()
 
     def test_device_id_is_immutable(self):
         """Test that device_id cannot be modified after creation."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -241,16 +242,16 @@ class TestScore:
         )
 
         with pytest.raises(ValidationError) as exc_info:
-            score.device_id = uuid4()
+            score.device_id = DeviceID(uuid4())
 
         assert "frozen" in str(exc_info.value).lower()
 
     def test_player_name_is_mutable(self):
         """Test that player_name can be modified after creation."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -266,10 +267,10 @@ class TestScore:
 
     def test_value_is_mutable(self):
         """Test that value can be modified after creation."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -285,11 +286,11 @@ class TestScore:
 
     def test_score_equality(self):
         """Test that scores with same ID are equal."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
-        score_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
+        score_id = ScoreID(uuid4())
         created_at = datetime.now(UTC)
 
         score1 = Score(
@@ -320,10 +321,10 @@ class TestScore:
 
     def test_score_hash(self):
         """Test that scores can be hashed."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -343,10 +344,10 @@ class TestScore:
 
     def test_soft_delete_score(self):
         """Test soft-deleting a score."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -368,10 +369,10 @@ class TestScore:
 
     def test_restore_score(self):
         """Test restoring a soft-deleted score."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -392,10 +393,10 @@ class TestScore:
 
     def test_value_accepts_integers(self):
         """Test that value field accepts integers (converted to float)."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -411,10 +412,10 @@ class TestScore:
 
     def test_value_accepts_negative_numbers(self):
         """Test that value field accepts negative numbers."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,

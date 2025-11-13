@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
+from leadr.common.domain.ids import AccountID, APIKeyID, UserID
 
 
 class TestAPIKeyStatus:
@@ -23,9 +24,9 @@ class TestAPIKey:
 
     def test_create_api_key_with_valid_data(self):
         """Test creating an API key with all required fields."""
-        key_id = uuid4()
-        account_id = uuid4()
-        user_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
         now = datetime.now(UTC)
         expires_at = now + timedelta(days=90)
 
@@ -57,14 +58,14 @@ class TestAPIKey:
 
     def test_create_api_key_defaults_to_active_status(self):
         """Test that API key status defaults to ACTIVE."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_test",
@@ -76,8 +77,8 @@ class TestAPIKey:
 
     def test_api_key_name_required(self):
         """Test that API key name is required."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -94,7 +95,7 @@ class TestAPIKey:
 
     def test_api_key_account_id_required(self):
         """Test that account_id is required."""
-        key_id = uuid4()
+        key_id = APIKeyID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -111,8 +112,8 @@ class TestAPIKey:
 
     def test_api_key_user_id_required(self):
         """Test that user_id is required."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -130,15 +131,15 @@ class TestAPIKey:
 
     def test_api_key_hash_required(self):
         """Test that key_hash is required."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             APIKey(  # type: ignore[call-arg]
                 id=key_id,
                 account_id=account_id,
-                user_id=uuid4(),
+                user_id=UserID(uuid4()),
                 name="Test Key",
                 key_prefix="ldr_test",
                 created_at=now,
@@ -149,15 +150,15 @@ class TestAPIKey:
 
     def test_api_key_prefix_required(self):
         """Test that key_prefix is required."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             APIKey(  # type: ignore[call-arg]
                 id=key_id,
                 account_id=account_id,
-                user_id=uuid4(),
+                user_id=UserID(uuid4()),
                 name="Test Key",
                 key_hash="hash",
                 created_at=now,
@@ -168,15 +169,15 @@ class TestAPIKey:
 
     def test_api_key_prefix_must_start_with_ldr(self):
         """Test that key_prefix must start with 'ldr_'."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             APIKey(
                 id=key_id,
                 account_id=account_id,
-                user_id=uuid4(),
+                user_id=UserID(uuid4()),
                 name="Test Key",
                 key_hash="hash",
                 key_prefix="invalid_prefix",
@@ -189,14 +190,14 @@ class TestAPIKey:
 
     def test_api_key_equality_based_on_id(self):
         """Test that API key equality is based on ID."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         api_key1 = APIKey(
             id=key_id,
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Key 1",
             key_hash="hash1",
             key_prefix="ldr_abc",
@@ -207,7 +208,7 @@ class TestAPIKey:
         api_key2 = APIKey(
             id=key_id,
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Key 2",
             key_hash="hash2",
             key_prefix="ldr_xyz",
@@ -219,13 +220,13 @@ class TestAPIKey:
 
     def test_api_key_inequality_different_ids(self):
         """Test that API keys with different IDs are not equal."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         api_key1 = APIKey(
-            id=uuid4(),
+            id=APIKeyID(uuid4()),
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -234,9 +235,9 @@ class TestAPIKey:
         )
 
         api_key2 = APIKey(
-            id=uuid4(),
+            id=APIKeyID(uuid4()),
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -248,14 +249,14 @@ class TestAPIKey:
 
     def test_api_key_is_hashable(self):
         """Test that API key can be used in sets and as dict keys."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -273,14 +274,14 @@ class TestAPIKey:
 
     def test_revoke_api_key(self):
         """Test revoking an active API key."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -295,15 +296,15 @@ class TestAPIKey:
 
     def test_is_expired_when_expiration_in_past(self):
         """Test that API key is expired when expires_at is in the past."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
         past_date = now - timedelta(days=1)
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -316,15 +317,15 @@ class TestAPIKey:
 
     def test_is_not_expired_when_expiration_in_future(self):
         """Test that API key is not expired when expires_at is in the future."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
         future_date = now + timedelta(days=30)
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -337,14 +338,14 @@ class TestAPIKey:
 
     def test_is_not_expired_when_no_expiration(self):
         """Test that API key is not expired when expires_at is None."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -357,15 +358,15 @@ class TestAPIKey:
 
     def test_is_valid_when_active_and_not_expired(self):
         """Test that API key is valid when active and not expired."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
         future_date = now + timedelta(days=30)
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -379,14 +380,14 @@ class TestAPIKey:
 
     def test_is_not_valid_when_revoked(self):
         """Test that API key is not valid when revoked."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -399,15 +400,15 @@ class TestAPIKey:
 
     def test_is_not_valid_when_expired(self):
         """Test that API key is not valid when expired."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
         past_date = now - timedelta(days=1)
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -421,14 +422,14 @@ class TestAPIKey:
 
     def test_record_usage_updates_last_used_at(self):
         """Test that record_usage updates last_used_at timestamp."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -446,14 +447,14 @@ class TestAPIKey:
 
     def test_api_key_immutability_of_id(self):
         """Test that API key ID cannot be changed after creation."""
-        key_id = uuid4()
-        account_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
-            user_id=uuid4(),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -464,18 +465,18 @@ class TestAPIKey:
         new_id = uuid4()
 
         with pytest.raises(ValidationError):
-            api_key.id = new_id
+            api_key.id = new_id  # type: ignore[misc]
 
     def test_account_id_as_uuid(self):
         """Test that account_id can be created from UUID."""
-        key_id = uuid4()
+        key_id = APIKeyID(uuid4())
         account_id = UUID("12345678-1234-5678-1234-567812345678")
         now = datetime.now(UTC)
 
         api_key = APIKey(
             id=key_id,
-            account_id=account_id,
-            user_id=uuid4(),
+            account_id=AccountID(account_id),
+            user_id=UserID(uuid4()),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",

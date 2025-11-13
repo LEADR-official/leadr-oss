@@ -10,6 +10,7 @@ from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import DeviceORM, NonceORM
 from leadr.auth.domain.nonce import Nonce, NonceStatus
 from leadr.auth.services.repositories import NonceRepository
+from leadr.common.domain.ids import DeviceID
 from leadr.games.adapters.orm import GameORM
 
 
@@ -49,7 +50,7 @@ class TestNonceRepository:
 
         # Create nonce entity
         nonce = Nonce(
-            device_id=device.id,
+            device_id=DeviceID(device.id),
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
             status=NonceStatus.PENDING,
@@ -97,7 +98,7 @@ class TestNonceRepository:
         # Create nonce directly in DB
         nonce_orm = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=DeviceID(device.id),
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
             status="pending",
@@ -148,7 +149,7 @@ class TestNonceRepository:
         nonce_value = str(uuid4())
         nonce_orm = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=DeviceID(device.id),
             nonce_value=nonce_value,
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
             status="pending",
@@ -208,7 +209,7 @@ class TestNonceRepository:
         nonce_value = str(uuid4())
         nonce_orm = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=DeviceID(device.id),
             nonce_value=nonce_value,
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
             status="pending",
@@ -255,7 +256,7 @@ class TestNonceRepository:
 
         # Create nonce
         nonce = Nonce(
-            device_id=device.id,
+            device_id=DeviceID(device.id),
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
             status=NonceStatus.PENDING,
@@ -304,7 +305,7 @@ class TestNonceRepository:
         # Create old expired nonce (expired 2 hours ago)
         old_expired_nonce = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=DeviceID(device.id),
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(hours=2),
             status="pending",
@@ -314,7 +315,7 @@ class TestNonceRepository:
         # Create recent expired nonce (expired 30 seconds ago)
         recent_expired_nonce = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=DeviceID(device.id),
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(seconds=30),
             status="pending",
@@ -324,7 +325,7 @@ class TestNonceRepository:
         # Create valid nonce
         valid_nonce = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=DeviceID(device.id),
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
             status="pending",
@@ -386,7 +387,7 @@ class TestNonceRepository:
         # Create old expired pending nonce
         pending_nonce = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=DeviceID(device.id),
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(hours=2),
             status="pending",
@@ -396,7 +397,7 @@ class TestNonceRepository:
         # Create old expired used nonce
         used_nonce = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=DeviceID(device.id),
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(hours=2),
             status="used",

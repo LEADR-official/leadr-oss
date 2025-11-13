@@ -2,19 +2,25 @@
 
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
 from leadr.auth.domain.device import Device, DeviceStatus
+from leadr.common.domain.ids import (
+    AccountID,
+    APIKeyID,
+    DeviceID,
+    GameID,
+    UserID,
+)
 
 
 class CreateAPIKeyRequest(BaseModel):
     """Request schema for creating an API key."""
 
-    account_id: UUID = Field(description="ID of the account this API key belongs to")
-    user_id: UUID = Field(description="ID of the user who owns this API key")
+    account_id: AccountID = Field(description="ID of the account this API key belongs to")
+    user_id: UserID = Field(description="ID of the user who owns this API key")
     name: str = Field(description="Human-readable name for the API key (e.g., 'Production Server')")
     expires_at: datetime | None = Field(
         default=None,
@@ -29,7 +35,7 @@ class CreateAPIKeyResponse(BaseModel):
     The client must save this key as it cannot be retrieved later.
     """
 
-    id: UUID = Field(description="Unique identifier for the API key")
+    id: APIKeyID = Field(description="Unique identifier for the API key")
     name: str = Field(description="Human-readable name for the API key")
     key: str = Field(
         description="Plain text API key. ONLY returned at creation - save this securely!"
@@ -72,9 +78,9 @@ class APIKeyResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: UUID = Field(description="Unique identifier for the API key")
-    account_id: UUID = Field(description="ID of the account this key belongs to")
-    user_id: UUID = Field(description="ID of the user who owns this API key")
+    id: APIKeyID = Field(description="Unique identifier for the API key")
+    account_id: AccountID = Field(description="ID of the account this key belongs to")
+    user_id: UserID = Field(description="ID of the user who owns this API key")
     name: str = Field(description="Human-readable name for the API key")
     prefix: str = Field(description="Key prefix for identification (first 8 characters)")
     status: APIKeyStatus = Field(description="Current status (active, revoked, expired)")
@@ -132,7 +138,7 @@ class StartSessionRequest(BaseModel):
     Used by game clients to authenticate and obtain an access token.
     """
 
-    game_id: UUID = Field(description="ID of the game this device belongs to")
+    game_id: GameID = Field(description="ID of the game this device belongs to")
     device_id: str = Field(
         description="Client-generated unique device identifier (e.g., UUID, hardware ID)"
     )
@@ -152,10 +158,10 @@ class StartSessionResponse(BaseModel):
     - Refresh token: Long-lived, used to obtain new access tokens when expired
     """
 
-    id: UUID = Field(description="Unique identifier for the device")
-    game_id: UUID = Field(description="ID of the game")
+    id: DeviceID = Field(description="Unique identifier for the device")
+    game_id: GameID = Field(description="ID of the game")
     device_id: str = Field(description="Client-generated device identifier")
-    account_id: UUID = Field(description="ID of the account that owns the game")
+    account_id: AccountID = Field(description="ID of the account that owns the game")
     platform: str | None = Field(default=None, description="Device platform")
     status: DeviceStatus = Field(description="Device status (active, suspended, banned)")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Device metadata")

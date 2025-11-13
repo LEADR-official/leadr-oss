@@ -108,7 +108,7 @@ class TestBoardRoutes:
             "/boards",
             json={
                 "account_id": str(account.id),
-                "game_id": "00000000-0000-0000-0000-000000000000",
+                "game_id": "gam_00000000-0000-0000-0000-000000000000",
                 "name": "Invalid Board",
                 "icon": "star",
                 "short_code": "INVALID",
@@ -208,7 +208,7 @@ class TestBoardRoutes:
     async def test_get_board_not_found(self, client: AsyncClient, test_api_key):
         """Test retrieving a non-existent board returns 404."""
         response = await client.get(
-            "/boards/00000000-0000-0000-0000-000000000000",
+            "/boards/brd_00000000-0000-0000-0000-000000000000",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -524,7 +524,7 @@ class TestBoardRoutes:
     async def test_update_board_not_found(self, client: AsyncClient, test_api_key):
         """Test updating a non-existent board returns 404."""
         response = await client.patch(
-            "/boards/00000000-0000-0000-0000-000000000000",
+            "/boards/brd_00000000-0000-0000-0000-000000000000",
             json={"name": "New Name"},
             headers={"leadr-api-key": test_api_key},
         )

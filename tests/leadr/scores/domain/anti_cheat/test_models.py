@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from leadr.common.domain.ids import BoardID, DeviceID, ScoreID, UserID
 from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
 
@@ -12,9 +13,9 @@ class TestScoreSubmissionMeta:
 
     def test_create_submission_meta(self):
         """Test creating a ScoreSubmissionMeta entity."""
-        score_id = uuid4()
-        device_id = uuid4()
-        board_id = uuid4()
+        score_id = ScoreID(uuid4())
+        device_id = DeviceID(uuid4())
+        board_id = BoardID(uuid4())
         now = datetime.now(UTC)
 
         meta = ScoreSubmissionMeta(
@@ -37,9 +38,9 @@ class TestScoreSubmissionMeta:
     def test_submission_count_default(self):
         """Test that submission_count defaults to 1."""
         meta = ScoreSubmissionMeta(
-            score_id=uuid4(),
-            device_id=uuid4(),
-            board_id=uuid4(),
+            score_id=ScoreID(uuid4()),
+            device_id=DeviceID(uuid4()),
+            board_id=BoardID(uuid4()),
             last_submission_at=datetime.now(UTC),
         )
 
@@ -48,9 +49,9 @@ class TestScoreSubmissionMeta:
     def test_update_submission_count(self):
         """Test updating submission count."""
         meta = ScoreSubmissionMeta(
-            score_id=uuid4(),
-            device_id=uuid4(),
-            board_id=uuid4(),
+            score_id=ScoreID(uuid4()),
+            device_id=DeviceID(uuid4()),
+            board_id=BoardID(uuid4()),
             submission_count=1,
             last_submission_at=datetime.now(UTC),
         )
@@ -63,9 +64,9 @@ class TestScoreSubmissionMeta:
         """Test updating last submission timestamp."""
         old_time = datetime.now(UTC)
         meta = ScoreSubmissionMeta(
-            score_id=uuid4(),
-            device_id=uuid4(),
-            board_id=uuid4(),
+            score_id=ScoreID(uuid4()),
+            device_id=DeviceID(uuid4()),
+            board_id=BoardID(uuid4()),
             last_submission_at=old_time,
         )
 
@@ -80,7 +81,7 @@ class TestScoreFlag:
 
     def test_create_score_flag(self):
         """Test creating a ScoreFlag entity."""
-        score_id = uuid4()
+        score_id = ScoreID(uuid4())
 
         flag = ScoreFlag(
             score_id=score_id,
@@ -103,7 +104,7 @@ class TestScoreFlag:
     def test_flag_metadata_defaults_to_empty_dict(self):
         """Test that metadata defaults to empty dict."""
         flag = ScoreFlag(
-            score_id=uuid4(),
+            score_id=ScoreID(uuid4()),
             flag_type=FlagType.DUPLICATE,
             confidence=FlagConfidence.MEDIUM,
         )
@@ -113,7 +114,7 @@ class TestScoreFlag:
     def test_flag_status_default(self):
         """Test that status defaults to PENDING."""
         flag = ScoreFlag(
-            score_id=uuid4(),
+            score_id=ScoreID(uuid4()),
             flag_type=FlagType.VELOCITY,
             confidence=FlagConfidence.HIGH,
         )
@@ -122,8 +123,8 @@ class TestScoreFlag:
 
     def test_flag_with_review_data(self):
         """Test creating a flag with review information."""
-        score_id = uuid4()
-        reviewer_id = uuid4()
+        score_id = ScoreID(uuid4())
+        reviewer_id = UserID(uuid4())
         reviewed_at = datetime.now(UTC)
 
         flag = ScoreFlag(
@@ -144,7 +145,7 @@ class TestScoreFlag:
 
     def test_flag_types_coverage(self):
         """Test creating flags with different types."""
-        score_id = uuid4()
+        score_id = ScoreID(uuid4())
 
         # Test each flag type
         for flag_type in [
@@ -166,7 +167,7 @@ class TestScoreFlag:
 
     def test_flag_confidence_levels(self):
         """Test creating flags with different confidence levels."""
-        score_id = uuid4()
+        score_id = ScoreID(uuid4())
 
         # Test each confidence level
         for confidence in [FlagConfidence.LOW, FlagConfidence.MEDIUM, FlagConfidence.HIGH]:

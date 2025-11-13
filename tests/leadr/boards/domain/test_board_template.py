@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from leadr.boards.domain.board_template import BoardTemplate
+from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 
 
 class TestBoardTemplate:
@@ -14,9 +15,9 @@ class TestBoardTemplate:
 
     def test_create_board_template_with_all_fields(self):
         """Test creating a board template with all fields including optional ones."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
         next_run_at = now + timedelta(days=7)
 
@@ -50,9 +51,9 @@ class TestBoardTemplate:
 
     def test_create_board_template_with_required_fields_only(self):
         """Test creating a board template with only required fields."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
         next_run_at = now + timedelta(days=1)
 
@@ -83,9 +84,9 @@ class TestBoardTemplate:
 
     def test_board_template_name_required(self):
         """Test that template name is required."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -104,8 +105,8 @@ class TestBoardTemplate:
 
     def test_board_template_account_id_required(self):
         """Test that account_id is required."""
-        template_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -124,8 +125,8 @@ class TestBoardTemplate:
 
     def test_board_template_game_id_required(self):
         """Test that game_id is required."""
-        template_id = uuid4()
-        account_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -144,9 +145,9 @@ class TestBoardTemplate:
 
     def test_board_template_repeat_interval_required(self):
         """Test that repeat_interval is required."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -165,9 +166,9 @@ class TestBoardTemplate:
 
     def test_board_template_next_run_at_required(self):
         """Test that next_run_at is required."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -186,9 +187,9 @@ class TestBoardTemplate:
 
     def test_board_template_is_active_required(self):
         """Test that is_active is required."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -207,9 +208,9 @@ class TestBoardTemplate:
 
     def test_board_template_name_cannot_be_empty(self):
         """Test that template name cannot be empty or whitespace only."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -229,9 +230,9 @@ class TestBoardTemplate:
 
     def test_board_template_name_cannot_be_whitespace_only(self):
         """Test that template name cannot be whitespace only."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -251,9 +252,9 @@ class TestBoardTemplate:
 
     def test_board_template_name_strips_whitespace(self):
         """Test that template name strips leading and trailing whitespace."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         template = BoardTemplate(
@@ -272,9 +273,9 @@ class TestBoardTemplate:
 
     def test_board_template_repeat_interval_validates_postgres_syntax(self):
         """Test that repeat_interval validates PostgreSQL interval syntax."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         # Valid PostgreSQL interval syntax
@@ -307,9 +308,9 @@ class TestBoardTemplate:
 
     def test_board_template_repeat_interval_rejects_invalid_syntax(self):
         """Test that repeat_interval rejects invalid PostgreSQL syntax."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         # Invalid interval syntax
@@ -339,9 +340,9 @@ class TestBoardTemplate:
 
     def test_board_template_config_defaults_to_empty_dict(self):
         """Test that config defaults to empty dict when not provided."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         template = BoardTemplate(
@@ -361,9 +362,9 @@ class TestBoardTemplate:
 
     def test_board_template_config_template_defaults_to_empty_dict(self):
         """Test that config_template defaults to empty dict when not provided."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         template = BoardTemplate(
@@ -383,9 +384,9 @@ class TestBoardTemplate:
 
     def test_board_template_equality_based_on_id(self):
         """Test that template equality is based on ID."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         template1 = BoardTemplate(
@@ -402,8 +403,8 @@ class TestBoardTemplate:
 
         template2 = BoardTemplate(
             id=template_id,
-            account_id=uuid4(),
-            game_id=uuid4(),
+            account_id=AccountID(uuid4()),
+            game_id=GameID(uuid4()),
             name="Template Two",
             repeat_interval="1 month",
             next_run_at=now + timedelta(days=30),
@@ -416,12 +417,12 @@ class TestBoardTemplate:
 
     def test_board_template_inequality_different_ids(self):
         """Test that templates with different IDs are not equal."""
-        account_id = uuid4()
-        game_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         template1 = BoardTemplate(
-            id=uuid4(),
+            id=BoardTemplateID(uuid4()),
             account_id=account_id,
             game_id=game_id,
             name="Template One",
@@ -433,7 +434,7 @@ class TestBoardTemplate:
         )
 
         template2 = BoardTemplate(
-            id=uuid4(),
+            id=BoardTemplateID(uuid4()),
             account_id=account_id,
             game_id=game_id,
             name="Template One",
@@ -448,9 +449,9 @@ class TestBoardTemplate:
 
     def test_board_template_is_hashable(self):
         """Test that template can be used in sets and as dict keys."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         template = BoardTemplate(
@@ -475,9 +476,9 @@ class TestBoardTemplate:
 
     def test_board_template_immutability_of_id(self):
         """Test that template ID cannot be changed after creation."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         template = BoardTemplate(
@@ -495,13 +496,13 @@ class TestBoardTemplate:
         new_id = uuid4()
 
         with pytest.raises(ValidationError):
-            template.id = new_id
+            template.id = new_id  # type: ignore[misc]
 
     def test_board_template_immutability_of_account_id(self):
         """Test that account_id cannot be changed after creation."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         template = BoardTemplate(
@@ -519,13 +520,13 @@ class TestBoardTemplate:
         new_account_id = uuid4()
 
         with pytest.raises(ValidationError):
-            template.account_id = new_account_id
+            template.account_id = new_account_id  # type: ignore[misc]
 
     def test_board_template_immutability_of_game_id(self):
         """Test that game_id cannot be changed after creation."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         template = BoardTemplate(
@@ -543,13 +544,13 @@ class TestBoardTemplate:
         new_game_id = uuid4()
 
         with pytest.raises(ValidationError):
-            template.game_id = new_game_id
+            template.game_id = new_game_id  # type: ignore[misc]
 
     def test_board_template_soft_delete(self):
         """Test that template can be soft-deleted."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         template = BoardTemplate(
@@ -574,9 +575,9 @@ class TestBoardTemplate:
 
     def test_board_template_restore(self):
         """Test that soft-deleted template can be restored."""
-        template_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         template = BoardTemplate(

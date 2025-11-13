@@ -11,6 +11,7 @@ from leadr.accounts.services.repositories import AccountRepository
 from leadr.accounts.services.user_service import UserService
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
 from leadr.auth.services.repositories import APIKeyRepository
+from leadr.common.domain.ids import AccountID, APIKeyID
 
 
 @pytest.mark.asyncio
@@ -21,7 +22,7 @@ class TestAPIKeyRepository:
         """Test creating an API key via repository."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -44,7 +45,7 @@ class TestAPIKeyRepository:
 
         # Create API key
         api_key_repo = APIKeyRepository(db_session)
-        key_id = uuid4()
+        key_id = APIKeyID(uuid4())
 
         api_key = APIKey(
             id=key_id,
@@ -71,7 +72,7 @@ class TestAPIKeyRepository:
         """Test retrieving an API key by ID."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -93,7 +94,7 @@ class TestAPIKeyRepository:
         )
 
         api_key_repo = APIKeyRepository(db_session)
-        key_id = uuid4()
+        key_id = APIKeyID(uuid4())
 
         api_key = APIKey(
             id=key_id,
@@ -127,7 +128,7 @@ class TestAPIKeyRepository:
         """Test retrieving an API key by its prefix."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -149,7 +150,7 @@ class TestAPIKeyRepository:
         )
 
         api_key_repo = APIKeyRepository(db_session)
-        key_id = uuid4()
+        key_id = APIKeyID(uuid4())
 
         api_key = APIKey(
             id=key_id,
@@ -182,7 +183,7 @@ class TestAPIKeyRepository:
         """Test listing all API keys for an account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -207,7 +208,7 @@ class TestAPIKeyRepository:
         api_key_repo = APIKeyRepository(db_session)
 
         key1 = APIKey(
-            id=uuid4(),
+            id=APIKeyID(uuid4()),
             account_id=account_id,
             user_id=user.id,
             name="Production Key",
@@ -217,7 +218,7 @@ class TestAPIKeyRepository:
             updated_at=now,
         )
         key2 = APIKey(
-            id=uuid4(),
+            id=APIKeyID(uuid4()),
             account_id=account_id,
             user_id=user.id,
             name="Development Key",
@@ -242,7 +243,7 @@ class TestAPIKeyRepository:
         """Test listing only active API keys for an account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -267,7 +268,7 @@ class TestAPIKeyRepository:
         api_key_repo = APIKeyRepository(db_session)
 
         active_key = APIKey(
-            id=uuid4(),
+            id=APIKeyID(uuid4()),
             account_id=account_id,
             user_id=user.id,
             name="Active Key",
@@ -278,7 +279,7 @@ class TestAPIKeyRepository:
             updated_at=now,
         )
         revoked_key = APIKey(
-            id=uuid4(),
+            id=APIKeyID(uuid4()),
             account_id=account_id,
             user_id=user.id,
             name="Revoked Key",
@@ -303,7 +304,7 @@ class TestAPIKeyRepository:
         """Test counting active API keys for an account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -329,7 +330,7 @@ class TestAPIKeyRepository:
 
         for i in range(3):
             key = APIKey(
-                id=uuid4(),
+                id=APIKeyID(uuid4()),
                 account_id=account_id,
                 user_id=user.id,
                 name=f"Key {i}",
@@ -343,7 +344,7 @@ class TestAPIKeyRepository:
 
         # Create one revoked key
         revoked_key = APIKey(
-            id=uuid4(),
+            id=APIKeyID(uuid4()),
             account_id=account_id,
             user_id=user.id,
             name="Revoked Key",
@@ -364,7 +365,7 @@ class TestAPIKeyRepository:
         """Test updating an API key via repository."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -386,7 +387,7 @@ class TestAPIKeyRepository:
         )
 
         api_key_repo = APIKeyRepository(db_session)
-        key_id = uuid4()
+        key_id = APIKeyID(uuid4())
 
         api_key = APIKey(
             id=key_id,
@@ -418,7 +419,7 @@ class TestAPIKeyRepository:
         """Test updating an API key status."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -440,7 +441,7 @@ class TestAPIKeyRepository:
         )
 
         api_key_repo = APIKeyRepository(db_session)
-        key_id = uuid4()
+        key_id = APIKeyID(uuid4())
 
         api_key = APIKey(
             id=key_id,
@@ -470,7 +471,7 @@ class TestAPIKeyRepository:
         """Test deleting an API key via repository."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -492,7 +493,7 @@ class TestAPIKeyRepository:
         )
 
         api_key_repo = APIKeyRepository(db_session)
-        key_id = uuid4()
+        key_id = APIKeyID(uuid4())
 
         api_key = APIKey(
             id=key_id,
@@ -517,7 +518,7 @@ class TestAPIKeyRepository:
         """Test creating and retrieving an API key with expiration."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -540,7 +541,7 @@ class TestAPIKeyRepository:
 
         # Create API key with expiration
         api_key_repo = APIKeyRepository(db_session)
-        key_id = uuid4()
+        key_id = APIKeyID(uuid4())
         expires_at = now + timedelta(days=90)
 
         api_key = APIKey(

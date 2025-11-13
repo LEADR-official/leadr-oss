@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from leadr.common.domain.ids import AccountID, BoardID, GameID
 from leadr.games.domain.game import Game
 
 
@@ -14,8 +15,8 @@ class TestGame:
 
     def test_create_game_with_all_fields(self):
         """Test creating a game with all fields including optional ones."""
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         default_board_id = uuid4()
         now = datetime.now(UTC)
 
@@ -24,7 +25,7 @@ class TestGame:
             account_id=account_id,
             name="Super Awesome Game",
             steam_app_id="123456",
-            default_board_id=default_board_id,
+            default_board_id=BoardID(default_board_id),
             created_at=now,
             updated_at=now,
         )
@@ -39,8 +40,8 @@ class TestGame:
 
     def test_create_game_with_required_fields_only(self):
         """Test creating a game with only required fields."""
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         game = Game(
@@ -61,8 +62,8 @@ class TestGame:
 
     def test_game_name_required(self):
         """Test that game name is required."""
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -77,7 +78,7 @@ class TestGame:
 
     def test_game_account_id_required(self):
         """Test that account_id is required."""
-        game_id = uuid4()
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -92,8 +93,8 @@ class TestGame:
 
     def test_game_name_cannot_be_empty(self):
         """Test that game name cannot be empty or whitespace only."""
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -109,8 +110,8 @@ class TestGame:
 
     def test_game_name_cannot_be_whitespace_only(self):
         """Test that game name cannot be whitespace only."""
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -126,8 +127,8 @@ class TestGame:
 
     def test_game_name_strips_whitespace(self):
         """Test that game name strips leading and trailing whitespace."""
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         game = Game(
@@ -142,8 +143,8 @@ class TestGame:
 
     def test_game_equality_based_on_id(self):
         """Test that game equality is based on ID."""
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         game1 = Game(
@@ -156,7 +157,7 @@ class TestGame:
 
         game2 = Game(
             id=game_id,
-            account_id=uuid4(),
+            account_id=AccountID(uuid4()),
             name="Game Two",
             created_at=now,
             updated_at=now,
@@ -166,11 +167,11 @@ class TestGame:
 
     def test_game_inequality_different_ids(self):
         """Test that games with different IDs are not equal."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         game1 = Game(
-            id=uuid4(),
+            id=GameID(uuid4()),
             account_id=account_id,
             name="Game One",
             created_at=now,
@@ -178,7 +179,7 @@ class TestGame:
         )
 
         game2 = Game(
-            id=uuid4(),
+            id=GameID(uuid4()),
             account_id=account_id,
             name="Game One",
             created_at=now,
@@ -189,8 +190,8 @@ class TestGame:
 
     def test_game_is_hashable(self):
         """Test that game can be used in sets and as dict keys."""
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         game = Game(
@@ -211,8 +212,8 @@ class TestGame:
 
     def test_game_immutability_of_id(self):
         """Test that game ID cannot be changed after creation."""
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         game = Game(
@@ -226,12 +227,12 @@ class TestGame:
         new_id = uuid4()
 
         with pytest.raises(ValidationError):
-            game.id = new_id
+            game.id = new_id  # type: ignore[misc]
 
     def test_game_immutability_of_account_id(self):
         """Test that account_id cannot be changed after creation."""
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         game = Game(
@@ -245,12 +246,12 @@ class TestGame:
         new_account_id = uuid4()
 
         with pytest.raises(ValidationError):
-            game.account_id = new_account_id
+            game.account_id = new_account_id  # type: ignore[misc]
 
     def test_game_soft_delete(self):
         """Test that game can be soft-deleted."""
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         game = Game(
@@ -271,8 +272,8 @@ class TestGame:
 
     def test_game_restore(self):
         """Test that soft-deleted game can be restored."""
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         game = Game(

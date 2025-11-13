@@ -2,10 +2,10 @@
 
 import json
 from typing import Any
-from uuid import UUID
 
 from pydantic import Field, field_validator
 
+from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.common.domain.models import Entity
 from leadr.config import settings
 
@@ -18,16 +18,21 @@ class Score(Entity):
     but mutable in terms of their value and metadata for corrections/updates.
     """
 
-    account_id: UUID = Field(
+    id: ScoreID = Field(
+        frozen=True,
+        default_factory=ScoreID,
+        description="Unique score identifier",
+    )
+    account_id: AccountID = Field(
         frozen=True, description="ID of the account this score belongs to (immutable)"
     )
-    game_id: UUID = Field(
+    game_id: GameID = Field(
         frozen=True, description="ID of the game this score belongs to (immutable)"
     )
-    board_id: UUID = Field(
+    board_id: BoardID = Field(
         frozen=True, description="ID of the board this score belongs to (immutable)"
     )
-    device_id: UUID = Field(
+    device_id: DeviceID = Field(
         frozen=True, description="ID of the device that submitted this score (immutable)"
     )
     player_name: str = Field(description="Display name of the player")

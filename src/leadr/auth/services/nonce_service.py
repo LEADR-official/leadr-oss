@@ -1,12 +1,13 @@
 """Nonce service for managing request nonces."""
 
 from datetime import UTC, datetime, timedelta
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.auth.domain.nonce import Nonce, NonceStatus
 from leadr.auth.services.repositories import NonceRepository
+from leadr.common.domain.ids import DeviceID
 from leadr.common.services import BaseService
 
 
@@ -28,7 +29,7 @@ class NonceService(BaseService[Nonce, NonceRepository]):
 
     async def generate_nonce(
         self,
-        device_id: UUID,
+        device_id: DeviceID,
         ttl_seconds: int = 60,
     ) -> tuple[str, datetime]:
         """Generate a fresh nonce for a device.
@@ -61,7 +62,7 @@ class NonceService(BaseService[Nonce, NonceRepository]):
     async def validate_and_consume_nonce(
         self,
         nonce_value: str,
-        device_id: UUID,
+        device_id: DeviceID,
     ) -> bool:
         """Validate nonce and mark as used (atomic operation).
 

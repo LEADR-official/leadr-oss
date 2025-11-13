@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID
 
 from sqlalchemy import delete, select
 
@@ -18,6 +17,13 @@ from leadr.auth.adapters.orm import (
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
 from leadr.auth.domain.device import Device, DeviceSession
 from leadr.auth.domain.nonce import Nonce
+from leadr.common.domain.ids import (
+    AccountID,
+    APIKeyID,
+    DeviceID,
+    GameID,
+    UserID,
+)
 from leadr.common.repositories import BaseRepository
 
 
@@ -27,9 +33,9 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
     def _to_domain(self, orm: APIKeyORM) -> APIKey:
         """Convert ORM model to domain entity."""
         return APIKey(
-            id=orm.id,
-            account_id=orm.account_id,
-            user_id=orm.user_id,
+            id=APIKeyID(orm.id),
+            account_id=AccountID(orm.account_id),
+            user_id=UserID(orm.user_id),
             name=orm.name,
             key_hash=orm.key_hash,
             key_prefix=orm.key_prefix,
@@ -44,9 +50,9 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
     def _to_orm(self, entity: APIKey) -> APIKeyORM:
         """Convert domain entity to ORM model."""
         return APIKeyORM(
-            id=entity.id,
-            account_id=entity.account_id,
-            user_id=entity.user_id,
+            id=entity.id.uuid,
+            account_id=entity.account_id.uuid,
+            user_id=entity.user_id.uuid,
             name=entity.name,
             key_hash=entity.key_hash,
             key_prefix=entity.key_prefix,
@@ -66,9 +72,9 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         """Get API key by prefix, returns None if not found or soft-deleted."""
         return await self._get_by_field("key_prefix", key_prefix)
 
-    async def filter(
+    async def filter(  # type: ignore[override]
         self,
-        account_id: UUID,
+        account_id: AccountID | None = None,
         status: APIKeyStatus | None = None,
         active_only: bool = False,
         **kwargs,
@@ -82,9 +88,15 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
 
         Returns:
             List of API keys for the account matching the filter criteria
+
+        Raises:
+            ValueError: If account_id is None (required for multi-tenant safety)
         """
+        if account_id is None:
+            raise ValueError("account_id is required for filtering API keys")
+        account_uuid = self._extract_uuid(account_id)
         query = select(APIKeyORM).where(
-            APIKeyORM.account_id == account_id,
+            APIKeyORM.account_id == account_uuid,
             APIKeyORM.deleted_at.is_(None),
         )
 
@@ -100,7 +112,7 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         orms = result.scalars().all()
         return [self._to_domain(orm) for orm in orms]
 
-    async def count_active_by_account(self, account_id: UUID) -> int:
+    async def count_active_by_account(self, account_id: AccountID) -> int:
         """Count active, non-deleted API keys for a given account.
 
         Args:
@@ -109,8 +121,9 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         Returns:
             Number of active, non-deleted API keys for the account.
         """
+        account_uuid = self._extract_uuid(account_id)
         return await self._count_where(
-            APIKeyORM.account_id == account_id,
+            APIKeyORM.account_id == account_uuid,
             APIKeyORM.status == APIKeyStatusEnum.ACTIVE,
             APIKeyORM.deleted_at.is_(None),
         )
@@ -131,7 +144,7 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
         """Get the ORM model class."""
         return DeviceORM
 
-    async def get_by_game_and_device_id(self, game_id: UUID, device_id: str) -> Device | None:
+    async def get_by_game_and_device_id(self, game_id: GameID, device_id: str) -> Device | None:
         """Get device by game_id and device_id, returns None if not found or soft-deleted.
 
         Args:
@@ -141,8 +154,9 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
         Returns:
             Device if found and not deleted, None otherwise
         """
+        game_uuid = self._extract_uuid(game_id)
         query = select(DeviceORM).where(
-            DeviceORM.game_id == game_id,
+            DeviceORM.game_id == game_uuid,
             DeviceORM.device_id == device_id,
             DeviceORM.deleted_at.is_(None),
         )
@@ -150,10 +164,10 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
-    async def filter(
+    async def filter(  # type: ignore[override]
         self,
-        account_id: UUID,
-        game_id: UUID | None = None,
+        account_id: AccountID | None = None,
+        game_id: GameID | None = None,
         status: str | None = None,
         **kwargs,
     ) -> list[Device]:
@@ -166,15 +180,21 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
 
         Returns:
             List of devices for the account matching the filter criteria
-        """
 
+        Raises:
+            ValueError: If account_id is None (required for multi-tenant safety)
+        """
+        if account_id is None:
+            raise ValueError("account_id is required for filtering devices")
+        account_uuid = self._extract_uuid(account_id)
         query = select(DeviceORM).where(
-            DeviceORM.account_id == account_id,
+            DeviceORM.account_id == account_uuid,
             DeviceORM.deleted_at.is_(None),
         )
 
         if game_id is not None:
-            query = query.where(DeviceORM.game_id == game_id)
+            game_uuid = self._extract_uuid(game_id)
+            query = query.where(DeviceORM.game_id == game_uuid)
 
         if status is not None:
             query = query.where(DeviceORM.status == DeviceStatusEnum(status))
@@ -233,10 +253,10 @@ class DeviceSessionRepository(BaseRepository[DeviceSession, DeviceSessionORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
-    async def filter(
+    async def filter(  # type: ignore[override]
         self,
-        account_id: UUID,
-        device_id: UUID | None = None,
+        account_id: AccountID | None = None,
+        device_id: DeviceID | None = None,
         **kwargs,
     ) -> list[DeviceSession]:
         """Filter sessions by account and optional criteria.
@@ -249,19 +269,26 @@ class DeviceSessionRepository(BaseRepository[DeviceSession, DeviceSessionORM]):
 
         Returns:
             List of sessions matching the filter criteria
+
+        Raises:
+            ValueError: If account_id is None (required for multi-tenant safety)
         """
+        if account_id is None:
+            raise ValueError("account_id is required for filtering device sessions")
+        account_uuid = self._extract_uuid(account_id)
         # Join with devices table to filter by account_id
         query = (
             select(DeviceSessionORM)
             .join(DeviceORM, DeviceSessionORM.device_id == DeviceORM.id)
             .where(
-                DeviceORM.account_id == account_id,
+                DeviceORM.account_id == account_uuid,
                 DeviceSessionORM.deleted_at.is_(None),
             )
         )
 
         if device_id is not None:
-            query = query.where(DeviceSessionORM.device_id == device_id)
+            device_uuid = self._extract_uuid(device_id)
+            query = query.where(DeviceSessionORM.device_id == device_uuid)
 
         result = await self.session.execute(query)
         orms = result.scalars().all()
@@ -300,10 +327,10 @@ class NonceRepository(BaseRepository[Nonce, NonceORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
-    async def filter(
+    async def filter(  # type: ignore[override]
         self,
-        account_id: UUID,
-        device_id: UUID | None = None,
+        account_id: AccountID | None = None,
+        device_id: DeviceID | None = None,
         **kwargs,
     ) -> list[Nonce]:
         """Filter nonces by account and optional criteria.
@@ -316,19 +343,26 @@ class NonceRepository(BaseRepository[Nonce, NonceORM]):
 
         Returns:
             List of nonces matching the filter criteria
+
+        Raises:
+            ValueError: If account_id is None (required for multi-tenant safety)
         """
+        if account_id is None:
+            raise ValueError("account_id is required for filtering nonces")
+        account_uuid = self._extract_uuid(account_id)
         # Join with devices table to filter by account_id
         query = (
             select(NonceORM)
             .join(DeviceORM, NonceORM.device_id == DeviceORM.id)
             .where(
-                DeviceORM.account_id == account_id,
+                DeviceORM.account_id == account_uuid,
                 NonceORM.deleted_at.is_(None),
             )
         )
 
         if device_id is not None:
-            query = query.where(NonceORM.device_id == device_id)
+            device_uuid = self._extract_uuid(device_id)
+            query = query.where(NonceORM.device_id == device_uuid)
 
         result = await self.session.execute(query)
         orms = result.scalars().all()
