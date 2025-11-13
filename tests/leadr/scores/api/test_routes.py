@@ -110,7 +110,7 @@ class TestScoreRoutes:
             keep_strategy=KeepStrategy.BEST_ONLY,
         )
 
-        # Create score with optional fields
+        # Create score with optional fields (geo fields auto-populated by middleware)
         response = await client.post(
             "/scores",
             json={
@@ -121,9 +121,6 @@ class TestScoreRoutes:
                 "player_name": "SpeedRunner99",
                 "value": 123.45,
                 "value_display": "2:03.45",
-                "timezone": "America/New_York",
-                "country": "USA",
-                "city": "New York",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -131,9 +128,10 @@ class TestScoreRoutes:
         assert response.status_code == 201
         data = response.json()
         assert data["value_display"] == "2:03.45"
-        assert data["timezone"] == "America/New_York"
-        assert data["country"] == "USA"
-        assert data["city"] == "New York"
+        # Geo fields will be None in tests (no real IP/GeoIP service)
+        assert data["timezone"] is None
+        assert data["country"] is None
+        assert data["city"] is None
 
     async def test_create_score_with_board_not_found(
         self, client: AsyncClient, db_session, test_api_key

@@ -20,6 +20,8 @@ plans
 # Ah!
 .keys
 data
+.geoip/
+.geoip-test/
 
 site-md
 CLIENT_AUTH_IMPLEMENTATION_PLAN.md
