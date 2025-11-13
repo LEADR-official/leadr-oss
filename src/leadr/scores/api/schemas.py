@@ -9,7 +9,11 @@ from leadr.scores.domain.score import Score
 
 
 class ScoreCreateRequest(BaseModel):
-    """Request model for creating a score."""
+    """Request model for creating a score.
+
+    Note: Timezone, country, and city are automatically populated from the client's
+    IP address via GeoIP middleware. These fields are not accepted in the request.
+    """
 
     account_id: UUID = Field(description="ID of the account this score belongs to")
     game_id: UUID = Field(description="ID of the game this score belongs to")
@@ -21,9 +25,6 @@ class ScoreCreateRequest(BaseModel):
         default=None,
         description="Optional formatted display string (e.g., '1:23.45', '1,234 points')",
     )
-    timezone: str | None = Field(default=None, description="Optional timezone for categorization")
-    country: str | None = Field(default=None, description="Optional country for categorization")
-    city: str | None = Field(default=None, description="Optional city for categorization")
 
 
 class ScoreUpdateRequest(BaseModel):

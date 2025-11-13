@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 from fastapi import APIRouter, Depends, FastAPI
 
+from api.middleware import GeoIPMiddleware
 from api.routes import router as api_router
 from leadr.accounts.api.routes import router as accounts_router
 from leadr.auth.api.client_routes import router as client_auth_router
@@ -22,6 +23,7 @@ from leadr.common.api.exceptions import entity_not_found_handler
 from leadr.common.background_tasks import get_scheduler
 from leadr.common.database import async_session_factory, engine
 from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.geoip import GeoIPService
 from leadr.config import settings
 from leadr.games.api.routes import router as games_router
 from leadr.scores.api.routes import router as scores_router
@@ -48,6 +50,23 @@ async def lifespan(app: FastAPI):
     # Startup: Database engine is already created at module import
     # The engine will establish connections as needed from the pool
 
+    # Initialize GeoIP service (skip in test environment to avoid network calls)
+    if settings.ENV != "TEST":
+        geoip_service = GeoIPService(
+            account_id=settings.MAXMIND_ACCOUNT_ID,
+            license_key=settings.MAXMIND_LICENSE_KEY,
+            city_db_url=settings.MAXMIND_CITY_DB_URL,
+            country_db_url=settings.MAXMIND_COUNTRY_DB_URL,
+            database_path=settings.GEOIP_DATABASE_PATH,
+            refresh_days=settings.GEOIP_REFRESH_DAYS,
+        )
+        await geoip_service.initialize()
+        app.state.geoip_service = geoip_service
+    else:
+        # In tests, GeoIP service is None - middleware handles gracefully
+        # Tests can override with mocks if needed via app.dependency_overrides
+        app.state.geoip_service = None
+
     # Bootstrap superadmin user if none exists
     async with async_session_factory() as session:
         await ensure_superadmin_exists(session)
@@ -73,8 +92,10 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown: Stop background tasks and dispose of the database engine
+    # Shutdown: Stop background tasks, close GeoIP service, and dispose of database engine
     await scheduler.stop()
+    if hasattr(app.state, "geoip_service") and app.state.geoip_service is not None:
+        app.state.geoip_service.close()
     await engine.dispose()
 
 
@@ -100,6 +121,9 @@ app = FastAPI(
 
 # Register global exception handlers
 app.add_exception_handler(EntityNotFoundError, entity_not_found_handler)
+
+# Add GeoIP middleware (will use app.state.geoip_service from lifespan)
+app.add_middleware(GeoIPMiddleware, dev_override_ip=settings.DEV_OVERRIDE_IP)
 
 # Create public and admin routers with separate authentication requirements
 public_router = APIRouter()

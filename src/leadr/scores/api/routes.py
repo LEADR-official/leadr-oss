@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
@@ -18,7 +18,8 @@ router = APIRouter()
 
 @router.post("/scores", status_code=status.HTTP_201_CREATED)
 async def create_score(
-    request: ScoreCreateRequest,
+    score_request: ScoreCreateRequest,
+    request: Request,
     service: ScoreServiceDep,
     background_tasks: BackgroundTasks,
     auth: AuthContextDep,
@@ -48,20 +49,25 @@ async def create_score(
         400: Validation failed (board doesn't belong to account, or game doesn't
             match board's game).
     """
-    validate_body_account_id(auth, request.account_id)
+    validate_body_account_id(auth, score_request.account_id)
+
+    # Get geo data from request state (populated by GeoIP middleware)
+    timezone = getattr(request.state, "geo_timezone", None)
+    country = getattr(request.state, "geo_country", None)
+    city = getattr(request.state, "geo_city", None)
 
     try:
         score, anti_cheat_result = await service.create_score(
-            account_id=request.account_id,
-            game_id=request.game_id,
-            board_id=request.board_id,
-            device_id=request.device_id,
-            player_name=request.player_name,
-            value=request.value,
-            value_display=request.value_display,
-            timezone=request.timezone,
-            country=request.country,
-            city=request.city,
+            account_id=score_request.account_id,
+            game_id=score_request.game_id,
+            board_id=score_request.board_id,
+            device_id=score_request.device_id,
+            player_name=score_request.player_name,
+            value=score_request.value,
+            value_display=score_request.value_display,
+            timezone=timezone,
+            country=country,
+            city=city,
         )
     except IntegrityError:
         raise HTTPException(
@@ -72,12 +78,12 @@ async def create_score(
         raise HTTPException(status_code=400, detail=str(e)) from None
 
     # Schedule metadata update as background task (non-blocking)
-    if request.device_id is not None:
+    if score_request.device_id is not None:
         background_tasks.add_task(
             service.update_submission_metadata,
             score,
-            request.device_id,
-            request.board_id,
+            score_request.device_id,
+            score_request.board_id,
             anti_cheat_result,
         )
 

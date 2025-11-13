@@ -262,6 +262,36 @@ class CommonSettings(BaseSettings):
         description="Minimum time between submissions to avoid velocity detection (in seconds)",
     )
 
+    # GeoIP Configuration
+    MAXMIND_ACCOUNT_ID: str = Field(
+        default="",
+        description="MaxMind account ID for database downloads (used for basic auth)",
+    )
+    MAXMIND_LICENSE_KEY: str = Field(
+        default="",
+        description="MaxMind license key for database downloads (used for basic auth)",
+    )
+    MAXMIND_CITY_DB_URL: str = Field(
+        default="https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz",
+        description="MaxMind GeoLite2 City database download URL",
+    )
+    MAXMIND_COUNTRY_DB_URL: str = Field(
+        default="https://download.maxmind.com/geoip/databases/GeoLite2-Country/download?suffix=tar.gz",
+        description="MaxMind GeoLite2 Country database download URL",
+    )
+    GEOIP_DATABASE_PATH: Path = Field(
+        default=PROJ_ROOT / ".geoip",
+        description="Directory path for storing GeoIP databases",
+    )
+    GEOIP_REFRESH_DAYS: int = Field(
+        default=7,
+        description="Number of days between GeoIP database refresh downloads (default: 7 days)",
+    )
+    DEV_OVERRIDE_IP: str | None = Field(
+        default=None,
+        description="Override IP address for development/testing (bypasses localhost detection)",
+    )
+
     @model_validator(mode="after")
     def validate_api_enabled(self):
         """Ensure at least one API (Admin or Client) is enabled."""
