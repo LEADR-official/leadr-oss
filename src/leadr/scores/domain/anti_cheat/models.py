@@ -7,7 +7,12 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from leadr.common.domain.models import Entity
-from leadr.scores.domain.anti_cheat.enums import FlagAction, FlagConfidence, FlagType
+from leadr.scores.domain.anti_cheat.enums import (
+    FlagAction,
+    FlagConfidence,
+    FlagType,
+    ScoreFlagStatus,
+)
 
 
 class AntiCheatResult(BaseModel):
@@ -67,8 +72,8 @@ class ScoreFlag(Entity):
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Supporting data for the detection"
     )
-    status: str = Field(
-        default="PENDING",
+    status: ScoreFlagStatus = Field(
+        default=ScoreFlagStatus.PENDING,
         description="Review status (PENDING/CONFIRMED_CHEAT/FALSE_POSITIVE/DISMISSED)",
     )
     reviewed_at: datetime | None = Field(

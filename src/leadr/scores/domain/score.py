@@ -33,13 +33,13 @@ class Score(Entity):
         default=None,
         description="Optional formatted display string (e.g., '1:23.45', '1,234 points')",
     )
-    filter_timezone: str | None = Field(
+    timezone: str | None = Field(
         default=None, description="Optional timezone filter for score categorization"
     )
-    filter_country: str | None = Field(
+    country: str | None = Field(
         default=None, description="Optional country filter for score categorization"
     )
-    filter_city: str | None = Field(
+    city: str | None = Field(
         default=None, description="Optional city filter for score categorization"
     )
 

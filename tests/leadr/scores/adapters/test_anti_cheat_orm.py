@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 
 from leadr.scores.adapters.orm import ScoreFlagORM, ScoreSubmissionMetaORM
-from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType
+from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
 
 
@@ -148,7 +148,7 @@ class TestScoreFlagORM:
             flag_type=FlagType.VELOCITY,
             confidence=FlagConfidence.HIGH,
             metadata={"time_delta_seconds": 0.5},
-            status="PENDING",
+            status=ScoreFlagStatus.PENDING,
         )
 
         orm = ScoreFlagORM.from_domain(domain)

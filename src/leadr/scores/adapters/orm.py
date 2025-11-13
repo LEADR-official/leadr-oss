@@ -141,7 +141,11 @@ class ScoreFlagORM(Base):
 
     def to_domain(self) -> "ScoreFlag":
         """Convert ORM model to domain entity."""
-        from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType
+        from leadr.scores.domain.anti_cheat.enums import (
+            FlagConfidence,
+            FlagType,
+            ScoreFlagStatus,
+        )
         from leadr.scores.domain.anti_cheat.models import ScoreFlag
 
         return ScoreFlag(
@@ -150,7 +154,7 @@ class ScoreFlagORM(Base):
             flag_type=FlagType(self.flag_type),
             confidence=FlagConfidence(self.confidence),
             metadata=self.flag_metadata,
-            status=self.status,
+            status=ScoreFlagStatus(self.status),
             reviewed_at=self.reviewed_at,
             reviewer_id=self.reviewer_id,
             reviewer_decision=self.reviewer_decision,
@@ -168,7 +172,7 @@ class ScoreFlagORM(Base):
             flag_type=entity.flag_type.value,
             confidence=entity.confidence.value,
             flag_metadata=entity.metadata,
-            status=entity.status,
+            status=entity.status.value,
             reviewed_at=entity.reviewed_at,
             reviewer_id=entity.reviewer_id,
             reviewer_decision=entity.reviewer_decision,

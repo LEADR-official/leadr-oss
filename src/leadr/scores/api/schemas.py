@@ -21,15 +21,9 @@ class ScoreCreateRequest(BaseModel):
         default=None,
         description="Optional formatted display string (e.g., '1:23.45', '1,234 points')",
     )
-    filter_timezone: str | None = Field(
-        default=None, description="Optional timezone filter for categorization"
-    )
-    filter_country: str | None = Field(
-        default=None, description="Optional country filter for categorization"
-    )
-    filter_city: str | None = Field(
-        default=None, description="Optional city filter for categorization"
-    )
+    timezone: str | None = Field(default=None, description="Optional timezone for categorization")
+    country: str | None = Field(default=None, description="Optional country for categorization")
+    city: str | None = Field(default=None, description="Optional city for categorization")
 
 
 class ScoreUpdateRequest(BaseModel):
@@ -38,9 +32,9 @@ class ScoreUpdateRequest(BaseModel):
     player_name: str | None = Field(default=None, description="Updated player name")
     value: float | None = Field(default=None, description="Updated score value")
     value_display: str | None = Field(default=None, description="Updated display string")
-    filter_timezone: str | None = Field(default=None, description="Updated timezone filter")
-    filter_country: str | None = Field(default=None, description="Updated country filter")
-    filter_city: str | None = Field(default=None, description="Updated city filter")
+    timezone: str | None = Field(default=None, description="Updated timezone")
+    country: str | None = Field(default=None, description="Updated country")
+    city: str | None = Field(default=None, description="Updated city")
     deleted: bool | None = Field(default=None, description="Set to true to soft delete the score")
 
 
@@ -55,15 +49,9 @@ class ScoreResponse(BaseModel):
     player_name: str = Field(description="Display name of the player")
     value: float = Field(description="Numeric value of the score")
     value_display: str | None = Field(default=None, description="Formatted display string, or null")
-    filter_timezone: str | None = Field(
-        default=None, description="Timezone filter for categorization, or null"
-    )
-    filter_country: str | None = Field(
-        default=None, description="Country filter for categorization, or null"
-    )
-    filter_city: str | None = Field(
-        default=None, description="City filter for categorization, or null"
-    )
+    timezone: str | None = Field(default=None, description="Timezone for categorization, or null")
+    country: str | None = Field(default=None, description="Country for categorization, or null")
+    city: str | None = Field(default=None, description="City for categorization, or null")
     created_at: datetime = Field(description="Timestamp when the score was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -86,9 +74,9 @@ class ScoreResponse(BaseModel):
             player_name=score.player_name,
             value=score.value,
             value_display=score.value_display,
-            filter_timezone=score.filter_timezone,
-            filter_country=score.filter_country,
-            filter_city=score.filter_city,
+            timezone=score.timezone,
+            country=score.country,
+            city=score.city,
             created_at=score.created_at,
             updated_at=score.updated_at,
         )

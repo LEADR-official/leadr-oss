@@ -5,7 +5,9 @@ from typing import Annotated
 from fastapi import Depends
 
 from leadr.common.dependencies import DatabaseSession
+from leadr.scores.services.score_flag_service import ScoreFlagService
 from leadr.scores.services.score_service import ScoreService
+from leadr.scores.services.score_submission_meta_service import ScoreSubmissionMetaService
 
 
 async def get_score_service(db: DatabaseSession) -> ScoreService:
@@ -21,3 +23,37 @@ async def get_score_service(db: DatabaseSession) -> ScoreService:
 
 
 ScoreServiceDep = Annotated[ScoreService, Depends(get_score_service)]
+
+
+async def get_score_flag_service(db: DatabaseSession) -> ScoreFlagService:
+    """Get ScoreFlagService dependency.
+
+    Args:
+        db: Database session from dependency injection
+
+    Returns:
+        Initialized ScoreFlagService instance
+    """
+    return ScoreFlagService(db)
+
+
+ScoreFlagServiceDep = Annotated[ScoreFlagService, Depends(get_score_flag_service)]
+
+
+async def get_score_submission_meta_service(
+    db: DatabaseSession,
+) -> ScoreSubmissionMetaService:
+    """Get ScoreSubmissionMetaService dependency.
+
+    Args:
+        db: Database session from dependency injection
+
+    Returns:
+        Initialized ScoreSubmissionMetaService instance
+    """
+    return ScoreSubmissionMetaService(db)
+
+
+ScoreSubmissionMetaServiceDep = Annotated[
+    ScoreSubmissionMetaService, Depends(get_score_submission_meta_service)
+]

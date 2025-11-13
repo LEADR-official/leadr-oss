@@ -12,7 +12,11 @@ from leadr.auth.api.schemas import (
     CreateAPIKeyResponse,
     UpdateAPIKeyRequest,
 )
-from leadr.auth.dependencies import AuthContextDep
+from leadr.auth.dependencies import (
+    AuthContextDep,
+    QueryAccountIDDep,
+    validate_body_account_id,
+)
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.dependencies import APIKeyServiceDep
 
@@ -34,19 +38,17 @@ async def create_api_key(
     The plain API key is returned only once in this response.
     Store it securely as it cannot be retrieved later.
 
+    For regular users, account_id must match their API key's account.
+    For superadmins, any account_id is accepted.
+
     Returns:
         CreateAPIKeyResponse with the plain key included.
 
     Raises:
-        403: User does not have access to this account.
+        403: User does not have access to the specified account.
         404: Account not found.
     """
-    # Check authorization
-    if not auth.has_access_to_account(request.account_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this account",
-        )
+    validate_body_account_id(auth, request.account_id)
 
     try:
         # Create API key
@@ -72,33 +74,28 @@ async def create_api_key(
 )
 async def list_api_keys(
     service: APIKeyServiceDep,
-    auth: AuthContextDep,
-    account_id: Annotated[UUID4, Query(description="Account ID to filter by")],
+    account_id: QueryAccountIDDep,
     key_status: Annotated[
         APIKeyStatus | None, Query(alias="status", description="Filter by status")
     ] = None,
 ) -> list[APIKeyResponse]:
     """List API keys for an account with optional filters.
 
+    For regular users, account_id is automatically derived from their API key.
+    For superadmins, account_id must be explicitly provided as a query parameter.
+
     Args:
         service: Injected API key service dependency.
-        auth: Authentication context with user info.
-        account_id: Account ID to filter results (REQUIRED for multi-tenant safety).
+        account_id: Account ID (auto-resolved for regular users, required for superadmins).
         key_status: Optional status to filter results (active or revoked).
 
     Returns:
         List of API keys matching the filters.
 
     Raises:
-        403: User does not have access to this account.
+        400: Superadmin did not provide account_id.
+        403: User does not have access to the specified account.
     """
-    # Check authorization
-    if not auth.has_access_to_account(account_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this account",
-        )
-
     # Get filtered list from service
     api_keys = await service.list_api_keys(
         account_id=account_id,

@@ -36,9 +36,9 @@ class TestScore:
         assert score.player_name == "SpeedRunner99"
         assert score.value == 123.45
         assert score.value_display is None
-        assert score.filter_timezone is None
-        assert score.filter_country is None
-        assert score.filter_city is None
+        assert score.timezone is None
+        assert score.country is None
+        assert score.city is None
         assert score.created_at is not None
         assert score.updated_at is not None
         assert score.deleted_at is None
@@ -59,15 +59,15 @@ class TestScore:
             player_name="SpeedRunner99",
             value=123.45,
             value_display="2:03.45",
-            filter_timezone="America/New_York",
-            filter_country="USA",
-            filter_city="New York",
+            timezone="America/New_York",
+            country="USA",
+            city="New York",
         )
 
         assert score.value_display == "2:03.45"
-        assert score.filter_timezone == "America/New_York"
-        assert score.filter_country == "USA"
-        assert score.filter_city == "New York"
+        assert score.timezone == "America/New_York"
+        assert score.country == "USA"
+        assert score.city == "New York"
 
     def test_create_score_requires_player_name(self):
         """Test that player_name is required."""

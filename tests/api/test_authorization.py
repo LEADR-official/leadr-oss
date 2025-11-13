@@ -675,3 +675,273 @@ class TestAPIKeyAuthorization:
         data = response.json()
         assert data["name"] == "Other User Key"
         assert "key" in data
+
+
+@pytest.mark.asyncio
+class TestAccountIDResolution:
+    """Test suite for automatic account_id resolution and validation."""
+
+    async def test_regular_user_list_without_account_id_uses_their_account(
+        self, db_session: AsyncSession, client: AsyncClient
+    ):
+        """Test that regular users can list resources without providing account_id.
+
+        The account_id should be automatically derived from their API key's account.
+        """
+        # Create account and game
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=uuid4(),
+            name="User Account",
+            slug="user-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game = Game(
+            id=uuid4(),
+            account_id=account.id,
+            name="Test Game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create user
+        user_service = await get_user_service(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email="user@test.com",
+            display_name="User",
+            super_admin=False,
+        )
+
+        # Create API key
+        api_key_service = APIKeyService(db_session)
+        _, plain_key = await api_key_service.create_api_key(
+            account_id=account.id,
+            user_id=user.id,
+            name="User Key",
+        )
+
+        # List games WITHOUT providing account_id - should auto-derive
+        response = await client.get(
+            "/games",
+            headers={"leadr-api-key": plain_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["name"] == "Test Game"
+
+    async def test_superadmin_list_without_account_id_returns_400(
+        self, authenticated_client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test that superadmins must provide account_id when listing resources."""
+        # Try to list games without account_id
+        response = await authenticated_client.get("/games")
+
+        # Should return 400 Bad Request
+        assert response.status_code == 400
+        assert "must explicitly specify account_id" in response.json()["detail"]
+
+    async def test_superadmin_list_with_account_id_succeeds(
+        self, authenticated_client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test that superadmins can list resources when providing account_id."""
+        # Create account and game
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=uuid4(),
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game = Game(
+            id=uuid4(),
+            account_id=account.id,
+            name="Test Game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # List games WITH account_id
+        response = await authenticated_client.get(f"/games?account_id={account.id}")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["name"] == "Test Game"
+
+    async def test_regular_user_list_with_wrong_account_id_returns_403(
+        self, db_session: AsyncSession, client: AsyncClient
+    ):
+        """Test that regular users get 403 when providing different account_id in query."""
+        # Create two accounts
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account1 = Account(
+            id=uuid4(),
+            name="User Account",
+            slug="user-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        account2 = Account(
+            id=uuid4(),
+            name="Other Account",
+            slug="other-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account1)
+        await account_repo.create(account2)
+
+        # Create user in account1
+        user_service = await get_user_service(db_session)
+        user = await user_service.create_user(
+            account_id=account1.id,
+            email="user@test.com",
+            display_name="User",
+            super_admin=False,
+        )
+
+        # Create API key
+        api_key_service = APIKeyService(db_session)
+        _, plain_key = await api_key_service.create_api_key(
+            account_id=account1.id,
+            user_id=user.id,
+            name="User Key",
+        )
+
+        # Try to list games with account2's ID
+        response = await client.get(
+            f"/games?account_id={account2.id}",
+            headers={"leadr-api-key": plain_key},
+        )
+
+        # Should be forbidden
+        assert response.status_code == 403
+        assert "access denied" in response.json()["detail"].lower()
+
+    async def test_regular_user_create_with_wrong_account_id_returns_403(
+        self, db_session: AsyncSession, client: AsyncClient
+    ):
+        """Test that regular users get 403 when providing different account_id in request body."""
+        # Create two accounts
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account1 = Account(
+            id=uuid4(),
+            name="User Account",
+            slug="user-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        account2 = Account(
+            id=uuid4(),
+            name="Other Account",
+            slug="other-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account1)
+        await account_repo.create(account2)
+
+        # Create user in account1
+        user_service = await get_user_service(db_session)
+        user = await user_service.create_user(
+            account_id=account1.id,
+            email="user@test.com",
+            display_name="User",
+            super_admin=False,
+        )
+
+        # Create API key
+        api_key_service = APIKeyService(db_session)
+        _, plain_key = await api_key_service.create_api_key(
+            account_id=account1.id,
+            user_id=user.id,
+            name="User Key",
+        )
+
+        # Try to create a game with account2's ID in the request body
+        response = await client.post(
+            "/games",
+            json={
+                "account_id": str(account2.id),
+                "name": "Test Game",
+                "slug": "test-game",
+            },
+            headers={"leadr-api-key": plain_key},
+        )
+
+        # Should be forbidden
+        assert response.status_code == 403
+        assert "access denied" in response.json()["detail"].lower()
+
+    async def test_regular_user_list_users_without_account_id_succeeds(
+        self, db_session: AsyncSession, client: AsyncClient
+    ):
+        """Test that regular users can list users without providing account_id."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=uuid4(),
+            name="User Account",
+            slug="user-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create user
+        user_service = await get_user_service(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email="user@test.com",
+            display_name="User",
+            super_admin=False,
+        )
+
+        # Create API key
+        api_key_service = APIKeyService(db_session)
+        _, plain_key = await api_key_service.create_api_key(
+            account_id=account.id,
+            user_id=user.id,
+            name="User Key",
+        )
+
+        # List users WITHOUT providing account_id
+        response = await client.get(
+            "/users",
+            headers={"leadr-api-key": plain_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) >= 1
+        assert any(u["email"] == "user@test.com" for u in data)

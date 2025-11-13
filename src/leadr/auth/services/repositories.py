@@ -16,7 +16,7 @@ from leadr.auth.adapters.orm import (
     NonceORM,
 )
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
-from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
+from leadr.auth.domain.device import Device, DeviceSession
 from leadr.auth.domain.nonce import Nonce
 from leadr.common.repositories import BaseRepository
 
@@ -154,7 +154,7 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
         self,
         account_id: UUID,
         game_id: UUID | None = None,
-        status: DeviceStatus | None = None,
+        status: str | None = None,
         **kwargs,
     ) -> list[Device]:
         """Filter devices by account and optional criteria.
@@ -162,11 +162,12 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
         Args:
             account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
             game_id: Optional game ID to filter by
-            status: Optional DeviceStatus to filter by
+            status: Optional status string to filter by (active, banned, suspended)
 
         Returns:
             List of devices for the account matching the filter criteria
         """
+
         query = select(DeviceORM).where(
             DeviceORM.account_id == account_id,
             DeviceORM.deleted_at.is_(None),
@@ -176,8 +177,7 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
             query = query.where(DeviceORM.game_id == game_id)
 
         if status is not None:
-            status_value = status.value if isinstance(status, DeviceStatus) else status
-            query = query.where(DeviceORM.status == DeviceStatusEnum(status_value))
+            query = query.where(DeviceORM.status == DeviceStatusEnum(status))
 
         result = await self.session.execute(query)
         orms = result.scalars().all()
