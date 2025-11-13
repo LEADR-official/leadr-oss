@@ -43,7 +43,7 @@ class TestGameRoutes:
         response = await client.post(
             "/games",
             json={
-                "account_id": "00000000-0000-0000-0000-000000000000",
+                "account_id": "acc_00000000-0000-0000-0000-000000000000",
                 "name": "Super Awesome Game",
             },
             headers={"leadr-api-key": test_api_key},
@@ -82,7 +82,7 @@ class TestGameRoutes:
     async def test_get_game_not_found(self, client: AsyncClient, test_api_key):
         """Test retrieving a non-existent game returns 404."""
         response = await client.get(
-            "/games/00000000-0000-0000-0000-000000000000",
+            "/games/gam_00000000-0000-0000-0000-000000000000",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -203,7 +203,7 @@ class TestGameRoutes:
     async def test_update_game_not_found(self, client: AsyncClient, test_api_key):
         """Test updating a non-existent game returns 404."""
         response = await client.patch(
-            "/games/00000000-0000-0000-0000-000000000000",
+            "/games/gam_00000000-0000-0000-0000-000000000000",
             json={"name": "New Name"},
             headers={"leadr-api-key": test_api_key},
         )

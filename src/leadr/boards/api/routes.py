@@ -1,7 +1,5 @@
 """Board API routes."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
@@ -19,6 +17,7 @@ from leadr.boards.api.schemas import (
     BoardUpdateRequest,
 )
 from leadr.boards.services.dependencies import BoardServiceDep, BoardTemplateServiceDep
+from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
 
 router = APIRouter()
 
@@ -77,7 +76,7 @@ async def create_board(
 
 @router.get("/boards/{board_id}", response_model=BoardResponse)
 async def get_board(
-    board_id: UUID, service: BoardServiceDep, auth: AuthContextDep
+    board_id: BoardID, service: BoardServiceDep, auth: AuthContextDep
 ) -> BoardResponse:
     """Get a board by ID.
 
@@ -109,7 +108,7 @@ async def get_board(
 async def list_boards(
     service: BoardServiceDep,
     auth: AuthContextDep,
-    account_id: UUID | None = None,
+    account_id: AccountID | None = None,
     code: str | None = None,
 ) -> list[BoardResponse]:
     """List boards filtered by account_id and/or short code.
@@ -165,7 +164,7 @@ async def list_boards(
 
 @router.patch("/boards/{board_id}", response_model=BoardResponse)
 async def update_board(
-    board_id: UUID, request: BoardUpdateRequest, service: BoardServiceDep, auth: AuthContextDep
+    board_id: BoardID, request: BoardUpdateRequest, service: BoardServiceDep, auth: AuthContextDep
 ) -> BoardResponse:
     """Update a board.
 
@@ -275,7 +274,7 @@ async def create_board_template(
 
 @router.get("/board-templates/{template_id}", response_model=BoardTemplateResponse)
 async def get_board_template(
-    template_id: UUID, service: BoardTemplateServiceDep, auth: AuthContextDep
+    template_id: BoardTemplateID, service: BoardTemplateServiceDep, auth: AuthContextDep
 ) -> BoardTemplateResponse:
     """Get a board template by ID.
 
@@ -307,7 +306,7 @@ async def get_board_template(
 async def list_board_templates(
     account_id: QueryAccountIDDep,
     service: BoardTemplateServiceDep,
-    game_id: UUID | None = None,
+    game_id: GameID | None = None,
 ) -> list[BoardTemplateResponse]:
     """List board templates for an account, optionally filtered by game.
 
@@ -336,7 +335,7 @@ async def list_board_templates(
 
 @router.patch("/board-templates/{template_id}", response_model=BoardTemplateResponse)
 async def update_board_template(
-    template_id: UUID,
+    template_id: BoardTemplateID,
     request: BoardTemplateUpdateRequest,
     service: BoardTemplateServiceDep,
     auth: AuthContextDep,

@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from leadr.accounts.domain.account import Account, AccountStatus
+from leadr.common.domain.ids import AccountID
 
 
 class TestAccount:
@@ -14,7 +15,7 @@ class TestAccount:
 
     def test_create_account_with_valid_data(self):
         """Test creating an account with all required fields."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -35,7 +36,7 @@ class TestAccount:
 
     def test_create_account_defaults_to_active_status(self):
         """Test that account status defaults to ACTIVE."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -50,7 +51,7 @@ class TestAccount:
 
     def test_account_name_required(self):
         """Test that account name is required."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -65,7 +66,7 @@ class TestAccount:
 
     def test_account_slug_required(self):
         """Test that account slug is required."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -80,7 +81,7 @@ class TestAccount:
 
     def test_account_equality_based_on_id(self):
         """Test that account equality is based on ID."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account1 = Account(
@@ -106,7 +107,7 @@ class TestAccount:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="Acme Corporation",
             slug="acme-corp",
             created_at=now,
@@ -114,7 +115,7 @@ class TestAccount:
         )
 
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="Acme Corporation",
             slug="acme-corp",
             created_at=now,
@@ -125,7 +126,7 @@ class TestAccount:
 
     def test_account_is_hashable(self):
         """Test that account can be used in sets and as dict keys."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -146,7 +147,7 @@ class TestAccount:
 
     def test_suspend_account(self):
         """Test suspending an active account."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -164,7 +165,7 @@ class TestAccount:
 
     def test_activate_account(self):
         """Test activating a suspended account."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -182,7 +183,7 @@ class TestAccount:
 
     def test_account_immutability_of_id(self):
         """Test that account ID cannot be changed after creation."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -193,14 +194,14 @@ class TestAccount:
             updated_at=now,
         )
 
-        new_id = uuid4()
+        new_id = AccountID(uuid4())
 
         with pytest.raises(ValidationError):
             account.id = new_id
 
     def test_account_soft_delete(self):
         """Test that account can be soft-deleted."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -221,7 +222,7 @@ class TestAccount:
 
     def test_account_restore(self):
         """Test that soft-deleted account can be restored."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(

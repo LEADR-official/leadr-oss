@@ -3,8 +3,9 @@
 import re
 from enum import Enum
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
+from leadr.common.domain.ids import AccountID
 from leadr.common.domain.models import Entity
 
 
@@ -23,6 +24,11 @@ class Account(Entity):
     active or suspended.
     """
 
+    id: AccountID = Field(
+        frozen=True,
+        default_factory=AccountID,
+        description="Unique account identifier",
+    )
     name: str
     slug: str
     status: AccountStatus = AccountStatus.ACTIVE

@@ -1,7 +1,6 @@
 """Tests for API authentication requirements."""
 
 from datetime import UTC, datetime
-from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -11,6 +10,7 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.accounts.services.user_service import UserService
 from leadr.auth.services.api_key_service import APIKeyService
+from leadr.common.domain.ids import AccountID
 
 
 @pytest.mark.asyncio
@@ -52,7 +52,7 @@ class TestAPIAuthentication:
         """Test that protected endpoints succeed with valid API key."""
         # Create account and API key
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -104,7 +104,7 @@ class TestAPIAuthentication:
         """Test that multiple endpoints require authentication."""
         # Create test account for GET endpoint
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(

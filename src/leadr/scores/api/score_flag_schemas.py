@@ -2,10 +2,10 @@
 
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from leadr.common.domain.ids import ScoreFlagID, ScoreID, UserID
 from leadr.scores.domain.anti_cheat.models import ScoreFlag
 
 
@@ -26,8 +26,8 @@ class ScoreFlagUpdateRequest(BaseModel):
 class ScoreFlagResponse(BaseModel):
     """Response model for a score flag."""
 
-    id: UUID = Field(description="Unique identifier for the score flag")
-    score_id: UUID = Field(description="ID of the score that was flagged")
+    id: ScoreFlagID = Field(description="Unique identifier for the score flag")
+    score_id: ScoreID = Field(description="ID of the score that was flagged")
     flag_type: str = Field(description="Type of flag (e.g., VELOCITY, DUPLICATE, RATE_LIMIT)")
     confidence: str = Field(description="Confidence level of the flag (LOW, MEDIUM, HIGH)")
     metadata: dict[str, Any] = Field(description="Additional metadata about the flag")
@@ -37,7 +37,7 @@ class ScoreFlagResponse(BaseModel):
     reviewed_at: datetime | None = Field(
         default=None, description="Timestamp when flag was reviewed, or null"
     )
-    reviewer_id: UUID | None = Field(
+    reviewer_id: UserID | None = Field(
         default=None, description="ID of the user who reviewed this flag, or null"
     )
     reviewer_decision: str | None = Field(

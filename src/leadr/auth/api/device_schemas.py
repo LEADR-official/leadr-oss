@@ -2,11 +2,11 @@
 
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from leadr.auth.domain.device import Device
+from leadr.common.domain.ids import AccountID, DeviceID, GameID
 
 
 class DeviceUpdateRequest(BaseModel):
@@ -21,10 +21,10 @@ class DeviceUpdateRequest(BaseModel):
 class DeviceResponse(BaseModel):
     """Response model for a device."""
 
-    id: UUID = Field(description="Unique identifier for the device")
-    game_id: UUID = Field(description="ID of the game this device belongs to")
+    id: DeviceID = Field(description="Unique identifier for the device")
+    game_id: GameID = Field(description="ID of the game this device belongs to")
     device_id: str = Field(description="Client-generated device identifier")
-    account_id: UUID = Field(description="ID of the account this device belongs to")
+    account_id: AccountID = Field(description="ID of the account this device belongs to")
     platform: str | None = Field(default=None, description="Platform (iOS, Android, etc.), or null")
     status: str = Field(description="Device status: active, banned, or suspended")
     first_seen_at: datetime = Field(description="Timestamp when device was first seen (UTC)")

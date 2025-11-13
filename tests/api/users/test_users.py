@@ -1,7 +1,6 @@
 """End-to-end tests for User API endpoints."""
 
 from datetime import UTC, datetime
-from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -9,6 +8,7 @@ from httpx import AsyncClient
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
 from leadr.accounts.services.repositories import AccountRepository, UserRepository
+from leadr.common.domain.ids import AccountID, UserID
 
 
 @pytest.mark.asyncio
@@ -19,7 +19,7 @@ class TestUserAPI:
         """Test creating a user via POST /users."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -73,7 +73,7 @@ class TestUserAPI:
         """Test getting user by ID via GET /users/{id}."""
         # Create account and user
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -87,7 +87,7 @@ class TestUserAPI:
         await account_repo.create(account)
 
         user_repo = UserRepository(db_session)
-        user_id = uuid4()
+        user_id = UserID()
 
         user = User(
             id=user_id,
@@ -111,7 +111,7 @@ class TestUserAPI:
 
     async def test_get_user_by_id_not_found(self, authenticated_client: AsyncClient):
         """Test getting non-existent user returns 404."""
-        fake_id = uuid4()
+        fake_id = UserID()
         response = await authenticated_client.get(f"/users/{fake_id}")
 
         assert response.status_code == 404
@@ -120,7 +120,7 @@ class TestUserAPI:
         """Test listing users by account via GET /users?account_id={id}."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -137,7 +137,7 @@ class TestUserAPI:
         user_repo = UserRepository(db_session)
 
         user1 = User(
-            id=uuid4(),
+            id=UserID(),
             account_id=account_id,
             email="user1@example.com",
             display_name="John Doe",
@@ -145,7 +145,7 @@ class TestUserAPI:
             updated_at=now,
         )
         user2 = User(
-            id=uuid4(),
+            id=UserID(),
             account_id=account_id,
             email="user2@example.com",
             display_name="Jane Smith",
@@ -181,7 +181,7 @@ class TestUserAPI:
         """Test updating user via PATCH /users/{id}."""
         # Create account and user
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -195,7 +195,7 @@ class TestUserAPI:
         await account_repo.create(account)
 
         user_repo = UserRepository(db_session)
-        user_id = uuid4()
+        user_id = UserID()
 
         user = User(
             id=user_id,
@@ -223,7 +223,7 @@ class TestUserAPI:
 
     async def test_update_user_not_found(self, authenticated_client: AsyncClient):
         """Test updating non-existent user returns 404."""
-        fake_id = uuid4()
+        fake_id = UserID()
         response = await authenticated_client.patch(
             f"/users/{fake_id}",
             json={"display_name": "Updated Name"},
@@ -235,7 +235,7 @@ class TestUserAPI:
         """Test soft-deleting user via PATCH with deleted field."""
         # Create account and user
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -249,7 +249,7 @@ class TestUserAPI:
         await account_repo.create(account)
 
         user_repo = UserRepository(db_session)
-        user_id = uuid4()
+        user_id = UserID()
 
         user = User(
             id=user_id,
@@ -275,7 +275,7 @@ class TestUserAPI:
 
     async def test_delete_user_not_found(self, authenticated_client: AsyncClient):
         """Test soft-deleting non-existent user returns 404."""
-        fake_id = uuid4()
+        fake_id = UserID()
         response = await authenticated_client.patch(
             f"/users/{fake_id}",
             json={"deleted": True},
@@ -329,7 +329,7 @@ class TestUserAPI:
         """Test updating only email of a user."""
         # Create account and user
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -343,7 +343,7 @@ class TestUserAPI:
         await account_repo.create(account)
 
         user_repo = UserRepository(db_session)
-        user_id = uuid4()
+        user_id = UserID()
 
         user = User(
             id=user_id,
@@ -374,7 +374,7 @@ class TestUserAPI:
         """Test updating only display_name of a user."""
         # Create account and user
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -388,7 +388,7 @@ class TestUserAPI:
         await account_repo.create(account)
 
         user_repo = UserRepository(db_session)
-        user_id = uuid4()
+        user_id = UserID()
 
         user = User(
             id=user_id,
@@ -417,7 +417,7 @@ class TestUserAPI:
         """Test that list users excludes soft-deleted users."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -434,7 +434,7 @@ class TestUserAPI:
         user_repo = UserRepository(db_session)
 
         user1 = User(
-            id=uuid4(),
+            id=UserID(),
             account_id=account_id,
             email="user1@example.com",
             display_name="John Doe",
@@ -442,7 +442,7 @@ class TestUserAPI:
             updated_at=now,
         )
         user2 = User(
-            id=uuid4(),
+            id=UserID(),
             account_id=account_id,
             email="user2@example.com",
             display_name="Jane Smith",
@@ -454,7 +454,7 @@ class TestUserAPI:
         await user_repo.create(user2)
 
         # Soft-delete one
-        await user_repo.delete(user1.id)
+        await user_repo.delete(user1.id.uuid)
 
         # List should only return non-deleted
         response = await authenticated_client.get(f"/users?account_id={account_id}")
@@ -468,7 +468,7 @@ class TestUserAPI:
         """Test getting soft-deleted user returns 404."""
         # Create account and user
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -482,7 +482,7 @@ class TestUserAPI:
         await account_repo.create(account)
 
         user_repo = UserRepository(db_session)
-        user_id = uuid4()
+        user_id = UserID()
 
         user = User(
             id=user_id,
@@ -495,7 +495,7 @@ class TestUserAPI:
         await user_repo.create(user)
 
         # Delete it
-        await user_repo.delete(user_id)
+        await user_repo.delete(user_id.uuid)
 
         # Try to get it
         response = await authenticated_client.get(f"/users/{user_id}")
@@ -506,7 +506,7 @@ class TestUserAPI:
         """Test updating user with empty request body."""
         # Create account and user
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -520,7 +520,7 @@ class TestUserAPI:
         await account_repo.create(account)
 
         user_repo = UserRepository(db_session)
-        user_id = uuid4()
+        user_id = UserID()
 
         user = User(
             id=user_id,

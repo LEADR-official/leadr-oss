@@ -12,6 +12,7 @@ from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM, DeviceStatusEnum
 from leadr.auth.dependencies import require_device_token
 from leadr.auth.services.dependencies import get_device_service
+from leadr.common.domain.ids import GameID
 from leadr.games.adapters.orm import GameORM
 
 
@@ -64,7 +65,7 @@ class TestRequireDeviceToken:
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen:
             mock_gen.return_value = ("valid_token", "valid_hash")
             await service.start_session(
-                game_id=game.id,
+                game_id=GameID(game.id),
                 device_id=str(uuid4()),
                 platform="ios",
             )
@@ -106,7 +107,7 @@ class TestRequireDeviceToken:
             ) as mock_gen_refresh:
                 mock_gen_refresh.return_value = ("test_refresh_token", "test_refresh_hash")
                 device, plain_token, _, _ = await service.start_session(
-                    game_id=game.id,
+                    game_id=GameID(game.id),
                     device_id=device_id,
                     platform="android",
                 )

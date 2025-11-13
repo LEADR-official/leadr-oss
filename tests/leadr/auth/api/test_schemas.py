@@ -13,6 +13,7 @@ from leadr.auth.api.schemas import (
     UpdateAPIKeyRequest,
 )
 from leadr.auth.domain.api_key import APIKeyStatus
+from leadr.common.domain.ids import AccountID, APIKeyID, UserID
 
 
 class TestCreateAPIKeyRequest:
@@ -20,8 +21,8 @@ class TestCreateAPIKeyRequest:
 
     def test_create_request_with_all_fields(self):
         """Test creating request with all fields."""
-        account_id = uuid4()
-        user_id = uuid4()
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
         expires_at = datetime.now(UTC) + timedelta(days=90)
 
         request = CreateAPIKeyRequest(
@@ -38,8 +39,8 @@ class TestCreateAPIKeyRequest:
 
     def test_create_request_without_expiration(self):
         """Test creating request without expiration."""
-        account_id = uuid4()
-        user_id = uuid4()
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
 
         request = CreateAPIKeyRequest(
             account_id=account_id,
@@ -63,7 +64,7 @@ class TestCreateAPIKeyRequest:
 
     def test_create_request_requires_name(self):
         """Test that name is required."""
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
 
         with pytest.raises(ValidationError) as exc_info:
             CreateAPIKeyRequest(  # type: ignore[call-arg]
@@ -78,7 +79,7 @@ class TestCreateAPIKeyResponse:
 
     def test_create_response_with_all_fields(self):
         """Test creating response with all fields."""
-        key_id = uuid4()
+        key_id = APIKeyID(uuid4())
         expires_at = datetime.now(UTC) + timedelta(days=90)
         created_at = datetime.now(UTC)
 
@@ -102,7 +103,7 @@ class TestCreateAPIKeyResponse:
 
     def test_create_response_without_expiration(self):
         """Test creating response without expiration."""
-        key_id = uuid4()
+        key_id = APIKeyID(uuid4())
         created_at = datetime.now(UTC)
 
         response = CreateAPIKeyResponse(
@@ -118,7 +119,7 @@ class TestCreateAPIKeyResponse:
 
     def test_create_response_requires_key(self):
         """Test that key field is required in create response."""
-        key_id = uuid4()
+        key_id = APIKeyID(uuid4())
         created_at = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -138,9 +139,9 @@ class TestAPIKeyResponse:
 
     def test_api_key_response_with_all_fields(self):
         """Test creating response with all fields."""
-        key_id = uuid4()
-        account_id = uuid4()
-        user_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
         last_used_at = datetime.now(UTC) - timedelta(hours=1)
         expires_at = datetime.now(UTC) + timedelta(days=90)
         created_at = datetime.now(UTC) - timedelta(days=30)
@@ -172,9 +173,9 @@ class TestAPIKeyResponse:
 
     def test_api_key_response_without_optional_fields(self):
         """Test creating response without optional fields."""
-        key_id = uuid4()
-        account_id = uuid4()
-        user_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
         created_at = datetime.now(UTC)
         updated_at = datetime.now(UTC)
 
@@ -194,9 +195,9 @@ class TestAPIKeyResponse:
 
     def test_api_key_response_does_not_include_key_hash(self):
         """Test that APIKeyResponse does not have key_hash field."""
-        key_id = uuid4()
-        account_id = uuid4()
-        user_id = uuid4()
+        key_id = APIKeyID(uuid4())
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
         created_at = datetime.now(UTC)
         updated_at = datetime.now(UTC)
 

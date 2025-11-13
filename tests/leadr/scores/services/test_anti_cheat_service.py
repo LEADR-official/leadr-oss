@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.domain.ids import BoardID, DeviceID
 from leadr.scores.domain.anti_cheat.enums import FlagAction, FlagConfidence, FlagType, TrustTier
 from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
 from leadr.scores.domain.score import Score
@@ -26,7 +27,7 @@ class TestAntiCheatServiceRateLimiting:
 
         # Create submission metadata showing 99 submissions in the last hour
         now = datetime.now(UTC)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
         meta = ScoreSubmissionMeta(
             score_id=test_score.id,
             device_id=device_id,
@@ -56,7 +57,7 @@ class TestAntiCheatServiceRateLimiting:
         meta_repo = ScoreSubmissionMetaRepository(db_session)
 
         now = datetime.now(UTC)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
 
         # Test at limit (100th submission) - should accept
         meta = ScoreSubmissionMeta(
@@ -107,7 +108,7 @@ class TestAntiCheatServiceRateLimiting:
         meta_repo = ScoreSubmissionMetaRepository(db_session)
 
         now = datetime.now(UTC)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
         meta = ScoreSubmissionMeta(
             score_id=test_score.id,
             device_id=device_id,
@@ -139,7 +140,7 @@ class TestAntiCheatServiceRateLimiting:
         meta_repo = ScoreSubmissionMetaRepository(db_session)
 
         now = datetime.now(UTC)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
         meta = ScoreSubmissionMeta(
             score_id=test_score.id,
             device_id=device_id,
@@ -176,10 +177,10 @@ class TestAntiCheatServiceRateLimiting:
         # Create two boards
         board_repo = BoardRepository(db_session)
         now = datetime.now(UTC)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
 
         board1 = Board(
-            id=uuid4(),
+            id=BoardID(uuid4()),
             account_id=test_account.id,
             game_id=test_game.id,
             name="Board 1",
@@ -195,7 +196,7 @@ class TestAntiCheatServiceRateLimiting:
         await board_repo.create(board1)
 
         board2 = Board(
-            id=uuid4(),
+            id=BoardID(uuid4()),
             account_id=test_account.id,
             game_id=test_game.id,
             name="Board 2",
@@ -246,7 +247,7 @@ class TestAntiCheatServiceRateLimiting:
         meta_repo = ScoreSubmissionMetaRepository(db_session)
 
         now = datetime.now(UTC)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
 
         # Create metadata with last submission 61 minutes ago (outside window)
         # Even though count is 100, it's outside the 1-hour window
@@ -274,7 +275,7 @@ class TestAntiCheatServiceRateLimiting:
     ):
         """Test that first submission is always accepted."""
         service = AntiCheatService(db_session)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
 
         # No metadata exists - first submission
         result = await service.check_submission(
@@ -301,7 +302,7 @@ class TestAntiCheatServiceDuplicateDetection:
 
         service = AntiCheatService(db_session)
         meta_repo = ScoreSubmissionMetaRepository(db_session)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
 
         # Create metadata simulating a previous submission with value 1000.0
@@ -338,7 +339,7 @@ class TestAntiCheatServiceDuplicateDetection:
 
         service = AntiCheatService(db_session)
         meta_repo = ScoreSubmissionMetaRepository(db_session)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
 
         # Create metadata with last submission 6 minutes ago (outside window)
@@ -367,14 +368,14 @@ class TestAntiCheatServiceDuplicateDetection:
         from leadr.scores.domain.score import Score
 
         service = AntiCheatService(db_session)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
 
         # First score with value 1000.0
         score1 = Score(
             account_id=test_board.account_id,
             game_id=test_board.game_id,
             board_id=test_board.id,
-            device_id=uuid4(),
+            device_id=DeviceID(uuid4()),
             player_name="Test Player",
             value=1000.0,
         )
@@ -392,7 +393,7 @@ class TestAntiCheatServiceDuplicateDetection:
             account_id=test_board.account_id,
             game_id=test_board.game_id,
             board_id=test_board.id,
-            device_id=uuid4(),
+            device_id=DeviceID(uuid4()),
             player_name="Test Player",
             value=2000.0,
         )
@@ -421,7 +422,7 @@ class TestAntiCheatServiceVelocityDetection:
 
         service = AntiCheatService(db_session)
         meta_repo = ScoreSubmissionMetaRepository(db_session)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
 
         # Create metadata simulating a submission 1 second ago
@@ -458,7 +459,7 @@ class TestAntiCheatServiceVelocityDetection:
 
         service = AntiCheatService(db_session)
         meta_repo = ScoreSubmissionMetaRepository(db_session)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
 
         # Create metadata simulating a submission 3 seconds ago (above threshold)
@@ -487,7 +488,7 @@ class TestAntiCheatServiceVelocityDetection:
     ):
         """Test that first submission always passes velocity check."""
         service = AntiCheatService(db_session)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
 
         # No metadata exists - first submission
         result = await service.check_submission(

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import DeviceORM, NonceORM
 from leadr.auth.services.nonce_tasks import cleanup_expired_nonces
+from leadr.common.domain.ids import NonceID
 from leadr.games.adapters.orm import GameORM
 
 
@@ -48,7 +49,7 @@ class TestCleanupExpiredNonces:
         await db_session.commit()
 
         # Create expired pending nonce (expired 1 hour ago)
-        nonce_id = uuid4()
+        nonce_id = NonceID(uuid4())
         expired_nonce = NonceORM(
             id=nonce_id,
             device_id=device.id,

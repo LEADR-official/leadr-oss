@@ -1,11 +1,14 @@
 """Tests for ScoreFlagService."""
 
+from uuid import uuid4
+
 import pytest
 
 from leadr.accounts.services.account_service import AccountService
 from leadr.auth.services.device_service import DeviceService
 from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
+from leadr.common.domain.ids import ScoreFlagID
 from leadr.games.services.game_service import GameService
 from leadr.scores.domain.anti_cheat.enums import (
     FlagConfidence,
@@ -87,10 +90,8 @@ class TestScoreFlagService:
 
     async def test_get_flag_returns_none_for_nonexistent(self, db_session):
         """Test get_flag returns None for nonexistent flag."""
-        from uuid import uuid4
-
         service = ScoreFlagService(db_session)
-        flag = await service.get_flag(uuid4())
+        flag = await service.get_flag(ScoreFlagID(uuid4()))
 
         assert flag is None
 

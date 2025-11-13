@@ -3,7 +3,6 @@
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import UUID4
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.api.schemas import (
@@ -19,6 +18,7 @@ from leadr.auth.dependencies import (
 )
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.dependencies import APIKeyServiceDep
+from leadr.common.domain.ids import APIKeyID
 
 router = APIRouter()
 
@@ -110,7 +110,7 @@ async def list_api_keys(
     response_model=APIKeyResponse,
 )
 async def get_api_key(
-    key_id: UUID4,
+    key_id: APIKeyID,
     service: APIKeyServiceDep,
     auth: AuthContextDep,
 ) -> APIKeyResponse:
@@ -145,7 +145,7 @@ async def get_api_key(
     response_model=APIKeyResponse,
 )
 async def update_api_key(
-    key_id: UUID4,
+    key_id: APIKeyID,
     request: UpdateAPIKeyRequest,
     service: APIKeyServiceDep,
     auth: AuthContextDep,

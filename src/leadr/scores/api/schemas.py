@@ -3,10 +3,10 @@
 import json
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
+from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.config import settings
 from leadr.scores.domain.score import Score
 
@@ -18,10 +18,10 @@ class ScoreCreateRequest(BaseModel):
     IP address via GeoIP middleware. These fields are not accepted in the request.
     """
 
-    account_id: UUID = Field(description="ID of the account this score belongs to")
-    game_id: UUID = Field(description="ID of the game this score belongs to")
-    board_id: UUID = Field(description="ID of the board this score belongs to")
-    device_id: UUID = Field(description="ID of the device that submitted this score")
+    account_id: AccountID = Field(description="ID of the account this score belongs to")
+    game_id: GameID = Field(description="ID of the game this score belongs to")
+    board_id: BoardID = Field(description="ID of the board this score belongs to")
+    device_id: DeviceID = Field(description="ID of the device that submitted this score")
     player_name: str = Field(description="Display name of the player")
     value: float = Field(description="Numeric value of the score for sorting/comparison")
     value_display: str | None = Field(
@@ -84,11 +84,11 @@ class ScoreUpdateRequest(BaseModel):
 class ScoreResponse(BaseModel):
     """Response model for a score."""
 
-    id: UUID = Field(description="Unique identifier for the score")
-    account_id: UUID = Field(description="ID of the account this score belongs to")
-    game_id: UUID = Field(description="ID of the game this score belongs to")
-    board_id: UUID = Field(description="ID of the board this score belongs to")
-    device_id: UUID = Field(description="ID of the device that submitted this score")
+    id: ScoreID = Field(description="Unique identifier for the score")
+    account_id: AccountID = Field(description="ID of the account this score belongs to")
+    game_id: GameID = Field(description="ID of the game this score belongs to")
+    board_id: BoardID = Field(description="ID of the board this score belongs to")
+    device_id: DeviceID = Field(description="ID of the device that submitted this score")
     player_name: str = Field(description="Display name of the player")
     value: float = Field(description="Numeric value of the score")
     value_display: str | None = Field(default=None, description="Formatted display string, or null")

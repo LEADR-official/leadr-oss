@@ -1,7 +1,6 @@
 """Integration tests for API Key CRUD endpoints."""
 
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -10,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.accounts.services.user_service import UserService
+from leadr.common.domain.ids import AccountID, APIKeyID, UserID
 
 
 @pytest.mark.asyncio
@@ -22,7 +22,7 @@ class TestCreateAPIKey:
         """Test creating an API key with valid data."""
         # Create an account first
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -70,7 +70,7 @@ class TestCreateAPIKey:
         """Test creating an API key with expiration date."""
         # Create an account first
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -126,7 +126,7 @@ class TestCreateAPIKey:
         """Test creating an API key without name returns 422."""
         # Create an account first
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -173,8 +173,8 @@ class TestCreateAPIKey:
 
     async def test_create_api_key_nonexistent_account(self, authenticated_client: AsyncClient):
         """Test creating an API key for non-existent account returns 404."""
-        non_existent_account_id = uuid4()
-        non_existent_user_id = uuid4()
+        non_existent_account_id = AccountID()
+        non_existent_user_id = UserID()
 
         response = await authenticated_client.post(
             "/api-keys",
@@ -194,7 +194,7 @@ class TestCreateAPIKey:
         """Test that plain key is returned in create response but not in subsequent GETs."""
         # Create an account first
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -256,7 +256,7 @@ class TestListAPIKeys:
         account_repo = AccountRepository(db_session)
         now = datetime.now(UTC)
 
-        account1_id = uuid4()
+        account1_id = AccountID()
         account1 = Account(
             id=account1_id,
             name="Account 1",
@@ -267,7 +267,7 @@ class TestListAPIKeys:
         )
         await account_repo.create(account1)
 
-        account2_id = uuid4()
+        account2_id = AccountID()
         account2 = Account(
             id=account2_id,
             name="Account 2",
@@ -340,7 +340,7 @@ class TestListAPIKeys:
         """Test listing API keys filtered by status."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -394,7 +394,7 @@ class TestListAPIKeys:
         """Test listing API keys with multiple filters (account_id + status)."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -444,7 +444,7 @@ class TestListAPIKeys:
         """Test listing API keys without filters returns all keys."""
         # Create an account and some keys
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -486,7 +486,7 @@ class TestListAPIKeys:
     async def test_list_api_keys_empty_result(self, authenticated_client: AsyncClient):
         """Test listing API keys with filter that matches nothing returns empty list."""
         # Query for a non-existent account
-        non_existent_id = uuid4()
+        non_existent_id = AccountID()
         response = await authenticated_client.get(f"/api-keys?account_id={non_existent_id}")
         assert response.status_code == 200
 
@@ -515,7 +515,7 @@ class TestGetSingleAPIKey:
         """Test getting a single API key by ID."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -564,7 +564,7 @@ class TestGetSingleAPIKey:
 
     async def test_get_api_key_not_found(self, authenticated_client: AsyncClient):
         """Test getting a non-existent API key returns 404."""
-        non_existent_id = uuid4()
+        non_existent_id = APIKeyID()
         response = await authenticated_client.get(f"/api-keys/{non_existent_id}")
         assert response.status_code == 404
 
@@ -579,7 +579,7 @@ class TestGetSingleAPIKey:
         """Test that get response includes all expected fields."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -643,7 +643,7 @@ class TestUpdateAPIKey:
         """Test revoking an API key by updating status to revoked."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -692,7 +692,7 @@ class TestUpdateAPIKey:
 
     async def test_update_api_key_not_found(self, authenticated_client: AsyncClient):
         """Test updating a non-existent API key returns 404."""
-        non_existent_id = uuid4()
+        non_existent_id = APIKeyID()
         response = await authenticated_client.patch(
             f"/api-keys/{non_existent_id}",
             json={"status": "revoked"},
@@ -705,7 +705,7 @@ class TestUpdateAPIKey:
         """Test updating with invalid status value returns 422."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -750,7 +750,7 @@ class TestUpdateAPIKey:
         """Test soft deleting an API key via PATCH."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -796,7 +796,7 @@ class TestUpdateAPIKey:
         """Test updating with empty body returns 200 but no changes."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -851,7 +851,7 @@ class TestUpdateAPIKey:
         """Test that attempting to change name field is ignored or rejected."""
         # Create an account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(

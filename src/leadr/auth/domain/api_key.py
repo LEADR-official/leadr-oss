@@ -2,10 +2,10 @@
 
 from datetime import UTC, datetime
 from enum import Enum
-from uuid import UUID
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
+from leadr.common.domain.ids import AccountID, APIKeyID, UserID
 from leadr.common.domain.models import Entity
 
 
@@ -25,8 +25,13 @@ class APIKey(Entity):
     Each API key is owned by a specific user within the account.
     """
 
-    account_id: UUID
-    user_id: UUID
+    id: APIKeyID = Field(
+        frozen=True,
+        default_factory=APIKeyID,
+        description="Unique API key identifier",
+    )
+    account_id: AccountID
+    user_id: UserID
     name: str
     key_hash: str
     key_prefix: str

@@ -1,13 +1,13 @@
 """End-to-end tests for Account API endpoints."""
 
 from datetime import UTC, datetime
-from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
+from leadr.common.domain.ids import AccountID
 
 
 @pytest.mark.asyncio
@@ -66,7 +66,7 @@ class TestAccountAPI:
         """Test getting account by ID via GET /accounts/{id}."""
         # Create account first
         repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -91,7 +91,7 @@ class TestAccountAPI:
 
     async def test_get_account_by_id_not_found(self, authenticated_client: AsyncClient):
         """Test getting non-existent account returns 404."""
-        fake_id = uuid4()
+        fake_id = AccountID()
         response = await authenticated_client.get(f"/accounts/{fake_id}")
 
         assert response.status_code == 404
@@ -100,7 +100,7 @@ class TestAccountAPI:
         """Test getting soft-deleted account returns 404."""
         # Create and delete account
         repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -112,7 +112,7 @@ class TestAccountAPI:
             updated_at=now,
         )
         await repo.create(account)
-        await repo.delete(account_id)
+        await repo.delete(account_id.uuid)
 
         # Try to get it
         response = await authenticated_client.get(f"/accounts/{account_id}")
@@ -126,7 +126,7 @@ class TestAccountAPI:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -134,7 +134,7 @@ class TestAccountAPI:
             updated_at=now,
         )
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="Beta Industries",
             slug="beta-industries",
             status=AccountStatus.ACTIVE,
@@ -166,7 +166,7 @@ class TestAccountAPI:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -174,7 +174,7 @@ class TestAccountAPI:
             updated_at=now,
         )
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="Beta Industries",
             slug="beta-industries",
             status=AccountStatus.ACTIVE,
@@ -186,7 +186,7 @@ class TestAccountAPI:
         await repo.create(account2)
 
         # Delete one
-        await repo.delete(account1.id)
+        await repo.delete(account1.id.uuid)
 
         # List should only show non-deleted
         response = await authenticated_client.get("/accounts")
@@ -203,7 +203,7 @@ class TestAccountAPI:
         """Test updating account via PATCH /accounts/{id}."""
         # Create account
         repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -233,7 +233,7 @@ class TestAccountAPI:
 
     async def test_update_account_not_found(self, authenticated_client: AsyncClient):
         """Test updating non-existent account returns 404."""
-        fake_id = uuid4()
+        fake_id = AccountID()
         response = await authenticated_client.patch(
             f"/accounts/{fake_id}",
             json={"name": "Updated Name"},
@@ -245,7 +245,7 @@ class TestAccountAPI:
         """Test soft-deleting account via PATCH with deleted field."""
         # Create account
         repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -272,7 +272,7 @@ class TestAccountAPI:
 
     async def test_delete_account_not_found(self, authenticated_client: AsyncClient):
         """Test soft-deleting non-existent account returns 404."""
-        fake_id = uuid4()
+        fake_id = AccountID()
         response = await authenticated_client.patch(
             f"/accounts/{fake_id}",
             json={"deleted": True},
@@ -303,7 +303,7 @@ class TestAccountAPI:
         """Test updating only some fields of an account."""
         # Create account
         repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -334,7 +334,7 @@ class TestAccountAPI:
         """Test updating only slug of an account."""
         # Create account
         repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -365,7 +365,7 @@ class TestAccountAPI:
         """Test updating only status of an account."""
         # Create account
         repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -398,7 +398,7 @@ class TestAccountAPI:
         """Test updating account with empty request body."""
         # Create account
         repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(

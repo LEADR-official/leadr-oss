@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
 
 
 class TestSortDirection:
@@ -42,10 +43,10 @@ class TestBoard:
 
     def test_create_board_with_all_fields(self):
         """Test creating a board with all fields including optional ones."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
-        template_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        template_id = BoardTemplateID(uuid4())
         now = datetime.now(UTC)
         starts_at = datetime(2025, 1, 1, tzinfo=UTC)
         ends_at = datetime(2025, 12, 31, tzinfo=UTC)
@@ -90,9 +91,9 @@ class TestBoard:
 
     def test_create_board_with_required_fields_only(self):
         """Test creating a board with only required fields."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         board = Board(
@@ -130,9 +131,9 @@ class TestBoard:
 
     def test_board_name_required(self):
         """Test that board name is required."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -154,8 +155,8 @@ class TestBoard:
 
     def test_board_account_id_required(self):
         """Test that account_id is required."""
-        board_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -177,8 +178,8 @@ class TestBoard:
 
     def test_board_game_id_required(self):
         """Test that game_id is required."""
-        board_id = uuid4()
-        account_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -200,9 +201,9 @@ class TestBoard:
 
     def test_board_name_cannot_be_empty(self):
         """Test that board name cannot be empty or whitespace only."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -225,9 +226,9 @@ class TestBoard:
 
     def test_board_name_cannot_be_whitespace_only(self):
         """Test that board name cannot be whitespace only."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -250,9 +251,9 @@ class TestBoard:
 
     def test_board_name_strips_whitespace(self):
         """Test that board name strips leading and trailing whitespace."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         board = Board(
@@ -274,9 +275,9 @@ class TestBoard:
 
     def test_board_short_code_cannot_be_empty(self):
         """Test that short_code cannot be empty."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -299,9 +300,9 @@ class TestBoard:
 
     def test_board_short_code_strips_whitespace(self):
         """Test that short_code strips leading and trailing whitespace."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         board = Board(
@@ -323,9 +324,9 @@ class TestBoard:
 
     def test_board_tags_defaults_to_empty_list(self):
         """Test that tags defaults to empty list when not provided."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         board = Board(
@@ -348,9 +349,9 @@ class TestBoard:
 
     def test_board_equality_based_on_id(self):
         """Test that board equality is based on ID."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         board1 = Board(
@@ -370,8 +371,8 @@ class TestBoard:
 
         board2 = Board(
             id=board_id,
-            account_id=uuid4(),
-            game_id=uuid4(),
+            account_id=AccountID(uuid4()),
+            game_id=GameID(uuid4()),
             name="Board Two",
             icon="trophy",
             short_code="B002",
@@ -387,12 +388,12 @@ class TestBoard:
 
     def test_board_inequality_different_ids(self):
         """Test that boards with different IDs are not equal."""
-        account_id = uuid4()
-        game_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         board1 = Board(
-            id=uuid4(),
+            id=BoardID(uuid4()),
             account_id=account_id,
             game_id=game_id,
             name="Board One",
@@ -407,7 +408,7 @@ class TestBoard:
         )
 
         board2 = Board(
-            id=uuid4(),
+            id=BoardID(uuid4()),
             account_id=account_id,
             game_id=game_id,
             name="Board One",
@@ -425,9 +426,9 @@ class TestBoard:
 
     def test_board_is_hashable(self):
         """Test that board can be used in sets and as dict keys."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         board = Board(
@@ -455,9 +456,9 @@ class TestBoard:
 
     def test_board_immutability_of_id(self):
         """Test that board ID cannot be changed after creation."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         board = Board(
@@ -478,13 +479,13 @@ class TestBoard:
         new_id = uuid4()
 
         with pytest.raises(ValidationError):
-            board.id = new_id
+            board.id = new_id  # type: ignore[misc]
 
     def test_board_immutability_of_account_id(self):
         """Test that account_id cannot be changed after creation."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         board = Board(
@@ -505,13 +506,13 @@ class TestBoard:
         new_account_id = uuid4()
 
         with pytest.raises(ValidationError):
-            board.account_id = new_account_id
+            board.account_id = new_account_id  # type: ignore[misc]
 
     def test_board_immutability_of_game_id(self):
         """Test that game_id cannot be changed after creation."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         board = Board(
@@ -532,13 +533,13 @@ class TestBoard:
         new_game_id = uuid4()
 
         with pytest.raises(ValidationError):
-            board.game_id = new_game_id
+            board.game_id = new_game_id  # type: ignore[misc]
 
     def test_board_soft_delete(self):
         """Test that board can be soft-deleted."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         board = Board(
@@ -566,9 +567,9 @@ class TestBoard:
 
     def test_board_restore(self):
         """Test that soft-deleted board can be restored."""
-        board_id = uuid4()
-        account_id = uuid4()
-        game_id = uuid4()
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         board = Board(

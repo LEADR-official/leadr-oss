@@ -13,6 +13,7 @@ from leadr.auth.services.device_token_crypto import (
     validate_access_token,
     validate_refresh_token,
 )
+from leadr.common.domain.ids import AccountID, GameID
 
 
 class TestGenerateAccessToken:
@@ -21,8 +22,8 @@ class TestGenerateAccessToken:
     def test_generates_valid_jwt_token(self):
         """Test that generated token is a valid JWT."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         expires_delta = timedelta(hours=1)
         secret = "test-secret"
 
@@ -42,8 +43,8 @@ class TestGenerateAccessToken:
     def test_token_contains_required_claims(self):
         """Test that JWT contains all required claims."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         expires_delta = timedelta(hours=1)
         secret = "test-secret"
 
@@ -68,8 +69,8 @@ class TestGenerateAccessToken:
     def test_token_expiration_is_correct(self):
         """Test that token expiration is set correctly."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         expires_delta = timedelta(hours=2)
         secret = "test-secret"
 
@@ -93,8 +94,8 @@ class TestGenerateAccessToken:
     def test_returns_token_and_hash(self):
         """Test that function returns both token and hash."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         expires_delta = timedelta(hours=1)
         secret = "test-secret"
 
@@ -116,8 +117,8 @@ class TestGenerateAccessToken:
     def test_hash_is_sha256_hex(self):
         """Test that hash is SHA-256 hexadecimal."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         expires_delta = timedelta(hours=1)
         secret = "test-secret"
 
@@ -137,13 +138,17 @@ class TestGenerateAccessToken:
     def test_each_token_has_unique_jti(self):
         """Test that each token gets a unique JTI."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         expires_delta = timedelta(hours=1)
         secret = "test-secret"
 
-        token1, _ = generate_access_token(device_id, game_id, account_id, expires_delta, secret)
-        token2, _ = generate_access_token(device_id, game_id, account_id, expires_delta, secret)
+        token1, _ = generate_access_token(
+            device_id, GameID(game_id), AccountID(account_id), expires_delta, secret
+        )
+        token2, _ = generate_access_token(
+            device_id, GameID(game_id), AccountID(account_id), expires_delta, secret
+        )
 
         decoded1 = jwt.decode(token1, options={"verify_signature": False})
         decoded2 = jwt.decode(token2, options={"verify_signature": False})
@@ -157,12 +162,14 @@ class TestValidateAccessToken:
     def test_validates_correct_token(self):
         """Test that valid token is accepted."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         expires_delta = timedelta(hours=1)
         secret = "test-secret"
 
-        token, _ = generate_access_token(device_id, game_id, account_id, expires_delta, secret)
+        token, _ = generate_access_token(
+            device_id, GameID(game_id), AccountID(account_id), expires_delta, secret
+        )
 
         claims = validate_access_token(token, secret)
 
@@ -174,12 +181,14 @@ class TestValidateAccessToken:
     def test_rejects_expired_token(self):
         """Test that expired token is rejected."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         expires_delta = timedelta(seconds=1)
         secret = "test-secret"
 
-        token, _ = generate_access_token(device_id, game_id, account_id, expires_delta, secret)
+        token, _ = generate_access_token(
+            device_id, GameID(game_id), AccountID(account_id), expires_delta, secret
+        )
 
         # Wait for token to expire
         time.sleep(2)
@@ -190,11 +199,13 @@ class TestValidateAccessToken:
     def test_rejects_token_with_wrong_secret(self):
         """Test that token signed with different secret is rejected."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         expires_delta = timedelta(hours=1)
 
-        token, _ = generate_access_token(device_id, game_id, account_id, expires_delta, "secret1")
+        token, _ = generate_access_token(
+            device_id, GameID(game_id), AccountID(account_id), expires_delta, "secret1"
+        )
 
         claims = validate_access_token(token, "secret2")
         assert claims is None
@@ -207,12 +218,14 @@ class TestValidateAccessToken:
     def test_rejects_tampered_token(self):
         """Test that tampered token is rejected."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         expires_delta = timedelta(hours=1)
         secret = "test-secret"
 
-        token, _ = generate_access_token(device_id, game_id, account_id, expires_delta, secret)
+        token, _ = generate_access_token(
+            device_id, GameID(game_id), AccountID(account_id), expires_delta, secret
+        )
 
         # Tamper with the token
         parts = token.split(".")
@@ -224,12 +237,14 @@ class TestValidateAccessToken:
     def test_returns_all_claims(self):
         """Test that all claims are returned."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         expires_delta = timedelta(hours=1)
         secret = "test-secret"
 
-        token, _ = generate_access_token(device_id, game_id, account_id, expires_delta, secret)
+        token, _ = generate_access_token(
+            device_id, GameID(game_id), AccountID(account_id), expires_delta, secret
+        )
 
         claims = validate_access_token(token, secret)
 
@@ -301,8 +316,8 @@ class TestGenerateRefreshToken:
     def test_generates_valid_jwt_token(self):
         """Test that generated refresh token is a valid JWT."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         token_version = 1
         expires_delta = timedelta(days=30)
         secret = "test-secret"
@@ -324,8 +339,8 @@ class TestGenerateRefreshToken:
     def test_token_contains_required_claims_including_version(self):
         """Test that refresh JWT contains all required claims including token_version."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         token_version = 2
         expires_delta = timedelta(days=30)
         secret = "test-secret"
@@ -353,8 +368,8 @@ class TestGenerateRefreshToken:
     def test_token_expiration_is_correct(self):
         """Test that refresh token expiration is set correctly."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         token_version = 1
         expires_delta = timedelta(days=30)
         secret = "test-secret"
@@ -380,8 +395,8 @@ class TestGenerateRefreshToken:
     def test_returns_token_and_hash(self):
         """Test that function returns both refresh token and hash."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         token_version = 1
         expires_delta = timedelta(days=30)
         secret = "test-secret"
@@ -405,8 +420,8 @@ class TestGenerateRefreshToken:
     def test_hash_is_sha256_hex(self):
         """Test that refresh token hash is SHA-256 hexadecimal."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         token_version = 1
         expires_delta = timedelta(days=30)
         secret = "test-secret"
@@ -428,8 +443,8 @@ class TestGenerateRefreshToken:
     def test_each_token_has_unique_jti(self):
         """Test that each refresh token gets a unique JTI."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         token_version = 1
         expires_delta = timedelta(days=30)
         secret = "test-secret"
@@ -449,8 +464,8 @@ class TestGenerateRefreshToken:
     def test_different_token_versions_produce_different_tokens(self):
         """Test that different token versions produce different tokens."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         expires_delta = timedelta(days=30)
         secret = "test-secret"
 
@@ -485,8 +500,8 @@ class TestValidateRefreshToken:
     def test_validates_correct_token(self):
         """Test that valid refresh token is accepted."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         token_version = 1
         expires_delta = timedelta(days=30)
         secret = "test-secret"
@@ -506,8 +521,8 @@ class TestValidateRefreshToken:
     def test_rejects_expired_token(self):
         """Test that expired refresh token is rejected."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         token_version = 1
         expires_delta = timedelta(seconds=1)
         secret = "test-secret"
@@ -525,8 +540,8 @@ class TestValidateRefreshToken:
     def test_rejects_token_with_wrong_secret(self):
         """Test that refresh token signed with different secret is rejected."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         token_version = 1
         expires_delta = timedelta(days=30)
 
@@ -545,8 +560,8 @@ class TestValidateRefreshToken:
     def test_rejects_tampered_token(self):
         """Test that tampered refresh token is rejected."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         token_version = 1
         expires_delta = timedelta(days=30)
         secret = "test-secret"
@@ -565,8 +580,8 @@ class TestValidateRefreshToken:
     def test_returns_all_claims_including_version(self):
         """Test that all claims including token_version are returned."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         token_version = 3
         expires_delta = timedelta(days=30)
         secret = "test-secret"
@@ -594,8 +609,8 @@ class TestTokenGenerationAndValidation:
     def test_full_cycle_with_generated_token(self):
         """Test complete token lifecycle."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         expires_delta = timedelta(hours=1)
         secret = "test-secret"
 
@@ -621,8 +636,12 @@ class TestTokenGenerationAndValidation:
         expires_delta = timedelta(hours=1)
 
         # Generate tokens for different devices
-        token1, _ = generate_access_token(str(uuid4()), uuid4(), uuid4(), expires_delta, secret)
-        token2, _ = generate_access_token(str(uuid4()), uuid4(), uuid4(), expires_delta, secret)
+        token1, _ = generate_access_token(
+            str(uuid4()), GameID(uuid4()), AccountID(uuid4()), expires_delta, secret
+        )
+        token2, _ = generate_access_token(
+            str(uuid4()), GameID(uuid4()), AccountID(uuid4()), expires_delta, secret
+        )
 
         # Both should validate
         claims1 = validate_access_token(token1, secret)
@@ -635,8 +654,8 @@ class TestTokenGenerationAndValidation:
     def test_full_cycle_with_refresh_token(self):
         """Test complete refresh token lifecycle."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         token_version = 2
         expires_delta = timedelta(days=30)
         secret = "test-secret"
@@ -661,8 +680,8 @@ class TestTokenGenerationAndValidation:
     def test_access_and_refresh_tokens_are_independent(self):
         """Test that access and refresh tokens can coexist."""
         device_id = str(uuid4())
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         secret = "test-secret"
 
         # Generate both token types

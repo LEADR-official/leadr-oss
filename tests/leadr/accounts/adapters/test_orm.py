@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.adapters.orm import AccountORM, UserORM
+from leadr.common.domain.ids import AccountID
 
 
 @pytest.mark.asyncio
@@ -227,7 +228,7 @@ class TestUserORM:
         # Try to create user without account
         user = UserORM(
             id=uuid4(),
-            account_id=uuid4(),  # Non-existent account
+            account_id=AccountID(uuid4()),  # Non-existent account
             email="user@example.com",
             display_name="John Doe",
         )

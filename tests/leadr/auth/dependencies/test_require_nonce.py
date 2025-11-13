@@ -12,6 +12,7 @@ from leadr.auth.adapters.orm import DeviceORM, NonceORM
 from leadr.auth.dependencies import require_nonce
 from leadr.auth.domain.device import Device
 from leadr.auth.services.dependencies import get_nonce_service
+from leadr.common.domain.ids import AccountID, DeviceID, GameID
 from leadr.games.adapters.orm import GameORM
 
 
@@ -63,10 +64,10 @@ class TestRequireNonce:
 
         # Create device entity
         device = Device(
-            id=device_orm.id,
-            game_id=device_orm.game_id,
+            id=DeviceID(device_orm.id),
+            game_id=GameID(device_orm.game_id),
             device_id=device_orm.device_id,
-            account_id=device_orm.account_id,
+            account_id=AccountID(device_orm.account_id),
             first_seen_at=device_orm.first_seen_at,
             last_seen_at=device_orm.last_seen_at,
         )
@@ -90,10 +91,10 @@ class TestRequireNonce:
         """Test that missing nonce header raises 412 Precondition Failed."""
         # Create minimal device
         device = Device(
-            id=uuid4(),
-            game_id=uuid4(),
+            id=DeviceID(uuid4()),
+            game_id=GameID(uuid4()),
             device_id="test-device",
-            account_id=uuid4(),
+            account_id=AccountID(uuid4()),
             first_seen_at=datetime.now(UTC),
             last_seen_at=datetime.now(UTC),
         )
@@ -137,10 +138,10 @@ class TestRequireNonce:
         await db_session.commit()
 
         device = Device(
-            id=device_orm.id,
-            game_id=device_orm.game_id,
+            id=DeviceID(device_orm.id),
+            game_id=GameID(device_orm.game_id),
             device_id=device_orm.device_id,
-            account_id=device_orm.account_id,
+            account_id=AccountID(device_orm.account_id),
             first_seen_at=device_orm.first_seen_at,
             last_seen_at=device_orm.last_seen_at,
         )
@@ -196,10 +197,10 @@ class TestRequireNonce:
         await db_session.commit()
 
         device = Device(
-            id=device_orm.id,
-            game_id=device_orm.game_id,
+            id=DeviceID(device_orm.id),
+            game_id=GameID(device_orm.game_id),
             device_id=device_orm.device_id,
-            account_id=device_orm.account_id,
+            account_id=AccountID(device_orm.account_id),
             first_seen_at=device_orm.first_seen_at,
             last_seen_at=device_orm.last_seen_at,
         )
@@ -256,10 +257,10 @@ class TestRequireNonce:
         await db_session.commit()
 
         device = Device(
-            id=device_orm.id,
-            game_id=device_orm.game_id,
+            id=DeviceID(device_orm.id),
+            game_id=GameID(device_orm.game_id),
             device_id=device_orm.device_id,
-            account_id=device_orm.account_id,
+            account_id=AccountID(device_orm.account_id),
             first_seen_at=device_orm.first_seen_at,
             last_seen_at=device_orm.last_seen_at,
         )
@@ -327,10 +328,10 @@ class TestRequireNonce:
 
         # Try to use nonce with device2
         device2 = Device(
-            id=device2_orm.id,
-            game_id=device2_orm.game_id,
+            id=DeviceID(device2_orm.id),
+            game_id=GameID(device2_orm.game_id),
             device_id=device2_orm.device_id,
-            account_id=device2_orm.account_id,
+            account_id=AccountID(device2_orm.account_id),
             first_seen_at=device2_orm.first_seen_at,
             last_seen_at=device2_orm.last_seen_at,
         )

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import DeviceORM
 from leadr.boards.adapters.orm import BoardORM
+from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID
 from leadr.games.adapters.orm import GameORM
 from leadr.scores.adapters.orm import ScoreORM
 
@@ -186,9 +187,9 @@ class TestScoreORM:
 
     async def test_score_requires_account_id(self, db_session: AsyncSession):
         """Test that account_id is required (foreign key constraint)."""
-        device_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
+        device_id = DeviceID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
 
         score = ScoreORM(
             id=uuid4(),
@@ -206,9 +207,9 @@ class TestScoreORM:
 
     async def test_score_requires_game_id(self, db_session: AsyncSession):
         """Test that game_id is required (foreign key constraint)."""
-        account_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = ScoreORM(
             id=uuid4(),
@@ -226,9 +227,9 @@ class TestScoreORM:
 
     async def test_score_requires_board_id(self, db_session: AsyncSession):
         """Test that board_id is required (foreign key constraint)."""
-        account_id = uuid4()
-        game_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = ScoreORM(
             id=uuid4(),
@@ -246,9 +247,9 @@ class TestScoreORM:
 
     async def test_score_requires_device_id(self, db_session: AsyncSession):
         """Test that device_id is required (NOT NULL constraint)."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
 
         score = ScoreORM(
             id=uuid4(),

@@ -1,22 +1,22 @@
 """API request and response models for games."""
 
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from leadr.common.domain.ids import AccountID, BoardID, GameID
 from leadr.games.domain.game import Game
 
 
 class GameCreateRequest(BaseModel):
     """Request model for creating a game."""
 
-    account_id: UUID = Field(description="ID of the account this game belongs to")
+    account_id: AccountID = Field(description="ID of the account this game belongs to")
     name: str = Field(description="Name of the game")
     steam_app_id: str | None = Field(
         default=None, description="Optional Steam App ID for Steam integration"
     )
-    default_board_id: UUID | None = Field(
+    default_board_id: BoardID | None = Field(
         default=None, description="Optional ID of the default leaderboard for this game"
     )
     anti_cheat_enabled: bool = Field(
@@ -29,7 +29,7 @@ class GameUpdateRequest(BaseModel):
 
     name: str | None = Field(default=None, description="Updated game name")
     steam_app_id: str | None = Field(default=None, description="Updated Steam App ID")
-    default_board_id: UUID | None = Field(
+    default_board_id: BoardID | None = Field(
         default=None, description="Updated default leaderboard ID"
     )
     anti_cheat_enabled: bool | None = Field(
@@ -41,13 +41,13 @@ class GameUpdateRequest(BaseModel):
 class GameResponse(BaseModel):
     """Response model for a game."""
 
-    id: UUID = Field(description="Unique identifier for the game")
-    account_id: UUID = Field(description="ID of the account this game belongs to")
+    id: GameID = Field(description="Unique identifier for the game")
+    account_id: AccountID = Field(description="ID of the account this game belongs to")
     name: str = Field(description="Name of the game")
     steam_app_id: str | None = Field(
         default=None, description="Steam App ID if Steam integration is configured"
     )
-    default_board_id: UUID | None = Field(
+    default_board_id: BoardID | None = Field(
         default=None, description="ID of the default leaderboard, or null if not set"
     )
     anti_cheat_enabled: bool = Field(description="Whether anti-cheat is enabled for this game")

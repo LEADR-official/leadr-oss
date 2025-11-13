@@ -1,7 +1,6 @@
 """Board repository services."""
 
 from typing import Any
-from uuid import UUID
 
 from pydantic import UUID4
 from sqlalchemy import select
@@ -9,6 +8,7 @@ from sqlalchemy import select
 from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
+from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID, PrefixedID
 from leadr.common.repositories import BaseRepository
 
 
@@ -18,9 +18,9 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
     def _to_domain(self, orm: BoardORM) -> Board:
         """Convert ORM model to domain entity."""
         return Board(
-            id=orm.id,
-            account_id=orm.account_id,
-            game_id=orm.game_id,
+            id=BoardID(orm.id),
+            account_id=AccountID(orm.account_id),
+            game_id=GameID(orm.game_id),
             name=orm.name,
             icon=orm.icon,
             short_code=orm.short_code,
@@ -28,7 +28,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             is_active=orm.is_active,
             sort_direction=SortDirection(orm.sort_direction),
             keep_strategy=KeepStrategy(orm.keep_strategy),
-            template_id=orm.template_id,
+            template_id=BoardTemplateID(orm.template_id) if orm.template_id else None,
             template_name=orm.template_name,
             starts_at=orm.starts_at,
             ends_at=orm.ends_at,
@@ -41,9 +41,9 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
     def _to_orm(self, entity: Board) -> BoardORM:
         """Convert domain entity to ORM model."""
         return BoardORM(
-            id=entity.id,
-            account_id=entity.account_id,
-            game_id=entity.game_id,
+            id=entity.id.uuid,
+            account_id=entity.account_id.uuid,
+            game_id=entity.game_id.uuid,
             name=entity.name,
             icon=entity.icon,
             short_code=entity.short_code,
@@ -51,7 +51,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             is_active=entity.is_active,
             sort_direction=entity.sort_direction.value,
             keep_strategy=entity.keep_strategy.value,
-            template_id=entity.template_id,
+            template_id=entity.template_id.uuid if entity.template_id else None,
             template_name=entity.template_name,
             starts_at=entity.starts_at,
             ends_at=entity.ends_at,
@@ -65,7 +65,9 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         """Get the ORM model class."""
         return BoardORM
 
-    async def filter(self, account_id: UUID4, **kwargs: Any) -> list[Board]:
+    async def filter(
+        self, account_id: UUID4 | PrefixedID | None = None, **kwargs: Any
+    ) -> list[Board]:
         """Filter boards by account and optional criteria.
 
         Args:
@@ -74,9 +76,15 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
 
         Returns:
             List of boards for the account matching the filter criteria
+
+        Raises:
+            ValueError: If account_id is None (required for multi-tenant safety)
         """
+        if account_id is None:
+            raise ValueError("account_id is required for filtering boards")
+        account_uuid = self._extract_uuid(account_id)
         query = select(BoardORM).where(
-            BoardORM.account_id == account_id,
+            BoardORM.account_id == account_uuid,
             BoardORM.deleted_at.is_(None),
         )
 
@@ -100,7 +108,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         return await self._get_by_field("short_code", short_code)
 
     async def list_boards(
-        self, account_id: UUID4 | None = None, code: str | None = None
+        self, account_id: UUID4 | AccountID | None = None, code: str | None = None
     ) -> list[Board]:
         """List boards with optional filtering by account_id and/or code.
 
@@ -114,7 +122,8 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         query = select(BoardORM).where(BoardORM.deleted_at.is_(None))
 
         if account_id is not None:
-            query = query.where(BoardORM.account_id == account_id)
+            account_uuid = self._extract_uuid(account_id)
+            query = query.where(BoardORM.account_id == account_uuid)
 
         if code is not None:
             query = query.where(BoardORM.short_code == code)
@@ -139,8 +148,11 @@ class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
         """Get the ORM model class."""
         return BoardTemplateORM
 
-    async def filter(
-        self, account_id: UUID, game_id: UUID | None = None, **kwargs: Any
+    async def filter(  # type: ignore[override]
+        self,
+        account_id: AccountID | None = None,
+        game_id: GameID | None = None,
+        **kwargs: Any,
     ) -> list[BoardTemplate]:
         """Filter board templates by account and optional game.
 
@@ -151,14 +163,21 @@ class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
 
         Returns:
             List of board templates for the account matching the filter criteria
+
+        Raises:
+            ValueError: If account_id is None (required for multi-tenant safety)
         """
+        if account_id is None:
+            raise ValueError("account_id is required for filtering board templates")
+        account_uuid = self._extract_uuid(account_id)
         query = select(BoardTemplateORM).where(
-            BoardTemplateORM.account_id == account_id,
+            BoardTemplateORM.account_id == account_uuid,
             BoardTemplateORM.deleted_at.is_(None),
         )
 
         if game_id is not None:
-            query = query.where(BoardTemplateORM.game_id == game_id)
+            game_uuid = self._extract_uuid(game_id)
+            query = query.where(BoardTemplateORM.game_id == game_uuid)
 
         result = await self.session.execute(query)
         orms = result.scalars().all()
