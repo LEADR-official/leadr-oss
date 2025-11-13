@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType
+from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
 from leadr.scores.services.anti_cheat_repositories import (
     ScoreFlagRepository,
@@ -139,7 +139,7 @@ class TestScoreFlagRepository:
             flag_type=FlagType.RATE_LIMIT,
             confidence=FlagConfidence.HIGH,
             metadata={"submissions_count": 101, "limit": 100},
-            status="PENDING",
+            status=ScoreFlagStatus.PENDING,
         )
 
         created = await repo.create(flag)
@@ -160,7 +160,7 @@ class TestScoreFlagRepository:
             flag_type=FlagType.DUPLICATE,
             confidence=FlagConfidence.MEDIUM,
             metadata={"duplicate_count": 3},
-            status="PENDING",
+            status=ScoreFlagStatus.PENDING,
         )
         await repo.create(flag)
 
@@ -189,14 +189,14 @@ class TestScoreFlagRepository:
             flag_type=FlagType.VELOCITY,
             confidence=FlagConfidence.HIGH,
             metadata={"time_delta_seconds": 0.5},
-            status="PENDING",
+            status=ScoreFlagStatus.PENDING,
         )
         await repo.create(flag)
 
         # Update it
         reviewed_at = datetime.now(UTC)
         reviewer_id = uuid4()
-        flag.status = "FALSE_POSITIVE"
+        flag.status = ScoreFlagStatus.FALSE_POSITIVE
         flag.reviewed_at = reviewed_at
         flag.reviewer_id = reviewer_id
         flag.reviewer_decision = "Legitimate speed"
@@ -245,7 +245,7 @@ class TestScoreFlagRepository:
             flag_type=FlagType.RATE_LIMIT,
             confidence=FlagConfidence.HIGH,
             metadata={"submissions_count": 101},
-            status="PENDING",
+            status=ScoreFlagStatus.PENDING,
         )
         await repo.create(flag1)
 
@@ -255,7 +255,7 @@ class TestScoreFlagRepository:
             flag_type=FlagType.DUPLICATE,
             confidence=FlagConfidence.MEDIUM,
             metadata={"duplicate_count": 2},
-            status="CONFIRMED_CHEAT",
+            status=ScoreFlagStatus.CONFIRMED_CHEAT,
         )
         await repo.create(flag2)
 

@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType
+from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
 
 
@@ -131,13 +131,13 @@ class TestScoreFlag:
             flag_type=FlagType.OUTLIER,
             confidence=FlagConfidence.MEDIUM,
             metadata={"z_score": 4.5},
-            status="FALSE_POSITIVE",
+            status=ScoreFlagStatus.FALSE_POSITIVE,
             reviewed_at=reviewed_at,
             reviewer_id=reviewer_id,
             reviewer_decision="Score was legitimate, player is exceptionally skilled",
         )
 
-        assert flag.status == "FALSE_POSITIVE"
+        assert flag.status == ScoreFlagStatus.FALSE_POSITIVE
         assert flag.reviewed_at == reviewed_at
         assert flag.reviewer_id == reviewer_id
         assert flag.reviewer_decision == "Score was legitimate, player is exceptionally skilled"
