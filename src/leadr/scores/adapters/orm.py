@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSON, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from leadr.common.orm import Base
@@ -51,6 +51,9 @@ class ScoreORM(Base):
     filter_timezone: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     filter_country: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     filter_city: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    score_metadata: Mapped[Any | None] = mapped_column(
+        "score_metadata", JSON, nullable=True, default=None
+    )
 
     # Relationships
     account: Mapped["AccountORM"] = relationship("AccountORM")  # type: ignore[name-defined]

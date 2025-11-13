@@ -574,3 +574,152 @@ class TestScoreORM:
         # Verify float precision is maintained (within reasonable bounds)
         assert abs(score.value - 123.456789) < 0.0001
         assert isinstance(score.value, float)
+
+    async def test_create_score_with_metadata(self, db_session: AsyncSession):
+        """Test creating a score with metadata."""
+        from datetime import UTC, datetime
+
+        now = datetime.now(UTC)
+
+        # Create account
+        account = AccountORM(
+            id=uuid4(),
+            name="Test Account",
+            slug="test-account",
+            status="active",
+        )
+        db_session.add(account)
+        await db_session.commit()
+
+        # Create game
+        game = GameORM(
+            id=uuid4(),
+            account_id=account.id,
+            name="Test Game",
+        )
+        db_session.add(game)
+        await db_session.commit()
+
+        # Create device
+        device = DeviceORM(
+            id=uuid4(),
+            account_id=account.id,
+            game_id=game.id,
+            device_id="test-device-001",
+            platform="test-platform",
+            status="active",
+            first_seen_at=now,
+            last_seen_at=now,
+        )
+        db_session.add(device)
+        await db_session.commit()
+
+        # Create board
+        board = BoardORM(
+            id=uuid4(),
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction="DESCENDING",
+            keep_strategy="BEST_ONLY",
+        )
+        db_session.add(board)
+        await db_session.commit()
+
+        # Create score with metadata
+        metadata = {"level": 5, "character": "Warrior", "loadout": ["sword", "shield"]}
+        score = ScoreORM(
+            id=uuid4(),
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="SpeedRunner99",
+            value=123.45,
+            score_metadata=metadata,
+        )
+
+        db_session.add(score)
+        await db_session.commit()
+        await db_session.refresh(score)
+
+        assert score.score_metadata == metadata
+        assert score.score_metadata["level"] == 5  # type: ignore[index]
+        assert score.score_metadata["character"] == "Warrior"  # type: ignore[index]
+        assert score.score_metadata["loadout"] == ["sword", "shield"]  # type: ignore[index]
+
+    async def test_create_score_with_null_metadata(self, db_session: AsyncSession):
+        """Test creating a score with null metadata."""
+        from datetime import UTC, datetime
+
+        now = datetime.now(UTC)
+
+        # Create account
+        account = AccountORM(
+            id=uuid4(),
+            name="Test Account",
+            slug="test-account",
+            status="active",
+        )
+        db_session.add(account)
+        await db_session.commit()
+
+        # Create game
+        game = GameORM(
+            id=uuid4(),
+            account_id=account.id,
+            name="Test Game",
+        )
+        db_session.add(game)
+        await db_session.commit()
+
+        # Create device
+        device = DeviceORM(
+            id=uuid4(),
+            account_id=account.id,
+            game_id=game.id,
+            device_id="test-device-001",
+            platform="test-platform",
+            status="active",
+            first_seen_at=now,
+            last_seen_at=now,
+        )
+        db_session.add(device)
+        await db_session.commit()
+
+        # Create board
+        board = BoardORM(
+            id=uuid4(),
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction="DESCENDING",
+            keep_strategy="BEST_ONLY",
+        )
+        db_session.add(board)
+        await db_session.commit()
+
+        # Create score without metadata
+        score = ScoreORM(
+            id=uuid4(),
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="SpeedRunner99",
+            value=123.45,
+        )
+
+        db_session.add(score)
+        await db_session.commit()
+        await db_session.refresh(score)
+
+        assert score.score_metadata is None

@@ -1,6 +1,7 @@
 """Score service for managing score operations."""
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +48,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         timezone: str | None = None,
         country: str | None = None,
         city: str | None = None,
+        metadata: Any | None = None,
         trust_tier: TrustTier = TrustTier.B,
     ) -> tuple[Score, AntiCheatResult | None]:
         """Create a new score.
@@ -62,6 +64,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             timezone: Optional timezone filter for categorization.
             country: Optional country filter for categorization.
             city: Optional city filter for categorization.
+            metadata: Optional JSON metadata for game-specific data.
             trust_tier: Trust tier of the device (defaults to B/medium trust).
 
         Returns:
@@ -107,6 +110,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             timezone=timezone,
             country=country,
             city=city,
+            metadata=metadata,
         )
 
         # Anti-cheat checking (if enabled and device_id provided)
@@ -242,6 +246,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         timezone: str | None = None,
         country: str | None = None,
         city: str | None = None,
+        metadata: Any | None = None,
     ) -> Score:
         """Update a score's mutable fields.
 
@@ -253,6 +258,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             timezone: Optional new timezone.
             country: Optional new country.
             city: Optional new city.
+            metadata: Optional new metadata.
 
         Returns:
             The updated Score entity.
@@ -274,5 +280,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             score.country = country
         if city is not None:
             score.city = city
+        if metadata is not None:
+            score.metadata = metadata
 
         return await self.repository.update(score)

@@ -426,3 +426,141 @@ class TestScore:
         )
 
         assert score.value == -50.5
+
+    def test_create_score_with_metadata_dict(self):
+        """Test creating a score with metadata as a dictionary."""
+        account_id = uuid4()
+        game_id = uuid4()
+        board_id = uuid4()
+        device_id = uuid4()
+        metadata = {"level": 5, "character": "Warrior", "loadout": ["sword", "shield"]}
+
+        score = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+            metadata=metadata,
+        )
+
+        assert score.metadata == metadata
+        assert score.metadata["level"] == 5  # type: ignore[index]
+        assert score.metadata["character"] == "Warrior"  # type: ignore[index]
+
+    def test_create_score_with_metadata_list(self):
+        """Test creating a score with metadata as a list."""
+        account_id = uuid4()
+        game_id = uuid4()
+        board_id = uuid4()
+        device_id = uuid4()
+        metadata = [1, 2, 3, 4, 5]
+
+        score = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+            metadata=metadata,
+        )
+
+        assert score.metadata == metadata
+        assert len(score.metadata) == 5  # type: ignore[arg-type]
+
+    def test_create_score_with_metadata_primitive(self):
+        """Test creating a score with metadata as a primitive value."""
+        account_id = uuid4()
+        game_id = uuid4()
+        board_id = uuid4()
+        device_id = uuid4()
+
+        # Test with string
+        score = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+            metadata="test-string",
+        )
+        assert score.metadata == "test-string"
+
+        # Test with number
+        score2 = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+            metadata=42,
+        )
+        assert score2.metadata == 42
+
+    def test_create_score_with_null_metadata(self):
+        """Test creating a score with null metadata (default)."""
+        account_id = uuid4()
+        game_id = uuid4()
+        board_id = uuid4()
+        device_id = uuid4()
+
+        score = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+        )
+
+        assert score.metadata is None
+
+    def test_create_score_with_oversized_metadata(self):
+        """Test that oversized metadata raises validation error."""
+        account_id = uuid4()
+        game_id = uuid4()
+        board_id = uuid4()
+        device_id = uuid4()
+
+        # Create metadata that exceeds 1KB when serialized
+        # Each key-value pair is roughly 20-30 bytes, so we need ~40-50 items
+        large_metadata = {f"key{i}": f"value{i}" for i in range(100)}
+
+        with pytest.raises(ValidationError) as exc_info:
+            Score(
+                account_id=account_id,
+                game_id=game_id,
+                board_id=board_id,
+                device_id=device_id,
+                player_name="SpeedRunner99",
+                value=123.45,
+                metadata=large_metadata,
+            )
+
+        assert "metadata" in str(exc_info.value).lower()
+        assert "limit" in str(exc_info.value).lower()
+
+    def test_metadata_is_mutable(self):
+        """Test that metadata can be modified after creation."""
+        account_id = uuid4()
+        game_id = uuid4()
+        board_id = uuid4()
+        device_id = uuid4()
+
+        score = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+            metadata={"initial": "data"},
+        )
+
+        new_metadata = {"updated": "data", "extra": 123}
+        score.metadata = new_metadata
+        assert score.metadata == new_metadata

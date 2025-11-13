@@ -808,3 +808,198 @@ class TestScoreRepository:
         # get_by_id should return None for soft-deleted
         result = await score_repo.get_by_id(score_id)
         assert result is None
+
+    async def test_create_score_with_metadata(self, db_session: AsyncSession):
+        """Test creating a score with metadata via repository."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = uuid4()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create game
+        game_repo = GameRepository(db_session)
+        game_id = uuid4()
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create device
+        device_repo = DeviceRepository(db_session)
+        device_id = uuid4()
+
+        device = Device(
+            id=device_id,
+            account_id=account_id,
+            game_id=game_id,
+            device_id="test-device-001",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device)
+
+        # Create board
+        board_repo = BoardRepository(db_session)
+        board_id = uuid4()
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(board)
+
+        # Create score with metadata
+        score_repo = ScoreRepository(db_session)
+        score_id = uuid4()
+        metadata = {"level": 5, "character": "Warrior", "loadout": ["sword", "shield"]}
+
+        score = Score(
+            id=score_id,
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+            metadata=metadata,
+            created_at=now,
+            updated_at=now,
+        )
+
+        created = await score_repo.create(score)
+
+        assert created.id == score_id
+        assert created.metadata == metadata
+        assert created.metadata["level"] == 5  # type: ignore[index]
+        assert created.metadata["character"] == "Warrior"  # type: ignore[index]
+
+        # Verify retrieval preserves metadata
+        retrieved = await score_repo.get_by_id(score_id)
+        assert retrieved is not None
+        assert retrieved.metadata == metadata
+
+    async def test_update_score_metadata(self, db_session: AsyncSession):
+        """Test updating score metadata via repository."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = uuid4()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create game
+        game_repo = GameRepository(db_session)
+        game_id = uuid4()
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create device
+        device_repo = DeviceRepository(db_session)
+        device_id = uuid4()
+
+        device = Device(
+            id=device_id,
+            account_id=account_id,
+            game_id=game_id,
+            device_id="test-device-001",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device)
+
+        # Create board
+        board_repo = BoardRepository(db_session)
+        board_id = uuid4()
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(board)
+
+        # Create score with initial metadata
+        score_repo = ScoreRepository(db_session)
+        score_id = uuid4()
+        initial_metadata = {"level": 1, "character": "Mage"}
+
+        score = Score(
+            id=score_id,
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+            metadata=initial_metadata,
+            created_at=now,
+            updated_at=now,
+        )
+
+        await score_repo.create(score)
+
+        # Update metadata
+        new_metadata = {"level": 10, "character": "Warrior", "items": ["sword", "shield", "potion"]}
+        score.metadata = new_metadata
+        updated = await score_repo.update(score)
+
+        assert updated.metadata == new_metadata
+        assert updated.metadata["level"] == 10  # type: ignore[index]
+
+        # Verify retrieval shows updated metadata
+        retrieved = await score_repo.get_by_id(score_id)
+        assert retrieved is not None
+        assert retrieved.metadata == new_metadata

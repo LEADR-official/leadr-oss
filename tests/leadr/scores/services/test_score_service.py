@@ -658,3 +658,119 @@ class TestScoreService:
         meta_repo = ScoreSubmissionMetaRepository(db_session)
         meta = await meta_repo.get_by_device_and_board(device.id, board.id)
         assert meta is None
+
+    async def test_create_score_with_metadata(self, db_session: AsyncSession):
+        """Test creating a score with metadata via service."""
+        # Create account
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        # Create game
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create device
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Create score with metadata
+        score_service = ScoreService(db_session)
+        metadata = {"level": 5, "character": "Warrior", "loadout": ["sword", "shield"]}
+        score, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="SpeedRunner99",
+            value=123.45,
+            metadata=metadata,
+        )
+
+        assert score.metadata == metadata
+        assert score.metadata["level"] == 5  # type: ignore[index]
+        assert score.metadata["character"] == "Warrior"  # type: ignore[index]
+
+    async def test_update_score_metadata(self, db_session: AsyncSession):
+        """Test updating score metadata via service."""
+        # Create account
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        # Create game
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create device
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Create score with initial metadata
+        score_service = ScoreService(db_session)
+        initial_metadata = {"level": 1, "character": "Mage"}
+        score, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="SpeedRunner99",
+            value=123.45,
+            metadata=initial_metadata,
+        )
+
+        assert score.metadata == initial_metadata
+
+        # Update metadata
+        new_metadata = {"level": 10, "character": "Warrior", "items": ["sword", "shield", "potion"]}
+        updated = await score_service.update_score(
+            score_id=score.id,
+            metadata=new_metadata,
+        )
+
+        assert updated.metadata == new_metadata
+        assert updated.metadata["level"] == 10  # type: ignore[index]

@@ -1,10 +1,13 @@
 """API request and response models for scores."""
 
+import json
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from leadr.config import settings
 from leadr.scores.domain.score import Score
 
 
@@ -25,6 +28,27 @@ class ScoreCreateRequest(BaseModel):
         default=None,
         description="Optional formatted display string (e.g., '1:23.45', '1,234 points')",
     )
+    metadata: Any | None = Field(
+        default=None,
+        description="Optional JSON metadata for game-specific data (max 1KB)",
+    )
+
+    @field_validator("metadata")
+    @classmethod
+    def validate_metadata_size(cls, v: Any) -> Any:
+        """Validate that metadata does not exceed size limit."""
+        if v is None:
+            return None
+
+        # Serialize to compact JSON and check string length
+        compacted = json.dumps(v, separators=(",", ":"))
+        if len(compacted) > settings.SCORE_METADATA_MAX_SIZE_BYTES:
+            raise ValueError(
+                f"Metadata exceeds {settings.SCORE_METADATA_MAX_SIZE_BYTES} char limit "
+                f"(got {len(compacted)} chars)"
+            )
+
+        return v
 
 
 class ScoreUpdateRequest(BaseModel):
@@ -36,7 +60,25 @@ class ScoreUpdateRequest(BaseModel):
     timezone: str | None = Field(default=None, description="Updated timezone")
     country: str | None = Field(default=None, description="Updated country")
     city: str | None = Field(default=None, description="Updated city")
+    metadata: Any | None = Field(default=None, description="Updated metadata")
     deleted: bool | None = Field(default=None, description="Set to true to soft delete the score")
+
+    @field_validator("metadata")
+    @classmethod
+    def validate_metadata_size(cls, v: Any) -> Any:
+        """Validate that metadata does not exceed size limit."""
+        if v is None:
+            return None
+
+        # Serialize to compact JSON and check string length
+        compacted = json.dumps(v, separators=(",", ":"))
+        if len(compacted) > settings.SCORE_METADATA_MAX_SIZE_BYTES:
+            raise ValueError(
+                f"Metadata exceeds {settings.SCORE_METADATA_MAX_SIZE_BYTES} char limit "
+                f"(got {len(compacted)} chars)"
+            )
+
+        return v
 
 
 class ScoreResponse(BaseModel):
@@ -53,6 +95,7 @@ class ScoreResponse(BaseModel):
     timezone: str | None = Field(default=None, description="Timezone for categorization, or null")
     country: str | None = Field(default=None, description="Country for categorization, or null")
     city: str | None = Field(default=None, description="City for categorization, or null")
+    metadata: Any | None = Field(default=None, description="Game-specific metadata, or null")
     created_at: datetime = Field(description="Timestamp when the score was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -78,6 +121,7 @@ class ScoreResponse(BaseModel):
             timezone=score.timezone,
             country=score.country,
             city=score.city,
+            metadata=score.metadata,
             created_at=score.created_at,
             updated_at=score.updated_at,
         )
