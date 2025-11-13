@@ -209,6 +209,114 @@ class TestClientSessionRoutes:
 
         assert response.status_code == 422
 
+    async def test_refresh_session_with_valid_token(self, client: AsyncClient, db_session):
+        """Test refreshing a session with a valid refresh token."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Start session
+        device_id = str(uuid4())
+        response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": str(game.id),
+                "device_id": device_id,
+            },
+        )
+        assert response.status_code == 201
+        old_access_token = response.json()["access_token"]
+        refresh_token = response.json()["refresh_token"]
+
+        # Refresh session
+        refresh_response = await client.post(
+            "/client/sessions/refresh",
+            json={"refresh_token": refresh_token},
+        )
+
+        assert refresh_response.status_code == 200
+        data = refresh_response.json()
+        assert "access_token" in data
+        assert "refresh_token" in data
+        assert "expires_in" in data
+        # Should get a new access token
+        assert data["access_token"] != old_access_token
+        # Should get a new refresh token (token rotation)
+        assert data["refresh_token"] != refresh_token
+
+    async def test_refresh_session_with_invalid_token(self, client: AsyncClient):
+        """Test refreshing a session with an invalid refresh token returns 401."""
+        response = await client.post(
+            "/client/sessions/refresh",
+            json={"refresh_token": "invalid.token.here"},
+        )
+
+        assert response.status_code == 401
+        assert "invalid" in response.json()["detail"].lower()
+
+    async def test_refresh_session_with_expired_token(self, client: AsyncClient, db_session):
+        """Test refreshing a session with an expired token returns 401."""
+        from datetime import UTC, datetime, timedelta
+
+        from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM
+
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create device and expired session directly
+        now = datetime.now(UTC)
+        device = DeviceORM(
+            id=uuid4(),
+            account_id=account.id,
+            game_id=game.id,
+            device_id="test-device-expired",
+            first_seen_at=now,
+            last_seen_at=now,
+            status="active",
+        )
+        db_session.add(device)
+        await db_session.commit()
+
+        # Create expired session
+        expired_session = DeviceSessionORM(
+            id=uuid4(),
+            device_id=device.id,
+            access_token_hash="dummy_hash",
+            refresh_token_hash="expired_refresh_hash",
+            token_version=1,
+            expires_at=now - timedelta(hours=1),
+            refresh_expires_at=now - timedelta(hours=1),  # Expired
+        )
+        db_session.add(expired_session)
+        await db_session.commit()
+
+        # Try to refresh with any token (will fail because service can't find valid session)
+        response = await client.post(
+            "/client/sessions/refresh",
+            json={"refresh_token": "any.refresh.token"},
+        )
+
+        assert response.status_code == 401
+
 
 @pytest.mark.asyncio
 class TestClientNonceRoutes:

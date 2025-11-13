@@ -592,3 +592,69 @@ class TestScoreService:
         # Verify it's not returned by get
         score = await score_service.get_score(created_score.id)
         assert score is None
+
+    async def test_update_submission_metadata_with_none_result(self, db_session: AsyncSession):
+        """Test that update_submission_metadata returns early if anti_cheat_result is None."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+            anti_cheat_enabled=False,  # Disable anti-cheat
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-001",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Create score
+        score_service = ScoreService(db_session)
+        score, anti_cheat_result = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="SpeedRunner99",
+            value=123.45,
+        )
+
+        # anti_cheat_result should be None since anti-cheat is disabled
+        assert anti_cheat_result is None
+
+        # Call update_submission_metadata with None (should return early)
+        await score_service.update_submission_metadata(
+            saved_score=score,
+            device_id=device.id,
+            board_id=board.id,
+            anti_cheat_result=None,
+        )
+
+        # Verify no submission metadata was created
+        from leadr.scores.services.anti_cheat_repositories import (
+            ScoreSubmissionMetaRepository,
+        )
+
+        meta_repo = ScoreSubmissionMetaRepository(db_session)
+        meta = await meta_repo.get_by_device_and_board(device.id, board.id)
+        assert meta is None
