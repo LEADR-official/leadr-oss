@@ -430,10 +430,10 @@ class TestScore:
 
     def test_create_score_with_metadata_dict(self):
         """Test creating a score with metadata as a dictionary."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
         metadata = {"level": 5, "character": "Warrior", "loadout": ["sword", "shield"]}
 
         score = Score(
@@ -452,10 +452,10 @@ class TestScore:
 
     def test_create_score_with_metadata_list(self):
         """Test creating a score with metadata as a list."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
         metadata = [1, 2, 3, 4, 5]
 
         score = Score(
@@ -473,10 +473,10 @@ class TestScore:
 
     def test_create_score_with_metadata_primitive(self):
         """Test creating a score with metadata as a primitive value."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         # Test with string
         score = Score(
@@ -504,10 +504,10 @@ class TestScore:
 
     def test_create_score_with_null_metadata(self):
         """Test creating a score with null metadata (default)."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,
@@ -522,10 +522,10 @@ class TestScore:
 
     def test_create_score_with_oversized_metadata(self):
         """Test that oversized metadata raises validation error."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         # Create metadata that exceeds 1KB when serialized
         # Each key-value pair is roughly 20-30 bytes, so we need ~40-50 items
@@ -547,10 +547,10 @@ class TestScore:
 
     def test_metadata_is_mutable(self):
         """Test that metadata can be modified after creation."""
-        account_id = uuid4()
-        game_id = uuid4()
-        board_id = uuid4()
-        device_id = uuid4()
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
 
         score = Score(
             account_id=account_id,

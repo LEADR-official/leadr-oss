@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 
 from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
+from leadr.common.domain.ids import AccountID, BoardID, DeviceID, ScoreSubmissionMetaID
 from leadr.scores.api.score_submission_meta_schemas import ScoreSubmissionMetaResponse
 from leadr.scores.services.dependencies import ScoreSubmissionMetaServiceDep
 
@@ -41,8 +42,8 @@ async def list_submission_meta(
     """
     metas = await service.list_submission_meta(
         account_id=account_id,
-        board_id=board_id,
-        device_id=device_id,
+        board_id=BoardID(board_id) if board_id else None,
+        device_id=DeviceID(device_id) if device_id else None,
     )
 
     return [ScoreSubmissionMetaResponse.from_domain(meta) for meta in metas]
@@ -73,10 +74,10 @@ async def get_submission_meta(
     """
     from leadr.scores.adapters.orm import ScoreORM
 
-    meta = await service.get_by_id_or_raise(meta_id)
+    meta = await service.get_by_id_or_raise(ScoreSubmissionMetaID(meta_id))
 
     # Get the associated score to check account access
-    score_orm = await service.repository.session.get(ScoreORM, meta.score_id)
+    score_orm = await service.repository.session.get(ScoreORM, meta.score_id.uuid)
     if not score_orm:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -84,7 +85,7 @@ async def get_submission_meta(
         )
 
     # Check authorization
-    if not auth.has_access_to_account(score_orm.account_id):
+    if not auth.has_access_to_account(AccountID(score_orm.account_id)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this metadata's account",

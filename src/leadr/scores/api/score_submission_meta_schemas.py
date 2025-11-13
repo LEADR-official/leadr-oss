@@ -1,20 +1,20 @@
 """API schemas for score submission metadata."""
 
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import BaseModel
 
+from leadr.common.domain.ids import BoardID, DeviceID, ScoreID, ScoreSubmissionMetaID
 from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
 
 
 class ScoreSubmissionMetaResponse(BaseModel):
     """Response model for score submission metadata."""
 
-    id: UUID
-    score_id: UUID
-    device_id: UUID
-    board_id: UUID
+    id: ScoreSubmissionMetaID
+    score_id: ScoreID
+    device_id: DeviceID
+    board_id: BoardID
     submission_count: int
     last_submission_at: datetime
     last_score_value: float | None

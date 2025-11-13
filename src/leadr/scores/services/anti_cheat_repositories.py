@@ -2,13 +2,14 @@
 
 from typing import Any
 
-from pydantic import UUID4
 from sqlalchemy import select
 
 from leadr.common.domain.ids import (
+    AccountID,
     BoardID,
     DeviceID,
-    PrefixedID,
+    GameID,
+    ScoreFlagID,
     ScoreID,
     ScoreSubmissionMetaID,
 )
@@ -54,9 +55,9 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
         """Get the ORM model class."""
         return ScoreSubmissionMetaORM
 
-    async def filter(
+    async def filter(  # type: ignore[override]
         self,
-        account_id: UUID4,
+        account_id: AccountID | None = None,
         board_id: BoardID | None = None,
         device_id: DeviceID | None = None,
         **kwargs: Any,
@@ -76,6 +77,10 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
             List of submission metadata for the account matching the filter criteria
         """
         from leadr.scores.adapters.orm import ScoreORM
+
+        if account_id is None:
+            msg = "account_id is required for filtering submission metadata"
+            raise ValueError(msg)
 
         account_uuid = self._extract_uuid(account_id)
         # Join with scores table to filter by account
@@ -132,7 +137,7 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
 
     def _to_domain(self, orm: ScoreFlagORM) -> ScoreFlag:
         """Convert ORM model to domain entity."""
-        from leadr.common.domain.ids import ScoreFlagID, UserID
+        from leadr.common.domain.ids import UserID
         from leadr.scores.domain.anti_cheat.enums import (
             FlagConfidence,
             FlagType,
@@ -175,9 +180,9 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
         """Get the ORM model class."""
         return ScoreFlagORM
 
-    async def filter(
+    async def filter(  # type: ignore[override]
         self,
-        account_id: UUID4,
+        account_id: AccountID | None = None,
         board_id: BoardID | None = None,
         game_id: GameID | None = None,
         status: str | None = None,
@@ -201,6 +206,10 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
             List of flags for the account matching the filter criteria
         """
         from leadr.scores.adapters.orm import ScoreORM
+
+        if account_id is None:
+            msg = "account_id is required for filtering score flags"
+            raise ValueError(msg)
 
         account_uuid = self._extract_uuid(account_id)
         # Join with scores table to filter by account

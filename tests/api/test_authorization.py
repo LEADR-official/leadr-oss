@@ -1,6 +1,7 @@
 """Integration tests for authorization and multi-tenant access control."""
 
 from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -693,7 +694,7 @@ class TestAccountIDResolution:
         now = datetime.now(UTC)
 
         account = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="User Account",
             slug="user-account",
             status=AccountStatus.ACTIVE,
@@ -704,7 +705,7 @@ class TestAccountIDResolution:
 
         game_repo = GameRepository(db_session)
         game = Game(
-            id=uuid4(),
+            id=GameID(uuid4()),
             account_id=account.id,
             name="Test Game",
             created_at=now,
@@ -760,7 +761,7 @@ class TestAccountIDResolution:
         now = datetime.now(UTC)
 
         account = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="Test Account",
             slug="test-account",
             status=AccountStatus.ACTIVE,
@@ -771,7 +772,7 @@ class TestAccountIDResolution:
 
         game_repo = GameRepository(db_session)
         game = Game(
-            id=uuid4(),
+            id=GameID(uuid4()),
             account_id=account.id,
             name="Test Game",
             created_at=now,
@@ -796,7 +797,7 @@ class TestAccountIDResolution:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="User Account",
             slug="user-account",
             status=AccountStatus.ACTIVE,
@@ -804,7 +805,7 @@ class TestAccountIDResolution:
             updated_at=now,
         )
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="Other Account",
             slug="other-account",
             status=AccountStatus.ACTIVE,
@@ -850,7 +851,7 @@ class TestAccountIDResolution:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="User Account",
             slug="user-account",
             status=AccountStatus.ACTIVE,
@@ -858,7 +859,7 @@ class TestAccountIDResolution:
             updated_at=now,
         )
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="Other Account",
             slug="other-account",
             status=AccountStatus.ACTIVE,
@@ -909,7 +910,7 @@ class TestAccountIDResolution:
         now = datetime.now(UTC)
 
         account = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="User Account",
             slug="user-account",
             status=AccountStatus.ACTIVE,

@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.common.domain.ids import BoardID, DeviceID, UserID
+from leadr.common.domain.ids import BoardID, DeviceID, ScoreID, UserID
 from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
 from leadr.scores.services.anti_cheat_repositories import (
@@ -66,7 +66,7 @@ class TestScoreSubmissionMetaRepository:
     async def test_get_submission_meta_by_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent submission meta returns None."""
         repo = ScoreSubmissionMetaRepository(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = ScoreID(uuid4())
 
         result = await repo.get_by_id(non_existent_id)
 
@@ -175,7 +175,7 @@ class TestScoreFlagRepository:
     async def test_get_flag_by_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent flag returns None."""
         repo = ScoreFlagRepository(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = ScoreID(uuid4())
 
         result = await repo.get_by_id(non_existent_id)
 

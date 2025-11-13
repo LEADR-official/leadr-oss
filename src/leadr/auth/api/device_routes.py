@@ -8,6 +8,7 @@ from leadr.auth.api.device_schemas import DeviceResponse, DeviceUpdateRequest
 from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
 from leadr.auth.domain.device import DeviceStatus
 from leadr.auth.services.dependencies import DeviceServiceDep
+from leadr.common.domain.ids import DeviceID, GameID
 
 router = APIRouter()
 
@@ -42,7 +43,7 @@ async def list_devices(
     """
     devices = await service.list_devices(
         account_id=account_id,
-        game_id=game_id,
+        game_id=GameID(game_id) if game_id else None,
         status=status,
     )
 
@@ -69,7 +70,7 @@ async def get_device(
         403: User does not have access to this device's account.
         404: Device not found or soft-deleted.
     """
-    device = await service.get_by_id_or_raise(device_id)
+    device = await service.get_by_id_or_raise(DeviceID(device_id))
 
     # Check authorization
     if not auth.has_access_to_account(device.account_id):
@@ -106,8 +107,10 @@ async def update_device(
         404: Device not found.
         400: Invalid status value.
     """
+    device_id_typed = DeviceID(device_id)
+
     # Get the device to check account access
-    device = await service.get_by_id_or_raise(device_id)
+    device = await service.get_by_id_or_raise(device_id_typed)
 
     # Check authorization
     if not auth.has_access_to_account(device.account_id):
@@ -130,11 +133,11 @@ async def update_device(
 
         # Update device status based on enum
         if status_enum == DeviceStatus.BANNED:
-            device = await service.ban_device(device_id)
+            device = await service.ban_device(device_id_typed)
         elif status_enum == DeviceStatus.SUSPENDED:
-            device = await service.suspend_device(device_id)
+            device = await service.suspend_device(device_id_typed)
         elif status_enum == DeviceStatus.ACTIVE:
-            device = await service.activate_device(device_id)
+            device = await service.activate_device(device_id_typed)
     else:
         raise HTTPException(
             status_code=400,

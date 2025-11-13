@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 
 from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
+from leadr.common.domain.ids import BoardID, GameID, ScoreFlagID
 from leadr.scores.api.score_flag_schemas import ScoreFlagResponse, ScoreFlagUpdateRequest
 from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
 from leadr.scores.services.dependencies import ScoreFlagServiceDep
@@ -46,8 +47,8 @@ async def list_score_flags(
     """
     flags = await service.list_flags(
         account_id=account_id,
-        board_id=board_id,
-        game_id=game_id,
+        board_id=BoardID(board_id) if board_id else None,
+        game_id=GameID(game_id) if game_id else None,
         status=status,
         flag_type=flag_type,
     )
@@ -75,7 +76,7 @@ async def get_score_flag(
         403: User does not have access to this flag's account.
         404: Flag not found or soft-deleted.
     """
-    flag = await service.get_by_id_or_raise(flag_id)
+    flag = await service.get_by_id_or_raise(ScoreFlagID(flag_id))
 
     # Get the associated score to check account access
     # We need to import ScoreService to look up the score
@@ -120,8 +121,10 @@ async def update_score_flag(
         404: Flag not found.
         400: Invalid update request.
     """
+    flag_id_typed = ScoreFlagID(flag_id)
+
     # Get the flag to check account access
-    flag = await service.get_by_id_or_raise(flag_id)
+    flag = await service.get_by_id_or_raise(flag_id_typed)
 
     # Get the associated score to check account access
     from leadr.scores.services.score_service import ScoreService
@@ -138,7 +141,7 @@ async def update_score_flag(
 
     # Handle soft delete
     if request.deleted is True:
-        flag = await service.soft_delete(flag_id)
+        flag = await service.soft_delete(flag_id_typed)
         return ScoreFlagResponse.from_domain(flag)
 
     # Handle review/update
@@ -155,14 +158,14 @@ async def update_score_flag(
             ) from None
 
         flag = await service.review_flag(
-            flag_id=flag_id,
+            flag_id=flag_id_typed,
             status=status_enum,
             reviewer_decision=request.reviewer_decision,
             reviewer_id=auth.user.id,
         )
     elif request.reviewer_decision is not None:
         flag = await service.update_flag(
-            flag_id=flag_id,
+            flag_id=flag_id_typed,
             reviewer_decision=request.reviewer_decision,
         )
     else:

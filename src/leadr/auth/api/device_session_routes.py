@@ -10,6 +10,7 @@ from leadr.auth.api.device_session_schemas import (
 )
 from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
 from leadr.auth.services.dependencies import DeviceServiceDep
+from leadr.common.domain.ids import DeviceID, DeviceSessionID
 
 router = APIRouter()
 
@@ -42,7 +43,7 @@ async def list_sessions(
     """
     sessions = await service.list_sessions(
         account_id=account_id,
-        device_id=device_id,
+        device_id=DeviceID(device_id) if device_id else None,
     )
 
     return [DeviceSessionResponse.from_domain(session) for session in sessions]
@@ -68,7 +69,7 @@ async def get_session(
         403: User does not have access to this session's account.
         404: Session not found or soft-deleted.
     """
-    session = await service.get_session_or_raise(session_id)
+    session = await service.get_session_or_raise(DeviceSessionID(session_id))
 
     # Get the device to check account access
     device = await service.get_by_id_or_raise(session.device_id)
@@ -108,8 +109,10 @@ async def update_session(
         404: Session not found.
         400: Invalid request or no revoked field provided.
     """
+    session_id_typed = DeviceSessionID(session_id)
+
     # Get the session to check account access
-    session = await service.get_session_or_raise(session_id)
+    session = await service.get_session_or_raise(session_id_typed)
 
     # Get the device to check account access
     device = await service.get_by_id_or_raise(session.device_id)
@@ -123,7 +126,7 @@ async def update_session(
 
     # Handle revoke update
     if request.revoked is True:
-        session = await service.revoke_session(session_id)
+        session = await service.revoke_session(session_id_typed)
     else:
         raise HTTPException(
             status_code=400,

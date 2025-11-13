@@ -1,11 +1,10 @@
 """Score flag service for managing flag operations."""
 
 from datetime import UTC, datetime
-from uuid import UUID
 
-from pydantic import UUID4
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.domain.ids import AccountID, BoardID, GameID, ScoreFlagID, UserID
 from leadr.common.services import BaseService
 from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag
@@ -29,9 +28,9 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
 
     async def list_flags(
         self,
-        account_id: UUID4,
-        board_id: UUID | None = None,
-        game_id: UUID | None = None,
+        account_id: AccountID,
+        board_id: BoardID | None = None,
+        game_id: GameID | None = None,
         status: str | None = None,
         flag_type: str | None = None,
     ) -> list[ScoreFlag]:
@@ -61,7 +60,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             flag_type=flag_type,
         )
 
-    async def get_flag(self, flag_id: UUID) -> ScoreFlag | None:
+    async def get_flag(self, flag_id: ScoreFlagID) -> ScoreFlag | None:
         """Get a flag by its ID.
 
         Args:
@@ -77,10 +76,10 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
 
     async def review_flag(
         self,
-        flag_id: UUID,
+        flag_id: ScoreFlagID,
         status: ScoreFlagStatus,
         reviewer_decision: str | None = None,
-        reviewer_id: UUID | None = None,
+        reviewer_id: UserID | None = None,
     ) -> ScoreFlag:
         """Review a flag and update its status.
 
@@ -117,7 +116,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
 
     async def update_flag(
         self,
-        flag_id: UUID,
+        flag_id: ScoreFlagID,
         status: ScoreFlagStatus | None = None,
         reviewer_decision: str | None = None,
     ) -> ScoreFlag:

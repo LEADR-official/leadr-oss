@@ -1,9 +1,8 @@
 """Service for score submission metadata management."""
 
-from uuid import UUID
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.domain.ids import AccountID, BoardID, DeviceID, ScoreSubmissionMetaID
 from leadr.common.services import BaseService
 from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
 from leadr.scores.services.anti_cheat_repositories import ScoreSubmissionMetaRepository
@@ -25,9 +24,9 @@ class ScoreSubmissionMetaService(BaseService[ScoreSubmissionMeta, ScoreSubmissio
 
     async def list_submission_meta(
         self,
-        account_id: UUID,
-        board_id: UUID | None = None,
-        device_id: UUID | None = None,
+        account_id: AccountID,
+        board_id: BoardID | None = None,
+        device_id: DeviceID | None = None,
     ) -> list[ScoreSubmissionMeta]:
         """List score submission metadata for an account with optional filters.
 
@@ -51,7 +50,9 @@ class ScoreSubmissionMetaService(BaseService[ScoreSubmissionMeta, ScoreSubmissio
             device_id=device_id,
         )
 
-    async def get_submission_meta(self, meta_id: UUID) -> ScoreSubmissionMeta | None:
+    async def get_submission_meta(
+        self, meta_id: ScoreSubmissionMetaID
+    ) -> ScoreSubmissionMeta | None:
         """Get submission metadata by its ID.
 
         Args:

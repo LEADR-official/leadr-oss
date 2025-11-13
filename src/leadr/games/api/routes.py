@@ -8,7 +8,7 @@ from leadr.auth.dependencies import (
     QueryAccountIDDep,
     validate_body_account_id,
 )
-from leadr.common.domain.ids import AccountID, GameID
+from leadr.common.domain.ids import GameID
 from leadr.games.api.schemas import (
     GameCreateRequest,
     GameResponse,

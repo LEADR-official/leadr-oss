@@ -1,8 +1,6 @@
 """Account and User API routes."""
 
-from typing import Annotated
-
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.accounts.api.schemas import (

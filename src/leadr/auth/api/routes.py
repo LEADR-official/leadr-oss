@@ -18,7 +18,7 @@ from leadr.auth.dependencies import (
 )
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.dependencies import APIKeyServiceDep
-from leadr.common.domain.ids import AccountID, APIKeyID
+from leadr.common.domain.ids import APIKeyID
 
 router = APIRouter()
 
