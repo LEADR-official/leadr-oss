@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
+from leadr.accounts.services.user_service import UserService
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
 from leadr.auth.services.repositories import APIKeyRepository
 
@@ -33,6 +34,14 @@ class TestAPIKeyRepository:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API key
         api_key_repo = APIKeyRepository(db_session)
         key_id = uuid4()
@@ -40,6 +49,7 @@ class TestAPIKeyRepository:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=user.id,
             name="Production API Key",
             key_hash="hashed_key_value",
             key_prefix="ldr_abc123",
@@ -74,12 +84,21 @@ class TestAPIKeyRepository:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         api_key_repo = APIKeyRepository(db_session)
         key_id = uuid4()
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=user.id,
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_test",
@@ -121,12 +140,21 @@ class TestAPIKeyRepository:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         api_key_repo = APIKeyRepository(db_session)
         key_id = uuid4()
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=user.id,
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_unique123",
@@ -167,12 +195,21 @@ class TestAPIKeyRepository:
         )
         await account_repo.create(account)
 
+        # Create user for API keys
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create multiple API keys
         api_key_repo = APIKeyRepository(db_session)
 
         key1 = APIKey(
             id=uuid4(),
             account_id=account_id,
+            user_id=user.id,
             name="Production Key",
             key_hash="hash1",
             key_prefix="ldr_prod",
@@ -182,6 +219,7 @@ class TestAPIKeyRepository:
         key2 = APIKey(
             id=uuid4(),
             account_id=account_id,
+            user_id=user.id,
             name="Development Key",
             key_hash="hash2",
             key_prefix="ldr_dev",
@@ -217,12 +255,21 @@ class TestAPIKeyRepository:
         )
         await account_repo.create(account)
 
+        # Create user for API keys
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API keys with different statuses
         api_key_repo = APIKeyRepository(db_session)
 
         active_key = APIKey(
             id=uuid4(),
             account_id=account_id,
+            user_id=user.id,
             name="Active Key",
             key_hash="hash1",
             key_prefix="ldr_active",
@@ -233,6 +280,7 @@ class TestAPIKeyRepository:
         revoked_key = APIKey(
             id=uuid4(),
             account_id=account_id,
+            user_id=user.id,
             name="Revoked Key",
             key_hash="hash2",
             key_prefix="ldr_revoked",
@@ -268,6 +316,14 @@ class TestAPIKeyRepository:
         )
         await account_repo.create(account)
 
+        # Create user for API keys
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API keys
         api_key_repo = APIKeyRepository(db_session)
 
@@ -275,6 +331,7 @@ class TestAPIKeyRepository:
             key = APIKey(
                 id=uuid4(),
                 account_id=account_id,
+                user_id=user.id,
                 name=f"Key {i}",
                 key_hash=f"hash{i}",
                 key_prefix=f"ldr_key{i}",
@@ -288,6 +345,7 @@ class TestAPIKeyRepository:
         revoked_key = APIKey(
             id=uuid4(),
             account_id=account_id,
+            user_id=user.id,
             name="Revoked Key",
             key_hash="revoked_hash",
             key_prefix="ldr_revoked",
@@ -319,12 +377,21 @@ class TestAPIKeyRepository:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         api_key_repo = APIKeyRepository(db_session)
         key_id = uuid4()
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=user.id,
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_test",
@@ -364,12 +431,21 @@ class TestAPIKeyRepository:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         api_key_repo = APIKeyRepository(db_session)
         key_id = uuid4()
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=user.id,
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_test",
@@ -407,12 +483,21 @@ class TestAPIKeyRepository:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         api_key_repo = APIKeyRepository(db_session)
         key_id = uuid4()
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=user.id,
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_test",
@@ -445,6 +530,14 @@ class TestAPIKeyRepository:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API key with expiration
         api_key_repo = APIKeyRepository(db_session)
         key_id = uuid4()
@@ -453,6 +546,7 @@ class TestAPIKeyRepository:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=user.id,
             name="Temporary Key",
             key_hash="hash",
             key_prefix="ldr_temp",

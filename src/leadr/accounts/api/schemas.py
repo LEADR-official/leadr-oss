@@ -74,6 +74,9 @@ class UserUpdateRequest(BaseModel):
 
     email: EmailStr | None = Field(default=None, description="Updated email address")
     display_name: str | None = Field(default=None, description="Updated display name")
+    super_admin: bool | None = Field(
+        default=None, description="Set superadmin privileges (true/false)"
+    )
     deleted: bool | None = Field(default=None, description="Set to true to soft delete the user")
 
 
@@ -84,6 +87,7 @@ class UserResponse(BaseModel):
     account_id: UUID = Field(description="ID of the account this user belongs to")
     email: str = Field(description="User's email address")
     display_name: str = Field(description="User's display name")
+    super_admin: bool = Field(description="Whether this user has superadmin privileges")
     created_at: datetime = Field(description="Timestamp when the user was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -102,6 +106,7 @@ class UserResponse(BaseModel):
             account_id=user.account_id,
             email=user.email,
             display_name=user.display_name,
+            super_admin=user.super_admin,
             created_at=user.created_at,
             updated_at=user.updated_at,
         )

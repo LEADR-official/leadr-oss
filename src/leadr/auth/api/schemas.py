@@ -14,6 +14,7 @@ class CreateAPIKeyRequest(BaseModel):
     """Request schema for creating an API key."""
 
     account_id: UUID = Field(description="ID of the account this API key belongs to")
+    user_id: UUID = Field(description="ID of the user who owns this API key")
     name: str = Field(description="Human-readable name for the API key (e.g., 'Production Server')")
     expires_at: datetime | None = Field(
         default=None,
@@ -73,6 +74,7 @@ class APIKeyResponse(BaseModel):
 
     id: UUID = Field(description="Unique identifier for the API key")
     account_id: UUID = Field(description="ID of the account this key belongs to")
+    user_id: UUID = Field(description="ID of the user who owns this API key")
     name: str = Field(description="Human-readable name for the API key")
     prefix: str = Field(description="Key prefix for identification (first 8 characters)")
     status: APIKeyStatus = Field(description="Current status (active, revoked, expired)")
@@ -98,6 +100,7 @@ class APIKeyResponse(BaseModel):
         return cls(
             id=api_key.id,
             account_id=api_key.account_id,
+            user_id=api_key.user_id,
             name=api_key.name,
             prefix=api_key.key_prefix,
             status=api_key.status,

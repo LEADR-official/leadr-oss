@@ -27,13 +27,19 @@ class APIKeyORM(Base):
     """API Key ORM model.
 
     Represents an API key for account authentication in the database.
-    Maps to the api_keys table with foreign key to accounts.
+    Maps to the api_keys table with foreign key to accounts and users.
+    Each API key is owned by a specific user within the account.
     """
 
     __tablename__ = "api_keys"
 
     account_id: Mapped[UUID] = mapped_column(
         ForeignKey("accounts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

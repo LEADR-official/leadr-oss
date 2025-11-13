@@ -32,17 +32,19 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
     async def create_api_key(
         self,
         account_id: UUID,
+        user_id: UUID,
         name: str,
         expires_at: datetime | None = None,
     ) -> tuple[APIKey, str]:
-        """Create a new API key for an account.
+        """Create a new API key for a user within an account.
 
         Generates a secure random key, hashes it for storage, and persists
         it to the database. The plain key is returned only once for the
         caller to provide to the user.
 
         Args:
-            account_id: The account ID to create the key for.
+            account_id: The account ID the key belongs to.
+            user_id: The user ID the key belongs to.
             name: A descriptive name for the key.
             expires_at: Optional expiration timestamp for the key.
 
@@ -53,6 +55,7 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         Example:
             >>> api_key, plain_key = await service.create_api_key(
             ...     account_id=account_id,
+            ...     user_id=user_id,
             ...     name="Production API Key",
             ...     expires_at=datetime.now(UTC) + timedelta(days=90)
             ... )
@@ -72,6 +75,7 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         # Create domain entity
         api_key = APIKey(
             account_id=account_id,
+            user_id=user_id,
             name=name,
             key_hash=key_hash,
             key_prefix=key_prefix,
@@ -82,6 +86,57 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         created_key = await self.repository.create(api_key)
 
         return created_key, plain_key
+
+    async def create_api_key_with_value(
+        self,
+        account_id: UUID,
+        user_id: UUID,
+        name: str,
+        key_value: str,
+        expires_at: datetime | None = None,
+    ) -> APIKey:
+        """Create a new API key with a specific key value (for bootstrap/testing).
+
+        This method is used for creating API keys with predetermined values,
+        such as during superadmin bootstrap. Unlike create_api_key, this does
+        not generate a random key and only returns the APIKey entity.
+
+        Args:
+            account_id: The account ID the key belongs to.
+            user_id: The user ID the key belongs to.
+            name: A descriptive name for the key.
+            key_value: The specific API key value to use.
+            expires_at: Optional expiration timestamp for the key.
+
+        Returns:
+            The created APIKey domain entity.
+
+        Example:
+            >>> api_key = await service.create_api_key_with_value(
+            ...     account_id=account_id,
+            ...     user_id=user_id,
+            ...     name="Superadmin Key",
+            ...     key_value="ldr_fixed_key_for_bootstrap",
+            ... )
+        """
+        # Hash the provided key
+        key_hash = hash_api_key(key_value, settings.API_KEY_SECRET)
+
+        # Extract prefix for lookup
+        key_prefix = key_value[:14]  # ldr_ + 10 chars
+
+        # Create domain entity
+        api_key = APIKey(
+            account_id=account_id,
+            user_id=user_id,
+            name=name,
+            key_hash=key_hash,
+            key_prefix=key_prefix,
+            expires_at=expires_at,
+        )
+
+        # Persist to database
+        return await self.repository.create(api_key)
 
     async def validate_api_key(self, plain_key: str) -> APIKey | None:
         """Validate an API key and return the domain entity if valid.

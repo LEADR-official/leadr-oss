@@ -17,6 +17,9 @@ class User(Entity):
     Each user belongs to exactly one account, and users cannot be
     transferred between accounts. The email must be unique within
     an account.
+
+    Superadmin users have elevated privileges and can access resources
+    across all accounts in the system.
     """
 
     account_id: UUID = Field(
@@ -24,6 +27,9 @@ class User(Entity):
     )
     email: EmailStr = Field(description="User's email address (validated format)")
     display_name: str = Field(description="User's display name (2-100 characters)")
+    super_admin: bool = Field(
+        default=False, description="Whether this user has superadmin privileges"
+    )
 
     @field_validator("display_name")
     @classmethod

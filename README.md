@@ -29,7 +29,7 @@ Whether you're building a retro arcade game, puzzle platformer, or competitive m
 Deploy our prebuilt & production-ready image to your preferred cloud host:
 
 ```plaintext
-ghcr.io/LEADR-official/leadr:latest
+ghcr.io/LEADR-official/leadr-oss:latest
 ```
 
 Or try it out locally:
@@ -39,7 +39,7 @@ Or try it out locally:
 docker run -d \
   -p 3000:3000 \
   -v leadr_data:/app/data \
-  -e LEADR_API_KEY=your-secure-api-key \
+  -e SUPERADMIN_API_KEY=ldr_your_secure_api_key \
   ghcr.io/LEADR-official/leadr:latest
 
 # Test it's working
@@ -48,11 +48,26 @@ curl http://localhost:3000/health
 
 **Required Environment Variables:**
 
-- `LEADR_API_KEY` - Your API authentication key (required)
+- `SUPERADMIN_API_KEY` - Superadmin authentication key for initial setup (must start with `ldr_`)
+- `SUPERADMIN_EMAIL` - Email for superadmin user
+
+Generate a secure API key:
+
+```bash
+# Generate a secure random API key
+echo "ldr_$(openssl rand -base64 60 | tr -d '/+=')"
+```
+
+Store this in your `.env` file:
+
+```bash
+SUPERADMIN_API_KEY=ldr_your_generated_key_here
+```
 
 **Optional Configuration:**
 
 - `DATABASE_URL` - Specify a different PostgreSQL database to connect to
+- `SUPERADMIN_ACCOUNT_NAME` - Name of system account (default: LEADR)
 
 ## API Overview
 
@@ -84,7 +99,7 @@ LEADR works with any cloud platform that supports Docker:
 - **DigitalOcean App Platform**: Simple container hosting
 - **AWS ECS/Fargate**: For enterprise scale
 
-Remember to set a strong `LEADR_API_KEY` environment variable
+Remember to set a strong `SUPERADMIN_API_KEY` environment variable (must start with `ldr_`)
 
 ______________________________________________________________________
 
@@ -102,7 +117,7 @@ docker buildx build -t leadr-api --load .
 
 # Run locally
 docker run -p 3000:3000 \
-  -e LEADR_API_KEY=your_secret_key \
+  -e SUPERADMIN_API_KEY=ldr_your_secret_key \
   leadr-api
 ```
 

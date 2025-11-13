@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
+from leadr.auth.dependencies import AuthContextDep
 from leadr.scores.api.schemas import ScoreCreateRequest, ScoreResponse, ScoreUpdateRequest
 from leadr.scores.services.dependencies import ScoreServiceDep
 
@@ -16,6 +17,7 @@ async def create_score(
     request: ScoreCreateRequest,
     service: ScoreServiceDep,
     background_tasks: BackgroundTasks,
+    auth: AuthContextDep,
 ) -> ScoreResponse:
     """Create a new score.
 
@@ -28,15 +30,24 @@ async def create_score(
                 device_id, player_name, value, and optional filters.
         service: Injected score service dependency.
         background_tasks: FastAPI background tasks for async metadata updates.
+        auth: Authentication context with user info.
 
     Returns:
         ScoreResponse with the created score including auto-generated ID and timestamps.
 
     Raises:
+        403: User does not have access to this account.
         404: Account, game, board, or device not found.
         400: Validation failed (board doesn't belong to account, or game doesn't
             match board's game).
     """
+    # Check authorization
+    if not auth.has_access_to_account(request.account_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this account",
+        )
+
     try:
         score, anti_cheat_result = await service.create_score(
             account_id=request.account_id,
@@ -75,30 +86,42 @@ async def create_score(
 async def get_score(
     score_id: UUID,
     service: ScoreServiceDep,
+    auth: AuthContextDep,
 ) -> ScoreResponse:
     """Get a score by ID.
 
     Args:
         score_id: UUID of the score to retrieve.
         service: Injected score service dependency.
+        auth: Authentication context with user info.
 
     Returns:
         ScoreResponse with the score details.
 
     Raises:
+        403: User does not have access to this score's account.
         404: Score not found or soft-deleted.
     """
     score = await service.get_by_id_or_raise(score_id)
+
+    # Check authorization
+    if not auth.has_access_to_account(score.account_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this score's account",
+        )
+
     return ScoreResponse.from_domain(score)
 
 
 @router.get("/scores", response_model=list[ScoreResponse])
 async def list_scores(
     account_id: UUID,
+    service: ScoreServiceDep,
+    auth: AuthContextDep,
     board_id: UUID | None = None,
     game_id: UUID | None = None,
     device_id: UUID | None = None,
-    service: ScoreServiceDep = None,  # type: ignore[assignment]
 ) -> list[ScoreResponse]:
     """List scores for an account with optional filters.
 
@@ -108,14 +131,25 @@ async def list_scores(
 
     Args:
         account_id: REQUIRED - Account ID to filter by (multi-tenant safety).
+        service: Injected score service dependency.
+        auth: Authentication context with user info.
         board_id: Optional board ID to filter by.
         game_id: Optional game ID to filter by.
         device_id: Optional device ID to filter by.
-        service: Injected score service dependency.
 
     Returns:
         List of ScoreResponse objects matching the filter criteria.
+
+    Raises:
+        403: User does not have access to this account.
     """
+    # Check authorization
+    if not auth.has_access_to_account(account_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this account",
+        )
+
     scores = await service.list_scores(
         account_id=account_id,
         board_id=board_id,
@@ -130,6 +164,7 @@ async def update_score(
     score_id: UUID,
     request: ScoreUpdateRequest,
     service: ScoreServiceDep,
+    auth: AuthContextDep,
 ) -> ScoreResponse:
     """Update a score.
 
@@ -140,13 +175,25 @@ async def update_score(
         score_id: UUID of the score to update.
         request: Score update details with optional fields to modify.
         service: Injected score service dependency.
+        auth: Authentication context with user info.
 
     Returns:
         ScoreResponse with the updated score details.
 
     Raises:
+        403: User does not have access to this score's account.
         404: Score not found or already soft-deleted.
     """
+    # Fetch score to check authorization
+    score = await service.get_by_id_or_raise(score_id)
+
+    # Check authorization
+    if not auth.has_access_to_account(score.account_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this score's account",
+        )
+
     # Handle soft delete
     if request.deleted is True:
         score = await service.soft_delete(score_id)

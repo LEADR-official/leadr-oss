@@ -29,6 +29,7 @@ class UserService(BaseService[User, UserRepository]):
         account_id: UUID,
         email: str,
         display_name: str,
+        super_admin: bool = False,
     ) -> User:
         """Create a new user.
 
@@ -36,6 +37,7 @@ class UserService(BaseService[User, UserRepository]):
             account_id: The account ID the user belongs to.
             email: The user's email address.
             display_name: The user's display name.
+            super_admin: Whether this user has superadmin privileges (default: False).
 
         Returns:
             The created User domain entity.
@@ -51,6 +53,7 @@ class UserService(BaseService[User, UserRepository]):
             account_id=account_id,
             email=email,
             display_name=display_name,
+            super_admin=super_admin,
         )
 
         return await self.repository.create(user)
@@ -93,6 +96,7 @@ class UserService(BaseService[User, UserRepository]):
         user_id: UUID,
         email: str | None = None,
         display_name: str | None = None,
+        super_admin: bool | None = None,
     ) -> User:
         """Update a user's information.
 
@@ -100,6 +104,7 @@ class UserService(BaseService[User, UserRepository]):
             user_id: The ID of the user to update.
             email: Optional new email address.
             display_name: Optional new display name.
+            super_admin: Optional superadmin flag.
 
         Returns:
             The updated User domain entity.
@@ -114,6 +119,8 @@ class UserService(BaseService[User, UserRepository]):
             user.email = email
         if display_name is not None:
             user.display_name = display_name
+        if super_admin is not None:
+            user.super_admin = super_admin
 
         return await self.repository.update(user)
 
@@ -127,3 +134,20 @@ class UserService(BaseService[User, UserRepository]):
             EntityNotFoundError: If the user doesn't exist.
         """
         await self.delete(user_id)
+
+    async def find_superadmins(self) -> list[User]:
+        """Find all superadmin users.
+
+        Returns:
+            List of all users with super_admin=True.
+        """
+        return await self.repository.find_superadmins()
+
+    async def superadmin_exists(self) -> bool:
+        """Check if any superadmin user exists.
+
+        Returns:
+            True if at least one superadmin exists, False otherwise.
+        """
+        superadmins = await self.find_superadmins()
+        return len(superadmins) > 0

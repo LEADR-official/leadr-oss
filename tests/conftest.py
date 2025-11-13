@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import (
 # Import all ORM models to register them with SQLAlchemy metadata
 from leadr.accounts.adapters.orm import AccountORM, UserORM  # noqa: F401
 from leadr.accounts.domain.account import Account, AccountStatus
+from leadr.accounts.services.dependencies import get_user_service
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.auth.adapters.orm import APIKeyORM  # noqa: F401
 from leadr.auth.services.dependencies import get_api_key_service
@@ -316,7 +317,7 @@ async def test_score(
 
 @pytest_asyncio.fixture
 async def test_api_key(db_session: AsyncSession) -> str:
-    """Create a test account and API key, return the plain key.
+    """Create a test account, user, and API key, return the plain key.
 
     This fixture provides a valid API key that can be used to authenticate
     requests to protected endpoints during testing.
@@ -339,10 +340,20 @@ async def test_api_key(db_session: AsyncSession) -> str:
     )
     await account_repo.create(account)
 
+    # Create test user for the API key (superadmin to allow access to all accounts)
+    user_service = await get_user_service(db_session)
+    user = await user_service.create_user(
+        account_id=account_id,
+        email=f"test-{str(account_id)[:8]}@example.com",
+        display_name="Test User",
+        super_admin=True,
+    )
+
     # Create API key using dependency factory
     service = await get_api_key_service(db_session)
     _, plain_key = await service.create_api_key(
         account_id=account_id,
+        user_id=user.id,
         name="Test API Key",
         expires_at=None,
     )

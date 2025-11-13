@@ -11,13 +11,14 @@ from api.routes import router as api_router
 from leadr.accounts.api.routes import router as accounts_router
 from leadr.auth.api.client_routes import router as client_auth_router
 from leadr.auth.api.routes import router as auth_router
+from leadr.auth.bootstrap import ensure_superadmin_exists
 from leadr.auth.dependencies import require_api_key
 from leadr.auth.services.nonce_tasks import cleanup_expired_nonces
 from leadr.boards.api.routes import router as boards_router
 from leadr.boards.services.board_tasks import expire_boards, process_due_templates
 from leadr.common.api.exceptions import entity_not_found_handler
 from leadr.common.background_tasks import get_scheduler
-from leadr.common.database import engine
+from leadr.common.database import async_session_factory, engine
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.config import settings
 from leadr.games.api.routes import router as games_router
@@ -42,6 +43,10 @@ async def lifespan(app: FastAPI):
     """Manage application lifespan events."""
     # Startup: Database engine is already created at module import
     # The engine will establish connections as needed from the pool
+
+    # Bootstrap superadmin user if none exists
+    async with async_session_factory() as session:
+        await ensure_superadmin_exists(session)
 
     # Register and start background tasks
     scheduler = get_scheduler()

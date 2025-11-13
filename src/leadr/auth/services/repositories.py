@@ -29,6 +29,7 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         return APIKey(
             id=orm.id,
             account_id=orm.account_id,
+            user_id=orm.user_id,
             name=orm.name,
             key_hash=orm.key_hash,
             key_prefix=orm.key_prefix,
@@ -45,6 +46,7 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         return APIKeyORM(
             id=entity.id,
             account_id=entity.account_id,
+            user_id=entity.user_id,
             name=entity.name,
             key_hash=entity.key_hash,
             key_prefix=entity.key_prefix,

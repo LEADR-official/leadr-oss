@@ -1,9 +1,13 @@
 """Authentication dependencies for FastAPI."""
 
+from dataclasses import dataclass
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException
 
+from leadr.accounts.domain.user import User
+from leadr.accounts.services.dependencies import UserServiceDep
 from leadr.auth.domain.api_key import APIKey
 from leadr.auth.domain.device import Device
 from leadr.auth.services.dependencies import (
@@ -13,32 +17,76 @@ from leadr.auth.services.dependencies import (
 )
 
 
+@dataclass(frozen=True)
+class AuthContext:
+    """Authentication context providing API key and user information.
+
+    This context is returned by the require_api_key dependency and provides
+    both the authenticated API key and the associated user. It includes helper
+    methods for authorization checks.
+
+    Attributes:
+        api_key: The authenticated API key entity.
+        user: The user associated with the API key.
+    """
+
+    api_key: APIKey
+    user: User
+
+    @property
+    def is_superadmin(self) -> bool:
+        """Check if the authenticated user has superadmin privileges.
+
+        Returns:
+            True if user is a superadmin, False otherwise.
+        """
+        return self.user.super_admin
+
+    def has_access_to_account(self, account_id: UUID) -> bool:
+        """Check if the authenticated user has access to a specific account.
+
+        Superadmins have access to all accounts. Regular users only have
+        access to their own account.
+
+        Args:
+            account_id: The account ID to check access for.
+
+        Returns:
+            True if user has access to the account, False otherwise.
+        """
+        return self.is_superadmin or self.api_key.account_id == account_id
+
+
 async def require_api_key(
-    service: APIKeyServiceDep,
+    api_key_service: APIKeyServiceDep,
+    user_service: UserServiceDep,
     api_key: Annotated[str | None, Header(alias="leadr-api-key")] = None,
-) -> APIKey:
+) -> AuthContext:
     """Require and validate API key authentication.
 
     This dependency validates the API key from the 'leadr-api-key' header
-    and returns the authenticated APIKey entity. It also records usage
-    of the key by updating the last_used_at timestamp.
+    and returns an AuthContext containing both the authenticated API key
+    and the associated user. It also records usage of the key by updating
+    the last_used_at timestamp.
 
     Args:
         api_key: The API key from the 'leadr-api-key' header.
-        service: APIKeyService dependency.
+        api_key_service: APIKeyService dependency.
+        user_service: UserService dependency.
 
     Returns:
-        The authenticated APIKey entity.
+        AuthContext containing the authenticated API key and user.
 
     Raises:
-        HTTPException: 401 Unauthorized if the API key is missing or invalid.
+        HTTPException: 401 Unauthorized if the API key is missing, invalid,
+            or if the associated user is not found.
 
     Example:
         >>> @router.get("/protected")
         >>> async def protected_endpoint(
-        >>>     authenticated_key: Annotated[APIKey, Depends(require_api_key)]
+        >>>     auth: AuthContextDep
         >>> ):
-        >>>     return {"account_id": authenticated_key.account_id}
+        >>>     return {"account_id": auth.api_key.account_id, "is_superadmin": auth.is_superadmin}
     """
     if api_key is None:
         raise HTTPException(
@@ -46,7 +94,7 @@ async def require_api_key(
             detail="API key required",
         )
 
-    validated_key = await service.validate_api_key(api_key)
+    validated_key = await api_key_service.validate_api_key(api_key)
 
     if validated_key is None:
         raise HTTPException(
@@ -54,7 +102,16 @@ async def require_api_key(
             detail="Invalid or expired API key",
         )
 
-    return validated_key
+    # Fetch the user associated with the API key
+    user = await user_service.get_user(validated_key.user_id)
+
+    if user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="User associated with API key not found",
+        )
+
+    return AuthContext(api_key=validated_key, user=user)
 
 
 async def require_device_token(
@@ -174,4 +231,5 @@ async def require_nonce(
 
 
 # Type aliases for dependency injection
+AuthContextDep = Annotated[AuthContext, Depends(require_api_key)]
 DeviceTokenDep = Annotated[Device, Depends(require_device_token)]

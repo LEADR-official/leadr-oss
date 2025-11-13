@@ -21,28 +21,34 @@ class TestCreateAPIKeyRequest:
     def test_create_request_with_all_fields(self):
         """Test creating request with all fields."""
         account_id = uuid4()
+        user_id = uuid4()
         expires_at = datetime.now(UTC) + timedelta(days=90)
 
         request = CreateAPIKeyRequest(
             account_id=account_id,
+            user_id=user_id,
             name="Production Key",
             expires_at=expires_at,
         )
 
         assert request.account_id == account_id
+        assert request.user_id == user_id
         assert request.name == "Production Key"
         assert request.expires_at == expires_at
 
     def test_create_request_without_expiration(self):
         """Test creating request without expiration."""
         account_id = uuid4()
+        user_id = uuid4()
 
         request = CreateAPIKeyRequest(
             account_id=account_id,
+            user_id=user_id,
             name="Production Key",
         )
 
         assert request.account_id == account_id
+        assert request.user_id == user_id
         assert request.name == "Production Key"
         assert request.expires_at is None
 
@@ -134,6 +140,7 @@ class TestAPIKeyResponse:
         """Test creating response with all fields."""
         key_id = uuid4()
         account_id = uuid4()
+        user_id = uuid4()
         last_used_at = datetime.now(UTC) - timedelta(hours=1)
         expires_at = datetime.now(UTC) + timedelta(days=90)
         created_at = datetime.now(UTC) - timedelta(days=30)
@@ -142,6 +149,7 @@ class TestAPIKeyResponse:
         response = APIKeyResponse(
             id=key_id,
             account_id=account_id,
+            user_id=user_id,
             name="Production Key",
             prefix="ldr_test123456",
             status=APIKeyStatus.ACTIVE,
@@ -153,6 +161,7 @@ class TestAPIKeyResponse:
 
         assert response.id == key_id
         assert response.account_id == account_id
+        assert response.user_id == user_id
         assert response.name == "Production Key"
         assert response.prefix == "ldr_test123456"
         assert response.status == APIKeyStatus.ACTIVE
@@ -165,12 +174,14 @@ class TestAPIKeyResponse:
         """Test creating response without optional fields."""
         key_id = uuid4()
         account_id = uuid4()
+        user_id = uuid4()
         created_at = datetime.now(UTC)
         updated_at = datetime.now(UTC)
 
         response = APIKeyResponse(
             id=key_id,
             account_id=account_id,
+            user_id=user_id,
             name="Production Key",
             prefix="ldr_test123456",
             status=APIKeyStatus.ACTIVE,
@@ -185,6 +196,7 @@ class TestAPIKeyResponse:
         """Test that APIKeyResponse does not have key_hash field."""
         key_id = uuid4()
         account_id = uuid4()
+        user_id = uuid4()
         created_at = datetime.now(UTC)
         updated_at = datetime.now(UTC)
 
@@ -193,6 +205,7 @@ class TestAPIKeyResponse:
             data = {
                 "id": key_id,
                 "account_id": account_id,
+                "user_id": user_id,
                 "name": "Production Key",
                 "prefix": "ldr_test123456",
                 "status": APIKeyStatus.ACTIVE,

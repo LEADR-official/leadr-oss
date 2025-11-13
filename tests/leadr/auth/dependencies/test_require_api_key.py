@@ -9,9 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
+from leadr.accounts.services.user_service import UserService
 from leadr.auth.dependencies import require_api_key
 from leadr.auth.domain.api_key import APIKeyStatus
-from leadr.auth.services.dependencies import get_api_key_service
+from leadr.auth.services.api_key_service import APIKeyService
 
 
 @pytest.mark.asyncio
@@ -20,9 +21,12 @@ class TestRequireAPIKey:
 
     async def test_missing_api_key_header_raises_401(self, db_session: AsyncSession):
         """Test that missing API key header raises 401 Unauthorized."""
-        service = await get_api_key_service(db_session)
+        api_key_service = APIKeyService(db_session)
+        user_service = UserService(db_session)
         with pytest.raises(HTTPException) as exc_info:
-            await require_api_key(service=service, api_key=None)
+            await require_api_key(
+                api_key_service=api_key_service, user_service=user_service, api_key=None
+            )
 
         assert exc_info.value.status_code == 401
         assert "required" in exc_info.value.detail.lower()
@@ -44,16 +48,29 @@ class TestRequireAPIKey:
         )
         await account_repo.create(account)
 
-        service = await get_api_key_service(db_session)
-        await service.create_api_key(
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
             account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
+        api_key_service = APIKeyService(db_session)
+        await api_key_service.create_api_key(
+            account_id=account_id,
+            user_id=user.id,
             name="Valid Key",
             expires_at=None,
         )
 
         # Try with a completely invalid key
         with pytest.raises(HTTPException) as exc_info:
-            await require_api_key(service=service, api_key="ldr_invalidkey123456")
+            await require_api_key(
+                api_key_service=api_key_service,
+                user_service=user_service,
+                api_key="ldr_invalidkey123456",
+            )
 
         assert exc_info.value.status_code == 401
         assert "invalid" in exc_info.value.detail.lower()
@@ -75,22 +92,34 @@ class TestRequireAPIKey:
         )
         await account_repo.create(account)
 
-        # Create API key
-        service = await get_api_key_service(db_session)
-        api_key, plain_key = await service.create_api_key(
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
             account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
+        # Create API key
+        api_key_service = APIKeyService(db_session)
+        api_key, plain_key = await api_key_service.create_api_key(
+            account_id=account_id,
+            user_id=user.id,
             name="Test Key",
             expires_at=None,
         )
 
         # Use the dependency
-        result = await require_api_key(service=service, api_key=plain_key)
+        result = await require_api_key(
+            api_key_service=api_key_service, user_service=user_service, api_key=plain_key
+        )
 
-        # Should return the APIKey entity
-        assert result.id == api_key.id
-        assert result.account_id == account_id
-        assert result.name == "Test Key"
-        assert result.status == APIKeyStatus.ACTIVE
+        # Should return AuthContext with APIKey and User
+        assert result.api_key.id == api_key.id
+        assert result.api_key.account_id == account_id
+        assert result.api_key.name == "Test Key"
+        assert result.api_key.status == APIKeyStatus.ACTIVE
+        assert result.user.id == user.id
 
     async def test_expired_api_key_raises_401(self, db_session: AsyncSession):
         """Test that an expired API key raises 401 Unauthorized."""
@@ -109,18 +138,29 @@ class TestRequireAPIKey:
         )
         await account_repo.create(account)
 
-        # Create expired API key
-        service = await get_api_key_service(db_session)
-        expired_time = now - timedelta(days=1)
-        api_key, plain_key = await service.create_api_key(
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
             account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
+        # Create expired API key
+        api_key_service = APIKeyService(db_session)
+        expired_time = now - timedelta(days=1)
+        api_key, plain_key = await api_key_service.create_api_key(
+            account_id=account_id,
+            user_id=user.id,
             name="Expired Key",
             expires_at=expired_time,
         )
 
         # Try to use expired key
         with pytest.raises(HTTPException) as exc_info:
-            await require_api_key(service=service, api_key=plain_key)
+            await require_api_key(
+                api_key_service=api_key_service, user_service=user_service, api_key=plain_key
+            )
 
         assert exc_info.value.status_code == 401
         assert (
@@ -144,20 +184,31 @@ class TestRequireAPIKey:
         )
         await account_repo.create(account)
 
-        # Create and revoke API key
-        service = await get_api_key_service(db_session)
-        api_key, plain_key = await service.create_api_key(
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
             account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
+        # Create and revoke API key
+        api_key_service = APIKeyService(db_session)
+        api_key, plain_key = await api_key_service.create_api_key(
+            account_id=account_id,
+            user_id=user.id,
             name="To Be Revoked",
             expires_at=None,
         )
 
         # Revoke it
-        await service.revoke_api_key(api_key.id)
+        await api_key_service.revoke_api_key(api_key.id)
 
         # Try to use revoked key
         with pytest.raises(HTTPException) as exc_info:
-            await require_api_key(service=service, api_key=plain_key)
+            await require_api_key(
+                api_key_service=api_key_service, user_service=user_service, api_key=plain_key
+            )
 
         assert exc_info.value.status_code == 401
         assert (
@@ -181,20 +232,31 @@ class TestRequireAPIKey:
         )
         await account_repo.create(account)
 
-        # Create and soft-delete API key
-        service = await get_api_key_service(db_session)
-        api_key, plain_key = await service.create_api_key(
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
             account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
+        # Create and soft-delete API key
+        api_key_service = APIKeyService(db_session)
+        api_key, plain_key = await api_key_service.create_api_key(
+            account_id=account_id,
+            user_id=user.id,
             name="To Be Deleted",
             expires_at=None,
         )
 
         # Soft delete it
-        await service.soft_delete(api_key.id)
+        await api_key_service.soft_delete(api_key.id)
 
         # Try to use deleted key
         with pytest.raises(HTTPException) as exc_info:
-            await require_api_key(service=service, api_key=plain_key)
+            await require_api_key(
+                api_key_service=api_key_service, user_service=user_service, api_key=plain_key
+            )
 
         assert exc_info.value.status_code == 401
         assert "invalid" in exc_info.value.detail.lower()
@@ -216,10 +278,19 @@ class TestRequireAPIKey:
         )
         await account_repo.create(account)
 
-        # Create API key
-        service = await get_api_key_service(db_session)
-        api_key, plain_key = await service.create_api_key(
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
             account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
+        # Create API key
+        api_key_service = APIKeyService(db_session)
+        api_key, plain_key = await api_key_service.create_api_key(
+            account_id=account_id,
+            user_id=user.id,
             name="Test Key",
             expires_at=None,
         )
@@ -228,10 +299,12 @@ class TestRequireAPIKey:
         assert api_key.last_used_at is None
 
         # Use the dependency
-        await require_api_key(service=service, api_key=plain_key)
+        await require_api_key(
+            api_key_service=api_key_service, user_service=user_service, api_key=plain_key
+        )
 
         # Refresh the key from DB to get updated timestamp
-        updated_key = await service.get_by_id_or_raise(api_key.id)
+        updated_key = await api_key_service.get_by_id_or_raise(api_key.id)
 
         # Verify last_used_at was updated
         assert updated_key.last_used_at is not None
