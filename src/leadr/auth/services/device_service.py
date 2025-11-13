@@ -261,3 +261,180 @@ class DeviceService(BaseService[Device, DeviceRepository]):
 
         expires_in_seconds = int(access_expires_delta.total_seconds())
         return access_token_plain, new_refresh_token_plain, expires_in_seconds
+
+    async def list_devices(
+        self,
+        account_id: UUID,
+        game_id: UUID | None = None,
+        status: str | None = None,
+    ) -> list[Device]:
+        """List devices for an account with optional filters.
+
+        Args:
+            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            game_id: Optional game ID to filter by
+            status: Optional status to filter by (active, banned, suspended)
+
+        Returns:
+            List of devices matching the filter criteria
+
+        Example:
+            >>> devices = await service.list_devices(
+            ...     account_id=account.id,
+            ...     status="active",
+            ... )
+        """
+        return await self.repository.filter(
+            account_id=account_id,
+            game_id=game_id,
+            status=status,
+        )
+
+    async def get_device(self, device_id: UUID) -> Device | None:
+        """Get a device by its ID.
+
+        Args:
+            device_id: The ID of the device to retrieve
+
+        Returns:
+            The device if found, None otherwise
+
+        Example:
+            >>> device = await service.get_device(device_id)
+        """
+        return await self.get_by_id(device_id)
+
+    async def ban_device(self, device_id: UUID) -> Device:
+        """Ban a device, preventing further authentication.
+
+        Args:
+            device_id: The ID of the device to ban
+
+        Returns:
+            The updated device
+
+        Raises:
+            EntityNotFoundError: If the device doesn't exist
+
+        Example:
+            >>> device = await service.ban_device(device_id)
+        """
+        device = await self.get_by_id_or_raise(device_id)
+        device.ban()
+        return await self.repository.update(device)
+
+    async def suspend_device(self, device_id: UUID) -> Device:
+        """Suspend a device temporarily.
+
+        Args:
+            device_id: The ID of the device to suspend
+
+        Returns:
+            The updated device
+
+        Raises:
+            EntityNotFoundError: If the device doesn't exist
+
+        Example:
+            >>> device = await service.suspend_device(device_id)
+        """
+        device = await self.get_by_id_or_raise(device_id)
+        device.suspend()
+        return await self.repository.update(device)
+
+    async def activate_device(self, device_id: UUID) -> Device:
+        """Activate a device, allowing authentication.
+
+        Args:
+            device_id: The ID of the device to activate
+
+        Returns:
+            The updated device
+
+        Raises:
+            EntityNotFoundError: If the device doesn't exist
+
+        Example:
+            >>> device = await service.activate_device(device_id)
+        """
+        device = await self.get_by_id_or_raise(device_id)
+        device.activate()
+        return await self.repository.update(device)
+
+    async def list_sessions(
+        self,
+        account_id: UUID,
+        device_id: UUID | None = None,
+    ) -> list[DeviceSession]:
+        """List device sessions for an account with optional filters.
+
+        Args:
+            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            device_id: Optional device ID to filter by
+
+        Returns:
+            List of device sessions matching the filter criteria
+
+        Example:
+            >>> sessions = await service.list_sessions(
+            ...     account_id=account.id,
+            ...     device_id=device.id,
+            ... )
+        """
+        return await self.session_repo.filter(
+            account_id=account_id,
+            device_id=device_id,
+        )
+
+    async def get_session(self, session_id: UUID) -> DeviceSession | None:
+        """Get a device session by its ID.
+
+        Args:
+            session_id: The ID of the session to retrieve
+
+        Returns:
+            The session if found, None otherwise
+
+        Example:
+            >>> session = await service.get_session(session_id)
+        """
+        return await self.session_repo.get_by_id(session_id)
+
+    async def get_session_or_raise(self, session_id: UUID) -> DeviceSession:
+        """Get a device session by its ID or raise EntityNotFoundError.
+
+        Args:
+            session_id: The ID of the session to retrieve
+
+        Returns:
+            The session
+
+        Raises:
+            EntityNotFoundError: If the session doesn't exist
+
+        Example:
+            >>> session = await service.get_session_or_raise(session_id)
+        """
+        session = await self.session_repo.get_by_id(session_id)
+        if not session:
+            raise EntityNotFoundError("DeviceSession", str(session_id))
+        return session
+
+    async def revoke_session(self, session_id: UUID) -> DeviceSession:
+        """Revoke a device session.
+
+        Args:
+            session_id: The ID of the session to revoke
+
+        Returns:
+            The updated session
+
+        Raises:
+            EntityNotFoundError: If the session doesn't exist
+
+        Example:
+            >>> session = await service.revoke_session(session_id)
+        """
+        session = await self.get_session_or_raise(session_id)
+        session.revoke()
+        return await self.session_repo.update(session)

@@ -49,22 +49,48 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
         return ScoreSubmissionMetaORM
 
     async def filter(
-        self, account_id: UUID4 | None = None, **kwargs: Any
+        self,
+        account_id: UUID4,
+        board_id: UUID | None = None,
+        device_id: UUID | None = None,
+        **kwargs: Any,
     ) -> list[ScoreSubmissionMeta]:
-        """Filter submission metadata (not typically used for this entity).
+        """Filter submission metadata by account and optional criteria.
+
+        Joins with scores table to filter by account_id since submission meta doesn't have
+        a direct account relation.
 
         Args:
-            account_id: Optional account ID (unused - submission meta doesn't
-                have direct account relation)
+            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            board_id: Optional board ID to filter by
+            device_id: Optional device ID to filter by
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            Empty list (this entity uses specialized queries like
-                get_by_device_and_board)
+            List of submission metadata for the account matching the filter criteria
         """
-        # This entity is typically queried via get_by_device_and_board
-        # rather than filtered by account
-        return []
+        from leadr.scores.adapters.orm import ScoreORM
+
+        # Join with scores table to filter by account
+        query = (
+            select(ScoreSubmissionMetaORM)
+            .join(ScoreORM, ScoreSubmissionMetaORM.score_id == ScoreORM.id)
+            .where(
+                ScoreORM.account_id == account_id,
+                ScoreSubmissionMetaORM.deleted_at.is_(None),
+            )
+        )
+
+        # Apply optional filters
+        if board_id is not None:
+            query = query.where(ScoreSubmissionMetaORM.board_id == board_id)
+
+        if device_id is not None:
+            query = query.where(ScoreSubmissionMetaORM.device_id == device_id)
+
+        result = await self.session.execute(query)
+        orms = result.scalars().all()
+        return [self._to_domain(orm) for orm in orms]
 
     async def get_by_device_and_board(
         self, device_id: UUID, board_id: UUID

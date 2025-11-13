@@ -10,6 +10,8 @@ from fastapi import APIRouter, Depends, FastAPI
 from api.routes import router as api_router
 from leadr.accounts.api.routes import router as accounts_router
 from leadr.auth.api.client_routes import router as client_auth_router
+from leadr.auth.api.device_routes import router as device_router
+from leadr.auth.api.device_session_routes import router as device_session_router
 from leadr.auth.api.routes import router as auth_router
 from leadr.auth.bootstrap import ensure_superadmin_exists
 from leadr.auth.dependencies import require_api_key
@@ -24,6 +26,7 @@ from leadr.config import settings
 from leadr.games.api.routes import router as games_router
 from leadr.scores.api.routes import router as scores_router
 from leadr.scores.api.score_flag_routes import router as score_flags_router
+from leadr.scores.api.score_submission_meta_routes import router as score_submission_meta_router
 
 # Configure logging from YAML file
 log_config_path = Path(__file__).parent / "logging.yaml"
@@ -113,6 +116,9 @@ admin_router.include_router(games_router, tags=["Games"])
 admin_router.include_router(boards_router, tags=["Boards"])
 admin_router.include_router(scores_router, tags=["Scores"])
 admin_router.include_router(score_flags_router, tags=["Score Flags"])
+admin_router.include_router(score_submission_meta_router, tags=["Score Submission Metadata"])
+admin_router.include_router(device_router, tags=["Devices"])
+admin_router.include_router(device_session_router, tags=["Device Sessions"])
 
 # Include public router (always available)
 app.include_router(public_router, prefix=settings.API_PREFIX)

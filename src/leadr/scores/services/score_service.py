@@ -185,13 +185,15 @@ class ScoreService(BaseService[Score, ScoreRepository]):
 
         # Create flag if score was flagged
         if anti_cheat_result.action == FlagAction.FLAG:
+            from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
+
             flag_repo = ScoreFlagRepository(self.repository.session)
             flag = ScoreFlag(
                 score_id=saved_score.id,
                 flag_type=anti_cheat_result.flag_type,  # type: ignore[arg-type]
                 confidence=anti_cheat_result.confidence,  # type: ignore[arg-type]
                 metadata=anti_cheat_result.metadata or {},
-                status="PENDING",
+                status=ScoreFlagStatus.PENDING,
             )
             await flag_repo.create(flag)
 
