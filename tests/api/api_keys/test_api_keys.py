@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
+from leadr.accounts.services.user_service import UserService
 
 
 @pytest.mark.asyncio
@@ -34,11 +35,20 @@ class TestCreateAPIKey:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API key
         response = await authenticated_client.post(
             "/api-keys",
             json={
                 "account_id": str(account_id),
+                "user_id": str(user.id),
                 "name": "Test API Key",
             },
         )
@@ -73,12 +83,21 @@ class TestCreateAPIKey:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API key with expiration
         expires_at = now + timedelta(days=90)
         response = await authenticated_client.post(
             "/api-keys",
             json={
                 "account_id": str(account_id),
+                "user_id": str(user.id),
                 "name": "Temporary Key",
                 "expires_at": expires_at.isoformat(),
             },
@@ -120,10 +139,19 @@ class TestCreateAPIKey:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         response = await authenticated_client.post(
             "/api-keys",
             json={
                 "account_id": str(account_id),
+                "user_id": str(user.id),
             },
         )
 
@@ -145,12 +173,14 @@ class TestCreateAPIKey:
 
     async def test_create_api_key_nonexistent_account(self, authenticated_client: AsyncClient):
         """Test creating an API key for non-existent account returns 404."""
-        non_existent_id = uuid4()
+        non_existent_account_id = uuid4()
+        non_existent_user_id = uuid4()
 
         response = await authenticated_client.post(
             "/api-keys",
             json={
-                "account_id": str(non_existent_id),
+                "account_id": str(non_existent_account_id),
+                "user_id": str(non_existent_user_id),
                 "name": "Test API Key",
             },
         )
@@ -177,11 +207,20 @@ class TestCreateAPIKey:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API key
         create_response = await authenticated_client.post(
             "/api-keys",
             json={
                 "account_id": str(account_id),
+                "user_id": str(user.id),
                 "name": "Test API Key",
             },
         )
@@ -239,6 +278,19 @@ class TestListAPIKeys:
         )
         await account_repo.create(account2)
 
+        # Create users for both accounts
+        user_service = UserService(db_session)
+        user1 = await user_service.create_user(
+            account_id=account1.id,
+            email=f"test-{str(account1_id)[:8]}@example.com",
+            display_name="Test User 1",
+        )
+        user2 = await user_service.create_user(
+            account_id=account2.id,
+            email=f"test-{str(account2_id)[:8]}@example.com",
+            display_name="Test User 2",
+        )
+
         # Create API keys for both accounts
         # Account 1: 3 keys
         for i in range(3):
@@ -246,6 +298,7 @@ class TestListAPIKeys:
                 "/api-keys",
                 json={
                     "account_id": str(account1_id),
+                    "user_id": str(user1.id),
                     "name": f"Account 1 Key {i + 1}",
                 },
             )
@@ -256,6 +309,7 @@ class TestListAPIKeys:
                 "/api-keys",
                 json={
                     "account_id": str(account2_id),
+                    "user_id": str(user2.id),
                     "name": f"Account 2 Key {i + 1}",
                 },
             )
@@ -299,6 +353,14 @@ class TestListAPIKeys:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create multiple API keys
         created_keys = []
         for i in range(3):
@@ -306,6 +368,7 @@ class TestListAPIKeys:
                 "/api-keys",
                 json={
                     "account_id": str(account_id),
+                    "user_id": str(user.id),
                     "name": f"Test Key {i + 1}",
                 },
             )
@@ -344,12 +407,21 @@ class TestListAPIKeys:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API keys
         for i in range(2):
             await authenticated_client.post(
                 "/api-keys",
                 json={
                     "account_id": str(account_id),
+                    "user_id": str(user.id),
                     "name": f"Test Key {i + 1}",
                 },
             )
@@ -385,12 +457,21 @@ class TestListAPIKeys:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create 3 API keys
         for i in range(3):
             await authenticated_client.post(
                 "/api-keys",
                 json={
                     "account_id": str(account_id),
+                    "user_id": str(user.id),
                     "name": f"Test Key {i + 1}",
                 },
             )
@@ -446,11 +527,20 @@ class TestGetSingleAPIKey:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create an API key
         create_response = await authenticated_client.post(
             "/api-keys",
             json={
                 "account_id": str(account_id),
+                "user_id": str(user.id),
                 "name": "Test API Key",
             },
         )
@@ -501,12 +591,21 @@ class TestGetSingleAPIKey:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create an API key with expiration
         expires_at = now + timedelta(days=90)
         create_response = await authenticated_client.post(
             "/api-keys",
             json={
                 "account_id": str(account_id),
+                "user_id": str(user.id),
                 "name": "Test API Key",
                 "expires_at": expires_at.isoformat(),
             },
@@ -556,11 +655,20 @@ class TestUpdateAPIKey:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create an API key
         create_response = await authenticated_client.post(
             "/api-keys",
             json={
                 "account_id": str(account_id),
+                "user_id": str(user.id),
                 "name": "Test API Key",
             },
         )
@@ -609,11 +717,20 @@ class TestUpdateAPIKey:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create an API key
         create_response = await authenticated_client.post(
             "/api-keys",
             json={
                 "account_id": str(account_id),
+                "user_id": str(user.id),
                 "name": "Test API Key",
             },
         )
@@ -645,11 +762,20 @@ class TestUpdateAPIKey:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create an API key
         create_response = await authenticated_client.post(
             "/api-keys",
             json={
                 "account_id": str(account_id),
+                "user_id": str(user.id),
                 "name": "Test API Key",
             },
         )
@@ -682,11 +808,20 @@ class TestUpdateAPIKey:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create an API key
         create_response = await authenticated_client.post(
             "/api-keys",
             json={
                 "account_id": str(account_id),
+                "user_id": str(user.id),
                 "name": "Test API Key",
             },
         )
@@ -728,11 +863,20 @@ class TestUpdateAPIKey:
         )
         await account_repo.create(account)
 
+        # Create a user
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account.id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create an API key
         create_response = await authenticated_client.post(
             "/api-keys",
             json={
                 "account_id": str(account_id),
+                "user_id": str(user.id),
                 "name": "Original Name",
             },
         )

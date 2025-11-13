@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
+from leadr.accounts.services.user_service import UserService
 from leadr.auth.services.api_key_service import APIKeyService
 
 
@@ -64,10 +65,20 @@ class TestAPIAuthentication:
         )
         await account_repo.create(account)
 
+        # Create user for API key (superadmin to allow creating accounts)
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+            super_admin=True,
+        )
+
         # Create API key
         service = APIKeyService(db_session)
         api_key, plain_key = await service.create_api_key(
             account_id=account_id,
+            user_id=user.id,
             name="Test Key",
             expires_at=None,
         )

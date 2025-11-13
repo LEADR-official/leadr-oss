@@ -22,9 +22,11 @@ class APIKey(Entity):
     Represents an API key used to authenticate requests to the admin API.
     Each account can have multiple API keys for different purposes.
     Keys are stored hashed for security and shown only once at creation.
+    Each API key is owned by a specific user within the account.
     """
 
     account_id: UUID
+    user_id: UUID
     name: str
     key_hash: str
     key_prefix: str

@@ -25,12 +25,14 @@ class TestAPIKey:
         """Test creating an API key with all required fields."""
         key_id = uuid4()
         account_id = uuid4()
+        user_id = uuid4()
         now = datetime.now(UTC)
         expires_at = now + timedelta(days=90)
 
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=user_id,
             name="Production API Key",
             key_hash="hashed_key_value",
             key_prefix="ldr_abc",
@@ -43,6 +45,7 @@ class TestAPIKey:
 
         assert api_key.id == key_id
         assert api_key.account_id == account_id
+        assert api_key.user_id == user_id
         assert api_key.name == "Production API Key"
         assert api_key.key_hash == "hashed_key_value"
         assert api_key.key_prefix == "ldr_abc"
@@ -61,6 +64,7 @@ class TestAPIKey:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_test",
@@ -105,6 +109,25 @@ class TestAPIKey:
 
         assert "account_id" in str(exc_info.value)
 
+    def test_api_key_user_id_required(self):
+        """Test that user_id is required."""
+        key_id = uuid4()
+        account_id = uuid4()
+        now = datetime.now(UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            APIKey(  # type: ignore[call-arg]
+                id=key_id,
+                account_id=account_id,
+                name="Test Key",
+                key_hash="hash",
+                key_prefix="ldr_test",
+                created_at=now,
+                updated_at=now,
+            )
+
+        assert "user_id" in str(exc_info.value)
+
     def test_api_key_hash_required(self):
         """Test that key_hash is required."""
         key_id = uuid4()
@@ -115,6 +138,7 @@ class TestAPIKey:
             APIKey(  # type: ignore[call-arg]
                 id=key_id,
                 account_id=account_id,
+                user_id=uuid4(),
                 name="Test Key",
                 key_prefix="ldr_test",
                 created_at=now,
@@ -133,6 +157,7 @@ class TestAPIKey:
             APIKey(  # type: ignore[call-arg]
                 id=key_id,
                 account_id=account_id,
+                user_id=uuid4(),
                 name="Test Key",
                 key_hash="hash",
                 created_at=now,
@@ -151,6 +176,7 @@ class TestAPIKey:
             APIKey(
                 id=key_id,
                 account_id=account_id,
+                user_id=uuid4(),
                 name="Test Key",
                 key_hash="hash",
                 key_prefix="invalid_prefix",
@@ -170,6 +196,7 @@ class TestAPIKey:
         api_key1 = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Key 1",
             key_hash="hash1",
             key_prefix="ldr_abc",
@@ -180,6 +207,7 @@ class TestAPIKey:
         api_key2 = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Key 2",
             key_hash="hash2",
             key_prefix="ldr_xyz",
@@ -197,6 +225,7 @@ class TestAPIKey:
         api_key1 = APIKey(
             id=uuid4(),
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -207,6 +236,7 @@ class TestAPIKey:
         api_key2 = APIKey(
             id=uuid4(),
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -225,6 +255,7 @@ class TestAPIKey:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -249,6 +280,7 @@ class TestAPIKey:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -271,6 +303,7 @@ class TestAPIKey:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -291,6 +324,7 @@ class TestAPIKey:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -310,6 +344,7 @@ class TestAPIKey:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -330,6 +365,7 @@ class TestAPIKey:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -350,6 +386,7 @@ class TestAPIKey:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -370,6 +407,7 @@ class TestAPIKey:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -390,6 +428,7 @@ class TestAPIKey:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -414,6 +453,7 @@ class TestAPIKey:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",
@@ -435,6 +475,7 @@ class TestAPIKey:
         api_key = APIKey(
             id=key_id,
             account_id=account_id,
+            user_id=uuid4(),
             name="Test Key",
             key_hash="hash",
             key_prefix="ldr_abc",

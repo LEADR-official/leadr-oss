@@ -85,6 +85,7 @@ async def ensure_superadmin_exists(session: AsyncSession) -> None:
     api_key_service = APIKeyService(session)
     api_key = await api_key_service.create_api_key_with_value(
         account_id=account.id,
+        user_id=user.id,
         name=settings.SUPERADMIN_API_KEY_NAME,
         key_value=settings.SUPERADMIN_API_KEY,
     )

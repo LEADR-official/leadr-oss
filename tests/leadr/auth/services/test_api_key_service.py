@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
+from leadr.accounts.services.user_service import UserService
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.api_key_service import APIKeyService
 from leadr.common.domain.exceptions import EntityNotFoundError
@@ -34,10 +35,19 @@ class TestAPIKeyService:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API key via service
         service = APIKeyService(db_session)
         api_key, plain_key = await service.create_api_key(
             account_id=account_id,
+            user_id=user.id,
             name="Production Key",
             expires_at=None,
         )
@@ -75,12 +85,21 @@ class TestAPIKeyService:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API key with expiration
         service = APIKeyService(db_session)
         expires_at = now + timedelta(days=90)
 
         api_key, _ = await service.create_api_key(
             account_id=account_id,
+            user_id=user.id,
             name="Temporary Key",
             expires_at=expires_at,
         )
@@ -105,10 +124,19 @@ class TestAPIKeyService:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API key
         service = APIKeyService(db_session)
         api_key, plain_key = await service.create_api_key(
             account_id=account_id,
+            user_id=user.id,
             name="Test Key",
         )
 
@@ -145,9 +173,18 @@ class TestAPIKeyService:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         service = APIKeyService(db_session)
         api_key, plain_key = await service.create_api_key(
             account_id=account_id,
+            user_id=user.id,
             name="Test Key",
         )
 
@@ -174,9 +211,18 @@ class TestAPIKeyService:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         service = APIKeyService(db_session)
         api_key, plain_key = await service.create_api_key(
             account_id=account_id,
+            user_id=user.id,
             name="Test Key",
         )
 
@@ -205,12 +251,21 @@ class TestAPIKeyService:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API key with past expiration
         service = APIKeyService(db_session)
         past_date = now - timedelta(days=1)
 
         api_key, plain_key = await service.create_api_key(
             account_id=account_id,
+            user_id=user.id,
             name="Expired Key",
             expires_at=past_date,
         )
@@ -237,9 +292,18 @@ class TestAPIKeyService:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         service = APIKeyService(db_session)
         api_key, _ = await service.create_api_key(
             account_id=account_id,
+            user_id=user.id,
             name="Test Key",
         )
 
@@ -276,10 +340,18 @@ class TestAPIKeyService:
         )
         await account_repo.create(account)
 
+        # Create user for API keys
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create multiple API keys
         service = APIKeyService(db_session)
-        await service.create_api_key(account_id, "Production Key")
-        await service.create_api_key(account_id, "Development Key")
+        await service.create_api_key(account_id, user.id, "Production Key")
+        await service.create_api_key(account_id, user.id, "Development Key")
 
         # List them
         keys = await service.list_account_api_keys(account_id)
@@ -306,10 +378,18 @@ class TestAPIKeyService:
         )
         await account_repo.create(account)
 
+        # Create user for API keys
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API keys
         service = APIKeyService(db_session)
-        active_key, _ = await service.create_api_key(account_id, "Active Key")
-        revoked_key, _ = await service.create_api_key(account_id, "Revoked Key")
+        active_key, _ = await service.create_api_key(account_id, user.id, "Active Key")
+        revoked_key, _ = await service.create_api_key(account_id, user.id, "Revoked Key")
 
         # Revoke one
         await service.revoke_api_key(revoked_key.id)
@@ -337,11 +417,19 @@ class TestAPIKeyService:
         )
         await account_repo.create(account)
 
+        # Create user for API keys
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         # Create API keys
         service = APIKeyService(db_session)
-        await service.create_api_key(account_id, "Key 1")
-        await service.create_api_key(account_id, "Key 2")
-        key3, _ = await service.create_api_key(account_id, "Key 3")
+        await service.create_api_key(account_id, user.id, "Key 1")
+        await service.create_api_key(account_id, user.id, "Key 2")
+        key3, _ = await service.create_api_key(account_id, user.id, "Key 3")
 
         # Revoke one
         await service.revoke_api_key(key3.id)
@@ -368,8 +456,16 @@ class TestAPIKeyService:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         service = APIKeyService(db_session)
-        api_key, _ = await service.create_api_key(account_id, "Test Key")
+        api_key, _ = await service.create_api_key(account_id, user.id, "Test Key")
 
         assert api_key.status == APIKeyStatus.ACTIVE
 
@@ -400,8 +496,16 @@ class TestAPIKeyService:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         service = APIKeyService(db_session)
-        api_key, _ = await service.create_api_key(account_id, "Test Key")
+        api_key, _ = await service.create_api_key(account_id, user.id, "Test Key")
 
         assert api_key.last_used_at is None
 
@@ -433,8 +537,16 @@ class TestAPIKeyService:
         )
         await account_repo.create(account)
 
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
         service = APIKeyService(db_session)
-        api_key, plain_key = await service.create_api_key(account_id, "Test Key")
+        api_key, plain_key = await service.create_api_key(account_id, user.id, "Test Key")
 
         assert api_key.last_used_at is None
 
