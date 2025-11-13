@@ -95,7 +95,11 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
 
     def _to_domain(self, orm: ScoreFlagORM) -> ScoreFlag:
         """Convert ORM model to domain entity."""
-        from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType
+        from leadr.scores.domain.anti_cheat.enums import (
+            FlagConfidence,
+            FlagType,
+            ScoreFlagStatus,
+        )
 
         return ScoreFlag(
             id=orm.id,
@@ -103,7 +107,7 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
             flag_type=FlagType(orm.flag_type),
             confidence=FlagConfidence(orm.confidence),
             metadata=orm.flag_metadata,
-            status=orm.status,
+            status=ScoreFlagStatus(orm.status),
             reviewed_at=orm.reviewed_at,
             reviewer_id=orm.reviewer_id,
             reviewer_decision=orm.reviewer_decision,
@@ -120,7 +124,7 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
             flag_type=entity.flag_type.value,
             confidence=entity.confidence.value,
             flag_metadata=entity.metadata,
-            status=entity.status,
+            status=entity.status.value,
             reviewed_at=entity.reviewed_at,
             reviewer_id=entity.reviewer_id,
             reviewer_decision=entity.reviewer_decision,
@@ -133,21 +137,59 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
         """Get the ORM model class."""
         return ScoreFlagORM
 
-    async def filter(self, account_id: UUID4 | None = None, **kwargs: Any) -> list[ScoreFlag]:
-        """Filter flags (not typically used for this entity).
+    async def filter(
+        self,
+        account_id: UUID4,
+        board_id: UUID | None = None,
+        game_id: UUID | None = None,
+        status: str | None = None,
+        flag_type: str | None = None,
+        **kwargs: Any,
+    ) -> list[ScoreFlag]:
+        """Filter flags by account and optional criteria.
+
+        Joins with scores table to filter by account_id since flags don't have
+        a direct account relation.
 
         Args:
-            account_id: Optional account ID (unused - flags don't have direct
-                account relation)
+            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            board_id: Optional board ID to filter by
+            game_id: Optional game ID to filter by
+            status: Optional status to filter by (PENDING, CONFIRMED_CHEAT, etc.)
+            flag_type: Optional flag type to filter by (VELOCITY, DUPLICATE, etc.)
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            Empty list (this entity uses specialized queries like
-                get_flags_by_score_id, get_pending_flags)
+            List of flags for the account matching the filter criteria
         """
-        # This entity is typically queried via get_flags_by_score_id or get_pending_flags
-        # rather than filtered by account
-        return []
+        from leadr.scores.adapters.orm import ScoreORM
+
+        # Join with scores table to filter by account
+        query = (
+            select(ScoreFlagORM)
+            .join(ScoreORM, ScoreFlagORM.score_id == ScoreORM.id)
+            .where(
+                ScoreORM.account_id == account_id,
+                ScoreFlagORM.deleted_at.is_(None),
+            )
+        )
+
+        # Apply optional filters
+        if board_id is not None:
+            query = query.where(ScoreORM.board_id == board_id)
+
+        if game_id is not None:
+            query = query.where(ScoreORM.game_id == game_id)
+
+        if status is not None:
+            query = query.where(ScoreFlagORM.status == status)
+
+        if flag_type is not None:
+            query = query.where(ScoreFlagORM.flag_type == flag_type)
+
+        result = await self.session.execute(query)
+        orms = result.scalars().all()
+        return [self._to_domain(orm) for orm in orms]
 
     async def get_flags_by_score_id(self, score_id: UUID) -> list[ScoreFlag]:
         """Get all flags for a specific score.

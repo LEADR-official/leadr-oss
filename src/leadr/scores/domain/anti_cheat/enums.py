@@ -87,3 +87,22 @@ class FlagAction(str, Enum):
 
     REJECT = "REJECT"
     """Reject the score submission (do not save to database)."""
+
+
+class ScoreFlagStatus(str, Enum):
+    """Status of a score flag review.
+
+    Indicates whether a flag has been reviewed and what decision was made.
+    """
+
+    PENDING = "PENDING"
+    """Flag has not been reviewed yet."""
+
+    CONFIRMED_CHEAT = "CONFIRMED_CHEAT"
+    """Admin confirmed this is cheating behavior."""
+
+    FALSE_POSITIVE = "FALSE_POSITIVE"
+    """Admin determined this was legitimate gameplay."""
+
+    DISMISSED = "DISMISSED"
+    """Admin dismissed the flag without a specific determination."""
