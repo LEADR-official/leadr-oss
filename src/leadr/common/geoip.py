@@ -207,49 +207,58 @@ class GeoIPService:
             GeoInfo with timezone, country, and city, or None if lookup fails
         """
         if self._city_reader is None:
+            logger.debug("GeoIP lookup skipped - city reader not initialized")
             return None
 
+        # Look up IP in City database (maxminddb raises ValueError for invalid IPs)
         try:
-            # Look up IP in City database (includes country info)
             result = self._city_reader.get(ip_address)
-            if result is None or not isinstance(result, dict):
-                return None
+        except ValueError:
+            logger.warning("Invalid IP address format for GeoIP lookup: %s", ip_address)
+            return None
 
-            # Extract geo information with type checking
-            timezone: str | None = None
-            country: str | None = None
-            city: str | None = None
+        # IP not found in database
+        if result is None or not isinstance(result, dict):
+            logger.debug("IP address not found in GeoIP database: %s", ip_address)
+            return None
 
-            location = result.get("location")
-            if isinstance(location, dict):
-                tz = location.get("time_zone")
-                timezone = str(tz) if tz is not None and not isinstance(tz, dict) else None
+        # Extract geo information with defensive type checking
+        timezone: str | None = None
+        country: str | None = None
+        city: str | None = None
 
-            country_data = result.get("country")
-            if isinstance(country_data, dict):
-                iso_code = country_data.get("iso_code")
-                country = (
-                    str(iso_code)
-                    if iso_code is not None and not isinstance(iso_code, dict)
+        location = result.get("location")
+        if isinstance(location, dict):
+            tz = location.get("time_zone")
+            timezone = str(tz) if tz is not None and not isinstance(tz, dict) else None
+
+        country_data = result.get("country")
+        if isinstance(country_data, dict):
+            iso_code = country_data.get("iso_code")
+            country = (
+                str(iso_code) if iso_code is not None and not isinstance(iso_code, dict) else None
+            )
+
+        city_data = result.get("city")
+        if isinstance(city_data, dict):
+            names = city_data.get("names")
+            if isinstance(names, dict):
+                city_name = names.get("en")
+                city = (
+                    str(city_name)
+                    if city_name is not None and not isinstance(city_name, dict)
                     else None
                 )
 
-            city_data = result.get("city")
-            if isinstance(city_data, dict):
-                names = city_data.get("names")
-                if isinstance(names, dict):
-                    city_name = names.get("en")
-                    city = (
-                        str(city_name)
-                        if city_name is not None and not isinstance(city_name, dict)
-                        else None
-                    )
+        logger.debug(
+            "GeoIP lookup for %s: timezone=%s, country=%s, city=%s",
+            ip_address,
+            timezone,
+            country,
+            city,
+        )
 
-            return GeoInfo(timezone=timezone, country=country, city=city)
-
-        except Exception:
-            logger.exception("Failed to look up IP address: %s", ip_address)
-            return None
+        return GeoInfo(timezone=timezone, country=country, city=city)
 
     def close(self) -> None:
         """Close database readers and release resources."""

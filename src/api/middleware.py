@@ -73,33 +73,39 @@ class GeoIPMiddleware(BaseHTTPMiddleware):
         Returns:
             Response from the next handler
         """
+        # Initialize geo fields to None (default if anything fails)
+        request.state.geo_timezone = None
+        request.state.geo_country = None
+        request.state.geo_city = None
+
         try:
             # Get GeoIP service
             geoip_service = self._get_geoip_service(request)
+            if not geoip_service:
+                logger.debug("GeoIP service not available, skipping geo extraction")
+                return await call_next(request)
 
             # Extract client IP
             client_ip = self._extract_ip(request)
+            if not client_ip:
+                logger.debug("No client IP found for request to %s", request.url.path)
+                return await call_next(request)
 
             # Look up geolocation data
-            if client_ip and geoip_service:
-                geo_info = geoip_service.get_geo_info(client_ip)
-
-                # Attach to request state (even if None)
-                request.state.geo_timezone = geo_info.timezone if geo_info else None
-                request.state.geo_country = geo_info.country if geo_info else None
-                request.state.geo_city = geo_info.city if geo_info else None
-            else:
-                # No IP extracted or no geoip service
-                request.state.geo_timezone = None
-                request.state.geo_country = None
-                request.state.geo_city = None
+            geo_info = geoip_service.get_geo_info(client_ip)
+            if geo_info:
+                request.state.geo_timezone = geo_info.timezone
+                request.state.geo_country = geo_info.country
+                request.state.geo_city = geo_info.city
 
         except Exception:
-            # Log error but don't crash the request
-            logger.exception("Failed to extract geo information from request")
-            request.state.geo_timezone = None
-            request.state.geo_country = None
-            request.state.geo_city = None
+            # UNEXPECTED ERROR: Log loudly but continue request gracefully
+            logger.exception(
+                "UNEXPECTED ERROR in GeoIP middleware for %s from IP %s - geo fields set to None",
+                request.url.path,
+                self._extract_ip(request) or "unknown",
+            )
+            # Geo fields already set to None above
 
         # Continue processing the request
         return await call_next(request)
