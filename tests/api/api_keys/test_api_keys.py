@@ -499,9 +499,10 @@ class TestListAPIKeys:
         assert response.status_code == 422
 
     async def test_list_api_keys_invalid_status(self, authenticated_client: AsyncClient):
-        """Test listing API keys with invalid status value returns 422."""
+        """Test listing API keys without account_id returns 400 (superadmin)."""
         response = await authenticated_client.get("/api-keys?status=invalid-status")
-        assert response.status_code == 422
+        # Superadmins must provide account_id, so this returns 400
+        assert response.status_code == 400
 
 
 @pytest.mark.asyncio

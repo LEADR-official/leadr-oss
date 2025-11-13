@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Query
 
 from leadr.accounts.domain.user import User
 from leadr.accounts.services.dependencies import UserServiceDep
@@ -230,6 +230,113 @@ async def require_nonce(
         ) from None
 
 
-# Type aliases for dependency injection
+# Type alias needed by resolve_query_account_id
 AuthContextDep = Annotated[AuthContext, Depends(require_api_key)]
+
+
+async def resolve_query_account_id(
+    auth: AuthContextDep,
+    account_id: UUID | None = Query(
+        None,
+        description="Account ID (required for superadmins, auto-derived for regular users)",
+    ),
+) -> UUID:
+    """Resolve account ID from query parameters based on user role.
+
+    For superadmin users:
+        - account_id query parameter is REQUIRED
+        - Returns 400 Bad Request if not provided
+        - Can access any account by providing explicit account_id
+
+    For regular users:
+        - account_id query parameter is optional
+        - If provided, must match their API key's account_id (403 Forbidden if mismatch)
+        - If not provided, automatically uses their API key's account_id
+        - Cannot access other accounts
+
+    Args:
+        auth: The authenticated user context from require_api_key.
+        account_id: Optional account_id from query parameters.
+
+    Returns:
+        The resolved account_id (UUID) that the user is authorized to access.
+
+    Raises:
+        HTTPException: 400 Bad Request if superadmin doesn't provide account_id.
+        HTTPException: 403 Forbidden if regular user tries to access unauthorized account.
+
+    Example:
+        >>> @router.get("/games")
+        >>> async def list_games(
+        >>>     account_id: QueryAccountIDDep,
+        >>>     service: GameServiceDep,
+        >>> ):
+        >>>     # account_id is guaranteed to be authorized
+        >>>     return await service.list_games(account_id)
+    """
+    if auth.is_superadmin:
+        # Superadmins must explicitly specify which account they want to access
+        if account_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Superadmins must explicitly specify account_id",
+            )
+        return account_id
+    else:
+        # Regular users can only access their own account
+        user_account_id = auth.api_key.account_id
+
+        if account_id is not None and account_id != user_account_id:
+            # User tried to access a different account
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied to the specified account",
+            )
+
+        # Use the user's account (either because it wasn't provided, or it matched)
+        return user_account_id
+
+
+def validate_body_account_id(
+    auth: AuthContext,
+    account_id: UUID,
+) -> None:
+    """Validate that an account_id from request body matches user's authorized account.
+
+    For superadmin users:
+        - Can access any account, so any account_id is accepted
+
+    For regular users:
+        - Can only access their own account from API key
+        - Raises 403 Forbidden if account_id doesn't match their API key's account
+
+    Args:
+        auth: The authenticated user context.
+        account_id: The account_id from the request body to validate.
+
+    Raises:
+        HTTPException: 403 Forbidden if user tries to access unauthorized account.
+
+    Example:
+        >>> @router.post("/games", status_code=201)
+        >>> async def create_game(
+        >>>     request: GameCreateRequest,
+        >>>     service: GameServiceDep,
+        >>>     auth: AuthContextDep,
+        >>> ):
+        >>>     validate_body_account_id(auth, request.account_id)
+        >>>     game = await service.create_game(...)
+        >>>     return GameResponse.from_domain(game)
+    """
+    if not auth.is_superadmin:
+        # Regular users can only access their own account
+        if account_id != auth.api_key.account_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied to the specified account",
+            )
+
+
+# Additional type aliases for dependency injection
 DeviceTokenDep = Annotated[Device, Depends(require_device_token)]
+QueryAccountIDDep = Annotated[UUID, Depends(resolve_query_account_id)]

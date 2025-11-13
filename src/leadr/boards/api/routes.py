@@ -5,7 +5,11 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
-from leadr.auth.dependencies import AuthContextDep
+from leadr.auth.dependencies import (
+    AuthContextDep,
+    QueryAccountIDDep,
+    validate_body_account_id,
+)
 from leadr.boards.api.schemas import (
     BoardCreateRequest,
     BoardResponse,
@@ -28,6 +32,9 @@ async def create_board(
     Creates a new leaderboard associated with an existing game and account.
     The game must belong to the specified account.
 
+    For regular users, account_id must match their API key's account.
+    For superadmins, any account_id is accepted.
+
     Args:
         request: Board creation details including account_id, game_id, name, and settings.
         service: Injected board service dependency.
@@ -37,16 +44,11 @@ async def create_board(
         BoardResponse with the created board including auto-generated ID and timestamps.
 
     Raises:
-        403: User does not have access to this account.
+        403: User does not have access to the specified account.
         404: Game or account not found.
         400: Game doesn't belong to the specified account.
     """
-    # Check authorization
-    if not auth.has_access_to_account(request.account_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this account",
-        )
+    validate_body_account_id(auth, request.account_id)
 
     try:
         board = await service.create_board(
@@ -112,6 +114,14 @@ async def list_boards(
 ) -> list[BoardResponse]:
     """List boards filtered by account_id and/or short code.
 
+    For regular users:
+    - If account_id not provided, defaults to their API key's account
+    - If account_id provided, must match their API key's account (403 otherwise)
+
+    For superadmins:
+    - Can provide any account_id or search by code only
+    - At least one of account_id or code is required
+
     Args:
         service: Injected board service dependency.
         auth: Authentication context with user info.
@@ -122,21 +132,26 @@ async def list_boards(
         List of boards matching the filter criteria.
 
     Raises:
-        403: User does not have access to this account.
-        422: Neither account_id nor code parameter provided.
+        403: User does not have access to the specified account.
+        422: Neither account_id nor code parameter provided (superadmins only).
     """
-    if account_id is None and code is None:
-        raise HTTPException(
-            status_code=422,
-            detail="At least one of account_id or code parameter is required",
-        )
-
-    # Check authorization if account_id is provided
-    if account_id is not None:
-        if not auth.has_access_to_account(account_id):
+    # Handle account_id resolution based on user role
+    if not auth.is_superadmin:
+        # Regular users: auto-derive account_id if not provided
+        user_account_id = auth.api_key.account_id
+        if account_id is None:
+            account_id = user_account_id
+        elif account_id != user_account_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have access to this account",
+                detail="Access denied to the specified account",
+            )
+    else:
+        # Superadmins: require at least one parameter
+        if account_id is None and code is None:
+            raise HTTPException(
+                status_code=422,
+                detail="At least one of account_id or code parameter is required",
             )
 
     boards = await service.list_boards(account_id=account_id, code=code)
@@ -220,6 +235,9 @@ async def create_board_template(
     Creates a template for automatically generating boards at regular intervals.
     The game must belong to the specified account.
 
+    For regular users, account_id must match their API key's account.
+    For superadmins, any account_id is accepted.
+
     Args:
         request: Template creation details including repeat_interval and configuration.
         service: Injected board template service dependency.
@@ -229,16 +247,11 @@ async def create_board_template(
         BoardTemplateResponse with the created template including auto-generated ID.
 
     Raises:
-        403: User does not have access to this account.
+        403: User does not have access to the specified account.
         404: Game or account not found.
         400: Game doesn't belong to the specified account.
     """
-    # Check authorization
-    if not auth.has_access_to_account(request.account_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this account",
-        )
+    validate_body_account_id(auth, request.account_id)
 
     try:
         template = await service.create_board_template(
@@ -292,32 +305,27 @@ async def get_board_template(
 
 @router.get("/board-templates", response_model=list[BoardTemplateResponse])
 async def list_board_templates(
-    account_id: UUID,
+    account_id: QueryAccountIDDep,
     service: BoardTemplateServiceDep,
-    auth: AuthContextDep,
     game_id: UUID | None = None,
 ) -> list[BoardTemplateResponse]:
     """List board templates for an account, optionally filtered by game.
 
+    For regular users, account_id is automatically derived from their API key.
+    For superadmins, account_id must be explicitly provided as a query parameter.
+
     Args:
-        account_id: Account ID to filter templates by (required).
+        account_id: Account ID (auto-resolved for regular users, required for superadmins).
         service: Injected board template service dependency.
-        auth: Authentication context with user info.
         game_id: Optional game ID to filter templates by.
 
     Returns:
         List of board templates matching the filter criteria.
 
     Raises:
-        403: User does not have access to this account.
+        400: Superadmin did not provide account_id.
+        403: User does not have access to the specified account.
     """
-    # Check authorization
-    if not auth.has_access_to_account(account_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this account",
-        )
-
     if game_id is not None:
         templates = await service.list_board_templates_by_game(account_id, game_id)
     else:

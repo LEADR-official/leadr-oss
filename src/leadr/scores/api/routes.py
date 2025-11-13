@@ -5,7 +5,11 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
-from leadr.auth.dependencies import AuthContextDep
+from leadr.auth.dependencies import (
+    AuthContextDep,
+    QueryAccountIDDep,
+    validate_body_account_id,
+)
 from leadr.scores.api.schemas import ScoreCreateRequest, ScoreResponse, ScoreUpdateRequest
 from leadr.scores.services.dependencies import ScoreServiceDep
 
@@ -25,6 +29,9 @@ async def create_score(
     board exists, board belongs to the specified account, and game matches
     the board's game.
 
+    For regular users, account_id must match their API key's account.
+    For superadmins, any account_id is accepted.
+
     Args:
         request: Score creation details including account_id, game_id, board_id,
                 device_id, player_name, value, and optional filters.
@@ -36,17 +43,12 @@ async def create_score(
         ScoreResponse with the created score including auto-generated ID and timestamps.
 
     Raises:
-        403: User does not have access to this account.
+        403: User does not have access to the specified account.
         404: Account, game, board, or device not found.
         400: Validation failed (board doesn't belong to account, or game doesn't
             match board's game).
     """
-    # Check authorization
-    if not auth.has_access_to_account(request.account_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this account",
-        )
+    validate_body_account_id(auth, request.account_id)
 
     try:
         score, anti_cheat_result = await service.create_score(
@@ -57,9 +59,9 @@ async def create_score(
             player_name=request.player_name,
             value=request.value,
             value_display=request.value_display,
-            filter_timezone=request.filter_timezone,
-            filter_country=request.filter_country,
-            filter_city=request.filter_city,
+            timezone=request.timezone,
+            country=request.country,
+            city=request.city,
         )
     except IntegrityError:
         raise HTTPException(
@@ -116,9 +118,8 @@ async def get_score(
 
 @router.get("/scores", response_model=list[ScoreResponse])
 async def list_scores(
-    account_id: UUID,
+    account_id: QueryAccountIDDep,
     service: ScoreServiceDep,
-    auth: AuthContextDep,
     board_id: UUID | None = None,
     game_id: UUID | None = None,
     device_id: UUID | None = None,
@@ -126,13 +127,14 @@ async def list_scores(
     """List scores for an account with optional filters.
 
     Returns all non-deleted scores for the specified account, with optional
-    filtering by board, game, or device. Enforces multi-tenant safety by
-    requiring account_id.
+    filtering by board, game, or device.
+
+    For regular users, account_id is automatically derived from their API key.
+    For superadmins, account_id must be explicitly provided as a query parameter.
 
     Args:
-        account_id: REQUIRED - Account ID to filter by (multi-tenant safety).
+        account_id: Account ID (auto-resolved for regular users, required for superadmins).
         service: Injected score service dependency.
-        auth: Authentication context with user info.
         board_id: Optional board ID to filter by.
         game_id: Optional game ID to filter by.
         device_id: Optional device ID to filter by.
@@ -141,15 +143,9 @@ async def list_scores(
         List of ScoreResponse objects matching the filter criteria.
 
     Raises:
-        403: User does not have access to this account.
+        400: Superadmin did not provide account_id.
+        403: User does not have access to the specified account.
     """
-    # Check authorization
-    if not auth.has_access_to_account(account_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this account",
-        )
-
     scores = await service.list_scores(
         account_id=account_id,
         board_id=board_id,
@@ -205,8 +201,8 @@ async def update_score(
         player_name=request.player_name,
         value=request.value,
         value_display=request.value_display,
-        filter_timezone=request.filter_timezone,
-        filter_country=request.filter_country,
-        filter_city=request.filter_city,
+        timezone=request.timezone,
+        country=request.country,
+        city=request.city,
     )
     return ScoreResponse.from_domain(score)

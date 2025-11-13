@@ -19,6 +19,7 @@ class SortDirection(str, Enum):
 class KeepStrategy(str, Enum):
     """Strategy for keeping scores from the same user."""
 
+    FIRST_ONLY = "FIRST_ONLY"
     BEST_ONLY = "BEST_ONLY"
     LATEST_ONLY = "LATEST_ONLY"
     ALL = "ALL"

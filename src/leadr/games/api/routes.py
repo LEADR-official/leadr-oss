@@ -5,7 +5,11 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
-from leadr.auth.dependencies import AuthContextDep
+from leadr.auth.dependencies import (
+    AuthContextDep,
+    QueryAccountIDDep,
+    validate_body_account_id,
+)
 from leadr.games.api.schemas import (
     GameCreateRequest,
     GameResponse,
@@ -25,6 +29,9 @@ async def create_game(
     Creates a new game associated with an existing account. Games can optionally
     be configured with Steam integration and a default leaderboard.
 
+    For regular users, account_id must match their API key's account.
+    For superadmins, any account_id is accepted.
+
     Args:
         request: Game creation details including account_id, name, and optional settings.
         service: Injected game service dependency.
@@ -34,15 +41,10 @@ async def create_game(
         GameResponse with the created game including auto-generated ID and timestamps.
 
     Raises:
-        403: User does not have access to this account.
+        403: User does not have access to the specified account.
         404: Account not found.
     """
-    # Check authorization
-    if not auth.has_access_to_account(request.account_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this account",
-        )
+    validate_body_account_id(auth, request.account_id)
 
     try:
         game = await service.create_game(
@@ -88,30 +90,25 @@ async def get_game(game_id: UUID, service: GameServiceDep, auth: AuthContextDep)
 
 @router.get("/games", response_model=list[GameResponse])
 async def list_games(
-    account_id: UUID,
+    account_id: QueryAccountIDDep,
     service: GameServiceDep,
-    auth: AuthContextDep,
 ) -> list[GameResponse]:
     """List all games for an account.
 
+    For regular users, account_id is automatically derived from their API key.
+    For superadmins, account_id must be explicitly provided as a query parameter.
+
     Args:
-        account_id: Account ID to filter games by.
+        account_id: Account ID (auto-resolved for regular users, required for superadmins).
         service: Injected game service dependency.
-        auth: Authentication context with user info.
 
     Returns:
         List of all active games for the specified account.
 
     Raises:
-        403: User does not have access to this account.
+        400: Superadmin did not provide account_id.
+        403: User does not have access to the specified account.
     """
-    # Check authorization
-    if not auth.has_access_to_account(account_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this account",
-        )
-
     games = await service.list_games(account_id)
     return [GameResponse.from_domain(game) for game in games]
 

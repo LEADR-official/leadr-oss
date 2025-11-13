@@ -101,9 +101,9 @@ class TestScoreRepository:
             player_name="SpeedRunner99",
             value=123.45,
             value_display="2:03.45",
-            filter_timezone="America/New_York",
-            filter_country="USA",
-            filter_city="New York",
+            timezone="America/New_York",
+            country="USA",
+            city="New York",
             created_at=now,
             updated_at=now,
         )
@@ -118,9 +118,9 @@ class TestScoreRepository:
         assert created.player_name == "SpeedRunner99"
         assert created.value == 123.45
         assert created.value_display == "2:03.45"
-        assert created.filter_timezone == "America/New_York"
-        assert created.filter_country == "USA"
-        assert created.filter_city == "New York"
+        assert created.timezone == "America/New_York"
+        assert created.country == "USA"
+        assert created.city == "New York"
 
     async def test_get_score_by_id(self, db_session: AsyncSession):
         """Test retrieving a score by ID."""

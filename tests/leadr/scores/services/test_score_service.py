@@ -121,15 +121,15 @@ class TestScoreService:
             player_name="SpeedRunner99",
             value=123.45,
             value_display="2:03.45",
-            filter_timezone="America/New_York",
-            filter_country="USA",
-            filter_city="New York",
+            timezone="America/New_York",
+            country="USA",
+            city="New York",
         )
 
         assert score.value_display == "2:03.45"
-        assert score.filter_timezone == "America/New_York"
-        assert score.filter_country == "USA"
-        assert score.filter_city == "New York"
+        assert score.timezone == "America/New_York"
+        assert score.country == "USA"
+        assert score.city == "New York"
 
     async def test_create_score_validates_board_exists(self, db_session: AsyncSession):
         """Test that create_score validates board exists."""

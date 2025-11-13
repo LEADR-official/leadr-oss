@@ -1,8 +1,6 @@
 """Account and User API routes."""
 
-from typing import Annotated
-
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, status
 from pydantic import UUID4
 from sqlalchemy.exc import IntegrityError
 
@@ -16,7 +14,11 @@ from leadr.accounts.api.schemas import (
 )
 from leadr.accounts.domain.account import AccountStatus
 from leadr.accounts.services.dependencies import AccountServiceDep, UserServiceDep
-from leadr.auth.dependencies import AuthContextDep
+from leadr.auth.dependencies import (
+    AuthContextDep,
+    QueryAccountIDDep,
+    validate_body_account_id,
+)
 
 router = APIRouter()
 
@@ -184,6 +186,9 @@ async def create_user(
 
     Creates a new user associated with an existing account.
 
+    For regular users, account_id must match their API key's account.
+    For superadmins, any account_id is accepted.
+
     Args:
         request: User creation details including account_id, email, and display name.
         service: Injected user service dependency.
@@ -193,15 +198,10 @@ async def create_user(
         UserResponse with the created user including auto-generated ID and timestamps.
 
     Raises:
-        403: User does not have access to this account.
+        403: User does not have access to the specified account.
         404: Account not found.
     """
-    # Check authorization - user must have access to the account
-    if not auth.has_access_to_account(request.account_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this account",
-        )
+    validate_body_account_id(auth, request.account_id)
 
     try:
         user = await service.create_user(
@@ -254,29 +254,24 @@ async def get_user(
 @router.get("/users", response_model=list[UserResponse])
 async def list_users(
     service: UserServiceDep,
-    auth: AuthContextDep,
-    account_id: Annotated[UUID4, Query(description="Account ID to filter by")],
+    account_id: QueryAccountIDDep,
 ) -> list[UserResponse]:
     """List users for an account.
 
+    For regular users, account_id is automatically derived from their API key.
+    For superadmins, account_id must be explicitly provided as a query parameter.
+
     Args:
         service: Injected user service dependency.
-        auth: Authentication context with user info.
-        account_id: Account ID to filter results (REQUIRED for multi-tenant safety).
+        account_id: Account ID (auto-resolved for regular users, required for superadmins).
 
     Returns:
         List of users for the account.
 
     Raises:
-        403: User does not have access to this account.
+        400: Superadmin did not provide account_id.
+        403: User does not have access to the specified account.
     """
-    # Check authorization - user must have access to the account
-    if not auth.has_access_to_account(account_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this account",
-        )
-
     users = await service.list_users_by_account(account_id)
     return [UserResponse.from_domain(user) for user in users]
 

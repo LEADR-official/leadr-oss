@@ -44,9 +44,9 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         player_name: str,
         value: float,
         value_display: str | None = None,
-        filter_timezone: str | None = None,
-        filter_country: str | None = None,
-        filter_city: str | None = None,
+        timezone: str | None = None,
+        country: str | None = None,
+        city: str | None = None,
         trust_tier: TrustTier = TrustTier.B,
     ) -> tuple[Score, AntiCheatResult | None]:
         """Create a new score.
@@ -59,9 +59,9 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             player_name: Display name of the player.
             value: Numeric value of the score for sorting/comparison.
             value_display: Optional formatted display string.
-            filter_timezone: Optional timezone filter for categorization.
-            filter_country: Optional country filter for categorization.
-            filter_city: Optional city filter for categorization.
+            timezone: Optional timezone filter for categorization.
+            country: Optional country filter for categorization.
+            city: Optional city filter for categorization.
             trust_tier: Trust tier of the device (defaults to B/medium trust).
 
         Returns:
@@ -104,9 +104,9 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             player_name=player_name,
             value=value,
             value_display=value_display,
-            filter_timezone=filter_timezone,
-            filter_country=filter_country,
-            filter_city=filter_city,
+            timezone=timezone,
+            country=country,
+            city=city,
         )
 
         # Anti-cheat checking (if enabled and device_id provided)
@@ -237,9 +237,9 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         player_name: str | None = None,
         value: float | None = None,
         value_display: str | None = None,
-        filter_timezone: str | None = None,
-        filter_country: str | None = None,
-        filter_city: str | None = None,
+        timezone: str | None = None,
+        country: str | None = None,
+        city: str | None = None,
     ) -> Score:
         """Update a score's mutable fields.
 
@@ -248,9 +248,9 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             player_name: Optional new player name.
             value: Optional new value.
             value_display: Optional new value display string.
-            filter_timezone: Optional new timezone filter.
-            filter_country: Optional new country filter.
-            filter_city: Optional new city filter.
+            timezone: Optional new timezone.
+            country: Optional new country.
+            city: Optional new city.
 
         Returns:
             The updated Score entity.
@@ -266,11 +266,11 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             score.value = value
         if value_display is not None:
             score.value_display = value_display
-        if filter_timezone is not None:
-            score.filter_timezone = filter_timezone
-        if filter_country is not None:
-            score.filter_country = filter_country
-        if filter_city is not None:
-            score.filter_city = filter_city
+        if timezone is not None:
+            score.timezone = timezone
+        if country is not None:
+            score.country = country
+        if city is not None:
+            score.city = city
 
         return await self.repository.update(score)

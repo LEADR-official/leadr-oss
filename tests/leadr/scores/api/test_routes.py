@@ -121,9 +121,9 @@ class TestScoreRoutes:
                 "player_name": "SpeedRunner99",
                 "value": 123.45,
                 "value_display": "2:03.45",
-                "filter_timezone": "America/New_York",
-                "filter_country": "USA",
-                "filter_city": "New York",
+                "timezone": "America/New_York",
+                "country": "USA",
+                "city": "New York",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -131,9 +131,9 @@ class TestScoreRoutes:
         assert response.status_code == 201
         data = response.json()
         assert data["value_display"] == "2:03.45"
-        assert data["filter_timezone"] == "America/New_York"
-        assert data["filter_country"] == "USA"
-        assert data["filter_city"] == "New York"
+        assert data["timezone"] == "America/New_York"
+        assert data["country"] == "USA"
+        assert data["city"] == "New York"
 
     async def test_create_score_with_board_not_found(
         self, client: AsyncClient, db_session, test_api_key
