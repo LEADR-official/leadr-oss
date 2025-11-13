@@ -292,6 +292,12 @@ class CommonSettings(BaseSettings):
         description="Override IP address for development/testing (bypasses localhost detection)",
     )
 
+    # Score Configuration
+    SCORE_METADATA_MAX_SIZE_BYTES: int = Field(
+        default=1024,
+        description="Maximum size in bytes for score metadata JSON (default: 1KB)",
+    )
+
     @model_validator(mode="after")
     def validate_api_enabled(self):
         """Ensure at least one API (Admin or Client) is enabled."""

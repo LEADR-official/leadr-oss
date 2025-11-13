@@ -1,10 +1,13 @@
 """Score domain entity."""
 
+import json
+from typing import Any
 from uuid import UUID
 
 from pydantic import Field, field_validator
 
 from leadr.common.domain.models import Entity
+from leadr.config import settings
 
 
 class Score(Entity):
@@ -42,6 +45,10 @@ class Score(Entity):
     city: str | None = Field(
         default=None, description="Optional city filter for score categorization"
     )
+    metadata: Any | None = Field(
+        default=None,
+        description="Optional JSON metadata for game-specific data (loadouts, seeds, etc.)",
+    )
 
     @field_validator("player_name")
     @classmethod
@@ -60,4 +67,31 @@ class Score(Entity):
         v = v.strip()
         if not v:
             raise ValueError("player_name cannot be empty")
+        return v
+
+    @field_validator("metadata")
+    @classmethod
+    def validate_metadata_size(cls, v: Any) -> Any:
+        """Validate that metadata does not exceed size limit.
+
+        Args:
+            v: The metadata to validate.
+
+        Returns:
+            The validated metadata.
+
+        Raises:
+            ValueError: If metadata exceeds the configured size limit.
+        """
+        if v is None:
+            return None
+
+        # Serialize to compact JSON and check string length
+        compacted = json.dumps(v, separators=(",", ":"))
+        if len(compacted) > settings.SCORE_METADATA_MAX_SIZE_BYTES:
+            raise ValueError(
+                f"Metadata exceeds {settings.SCORE_METADATA_MAX_SIZE_BYTES} char limit "
+                f"(got {len(compacted)} chars)"
+            )
+
         return v

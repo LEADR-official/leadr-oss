@@ -68,6 +68,7 @@ async def create_score(
             timezone=timezone,
             country=country,
             city=city,
+            metadata=score_request.metadata,
         )
     except IntegrityError:
         raise HTTPException(
@@ -210,5 +211,6 @@ async def update_score(
         timezone=request.timezone,
         country=request.country,
         city=request.city,
+        metadata=request.metadata,
     )
     return ScoreResponse.from_domain(score)
