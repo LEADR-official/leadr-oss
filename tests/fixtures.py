@@ -145,7 +145,7 @@ async def board_orm(
         is_active=True,
         sort_direction=SortDirection.DESCENDING.value,  # Use enum value (string)
         keep_strategy=KeepStrategy.BEST_ONLY.value,  # Use enum value (string)
-        template_id=None,
+        created_from_template_id=None,
         tags=[],
     )
     db_session.add(board)

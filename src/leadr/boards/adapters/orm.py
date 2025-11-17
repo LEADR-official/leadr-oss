@@ -83,7 +83,7 @@ class BoardTemplateORM(Base):
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
     name_template: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
-    counter: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    series: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     repeat_interval: Mapped[str] = mapped_column(String, nullable=False)
     config: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"
@@ -113,7 +113,7 @@ class BoardTemplateORM(Base):
             game_id=GameID(self.game_id),
             name=self.name,
             name_template=self.name_template,
-            counter=self.counter,
+            series=self.series,
             repeat_interval=self.repeat_interval,
             config=self.config,
             config_template=self.config_template,
@@ -141,7 +141,7 @@ class BoardTemplateORM(Base):
             game_id=entity.game_id.uuid,
             name=entity.name,
             name_template=entity.name_template,
-            counter=entity.counter,
+            series=entity.series,
             repeat_interval=entity.repeat_interval,
             config=entity.config,
             config_template=entity.config_template,

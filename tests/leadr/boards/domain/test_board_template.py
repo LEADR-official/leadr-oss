@@ -623,7 +623,7 @@ class TestBoardTemplateGenerateName:
             updated_at=now,
         )
 
-        result = template.generate_name(timestamp=now, counter_value=None)
+        result = template.generate_name(timestamp=now, series_value=None)
         assert result == "Fallback Name"
 
     def test_generate_name_with_year_placeholder(self):
@@ -647,7 +647,7 @@ class TestBoardTemplateGenerateName:
         )
 
         timestamp = datetime(2025, 7, 15, tzinfo=UTC)
-        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        result = template.generate_name(timestamp=timestamp, series_value=None)
         assert result == "Championship 2025"
 
     def test_generate_name_with_month_placeholder(self):
@@ -671,7 +671,7 @@ class TestBoardTemplateGenerateName:
         )
 
         timestamp = datetime(2025, 7, 15, tzinfo=UTC)
-        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        result = template.generate_name(timestamp=timestamp, series_value=None)
         assert result == "High Scores - July"
 
     def test_generate_name_with_month_short_placeholder(self):
@@ -695,7 +695,7 @@ class TestBoardTemplateGenerateName:
         )
 
         timestamp = datetime(2025, 7, 15, tzinfo=UTC)
-        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        result = template.generate_name(timestamp=timestamp, series_value=None)
         assert result == "Leaderboard Jul 2025"
 
     def test_generate_name_with_week_placeholder(self):
@@ -720,7 +720,7 @@ class TestBoardTemplateGenerateName:
 
         # July 15, 2025 is week 29 of the year (ISO week)
         timestamp = datetime(2025, 7, 15, tzinfo=UTC)
-        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        result = template.generate_name(timestamp=timestamp, series_value=None)
         assert result == "Week 29 Challenge"
 
     def test_generate_name_with_quarter_placeholder(self):
@@ -745,17 +745,17 @@ class TestBoardTemplateGenerateName:
 
         # July is Q3
         timestamp = datetime(2025, 7, 15, tzinfo=UTC)
-        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        result = template.generate_name(timestamp=timestamp, series_value=None)
         assert result == "Q3 2025 Rankings"
 
         # January is Q1
         timestamp = datetime(2025, 1, 15, tzinfo=UTC)
-        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        result = template.generate_name(timestamp=timestamp, series_value=None)
         assert result == "Q1 2025 Rankings"
 
         # December is Q4
         timestamp = datetime(2025, 12, 15, tzinfo=UTC)
-        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        result = template.generate_name(timestamp=timestamp, series_value=None)
         assert result == "Q4 2025 Rankings"
 
     def test_generate_name_with_date_placeholder(self):
@@ -779,11 +779,11 @@ class TestBoardTemplateGenerateName:
         )
 
         timestamp = datetime(2025, 7, 15, tzinfo=UTC)
-        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        result = template.generate_name(timestamp=timestamp, series_value=None)
         assert result == "Daily Challenge 2025-07-15"
 
-    def test_generate_name_with_counter_placeholder(self):
-        """Test generate_name() with {counter} placeholder."""
+    def test_generate_name_with_series_placeholder(self):
+        """Test generate_name() with {series} placeholder."""
         template_id = uuid4()
         account_id = uuid4()
         game_id = uuid4()
@@ -794,7 +794,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
-            name_template="Weekly Challenge {counter}",
+            name_template="Weekly Challenge {series}",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -802,7 +802,7 @@ class TestBoardTemplateGenerateName:
             updated_at=now,
         )
 
-        result = template.generate_name(timestamp=now, counter_value=21)
+        result = template.generate_name(timestamp=now, series_value=21)
         assert result == "Weekly Challenge 21"
 
     def test_generate_name_with_multiple_placeholders(self):
@@ -817,7 +817,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
-            name_template="{month} {year} - Week {counter}",
+            name_template="{month} {year} - Week {series}",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -826,7 +826,7 @@ class TestBoardTemplateGenerateName:
         )
 
         timestamp = datetime(2025, 7, 15, tzinfo=UTC)
-        result = template.generate_name(timestamp=timestamp, counter_value=3)
+        result = template.generate_name(timestamp=timestamp, series_value=3)
         assert result == "July 2025 - Week 3"
 
     def test_generate_name_with_invalid_placeholder_raises_error(self):
@@ -850,13 +850,13 @@ class TestBoardTemplateGenerateName:
         )
 
         with pytest.raises(ValueError) as exc_info:
-            template.generate_name(timestamp=now, counter_value=None)
+            template.generate_name(timestamp=now, series_value=None)
 
         assert "invalid" in str(exc_info.value).lower()
         assert "placeholder" in str(exc_info.value).lower()
 
-    def test_generate_name_with_counter_placeholder_but_no_counter_value(self):
-        """Test that generate_name() raises error when {counter} used but counter_value is None."""
+    def test_generate_name_with_series_placeholder_but_no_series_value(self):
+        """Test that generate_name() raises error when {series} used but series_value is None."""
         template_id = uuid4()
         account_id = uuid4()
         game_id = uuid4()
@@ -867,7 +867,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
-            name_template="Weekly Challenge {counter}",
+            name_template="Weekly Challenge {series}",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -876,9 +876,9 @@ class TestBoardTemplateGenerateName:
         )
 
         with pytest.raises(ValueError) as exc_info:
-            template.generate_name(timestamp=now, counter_value=None)
+            template.generate_name(timestamp=now, series_value=None)
 
-        assert "counter" in str(exc_info.value).lower()
+        assert "series" in str(exc_info.value).lower()
 
     def test_generate_name_with_all_placeholders(self):
         """Test generate_name() with all supported placeholders."""
@@ -892,7 +892,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
-            name_template=("{year}/{month}/{month_short}/{week}/{quarter}/{date}/#{counter}"),
+            name_template=("{year}/{month}/{month_short}/{week}/{quarter}/{date}/#{series}"),
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -901,5 +901,5 @@ class TestBoardTemplateGenerateName:
         )
 
         timestamp = datetime(2025, 7, 15, tzinfo=UTC)
-        result = template.generate_name(timestamp=timestamp, counter_value=42)
+        result = template.generate_name(timestamp=timestamp, series_value=42)
         assert result == "2025/July/Jul/29/Q3/2025-07-15/#42"

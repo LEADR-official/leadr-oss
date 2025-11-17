@@ -51,7 +51,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             "week",
             "quarter",
             "date",
-            "counter",
+            "series",
         }
 
         # Extract all placeholders from the template
@@ -77,7 +77,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         next_run_at: datetime,
         is_active: bool,
         name_template: str | None = None,
-        counter: str | None = None,
+        series: str | None = None,
         config: dict[str, Any] | None = None,
         config_template: dict[str, Any] | None = None,
     ) -> BoardTemplate:
@@ -91,7 +91,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             next_run_at: Next scheduled time to create a board.
             is_active: Whether the template is currently active.
             name_template: Optional template string for generating board names.
-            counter: Optional counter identifier for sequential board naming.
+            series: Optional series identifier for sequential board naming.
             config: Optional configuration object for boards created from this template.
             config_template: Optional template configuration for random generation.
 
@@ -108,8 +108,8 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             ...     account_id=account.id,
             ...     game_id=game.id,
             ...     name="Weekly Speed Run Template",
-            ...     name_template="Week {counter} - {year}",
-            ...     counter="weekly",
+            ...     name_template="Week {series} - {year}",
+            ...     series="weekly",
             ...     repeat_interval="7 days",
             ...     next_run_at=datetime.now(UTC) + timedelta(days=7),
             ...     is_active=True,
@@ -130,7 +130,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             game_id=game_id,
             name=name,
             name_template=name_template,
-            counter=counter,
+            series=series,
             repeat_interval=repeat_interval,
             config=config or {},
             config_template=config_template or {},
@@ -181,7 +181,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         template_id: BoardTemplateID,
         name: str | None = None,
         name_template: str | None = None,
-        counter: str | None = None,
+        series: str | None = None,
         repeat_interval: str | None = None,
         config: dict[str, Any] | None = None,
         config_template: dict[str, Any] | None = None,
@@ -194,7 +194,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             template_id: The ID of the template to update.
             name: New template name, if provided.
             name_template: New name template, if provided.
-            counter: New counter identifier, if provided.
+            series: New series identifier, if provided.
             repeat_interval: New repeat interval, if provided.
             config: New config, if provided.
             config_template: New config template, if provided.
@@ -218,8 +218,8 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             template.name = name
         if name_template is not None:
             template.name_template = name_template
-        if counter is not None:
-            template.counter = counter
+        if series is not None:
+            template.series = series
         if repeat_interval is not None:
             template.repeat_interval = repeat_interval
         if config is not None:

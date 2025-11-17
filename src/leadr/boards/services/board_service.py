@@ -122,8 +122,8 @@ class BoardService(BaseService[Board, BoardRepository]):
 
         Extracts configuration from the template and calculates time boundaries
         based on the template's repeat_interval. Automatically generates a unique
-        short code for the board. If the template has a counter field, generates
-        a sequential counter value and uses it in the board name.
+        short code for the board. If the template has a series field, generates
+        a sequential series value and uses it in the board name.
 
         Args:
             template: The BoardTemplate to create a board from.
@@ -143,15 +143,15 @@ class BoardService(BaseService[Board, BoardRepository]):
         # Get current timestamp for name generation
         now = datetime.now(UTC)
 
-        # Calculate counter value if template uses counters
-        counter_value = None
-        if template.counter is not None:
+        # Calculate series value if template uses series
+        series_value = None
+        if template.series is not None:
             # Count existing boards from this template and increment
             count = await self.repository.count_boards_by_template(template.id)
-            counter_value = count + 1
+            series_value = count + 1
 
         # Generate board name using template
-        board_name = template.generate_name(timestamp=now, counter_value=counter_value)
+        board_name = template.generate_name(timestamp=now, series_value=series_value)
 
         # Parse interval to calculate time boundaries
         duration = parse_interval_to_timedelta(template.repeat_interval)

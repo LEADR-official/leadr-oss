@@ -37,10 +37,10 @@ class BoardTemplate(Entity):
     name_template: str | None = Field(
         default=None, description="Optional template string for generating board names"
     )
-    counter: str | None = Field(
+    series: str | None = Field(
         default=None,
         description=(
-            "Optional counter identifier for sequential board naming (e.g., 'weekly', 'seasonal')"
+            "Optional series identifier for sequential board naming (e.g., 'weekly', 'seasonal')"
         ),
     )
     repeat_interval: str = Field(
@@ -111,11 +111,11 @@ class BoardTemplate(Entity):
 
         return value.strip()
 
-    def generate_name(self, timestamp: datetime, counter_value: int | None) -> str:
+    def generate_name(self, timestamp: datetime, series_value: int | None) -> str:
         """Generate a board name using the name template.
 
         If name_template is None, returns the template's name.
-        Otherwise, substitutes placeholders with values derived from the timestamp and counter.
+        Otherwise, substitutes placeholders with values derived from the timestamp and series.
 
         Supported placeholders:
         - {year}: 4-digit year (e.g., 2025)
@@ -124,18 +124,18 @@ class BoardTemplate(Entity):
         - {week}: ISO week number (e.g., 29)
         - {quarter}: Quarter (e.g., Q1, Q2, Q3, Q4)
         - {date}: ISO date (e.g., 2025-07-15)
-        - {counter}: Sequential counter value
+        - {series}: Sequential series value
 
         Args:
             timestamp: The datetime to use for generating time-based placeholders.
-            counter_value: Optional counter value for {counter} placeholder.
+            series_value: Optional series value for {series} placeholder.
 
         Returns:
             The generated board name.
 
         Raises:
             ValueError: If the name_template contains invalid placeholders or if
-                       {counter} is used but counter_value is None.
+                       {series} is used but series_value is None.
         """
         if self.name_template is None:
             return self.name
@@ -148,7 +148,7 @@ class BoardTemplate(Entity):
             "week",
             "quarter",
             "date",
-            "counter",
+            "series",
         }
 
         # Extract all placeholders from the template
@@ -165,10 +165,10 @@ class BoardTemplate(Entity):
                 f"Valid placeholders are: {valid_str}"
             )
 
-        # Check if counter is required but not provided
-        if "counter" in found_placeholders and counter_value is None:
+        # Check if series is required but not provided
+        if "series" in found_placeholders and series_value is None:
             raise ValueError(
-                "Template contains {counter} placeholder but counter_value was not provided"
+                "Template contains {series} placeholder but series_value was not provided"
             )
 
         # Calculate quarter (Q1, Q2, Q3, Q4)
@@ -182,7 +182,7 @@ class BoardTemplate(Entity):
             "week": timestamp.isocalendar()[1],  # ISO week number
             "quarter": quarter,
             "date": timestamp.strftime("%Y-%m-%d"),  # ISO date
-            "counter": counter_value,
+            "series": series_value,
         }
 
         # Generate the board name
