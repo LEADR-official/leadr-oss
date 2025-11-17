@@ -158,7 +158,7 @@ class TestScoreSubmissionMetaRoutes:
 
         # Filter by board1
         response = await client.get(
-            f"/score-submission-metadata?account_id={account.id}&board_id={board1.id}",
+            f"/score-submission-metadata?account_id={account.id}&board_id={board1.id.uuid}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -240,7 +240,7 @@ class TestScoreSubmissionMetaRoutes:
 
         # Filter by device1
         response = await client.get(
-            (f"/score-submission-metadata?account_id={account.id}&device_id={device1.id}"),
+            (f"/score-submission-metadata?account_id={account.id}&device_id={device1.id.uuid}"),
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -310,7 +310,7 @@ class TestScoreSubmissionMetaRoutes:
 
         # Get via API
         response = await client.get(
-            f"/score-submission-metadata/{meta.id}",
+            f"/score-submission-metadata/{meta.id.uuid}",
             headers={"leadr-api-key": test_api_key},
         )
 

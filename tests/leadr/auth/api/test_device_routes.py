@@ -85,7 +85,7 @@ class TestDeviceRoutes:
 
         # Filter by game1
         response = await client.get(
-            f"/devices?account_id={account.id}&game_id={game1.id}",
+            f"/devices?account_id={account.id}&game_id={game1.id.uuid}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -163,7 +163,7 @@ class TestDeviceRoutes:
 
         # Get device
         response = await client.get(
-            f"/devices/{device.id}",
+            f"/devices/{device.id.uuid}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -207,7 +207,7 @@ class TestDeviceRoutes:
 
         # Ban device
         response = await client.patch(
-            f"/devices/{device.id}",
+            f"/devices/{device.id.uuid}",
             json={"status": "banned"},
             headers={"leadr-api-key": test_api_key},
         )
@@ -240,7 +240,7 @@ class TestDeviceRoutes:
 
         # Suspend device
         response = await client.patch(
-            f"/devices/{device.id}",
+            f"/devices/{device.id.uuid}",
             json={"status": "suspended"},
             headers={"leadr-api-key": test_api_key},
         )
@@ -275,7 +275,7 @@ class TestDeviceRoutes:
 
         # Activate device
         response = await client.patch(
-            f"/devices/{device.id}",
+            f"/devices/{device.id.uuid}",
             json={"status": "active"},
             headers={"leadr-api-key": test_api_key},
         )

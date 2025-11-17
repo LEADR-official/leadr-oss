@@ -40,32 +40,15 @@ class TestRequireDeviceToken:
             "format" in exc_info.value.detail.lower() or "invalid" in exc_info.value.detail.lower()
         )
 
-    async def test_invalid_token_raises_401(self, db_session: AsyncSession):
+    async def test_invalid_token_raises_401(self, db_session: AsyncSession, game_orm: GameORM):
         """Test that an invalid/unknown token raises 401 Unauthorized."""
-        # Create account, game, and device to ensure DB works
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
         service = await get_device_service(db_session)
 
         # Start a valid session to ensure setup works
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen:
             mock_gen.return_value = ("valid_token", "valid_hash")
             await service.start_session(
-                game_id=GameID(game.id),
+                game_id=GameID(game_orm.id),
                 device_id=str(uuid4()),
                 platform="ios",
             )
@@ -77,25 +60,10 @@ class TestRequireDeviceToken:
         assert exc_info.value.status_code == 401
         assert "invalid" in exc_info.value.detail.lower()
 
-    async def test_valid_token_returns_device_entity(self, db_session: AsyncSession):
+    async def test_valid_token_returns_device_entity(
+        self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
+    ):
         """Test that a valid device token returns the Device entity."""
-        # Create account and game
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
         # Create device and session
         service = await get_device_service(db_session)
         device_id = str(uuid4())
@@ -107,7 +75,7 @@ class TestRequireDeviceToken:
             ) as mock_gen_refresh:
                 mock_gen_refresh.return_value = ("test_refresh_token", "test_refresh_hash")
                 device, plain_token, _, _ = await service.start_session(
-                    game_id=GameID(game.id),
+                    game_id=GameID(game_orm.id),
                     device_id=device_id,
                     platform="android",
                 )
@@ -116,8 +84,8 @@ class TestRequireDeviceToken:
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
             mock_val.return_value = {
                 "sub": device_id,
-                "game_id": str(game.id),
-                "account_id": str(account.id),
+                "game_id": str(game_orm.id),
+                "account_id": str(account_orm.id),
             }
             with patch("leadr.auth.services.device_service.hash_token") as mock_hash:
                 mock_hash.return_value = "test_hash"
@@ -130,41 +98,17 @@ class TestRequireDeviceToken:
         # Should return the Device entity
         assert result.id == device.id
         assert result.device_id == device_id
-        assert result.game_id == game.id
-        assert result.account_id == account.id
+        assert result.game_id == game_orm.id
+        assert result.account_id == account_orm.id
 
-    async def test_expired_session_raises_401(self, db_session: AsyncSession):
+    async def test_expired_session_raises_401(
+        self,
+        db_session: AsyncSession,
+        device_orm: DeviceORM,
+        account_orm: AccountORM,
+        game_orm: GameORM,
+    ):
         """Test that a token with expired session raises 401 Unauthorized."""
-        # Create account and game
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        # Create device with expired session
-        device_orm = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id=str(uuid4()),
-            account_id=account.id,
-            platform="ios",
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device_orm)
-        await db_session.commit()
-
         # Create expired session
         expired_session = DeviceSessionORM(
             id=uuid4(),
@@ -184,8 +128,8 @@ class TestRequireDeviceToken:
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
             mock_val.return_value = {
                 "sub": device_orm.device_id,
-                "game_id": str(game.id),
-                "account_id": str(account.id),
+                "game_id": str(game_orm.id),
+                "account_id": str(account_orm.id),
             }
             with patch("leadr.auth.services.device_service.hash_token") as mock_hash:
                 mock_hash.return_value = "test_hash"
@@ -199,38 +143,14 @@ class TestRequireDeviceToken:
             "invalid" in exc_info.value.detail.lower() or "expired" in exc_info.value.detail.lower()
         )
 
-    async def test_revoked_session_raises_401(self, db_session: AsyncSession):
+    async def test_revoked_session_raises_401(
+        self,
+        db_session: AsyncSession,
+        device_orm: DeviceORM,
+        account_orm: AccountORM,
+        game_orm: GameORM,
+    ):
         """Test that a token with revoked session raises 401 Unauthorized."""
-        # Create account and game
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        # Create device with revoked session
-        device_orm = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id=str(uuid4()),
-            account_id=account.id,
-            platform="android",
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device_orm)
-        await db_session.commit()
-
         # Create revoked session
         revoked_session = DeviceSessionORM(
             id=uuid4(),
@@ -250,8 +170,8 @@ class TestRequireDeviceToken:
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
             mock_val.return_value = {
                 "sub": device_orm.device_id,
-                "game_id": str(game.id),
-                "account_id": str(account.id),
+                "game_id": str(game_orm.id),
+                "account_id": str(account_orm.id),
             }
             with patch("leadr.auth.services.device_service.hash_token") as mock_hash:
                 mock_hash.return_value = "test_hash"
@@ -265,31 +185,16 @@ class TestRequireDeviceToken:
             "invalid" in exc_info.value.detail.lower() or "revoked" in exc_info.value.detail.lower()
         )
 
-    async def test_banned_device_raises_401(self, db_session: AsyncSession):
+    async def test_banned_device_raises_401(
+        self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
+    ):
         """Test that a token for banned device raises 401 Unauthorized."""
-        # Create account and game
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
         # Create banned device
         device_orm = DeviceORM(
             id=uuid4(),
-            game_id=game.id,
+            game_id=game_orm.id,
             device_id=str(uuid4()),
-            account_id=account.id,
+            account_id=account_orm.id,
             platform="ios",
             status=DeviceStatusEnum.BANNED,
             first_seen_at=datetime.now(UTC),
@@ -316,8 +221,8 @@ class TestRequireDeviceToken:
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
             mock_val.return_value = {
                 "sub": device_orm.device_id,
-                "game_id": str(game.id),
-                "account_id": str(account.id),
+                "game_id": str(game_orm.id),
+                "account_id": str(account_orm.id),
             }
             with patch("leadr.auth.services.device_service.hash_token") as mock_hash:
                 mock_hash.return_value = "test_hash"
@@ -331,31 +236,16 @@ class TestRequireDeviceToken:
             "invalid" in exc_info.value.detail.lower() or "banned" in exc_info.value.detail.lower()
         )
 
-    async def test_soft_deleted_device_raises_401(self, db_session: AsyncSession):
+    async def test_soft_deleted_device_raises_401(
+        self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
+    ):
         """Test that a token for soft-deleted device raises 401 Unauthorized."""
-        # Create account and game
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
         # Create soft-deleted device
         device_orm = DeviceORM(
             id=uuid4(),
-            game_id=game.id,
+            game_id=game_orm.id,
             device_id=str(uuid4()),
-            account_id=account.id,
+            account_id=account_orm.id,
             platform="android",
             first_seen_at=datetime.now(UTC),
             last_seen_at=datetime.now(UTC),
@@ -369,8 +259,8 @@ class TestRequireDeviceToken:
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
             mock_val.return_value = {
                 "sub": device_orm.device_id,
-                "game_id": str(game.id),
-                "account_id": str(account.id),
+                "game_id": str(game_orm.id),
+                "account_id": str(account_orm.id),
             }
 
             # Try to use token for deleted device

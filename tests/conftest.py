@@ -38,6 +38,9 @@ from leadr.config import settings
 from leadr.games.adapters.orm import GameORM  # noqa: F401
 from leadr.scores.adapters.orm import ScoreFlagORM, ScoreORM, ScoreSubmissionMetaORM  # noqa: F401
 
+# Import all ORM fixtures from fixtures module
+from tests.fixtures import *  # noqa: F403, F401
+
 
 @pytest.fixture(scope="session", autouse=True)
 def ensure_test_environment():

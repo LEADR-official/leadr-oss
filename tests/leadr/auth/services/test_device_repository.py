@@ -18,31 +18,16 @@ from leadr.games.adapters.orm import GameORM
 class TestDeviceRepository:
     """Test suite for DeviceRepository."""
 
-    async def test_create_device(self, db_session: AsyncSession):
+    async def test_create_device(
+        self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
+    ):
         """Test creating a device via repository."""
-        # Set up game and account
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
         # Create domain entity
         now = datetime.now(UTC)
         device = Device(
-            game_id=GameID(game.id),
+            game_id=GameID(game_orm.id),
             device_id="test-device-123",
-            account_id=AccountID(account.id),
+            account_id=AccountID(account_orm.id),
             platform="ios",
             first_seen_at=now,
             last_seen_at=now,
@@ -53,53 +38,22 @@ class TestDeviceRepository:
         created_device = await repository.create(device)
 
         assert created_device.id is not None
-        assert created_device.game_id == game.id
+        assert created_device.game_id == game_orm.id
         assert created_device.device_id == "test-device-123"
-        assert created_device.account_id == account.id
+        assert created_device.account_id == account_orm.id
         assert created_device.platform == "ios"
         assert created_device.status == DeviceStatus.ACTIVE
 
-    async def test_get_device_by_id(self, db_session: AsyncSession):
+    async def test_get_device_by_id(self, db_session: AsyncSession, device_orm: DeviceORM):
         """Test retrieving a device by ID."""
-        # Set up game and account
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        # Create device directly in DB
-        device_id_val = uuid4()
-        device_orm = DeviceORM(
-            id=device_id_val,
-            game_id=game.id,
-            device_id="test-device",
-            account_id=account.id,
-            platform="android",
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device_orm)
-        await db_session.commit()
-
         # Retrieve via repository
         repository = DeviceRepository(db_session)
-        device = await repository.get_by_id(device_id_val)
+        device = await repository.get_by_id(device_orm.id)
 
         assert device is not None
-        assert device.id == device_id_val
-        assert device.device_id == "test-device"
-        assert device.platform == "android"
+        assert device.id == device_orm.id
+        assert device.device_id == device_orm.device_id
+        assert device.platform == device_orm.platform
 
     async def test_get_device_by_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent device returns None."""
@@ -107,44 +61,19 @@ class TestDeviceRepository:
         device = await repository.get_by_id(uuid4())
         assert device is None
 
-    async def test_get_device_by_game_and_device_id(self, db_session: AsyncSession):
+    async def test_get_device_by_game_and_device_id(
+        self, db_session: AsyncSession, device_orm: DeviceORM
+    ):
         """Test retrieving a device by game_id and device_id."""
-        # Set up game and account
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        # Create device
-        device_orm = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="unique-device-123",
-            account_id=account.id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device_orm)
-        await db_session.commit()
-
         # Retrieve via repository
         repository = DeviceRepository(db_session)
-        device = await repository.get_by_game_and_device_id(GameID(game.id), "unique-device-123")
+        device = await repository.get_by_game_and_device_id(
+            GameID(device_orm.game_id), device_orm.device_id
+        )
 
         assert device is not None
-        assert device.game_id == game.id
-        assert device.device_id == "unique-device-123"
+        assert device.game_id == device_orm.game_id
+        assert device.device_id == device_orm.device_id
 
     async def test_get_device_by_game_and_device_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent device by game and device_id returns None."""
@@ -152,31 +81,16 @@ class TestDeviceRepository:
         device = await repository.get_by_game_and_device_id(GameID(uuid4()), "nonexistent")
         assert device is None
 
-    async def test_update_device(self, db_session: AsyncSession):
+    async def test_update_device(
+        self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
+    ):
         """Test updating a device via repository."""
-        # Set up game and account
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
         # Create device
         now = datetime.now(UTC)
         device = Device(
-            game_id=GameID(game.id),
+            game_id=GameID(game_orm.id),
             device_id="test-device",
-            account_id=AccountID(account.id),
+            account_id=AccountID(account_orm.id),
             first_seen_at=now,
             last_seen_at=now,
         )
@@ -258,28 +172,8 @@ class TestDeviceRepository:
 class TestDeviceSessionRepository:
     """Test suite for DeviceSessionRepository."""
 
-    async def test_get_by_token_hash(self, db_session: AsyncSession):
+    async def test_get_by_token_hash(self, db_session: AsyncSession, device_orm: DeviceORM):
         """Test retrieving a session by access token hash."""
-        # Setup account, game, and device
-        account = AccountORM(id=uuid4(), name="Test Account", slug="test-account")
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(id=uuid4(), account_id=account.id, name="Test Game")
-        db_session.add(game)
-        await db_session.commit()
-
-        device_orm = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=account.id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device_orm)
-        await db_session.commit()
-
         # Create session
         now = datetime.now(UTC)
         from leadr.auth.services.repositories import DeviceSessionRepository
@@ -310,28 +204,8 @@ class TestDeviceSessionRepository:
 
         assert session is None
 
-    async def test_get_by_refresh_token_hash(self, db_session: AsyncSession):
+    async def test_get_by_refresh_token_hash(self, db_session: AsyncSession, device_orm: DeviceORM):
         """Test retrieving a session by refresh token hash."""
-        # Setup account, game, and device
-        account = AccountORM(id=uuid4(), name="Test Account", slug="test-account")
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(id=uuid4(), account_id=account.id, name="Test Game")
-        db_session.add(game)
-        await db_session.commit()
-
-        device_orm = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=account.id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device_orm)
-        await db_session.commit()
-
         # Create session with refresh token
         now = datetime.now(UTC)
         from leadr.auth.services.repositories import DeviceSessionRepository
@@ -364,28 +238,10 @@ class TestDeviceSessionRepository:
 
         assert session is None
 
-    async def test_get_by_refresh_token_hash_excludes_soft_deleted(self, db_session: AsyncSession):
+    async def test_get_by_refresh_token_hash_excludes_soft_deleted(
+        self, db_session: AsyncSession, device_orm: DeviceORM
+    ):
         """Test that get_by_refresh_token_hash excludes soft-deleted sessions."""
-        # Setup account, game, and device
-        account = AccountORM(id=uuid4(), name="Test Account", slug="test-account")
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(id=uuid4(), account_id=account.id, name="Test Game")
-        db_session.add(game)
-        await db_session.commit()
-
-        device_orm = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=account.id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device_orm)
-        await db_session.commit()
-
         # Create and then soft-delete session
         now = datetime.now(UTC)
         from leadr.auth.services.repositories import DeviceSessionRepository

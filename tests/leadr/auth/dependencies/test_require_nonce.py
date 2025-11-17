@@ -20,48 +20,10 @@ from leadr.games.adapters.orm import GameORM
 class TestRequireNonce:
     """Test suite for require_nonce dependency."""
 
-    async def test_valid_nonce_succeeds(self, db_session: AsyncSession):
+    async def test_valid_nonce_succeeds(
+        self, db_session: AsyncSession, device_orm: DeviceORM, nonce_orm: NonceORM
+    ):
         """Test that valid nonce is accepted and consumed."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device_orm = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device_orm)
-        await db_session.commit()
-
-        # Create valid nonce
-        nonce_value = str(uuid4())
-        nonce_orm = NonceORM(
-            id=uuid4(),
-            device_id=device_orm.id,
-            nonce_value=nonce_value,
-            expires_at=datetime.now(UTC) + timedelta(seconds=60),
-            status="pending",
-        )
-        db_session.add(nonce_orm)
-        await db_session.commit()
-
         # Create device entity
         device = Device(
             id=DeviceID(device_orm.id),
@@ -77,7 +39,7 @@ class TestRequireNonce:
         result = await require_nonce(
             device=device,
             service=service,
-            leadr_client_nonce=nonce_value,
+            leadr_client_nonce=nonce_orm.nonce_value,
         )
 
         assert result is True
@@ -107,36 +69,8 @@ class TestRequireNonce:
         assert exc_info.value.status_code == 412
         assert "nonce required" in exc_info.value.detail.lower()
 
-    async def test_invalid_nonce_raises_412(self, db_session: AsyncSession):
+    async def test_invalid_nonce_raises_412(self, db_session: AsyncSession, device_orm: DeviceORM):
         """Test that invalid/unknown nonce raises 412."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device_orm = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device_orm)
-        await db_session.commit()
-
         device = Device(
             id=DeviceID(device_orm.id),
             game_id=GameID(device_orm.game_id),
@@ -154,36 +88,8 @@ class TestRequireNonce:
         assert exc_info.value.status_code == 412
         assert "invalid" in exc_info.value.detail.lower()
 
-    async def test_expired_nonce_raises_412(self, db_session: AsyncSession):
+    async def test_expired_nonce_raises_412(self, db_session: AsyncSession, device_orm: DeviceORM):
         """Test that expired nonce raises 412."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device_orm = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device_orm)
-        await db_session.commit()
-
         # Create expired nonce
         nonce_value = str(uuid4())
         nonce_orm = NonceORM(
@@ -213,36 +119,10 @@ class TestRequireNonce:
         assert exc_info.value.status_code == 412
         assert "expired" in exc_info.value.detail.lower()
 
-    async def test_already_used_nonce_raises_412(self, db_session: AsyncSession):
+    async def test_already_used_nonce_raises_412(
+        self, db_session: AsyncSession, device_orm: DeviceORM
+    ):
         """Test that already-used nonce raises 412."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device_orm = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device_orm)
-        await db_session.commit()
-
         # Create used nonce
         nonce_value = str(uuid4())
         nonce_orm = NonceORM(

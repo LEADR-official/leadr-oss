@@ -78,7 +78,7 @@ class TestDeviceSessionRoutes:
 
         # Filter by device1
         response = await client.get(
-            f"/device-sessions?account_id={account.id}&device_id={device1.id}",
+            f"/device-sessions?account_id={account.id}&device_id={device1.id.uuid}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -118,7 +118,7 @@ class TestDeviceSessionRoutes:
 
         # Get session via API
         response = await client.get(
-            f"/device-sessions/{session.id}",
+            f"/device-sessions/{session.id.uuid}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -167,7 +167,7 @@ class TestDeviceSessionRoutes:
 
         # Revoke session
         response = await client.patch(
-            f"/device-sessions/{session.id}",
+            f"/device-sessions/{session.id.uuid}",
             json={"revoked": True},
             headers={"leadr-api-key": test_api_key},
         )

@@ -194,7 +194,7 @@ class TestScoreFlagRoutes:
 
         # Filter by board1
         response = await client.get(
-            f"/score-flags?account_id={account.id}&board_id={board1.id}",
+            f"/score-flags?account_id={account.id}&board_id={board1.id.uuid}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -430,7 +430,7 @@ class TestScoreFlagRoutes:
 
         # Get flag
         response = await client.get(
-            f"/score-flags/{created_flag.id}",
+            f"/score-flags/{created_flag.id.uuid}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -509,7 +509,7 @@ class TestScoreFlagRoutes:
 
         # Review flag - mark as confirmed cheat
         response = await client.patch(
-            f"/score-flags/{created_flag.id}",
+            f"/score-flags/{created_flag.id.uuid}",
             json={
                 "status": "CONFIRMED_CHEAT",
                 "reviewer_decision": "Verified cheating behavior",
@@ -583,7 +583,7 @@ class TestScoreFlagRoutes:
 
         # Review flag - mark as false positive
         response = await client.patch(
-            f"/score-flags/{created_flag.id}",
+            f"/score-flags/{created_flag.id.uuid}",
             json={
                 "status": "FALSE_POSITIVE",
                 "reviewer_decision": "Legitimate gameplay",
@@ -654,7 +654,7 @@ class TestScoreFlagRoutes:
 
         # Soft-delete flag
         response = await client.patch(
-            f"/score-flags/{created_flag.id}",
+            f"/score-flags/{created_flag.id.uuid}",
             json={"deleted": True},
             headers={"leadr-api-key": test_api_key},
         )

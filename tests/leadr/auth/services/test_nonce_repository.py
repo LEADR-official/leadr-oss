@@ -6,51 +6,21 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import DeviceORM, NonceORM
 from leadr.auth.domain.nonce import Nonce, NonceStatus
 from leadr.auth.services.repositories import NonceRepository
 from leadr.common.domain.ids import DeviceID
-from leadr.games.adapters.orm import GameORM
 
 
 @pytest.mark.asyncio
 class TestNonceRepository:
     """Test suite for NonceRepository."""
 
-    async def test_create_nonce(self, db_session: AsyncSession):
+    async def test_create_nonce(self, db_session: AsyncSession, device_orm: DeviceORM):
         """Test creating a nonce via repository."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
         # Create nonce entity
         nonce = Nonce(
-            device_id=DeviceID(device.id),
+            device_id=DeviceID(device_orm.id),
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
             status=NonceStatus.PENDING,
@@ -61,95 +31,30 @@ class TestNonceRepository:
         created_nonce = await repository.create(nonce)
 
         assert created_nonce.id == nonce.id
-        assert created_nonce.device_id == device.id
+        assert created_nonce.device_id == device_orm.id
         assert created_nonce.nonce_value == nonce.nonce_value
         assert created_nonce.status == NonceStatus.PENDING
 
-    async def test_get_by_id(self, db_session: AsyncSession):
+    async def test_get_by_id(self, db_session: AsyncSession, nonce_orm: NonceORM):
         """Test getting a nonce by ID."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
-        # Create nonce directly in DB
-        nonce_orm = NonceORM(
-            id=uuid4(),
-            device_id=DeviceID(device.id),
-            nonce_value=str(uuid4()),
-            expires_at=datetime.now(UTC) + timedelta(seconds=60),
-            status="pending",
-        )
-        db_session.add(nonce_orm)
-        await db_session.commit()
-
         # Get via repository
         repository = NonceRepository(db_session)
         retrieved = await repository.get_by_id(nonce_orm.id)
 
         assert retrieved is not None
         assert retrieved.id == nonce_orm.id
-        assert retrieved.device_id == device.id
+        assert retrieved.device_id == nonce_orm.device_id
         assert retrieved.nonce_value == nonce_orm.nonce_value
 
-    async def test_get_by_nonce_value_returns_nonce(self, db_session: AsyncSession):
+    async def test_get_by_nonce_value_returns_nonce(
+        self, db_session: AsyncSession, device_orm: DeviceORM
+    ):
         """Test getting a nonce by nonce_value."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
         # Create nonce
         nonce_value = str(uuid4())
         nonce_orm = NonceORM(
             id=uuid4(),
-            device_id=DeviceID(device.id),
+            device_id=device_orm.id,
             nonce_value=nonce_value,
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
             status="pending",
@@ -163,7 +68,7 @@ class TestNonceRepository:
 
         assert retrieved is not None
         assert retrieved.nonce_value == nonce_value
-        assert retrieved.device_id == device.id
+        assert retrieved.device_id == device_orm.id
         assert retrieved.status == NonceStatus.PENDING
 
     async def test_get_by_nonce_value_returns_none_for_unknown_value(
@@ -175,41 +80,15 @@ class TestNonceRepository:
 
         assert retrieved is None
 
-    async def test_get_by_nonce_value_excludes_soft_deleted(self, db_session: AsyncSession):
+    async def test_get_by_nonce_value_excludes_soft_deleted(
+        self, db_session: AsyncSession, device_orm: DeviceORM
+    ):
         """Test that get_by_nonce_value excludes soft-deleted nonces."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
         # Create soft-deleted nonce
         nonce_value = str(uuid4())
         nonce_orm = NonceORM(
             id=uuid4(),
-            device_id=DeviceID(device.id),
+            device_id=device_orm.id,
             nonce_value=nonce_value,
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
             status="pending",
@@ -224,39 +103,11 @@ class TestNonceRepository:
 
         assert retrieved is None
 
-    async def test_update_nonce(self, db_session: AsyncSession):
+    async def test_update_nonce(self, db_session: AsyncSession, device_orm: DeviceORM):
         """Test updating a nonce."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
         # Create nonce
         nonce = Nonce(
-            device_id=DeviceID(device.id),
+            device_id=DeviceID(device_orm.id),
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
             status=NonceStatus.PENDING,
@@ -272,40 +123,14 @@ class TestNonceRepository:
         assert updated_nonce.status == NonceStatus.USED
         assert updated_nonce.used_at is not None
 
-    async def test_cleanup_expired_nonces_deletes_old_expired(self, db_session: AsyncSession):
+    async def test_cleanup_expired_nonces_deletes_old_expired(
+        self, db_session: AsyncSession, device_orm: DeviceORM
+    ):
         """Test that cleanup_expired_nonces deletes old expired nonces."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
         # Create old expired nonce (expired 2 hours ago)
         old_expired_nonce = NonceORM(
             id=uuid4(),
-            device_id=DeviceID(device.id),
+            device_id=device_orm.id,
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(hours=2),
             status="pending",
@@ -315,7 +140,7 @@ class TestNonceRepository:
         # Create recent expired nonce (expired 30 seconds ago)
         recent_expired_nonce = NonceORM(
             id=uuid4(),
-            device_id=DeviceID(device.id),
+            device_id=device_orm.id,
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(seconds=30),
             status="pending",
@@ -325,7 +150,7 @@ class TestNonceRepository:
         # Create valid nonce
         valid_nonce = NonceORM(
             id=uuid4(),
-            device_id=DeviceID(device.id),
+            device_id=device_orm.id,
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
             status="pending",
@@ -354,40 +179,14 @@ class TestNonceRepository:
         valid_retrieved = await repository.get_by_id(valid_nonce.id)
         assert valid_retrieved is not None
 
-    async def test_cleanup_expired_nonces_only_deletes_pending(self, db_session: AsyncSession):
+    async def test_cleanup_expired_nonces_only_deletes_pending(
+        self, db_session: AsyncSession, device_orm: DeviceORM
+    ):
         """Test that cleanup only deletes nonces with PENDING status."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
         # Create old expired pending nonce
         pending_nonce = NonceORM(
             id=uuid4(),
-            device_id=DeviceID(device.id),
+            device_id=device_orm.id,
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(hours=2),
             status="pending",
@@ -397,7 +196,7 @@ class TestNonceRepository:
         # Create old expired used nonce
         used_nonce = NonceORM(
             id=uuid4(),
-            device_id=DeviceID(device.id),
+            device_id=device_orm.id,
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(hours=2),
             status="used",

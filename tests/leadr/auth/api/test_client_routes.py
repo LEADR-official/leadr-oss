@@ -286,8 +286,8 @@ class TestClientSessionRoutes:
         now = datetime.now(UTC)
         device = DeviceORM(
             id=uuid4(),
-            account_id=account.id,
-            game_id=game.id,
+            account_id=account.id.uuid,
+            game_id=game.id.uuid,
             device_id="test-device-expired",
             first_seen_at=now,
             last_seen_at=now,

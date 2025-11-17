@@ -60,8 +60,8 @@ class TestGenerateAccessToken:
         decoded = jwt.decode(token, options={"verify_signature": False})
 
         assert decoded["sub"] == device_id
-        assert decoded["game_id"] == str(game_id)
-        assert decoded["account_id"] == str(account_id)
+        assert decoded["game_id"] == str(game_id.uuid)
+        assert decoded["account_id"] == str(account_id.uuid)
         assert "exp" in decoded
         assert "iat" in decoded
         assert "jti" in decoded
@@ -175,8 +175,8 @@ class TestValidateAccessToken:
 
         assert claims is not None
         assert claims["sub"] == device_id
-        assert claims["game_id"] == str(game_id)
-        assert claims["account_id"] == str(account_id)
+        assert claims["game_id"] == str(game_id.uuid)
+        assert claims["account_id"] == str(account_id.uuid)
 
     def test_rejects_expired_token(self):
         """Test that expired token is rejected."""
@@ -358,8 +358,8 @@ class TestGenerateRefreshToken:
         decoded = jwt.decode(token, options={"verify_signature": False})
 
         assert decoded["sub"] == device_id
-        assert decoded["game_id"] == str(game_id)
-        assert decoded["account_id"] == str(account_id)
+        assert decoded["game_id"] == str(game_id.uuid)
+        assert decoded["account_id"] == str(account_id.uuid)
         assert decoded["token_version"] == token_version
         assert "exp" in decoded
         assert "iat" in decoded
@@ -514,8 +514,8 @@ class TestValidateRefreshToken:
 
         assert claims is not None
         assert claims["sub"] == device_id
-        assert claims["game_id"] == str(game_id)
-        assert claims["account_id"] == str(account_id)
+        assert claims["game_id"] == str(game_id.uuid)
+        assert claims["account_id"] == str(account_id.uuid)
         assert claims["token_version"] == token_version
 
     def test_rejects_expired_token(self):
@@ -623,8 +623,8 @@ class TestTokenGenerationAndValidation:
         claims = validate_access_token(token, secret)
         assert claims is not None
         assert claims["sub"] == device_id
-        assert claims["game_id"] == str(game_id)
-        assert claims["account_id"] == str(account_id)
+        assert claims["game_id"] == str(game_id.uuid)
+        assert claims["account_id"] == str(account_id.uuid)
 
         # Hash matches
         rehashed = hash_token(token, secret)
@@ -669,8 +669,8 @@ class TestTokenGenerationAndValidation:
         claims = validate_refresh_token(token, secret)
         assert claims is not None
         assert claims["sub"] == device_id
-        assert claims["game_id"] == str(game_id)
-        assert claims["account_id"] == str(account_id)
+        assert claims["game_id"] == str(game_id.uuid)
+        assert claims["account_id"] == str(account_id.uuid)
         assert claims["token_version"] == token_version
 
         # Hash matches
