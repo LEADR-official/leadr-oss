@@ -62,7 +62,7 @@ class TestBoard:
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
             keep_strategy=KeepStrategy.BEST_ONLY,
-            template_id=template_id,
+            created_from_template_id=template_id,
             template_name="Speed Run Template",
             starts_at=starts_at,
             ends_at=ends_at,
@@ -81,7 +81,7 @@ class TestBoard:
         assert board.is_active is True
         assert board.sort_direction == SortDirection.ASCENDING
         assert board.keep_strategy == KeepStrategy.BEST_ONLY
-        assert board.template_id == template_id
+        assert board.created_from_template_id == template_id
         assert board.template_name == "Speed Run Template"
         assert board.starts_at == starts_at
         assert board.ends_at == ends_at
@@ -121,7 +121,7 @@ class TestBoard:
         assert board.is_active is True
         assert board.sort_direction == SortDirection.DESCENDING
         assert board.keep_strategy == KeepStrategy.ALL
-        assert board.template_id is None
+        assert board.created_from_template_id is None
         assert board.template_name is None
         assert board.starts_at is None
         assert board.ends_at is None

@@ -44,7 +44,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         sort_direction: SortDirection,
         keep_strategy: KeepStrategy,
         short_code: str | None = None,
-        template_id: BoardTemplateID | None = None,
+        created_from_template_id: BoardTemplateID | None = None,
         template_name: str | None = None,
         starts_at: datetime | None = None,
         ends_at: datetime | None = None,
@@ -62,7 +62,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             sort_direction: Direction to sort scores.
             keep_strategy: Strategy for keeping multiple scores from same user.
             short_code: Globally unique short code for direct sharing.
-            template_id: Optional template ID this board was created from.
+            created_from_template_id: Optional template ID this board was created from.
             template_name: Optional template name.
             starts_at: Optional start time for time-bounded boards.
             ends_at: Optional end time for time-bounded boards.
@@ -108,7 +108,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             is_active=is_active,
             sort_direction=sort_direction,
             keep_strategy=keep_strategy,
-            template_id=template_id,
+            created_from_template_id=created_from_template_id,
             template_name=template_name,
             starts_at=starts_at,
             ends_at=ends_at,
@@ -122,7 +122,8 @@ class BoardService(BaseService[Board, BoardRepository]):
 
         Extracts configuration from the template and calculates time boundaries
         based on the template's repeat_interval. Automatically generates a unique
-        short code for the board.
+        short code for the board. If the template has a counter field, generates
+        a sequential counter value and uses it in the board name.
 
         Args:
             template: The BoardTemplate to create a board from.
@@ -131,11 +132,27 @@ class BoardService(BaseService[Board, BoardRepository]):
             The created Board domain entity.
 
         Raises:
-            ValueError: If interval parsing fails or game doesn't belong to account.
+            ValueError: If interval parsing fails, game doesn't belong to account,
+                       or name generation fails.
 
         Example:
             >>> board = await service.create_board_from_template(template)
         """
+        from datetime import UTC
+
+        # Get current timestamp for name generation
+        now = datetime.now(UTC)
+
+        # Calculate counter value if template uses counters
+        counter_value = None
+        if template.counter is not None:
+            # Count existing boards from this template and increment
+            count = await self.repository.count_boards_by_template(template.id)
+            counter_value = count + 1
+
+        # Generate board name using template
+        board_name = template.generate_name(timestamp=now, counter_value=counter_value)
+
         # Parse interval to calculate time boundaries
         duration = parse_interval_to_timedelta(template.repeat_interval)
         starts_at = template.next_run_at
@@ -170,13 +187,13 @@ class BoardService(BaseService[Board, BoardRepository]):
         return await self.create_board(
             account_id=template.account_id,
             game_id=template.game_id,
-            name=template.name,
+            name=board_name,
             icon=icon,
             unit=unit,
             is_active=is_active,
             sort_direction=sort_direction,
             keep_strategy=keep_strategy,
-            template_id=template.id,
+            created_from_template_id=template.id,
             template_name=template.name,
             starts_at=starts_at,
             ends_at=ends_at,
@@ -240,7 +257,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         is_active: bool | None = None,
         sort_direction: SortDirection | None = None,
         keep_strategy: KeepStrategy | None = None,
-        template_id: BoardTemplateID | None = None,
+        created_from_template_id: BoardTemplateID | None = None,
         template_name: str | None = None,
         starts_at: datetime | None = None,
         ends_at: datetime | None = None,
@@ -257,7 +274,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             is_active: New is_active status, if provided
             sort_direction: New sort_direction, if provided
             keep_strategy: New keep_strategy, if provided
-            template_id: New template_id, if provided
+            created_from_template_id: New created_from_template_id, if provided
             template_name: New template_name, if provided
             starts_at: New starts_at, if provided
             ends_at: New ends_at, if provided
@@ -285,8 +302,8 @@ class BoardService(BaseService[Board, BoardRepository]):
             board.sort_direction = sort_direction
         if keep_strategy is not None:
             board.keep_strategy = keep_strategy
-        if template_id is not None:
-            board.template_id = template_id
+        if created_from_template_id is not None:
+            board.created_from_template_id = created_from_template_id
         if template_name is not None:
             board.template_name = template_name
         if starts_at is not None:

@@ -44,7 +44,7 @@ class BoardORM(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
     sort_direction: Mapped[str] = mapped_column(String, nullable=False)
     keep_strategy: Mapped[str] = mapped_column(String, nullable=False)
-    template_id: Mapped[UUID | None] = mapped_column(nullable=True, default=None)
+    created_from_template_id: Mapped[UUID | None] = mapped_column(nullable=True, default=None)
     template_name: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     starts_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
@@ -83,6 +83,7 @@ class BoardTemplateORM(Base):
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
     name_template: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    counter: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     repeat_interval: Mapped[str] = mapped_column(String, nullable=False)
     config: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"
@@ -112,6 +113,7 @@ class BoardTemplateORM(Base):
             game_id=GameID(self.game_id),
             name=self.name,
             name_template=self.name_template,
+            counter=self.counter,
             repeat_interval=self.repeat_interval,
             config=self.config,
             config_template=self.config_template,
@@ -139,6 +141,7 @@ class BoardTemplateORM(Base):
             game_id=entity.game_id.uuid,
             name=entity.name,
             name_template=entity.name_template,
+            counter=entity.counter,
             repeat_interval=entity.repeat_interval,
             config=entity.config,
             config_template=entity.config_template,

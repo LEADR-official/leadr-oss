@@ -22,9 +22,9 @@ class TestBoardTemplate:
         next_run_at = now + timedelta(days=7)
 
         template = BoardTemplate(
-            id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Weekly Speed Run Template",
             name_template="Speed Run Week {week}",
             repeat_interval="7 days",
@@ -58,9 +58,9 @@ class TestBoardTemplate:
         next_run_at = now + timedelta(days=1)
 
         template = BoardTemplate(
-            id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Simple Template",
             repeat_interval="1 day",
             next_run_at=next_run_at,
@@ -91,9 +91,9 @@ class TestBoardTemplate:
 
         with pytest.raises(ValidationError) as exc_info:
             BoardTemplate(  # type: ignore[call-arg]
-                id=template_id,
-                account_id=account_id,
-                game_id=game_id,
+                id=BoardTemplateID(template_id),
+                account_id=AccountID(account_id),
+                game_id=GameID(game_id),
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
                 is_active=True,
@@ -111,8 +111,8 @@ class TestBoardTemplate:
 
         with pytest.raises(ValidationError) as exc_info:
             BoardTemplate(  # type: ignore[call-arg]
-                id=template_id,
-                game_id=game_id,
+                id=BoardTemplateID(template_id),
+                game_id=GameID(game_id),
                 name="Template Without Account",
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
@@ -131,8 +131,8 @@ class TestBoardTemplate:
 
         with pytest.raises(ValidationError) as exc_info:
             BoardTemplate(  # type: ignore[call-arg]
-                id=template_id,
-                account_id=account_id,
+                id=BoardTemplateID(template_id),
+                account_id=AccountID(account_id),
                 name="Template Without Game",
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
@@ -152,9 +152,9 @@ class TestBoardTemplate:
 
         with pytest.raises(ValidationError) as exc_info:
             BoardTemplate(  # type: ignore[call-arg]
-                id=template_id,
-                account_id=account_id,
-                game_id=game_id,
+                id=BoardTemplateID(template_id),
+                account_id=AccountID(account_id),
+                game_id=GameID(game_id),
                 name="Template Without Interval",
                 next_run_at=now + timedelta(days=7),
                 is_active=True,
@@ -173,9 +173,9 @@ class TestBoardTemplate:
 
         with pytest.raises(ValidationError) as exc_info:
             BoardTemplate(  # type: ignore[call-arg]
-                id=template_id,
-                account_id=account_id,
-                game_id=game_id,
+                id=BoardTemplateID(template_id),
+                account_id=AccountID(account_id),
+                game_id=GameID(game_id),
                 name="Template Without Next Run",
                 repeat_interval="7 days",
                 is_active=True,
@@ -194,9 +194,9 @@ class TestBoardTemplate:
 
         with pytest.raises(ValidationError) as exc_info:
             BoardTemplate(  # type: ignore[call-arg]
-                id=template_id,
-                account_id=account_id,
-                game_id=game_id,
+                id=BoardTemplateID(template_id),
+                account_id=AccountID(account_id),
+                game_id=GameID(game_id),
                 name="Template Without Active Status",
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
@@ -215,9 +215,9 @@ class TestBoardTemplate:
 
         with pytest.raises(ValidationError) as exc_info:
             BoardTemplate(
-                id=template_id,
-                account_id=account_id,
-                game_id=game_id,
+                id=BoardTemplateID(template_id),
+                account_id=AccountID(account_id),
+                game_id=GameID(game_id),
                 name="",
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
@@ -237,9 +237,9 @@ class TestBoardTemplate:
 
         with pytest.raises(ValidationError) as exc_info:
             BoardTemplate(
-                id=template_id,
-                account_id=account_id,
-                game_id=game_id,
+                id=BoardTemplateID(template_id),
+                account_id=AccountID(account_id),
+                game_id=GameID(game_id),
                 name="   ",
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
@@ -258,9 +258,9 @@ class TestBoardTemplate:
         now = datetime.now(UTC)
 
         template = BoardTemplate(
-            id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="  Padded Template Name  ",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -294,9 +294,9 @@ class TestBoardTemplate:
 
         for interval in valid_intervals:
             template = BoardTemplate(
-                id=template_id,
-                account_id=account_id,
-                game_id=game_id,
+                id=BoardTemplateID(template_id),
+                account_id=AccountID(account_id),
+                game_id=GameID(game_id),
                 name="Test Template",
                 repeat_interval=interval,
                 next_run_at=now + timedelta(days=1),
@@ -325,9 +325,9 @@ class TestBoardTemplate:
         for interval in invalid_intervals:
             with pytest.raises(ValidationError) as exc_info:
                 BoardTemplate(
-                    id=template_id,
-                    account_id=account_id,
-                    game_id=game_id,
+                    id=BoardTemplateID(template_id),
+                    account_id=AccountID(account_id),
+                    game_id=GameID(game_id),
                     name="Test Template",
                     repeat_interval=interval,
                     next_run_at=now + timedelta(days=1),
@@ -346,9 +346,9 @@ class TestBoardTemplate:
         now = datetime.now(UTC)
 
         template = BoardTemplate(
-            id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Test Template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -368,9 +368,9 @@ class TestBoardTemplate:
         now = datetime.now(UTC)
 
         template = BoardTemplate(
-            id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Test Template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -390,9 +390,9 @@ class TestBoardTemplate:
         now = datetime.now(UTC)
 
         template1 = BoardTemplate(
-            id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Template One",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -402,7 +402,7 @@ class TestBoardTemplate:
         )
 
         template2 = BoardTemplate(
-            id=template_id,
+            id=BoardTemplateID(template_id),
             account_id=AccountID(uuid4()),
             game_id=GameID(uuid4()),
             name="Template Two",
@@ -423,8 +423,8 @@ class TestBoardTemplate:
 
         template1 = BoardTemplate(
             id=BoardTemplateID(uuid4()),
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Template One",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -435,8 +435,8 @@ class TestBoardTemplate:
 
         template2 = BoardTemplate(
             id=BoardTemplateID(uuid4()),
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Template One",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -455,9 +455,9 @@ class TestBoardTemplate:
         now = datetime.now(UTC)
 
         template = BoardTemplate(
-            id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Hashable Template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -482,9 +482,9 @@ class TestBoardTemplate:
         now = datetime.now(UTC)
 
         template = BoardTemplate(
-            id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Immutable ID Template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -506,9 +506,9 @@ class TestBoardTemplate:
         now = datetime.now(UTC)
 
         template = BoardTemplate(
-            id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Immutable Account Template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -530,9 +530,9 @@ class TestBoardTemplate:
         now = datetime.now(UTC)
 
         template = BoardTemplate(
-            id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Immutable Game Template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -554,9 +554,9 @@ class TestBoardTemplate:
         now = datetime.now(UTC)
 
         template = BoardTemplate(
-            id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Deletable Template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -581,9 +581,9 @@ class TestBoardTemplate:
         now = datetime.now(UTC)
 
         template = BoardTemplate(
-            id=template_id,
-            account_id=account_id,
-            game_id=game_id,
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Restorable Template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -598,3 +598,308 @@ class TestBoardTemplate:
         template.restore()
         assert template.is_deleted is False
         assert template.deleted_at is None
+
+
+class TestBoardTemplateGenerateName:
+    """Test suite for BoardTemplate.generate_name() method."""
+
+    def test_generate_name_falls_back_to_template_name_when_no_name_template(self):
+        """Test that generate_name() returns template.name when name_template is None."""
+        template_id = uuid4()
+        account_id = uuid4()
+        game_id = uuid4()
+        now = datetime.now(UTC)
+
+        template = BoardTemplate(
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Fallback Name",
+            name_template=None,
+            repeat_interval="7 days",
+            next_run_at=now + timedelta(days=7),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        result = template.generate_name(timestamp=now, counter_value=None)
+        assert result == "Fallback Name"
+
+    def test_generate_name_with_year_placeholder(self):
+        """Test generate_name() with {year} placeholder."""
+        template_id = uuid4()
+        account_id = uuid4()
+        game_id = uuid4()
+        now = datetime.now(UTC)
+
+        template = BoardTemplate(
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Template Name",
+            name_template="Championship {year}",
+            repeat_interval="1 year",
+            next_run_at=now + timedelta(days=365),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        timestamp = datetime(2025, 7, 15, tzinfo=UTC)
+        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        assert result == "Championship 2025"
+
+    def test_generate_name_with_month_placeholder(self):
+        """Test generate_name() with {month} placeholder."""
+        template_id = uuid4()
+        account_id = uuid4()
+        game_id = uuid4()
+        now = datetime.now(UTC)
+
+        template = BoardTemplate(
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Template Name",
+            name_template="High Scores - {month}",
+            repeat_interval="1 month",
+            next_run_at=now + timedelta(days=30),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        timestamp = datetime(2025, 7, 15, tzinfo=UTC)
+        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        assert result == "High Scores - July"
+
+    def test_generate_name_with_month_short_placeholder(self):
+        """Test generate_name() with {month_short} placeholder."""
+        template_id = uuid4()
+        account_id = uuid4()
+        game_id = uuid4()
+        now = datetime.now(UTC)
+
+        template = BoardTemplate(
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Template Name",
+            name_template="Leaderboard {month_short} {year}",
+            repeat_interval="1 month",
+            next_run_at=now + timedelta(days=30),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        timestamp = datetime(2025, 7, 15, tzinfo=UTC)
+        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        assert result == "Leaderboard Jul 2025"
+
+    def test_generate_name_with_week_placeholder(self):
+        """Test generate_name() with {week} placeholder."""
+        template_id = uuid4()
+        account_id = uuid4()
+        game_id = uuid4()
+        now = datetime.now(UTC)
+
+        template = BoardTemplate(
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Template Name",
+            name_template="Week {week} Challenge",
+            repeat_interval="7 days",
+            next_run_at=now + timedelta(days=7),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        # July 15, 2025 is week 29 of the year (ISO week)
+        timestamp = datetime(2025, 7, 15, tzinfo=UTC)
+        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        assert result == "Week 29 Challenge"
+
+    def test_generate_name_with_quarter_placeholder(self):
+        """Test generate_name() with {quarter} placeholder."""
+        template_id = uuid4()
+        account_id = uuid4()
+        game_id = uuid4()
+        now = datetime.now(UTC)
+
+        template = BoardTemplate(
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Template Name",
+            name_template="{quarter} {year} Rankings",
+            repeat_interval="3 months",
+            next_run_at=now + timedelta(days=90),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        # July is Q3
+        timestamp = datetime(2025, 7, 15, tzinfo=UTC)
+        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        assert result == "Q3 2025 Rankings"
+
+        # January is Q1
+        timestamp = datetime(2025, 1, 15, tzinfo=UTC)
+        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        assert result == "Q1 2025 Rankings"
+
+        # December is Q4
+        timestamp = datetime(2025, 12, 15, tzinfo=UTC)
+        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        assert result == "Q4 2025 Rankings"
+
+    def test_generate_name_with_date_placeholder(self):
+        """Test generate_name() with {date} placeholder."""
+        template_id = uuid4()
+        account_id = uuid4()
+        game_id = uuid4()
+        now = datetime.now(UTC)
+
+        template = BoardTemplate(
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Template Name",
+            name_template="Daily Challenge {date}",
+            repeat_interval="1 day",
+            next_run_at=now + timedelta(days=1),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        timestamp = datetime(2025, 7, 15, tzinfo=UTC)
+        result = template.generate_name(timestamp=timestamp, counter_value=None)
+        assert result == "Daily Challenge 2025-07-15"
+
+    def test_generate_name_with_counter_placeholder(self):
+        """Test generate_name() with {counter} placeholder."""
+        template_id = uuid4()
+        account_id = uuid4()
+        game_id = uuid4()
+        now = datetime.now(UTC)
+
+        template = BoardTemplate(
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Template Name",
+            name_template="Weekly Challenge {counter}",
+            repeat_interval="7 days",
+            next_run_at=now + timedelta(days=7),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        result = template.generate_name(timestamp=now, counter_value=21)
+        assert result == "Weekly Challenge 21"
+
+    def test_generate_name_with_multiple_placeholders(self):
+        """Test generate_name() with multiple placeholders."""
+        template_id = uuid4()
+        account_id = uuid4()
+        game_id = uuid4()
+        now = datetime.now(UTC)
+
+        template = BoardTemplate(
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Template Name",
+            name_template="{month} {year} - Week {counter}",
+            repeat_interval="7 days",
+            next_run_at=now + timedelta(days=7),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        timestamp = datetime(2025, 7, 15, tzinfo=UTC)
+        result = template.generate_name(timestamp=timestamp, counter_value=3)
+        assert result == "July 2025 - Week 3"
+
+    def test_generate_name_with_invalid_placeholder_raises_error(self):
+        """Test that generate_name() raises ValueError for invalid placeholders."""
+        template_id = uuid4()
+        account_id = uuid4()
+        game_id = uuid4()
+        now = datetime.now(UTC)
+
+        template = BoardTemplate(
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Template Name",
+            name_template="Challenge {invalid_placeholder}",
+            repeat_interval="7 days",
+            next_run_at=now + timedelta(days=7),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            template.generate_name(timestamp=now, counter_value=None)
+
+        assert "invalid" in str(exc_info.value).lower()
+        assert "placeholder" in str(exc_info.value).lower()
+
+    def test_generate_name_with_counter_placeholder_but_no_counter_value(self):
+        """Test that generate_name() raises error when {counter} used but counter_value is None."""
+        template_id = uuid4()
+        account_id = uuid4()
+        game_id = uuid4()
+        now = datetime.now(UTC)
+
+        template = BoardTemplate(
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Template Name",
+            name_template="Weekly Challenge {counter}",
+            repeat_interval="7 days",
+            next_run_at=now + timedelta(days=7),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            template.generate_name(timestamp=now, counter_value=None)
+
+        assert "counter" in str(exc_info.value).lower()
+
+    def test_generate_name_with_all_placeholders(self):
+        """Test generate_name() with all supported placeholders."""
+        template_id = uuid4()
+        account_id = uuid4()
+        game_id = uuid4()
+        now = datetime.now(UTC)
+
+        template = BoardTemplate(
+            id=BoardTemplateID(template_id),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Template Name",
+            name_template=("{year}/{month}/{month_short}/{week}/{quarter}/{date}/#{counter}"),
+            repeat_interval="7 days",
+            next_run_at=now + timedelta(days=7),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        timestamp = datetime(2025, 7, 15, tzinfo=UTC)
+        result = template.generate_name(timestamp=timestamp, counter_value=42)
+        assert result == "2025/July/Jul/29/Q3/2025-07-15/#42"

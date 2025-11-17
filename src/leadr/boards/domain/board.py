@@ -59,7 +59,7 @@ class Board(Entity):
     keep_strategy: KeepStrategy = Field(
         description="Strategy for keeping multiple scores from the same user"
     )
-    template_id: BoardTemplateID | None = Field(
+    created_from_template_id: BoardTemplateID | None = Field(
         default=None, description="Optional template ID this board was created from"
     )
     template_name: str | None = Field(

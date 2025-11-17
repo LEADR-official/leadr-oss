@@ -66,7 +66,7 @@ class TestProcessDueTemplates:
 
         result = await db_session.execute(
             select(BoardORM).where(
-                BoardORM.template_id == template.id.uuid,
+                BoardORM.created_from_template_id == template.id.uuid,
             )
         )
         boards = result.scalars().all()
@@ -124,7 +124,7 @@ class TestProcessDueTemplates:
 
         result = await db_session.execute(
             select(BoardORM).where(
-                BoardORM.template_id == template.id.uuid,
+                BoardORM.created_from_template_id == template.id.uuid,
             )
         )
         boards = result.scalars().all()
