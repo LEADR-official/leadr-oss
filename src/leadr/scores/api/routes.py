@@ -99,7 +99,7 @@ async def get_score(
     """Get a score by ID.
 
     Args:
-        score_id: UUID of the score to retrieve.
+        score_id: Score identifier to retrieve.
         service: Injected score service dependency.
         auth: Authentication context with user info.
 
@@ -174,7 +174,7 @@ async def update_score(
     remain unchanged. Set deleted: true to soft delete the score.
 
     Args:
-        score_id: UUID of the score to update.
+        score_id: Score identifier to update.
         request: Score update details with optional fields to modify.
         service: Injected score service dependency.
         auth: Authentication context with user info.

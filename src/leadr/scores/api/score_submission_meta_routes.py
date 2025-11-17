@@ -1,7 +1,5 @@
 """API routes for score submission metadata management."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, HTTPException, status
 
 from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
@@ -16,8 +14,8 @@ router = APIRouter()
 async def list_submission_meta(
     account_id: QueryAccountIDDep,
     service: ScoreSubmissionMetaServiceDep,
-    board_id: UUID | None = None,
-    device_id: UUID | None = None,
+    board_id: BoardID | None = None,
+    device_id: DeviceID | None = None,
 ) -> list[ScoreSubmissionMetaResponse]:
     """List score submission metadata for an account with optional filters.
 
@@ -42,8 +40,8 @@ async def list_submission_meta(
     """
     metas = await service.list_submission_meta(
         account_id=account_id,
-        board_id=BoardID(board_id) if board_id else None,
-        device_id=DeviceID(device_id) if device_id else None,
+        board_id=board_id,
+        device_id=device_id,
     )
 
     return [ScoreSubmissionMetaResponse.from_domain(meta) for meta in metas]
@@ -54,14 +52,14 @@ async def list_submission_meta(
     response_model=ScoreSubmissionMetaResponse,
 )
 async def get_submission_meta(
-    meta_id: UUID,
+    meta_id: ScoreSubmissionMetaID,
     service: ScoreSubmissionMetaServiceDep,
     auth: AuthContextDep,
 ) -> ScoreSubmissionMetaResponse:
     """Get score submission metadata by ID.
 
     Args:
-        meta_id: UUID of the submission metadata to retrieve.
+        meta_id: Submission metadata identifier to retrieve.
         service: Injected submission metadata service dependency.
         auth: Authentication context with user info.
 
@@ -74,7 +72,7 @@ async def get_submission_meta(
     """
     from leadr.scores.adapters.orm import ScoreORM
 
-    meta = await service.get_by_id_or_raise(ScoreSubmissionMetaID(meta_id))
+    meta = await service.get_by_id_or_raise(meta_id)
 
     # Get the associated score to check account access
     score_orm = await service.repository.session.get(ScoreORM, meta.score_id.uuid)

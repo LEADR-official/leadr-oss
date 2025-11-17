@@ -158,7 +158,7 @@ class TestScoreSubmissionMetaRoutes:
 
         # Filter by board1
         response = await client.get(
-            f"/score-submission-metadata?account_id={account.id}&board_id={board1.id.uuid}",
+            f"/score-submission-metadata?account_id={account.id}&board_id={board1.id}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -240,7 +240,7 @@ class TestScoreSubmissionMetaRoutes:
 
         # Filter by device1
         response = await client.get(
-            (f"/score-submission-metadata?account_id={account.id}&device_id={device1.id.uuid}"),
+            f"/score-submission-metadata?account_id={account.id}&device_id={device1.id}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -310,7 +310,7 @@ class TestScoreSubmissionMetaRoutes:
 
         # Get via API
         response = await client.get(
-            f"/score-submission-metadata/{meta.id.uuid}",
+            f"/score-submission-metadata/{meta.id}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -326,7 +326,7 @@ class TestScoreSubmissionMetaRoutes:
     ):
         """Test getting a non-existent submission metadata returns 404."""
         response = await client.get(
-            "/score-submission-metadata/00000000-0000-0000-0000-000000000000",
+            "/score-submission-metadata/sub_00000000-0000-0000-0000-000000000000",
             headers={"leadr-api-key": test_api_key},
         )
 

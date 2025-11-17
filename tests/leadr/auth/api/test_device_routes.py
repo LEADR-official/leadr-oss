@@ -85,7 +85,7 @@ class TestDeviceRoutes:
 
         # Filter by game1
         response = await client.get(
-            f"/devices?account_id={account.id}&game_id={game1.id.uuid}",
+            f"/devices?account_id={account.id}&game_id={game1.id}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -163,7 +163,7 @@ class TestDeviceRoutes:
 
         # Get device
         response = await client.get(
-            f"/devices/{device.id.uuid}",
+            f"/devices/{device.id}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -177,7 +177,7 @@ class TestDeviceRoutes:
     async def test_get_device_not_found(self, client: AsyncClient, db_session, test_api_key):
         """Test getting a non-existent device returns 404."""
         response = await client.get(
-            "/devices/00000000-0000-0000-0000-000000000000",
+            "/devices/dev_00000000-0000-0000-0000-000000000000",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -207,7 +207,7 @@ class TestDeviceRoutes:
 
         # Ban device
         response = await client.patch(
-            f"/devices/{device.id.uuid}",
+            f"/devices/{device.id}",
             json={"status": "banned"},
             headers={"leadr-api-key": test_api_key},
         )
@@ -240,7 +240,7 @@ class TestDeviceRoutes:
 
         # Suspend device
         response = await client.patch(
-            f"/devices/{device.id.uuid}",
+            f"/devices/{device.id}",
             json={"status": "suspended"},
             headers={"leadr-api-key": test_api_key},
         )
@@ -275,7 +275,7 @@ class TestDeviceRoutes:
 
         # Activate device
         response = await client.patch(
-            f"/devices/{device.id.uuid}",
+            f"/devices/{device.id}",
             json={"status": "active"},
             headers={"leadr-api-key": test_api_key},
         )

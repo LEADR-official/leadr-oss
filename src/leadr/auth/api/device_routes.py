@@ -1,7 +1,5 @@
 """API routes for device management."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, HTTPException, status
 
 from leadr.auth.api.device_schemas import DeviceResponse, DeviceUpdateRequest
@@ -17,7 +15,7 @@ router = APIRouter()
 async def list_devices(
     account_id: QueryAccountIDDep,
     service: DeviceServiceDep,
-    game_id: UUID | None = None,
+    game_id: GameID | None = None,
     status: str | None = None,
 ) -> list[DeviceResponse]:
     """List devices for an account with optional filters.
@@ -43,7 +41,7 @@ async def list_devices(
     """
     devices = await service.list_devices(
         account_id=account_id,
-        game_id=GameID(game_id) if game_id else None,
+        game_id=game_id,
         status=status,
     )
 
@@ -52,14 +50,14 @@ async def list_devices(
 
 @router.get("/devices/{device_id}", response_model=DeviceResponse)
 async def get_device(
-    device_id: UUID,
+    device_id: DeviceID,
     service: DeviceServiceDep,
     auth: AuthContextDep,
 ) -> DeviceResponse:
     """Get a device by ID.
 
     Args:
-        device_id: UUID of the device to retrieve.
+        device_id: Device identifier to retrieve.
         service: Injected device service dependency.
         auth: Authentication context with user info.
 
@@ -70,7 +68,7 @@ async def get_device(
         403: User does not have access to this device's account.
         404: Device not found or soft-deleted.
     """
-    device = await service.get_by_id_or_raise(DeviceID(device_id))
+    device = await service.get_by_id_or_raise(device_id)
 
     # Check authorization
     if not auth.has_access_to_account(device.account_id):
@@ -84,7 +82,7 @@ async def get_device(
 
 @router.patch("/devices/{device_id}", response_model=DeviceResponse)
 async def update_device(
-    device_id: UUID,
+    device_id: DeviceID,
     request: DeviceUpdateRequest,
     service: DeviceServiceDep,
     auth: AuthContextDep,
@@ -94,7 +92,7 @@ async def update_device(
     Allows changing device status to ban, suspend, or activate devices.
 
     Args:
-        device_id: UUID of the device to update.
+        device_id: Device identifier to update.
         request: Update details (status).
         service: Injected device service dependency.
         auth: Authentication context with user info.
@@ -107,10 +105,8 @@ async def update_device(
         404: Device not found.
         400: Invalid status value.
     """
-    device_id_typed = DeviceID(device_id)
-
     # Get the device to check account access
-    device = await service.get_by_id_or_raise(device_id_typed)
+    device = await service.get_by_id_or_raise(device_id)
 
     # Check authorization
     if not auth.has_access_to_account(device.account_id):
@@ -133,11 +129,11 @@ async def update_device(
 
         # Update device status based on enum
         if status_enum == DeviceStatus.BANNED:
-            device = await service.ban_device(device_id_typed)
+            device = await service.ban_device(device_id)
         elif status_enum == DeviceStatus.SUSPENDED:
-            device = await service.suspend_device(device_id_typed)
+            device = await service.suspend_device(device_id)
         elif status_enum == DeviceStatus.ACTIVE:
-            device = await service.activate_device(device_id_typed)
+            device = await service.activate_device(device_id)
     else:
         raise HTTPException(
             status_code=400,

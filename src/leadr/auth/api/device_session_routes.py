@@ -1,7 +1,5 @@
 """API routes for device session management."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, HTTPException, status
 
 from leadr.auth.api.device_session_schemas import (
@@ -19,7 +17,7 @@ router = APIRouter()
 async def list_sessions(
     account_id: QueryAccountIDDep,
     service: DeviceServiceDep,
-    device_id: UUID | None = None,
+    device_id: DeviceID | None = None,
 ) -> list[DeviceSessionResponse]:
     """List device sessions for an account with optional filters.
 
@@ -43,7 +41,7 @@ async def list_sessions(
     """
     sessions = await service.list_sessions(
         account_id=account_id,
-        device_id=DeviceID(device_id) if device_id else None,
+        device_id=device_id,
     )
 
     return [DeviceSessionResponse.from_domain(session) for session in sessions]
@@ -51,14 +49,14 @@ async def list_sessions(
 
 @router.get("/device-sessions/{session_id}", response_model=DeviceSessionResponse)
 async def get_session(
-    session_id: UUID,
+    session_id: DeviceSessionID,
     service: DeviceServiceDep,
     auth: AuthContextDep,
 ) -> DeviceSessionResponse:
     """Get a device session by ID.
 
     Args:
-        session_id: UUID of the session to retrieve.
+        session_id: Session identifier to retrieve.
         service: Injected device service dependency.
         auth: Authentication context with user info.
 
@@ -69,7 +67,7 @@ async def get_session(
         403: User does not have access to this session's account.
         404: Session not found or soft-deleted.
     """
-    session = await service.get_session_or_raise(DeviceSessionID(session_id))
+    session = await service.get_session_or_raise(session_id)
 
     # Get the device to check account access
     device = await service.get_by_id_or_raise(session.device_id)
@@ -86,7 +84,7 @@ async def get_session(
 
 @router.patch("/device-sessions/{session_id}", response_model=DeviceSessionResponse)
 async def update_session(
-    session_id: UUID,
+    session_id: DeviceSessionID,
     request: DeviceSessionUpdateRequest,
     service: DeviceServiceDep,
     auth: AuthContextDep,
@@ -96,7 +94,7 @@ async def update_session(
     Allows revoking a device session to invalidate authentication.
 
     Args:
-        session_id: UUID of the session to update.
+        session_id: Session identifier to update.
         request: Update details (revoked status).
         service: Injected device service dependency.
         auth: Authentication context with user info.
@@ -109,10 +107,8 @@ async def update_session(
         404: Session not found.
         400: Invalid request or no revoked field provided.
     """
-    session_id_typed = DeviceSessionID(session_id)
-
     # Get the session to check account access
-    session = await service.get_session_or_raise(session_id_typed)
+    session = await service.get_session_or_raise(session_id)
 
     # Get the device to check account access
     device = await service.get_by_id_or_raise(session.device_id)
@@ -126,7 +122,7 @@ async def update_session(
 
     # Handle revoke update
     if request.revoked is True:
-        session = await service.revoke_session(session_id_typed)
+        session = await service.revoke_session(session_id)
     else:
         raise HTTPException(
             status_code=400,

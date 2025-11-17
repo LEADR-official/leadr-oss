@@ -1,7 +1,5 @@
 """API routes for score flag management."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, HTTPException, status
 
 from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
@@ -17,8 +15,8 @@ router = APIRouter()
 async def list_score_flags(
     account_id: QueryAccountIDDep,
     service: ScoreFlagServiceDep,
-    board_id: UUID | None = None,
-    game_id: UUID | None = None,
+    board_id: BoardID | None = None,
+    game_id: GameID | None = None,
     status: str | None = None,
     flag_type: str | None = None,
 ) -> list[ScoreFlagResponse]:
@@ -47,8 +45,8 @@ async def list_score_flags(
     """
     flags = await service.list_flags(
         account_id=account_id,
-        board_id=BoardID(board_id) if board_id else None,
-        game_id=GameID(game_id) if game_id else None,
+        board_id=board_id,
+        game_id=game_id,
         status=status,
         flag_type=flag_type,
     )
@@ -58,14 +56,14 @@ async def list_score_flags(
 
 @router.get("/score-flags/{flag_id}", response_model=ScoreFlagResponse)
 async def get_score_flag(
-    flag_id: UUID,
+    flag_id: ScoreFlagID,
     service: ScoreFlagServiceDep,
     auth: AuthContextDep,
 ) -> ScoreFlagResponse:
     """Get a score flag by ID.
 
     Args:
-        flag_id: UUID of the flag to retrieve.
+        flag_id: Flag identifier to retrieve.
         service: Injected score flag service dependency.
         auth: Authentication context with user info.
 
@@ -76,7 +74,7 @@ async def get_score_flag(
         403: User does not have access to this flag's account.
         404: Flag not found or soft-deleted.
     """
-    flag = await service.get_by_id_or_raise(ScoreFlagID(flag_id))
+    flag = await service.get_by_id_or_raise(flag_id)
 
     # Get the associated score to check account access
     # We need to import ScoreService to look up the score
@@ -97,7 +95,7 @@ async def get_score_flag(
 
 @router.patch("/score-flags/{flag_id}", response_model=ScoreFlagResponse)
 async def update_score_flag(
-    flag_id: UUID,
+    flag_id: ScoreFlagID,
     request: ScoreFlagUpdateRequest,
     service: ScoreFlagServiceDep,
     auth: AuthContextDep,
@@ -108,7 +106,7 @@ async def update_score_flag(
     soft-deleting the flag.
 
     Args:
-        flag_id: UUID of the flag to update.
+        flag_id: Flag identifier to update.
         request: Update details (status, reviewer_decision, or deleted flag).
         service: Injected score flag service dependency.
         auth: Authentication context with user info.
@@ -121,10 +119,8 @@ async def update_score_flag(
         404: Flag not found.
         400: Invalid update request.
     """
-    flag_id_typed = ScoreFlagID(flag_id)
-
     # Get the flag to check account access
-    flag = await service.get_by_id_or_raise(flag_id_typed)
+    flag = await service.get_by_id_or_raise(flag_id)
 
     # Get the associated score to check account access
     from leadr.scores.services.score_service import ScoreService
@@ -141,7 +137,7 @@ async def update_score_flag(
 
     # Handle soft delete
     if request.deleted is True:
-        flag = await service.soft_delete(flag_id_typed)
+        flag = await service.soft_delete(flag_id)
         return ScoreFlagResponse.from_domain(flag)
 
     # Handle review/update
@@ -158,14 +154,14 @@ async def update_score_flag(
             ) from None
 
         flag = await service.review_flag(
-            flag_id=flag_id_typed,
+            flag_id=flag_id,
             status=status_enum,
             reviewer_decision=request.reviewer_decision,
             reviewer_id=auth.user.id,
         )
     elif request.reviewer_decision is not None:
         flag = await service.update_flag(
-            flag_id=flag_id_typed,
+            flag_id=flag_id,
             reviewer_decision=request.reviewer_decision,
         )
     else:

@@ -78,7 +78,7 @@ class TestDeviceSessionRoutes:
 
         # Filter by device1
         response = await client.get(
-            f"/device-sessions?account_id={account.id}&device_id={device1.id.uuid}",
+            f"/device-sessions?account_id={account.id}&device_id={device1.id}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -118,7 +118,7 @@ class TestDeviceSessionRoutes:
 
         # Get session via API
         response = await client.get(
-            f"/device-sessions/{session.id.uuid}",
+            f"/device-sessions/{session.id}",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -130,7 +130,7 @@ class TestDeviceSessionRoutes:
     async def test_get_session_not_found(self, client: AsyncClient, db_session, test_api_key):
         """Test getting a non-existent session returns 404."""
         response = await client.get(
-            "/device-sessions/00000000-0000-0000-0000-000000000000",
+            "/device-sessions/ses_00000000-0000-0000-0000-000000000000",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -167,7 +167,7 @@ class TestDeviceSessionRoutes:
 
         # Revoke session
         response = await client.patch(
-            f"/device-sessions/{session.id.uuid}",
+            f"/device-sessions/{session.id}",
             json={"revoked": True},
             headers={"leadr-api-key": test_api_key},
         )
