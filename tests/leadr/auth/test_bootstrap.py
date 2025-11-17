@@ -7,6 +7,7 @@ from leadr.accounts.services.repositories import AccountRepository, UserReposito
 from leadr.accounts.services.user_service import UserService
 from leadr.auth.bootstrap import ensure_superadmin_exists
 from leadr.auth.services.repositories import APIKeyRepository
+from leadr.common.domain.ids import AccountID
 from leadr.config import settings
 
 
@@ -82,7 +83,7 @@ class TestSuperadminBootstrap:
         from leadr.accounts.services.repositories import AccountRepository
 
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
 
         account = Account(
             id=account_id,

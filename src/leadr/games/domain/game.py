@@ -1,9 +1,8 @@
 """Game domain model."""
 
-from uuid import UUID
-
 from pydantic import Field, field_validator
 
+from leadr.common.domain.ids import AccountID, BoardID, GameID
 from leadr.common.domain.models import Entity
 
 
@@ -18,14 +17,19 @@ class Game(Entity):
     Steam platform features.
     """
 
-    account_id: UUID = Field(
+    id: GameID = Field(
+        frozen=True,
+        default_factory=GameID,
+        description="Unique game identifier",
+    )
+    account_id: AccountID = Field(
         frozen=True, description="ID of the account this game belongs to (immutable)"
     )
     name: str = Field(description="Name of the game")
     steam_app_id: str | None = Field(
         default=None, description="Optional Steam App ID for platform integration"
     )
-    default_board_id: UUID | None = Field(
+    default_board_id: BoardID | None = Field(
         default=None, description="Optional default leaderboard ID for this game"
     )
     anti_cheat_enabled: bool = Field(

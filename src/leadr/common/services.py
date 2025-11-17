@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import PrefixedID
 from leadr.common.domain.models import Entity
 from leadr.common.repositories import BaseRepository
 
@@ -65,7 +66,21 @@ class BaseService(ABC, Generic[DomainEntityT, RepositoryT]):
                 return "Account"
         """
 
-    async def get_by_id(self, entity_id: UUID) -> DomainEntityT | None:
+    @staticmethod
+    def _extract_uuid(id_value: UUID | PrefixedID) -> UUID:
+        """Extract UUID from either a UUID or PrefixedID.
+
+        Args:
+            id_value: Either a UUID or a PrefixedID instance
+
+        Returns:
+            The UUID value
+        """
+        if isinstance(id_value, PrefixedID):
+            return id_value.uuid
+        return id_value
+
+    async def get_by_id(self, entity_id: UUID | PrefixedID) -> DomainEntityT | None:
         """Get an entity by its ID.
 
         Args:
@@ -74,9 +89,10 @@ class BaseService(ABC, Generic[DomainEntityT, RepositoryT]):
         Returns:
             The domain entity if found, None otherwise
         """
-        return await self.repository.get_by_id(entity_id)
+        uuid_value = self._extract_uuid(entity_id)
+        return await self.repository.get_by_id(uuid_value)
 
-    async def get_by_id_or_raise(self, entity_id: UUID) -> DomainEntityT:
+    async def get_by_id_or_raise(self, entity_id: UUID | PrefixedID) -> DomainEntityT:
         """Get an entity by its ID or raise EntityNotFoundError.
 
         Args:
@@ -89,12 +105,13 @@ class BaseService(ABC, Generic[DomainEntityT, RepositoryT]):
             EntityNotFoundError: If the entity is not found
                 (converted to HTTP 404 by global handler)
         """
-        entity = await self.repository.get_by_id(entity_id)
+        uuid_value = self._extract_uuid(entity_id)
+        entity = await self.repository.get_by_id(uuid_value)
         if not entity:
             raise EntityNotFoundError(self._get_entity_name(), str(entity_id))
         return entity
 
-    async def delete(self, entity_id: UUID) -> None:
+    async def delete(self, entity_id: UUID | PrefixedID) -> None:
         """Soft-delete an entity.
 
         Args:
@@ -105,9 +122,10 @@ class BaseService(ABC, Generic[DomainEntityT, RepositoryT]):
         """
         # Verify entity exists before deleting
         await self.get_by_id_or_raise(entity_id)
-        await self.repository.delete(entity_id)
+        uuid_value = self._extract_uuid(entity_id)
+        await self.repository.delete(uuid_value)
 
-    async def soft_delete(self, entity_id: UUID) -> DomainEntityT:
+    async def soft_delete(self, entity_id: UUID | PrefixedID) -> DomainEntityT:
         """Soft-delete an entity and return it before deletion.
 
         Useful for endpoints that need to return the deleted entity in the response.
@@ -122,7 +140,8 @@ class BaseService(ABC, Generic[DomainEntityT, RepositoryT]):
             EntityNotFoundError: If the entity doesn't exist
         """
         entity = await self.get_by_id_or_raise(entity_id)
-        await self.repository.delete(entity_id)
+        uuid_value = self._extract_uuid(entity_id)
+        await self.repository.delete(uuid_value)
         return entity
 
     async def list_all(self) -> list[DomainEntityT]:

@@ -25,10 +25,21 @@ from leadr.auth.adapters.orm import APIKeyORM  # noqa: F401
 from leadr.auth.services.dependencies import get_api_key_service
 from leadr.boards.adapters.orm import BoardORM  # noqa: F401
 from leadr.common.database import get_db
+from leadr.common.domain.ids import (
+    AccountID,
+    BoardID,
+    DeviceID,
+    GameID,
+    ScoreID,
+    UserID,
+)
 from leadr.common.orm import Base
 from leadr.config import settings
 from leadr.games.adapters.orm import GameORM  # noqa: F401
 from leadr.scores.adapters.orm import ScoreFlagORM, ScoreORM, ScoreSubmissionMetaORM  # noqa: F401
+
+# Import all ORM fixtures from fixtures module
+from tests.fixtures import *  # noqa: F403, F401
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -164,13 +175,13 @@ async def test_account(db_session: AsyncSession) -> Account:
         The created Account domain entity.
     """
     account_repo = AccountRepository(db_session)
-    account_id = uuid4()
+    account_id = AccountID()
     now = datetime.now(UTC)
 
     account = Account(
         id=account_id,
         name="Test Account",
-        slug=f"test-{str(account_id)[:8]}",  # Unique slug using UUID prefix
+        slug=f"test-{str(account_id.uuid)[:8]}",  # Unique slug using UUID prefix
         status=AccountStatus.ACTIVE,
         created_at=now,
         updated_at=now,
@@ -189,13 +200,13 @@ async def test_user(db_session: AsyncSession, test_account: Account):
     from leadr.accounts.services.repositories import UserRepository
 
     user_repo = UserRepository(db_session)
-    user_id = uuid4()
+    user_id = UserID()
     now = datetime.now(UTC)
 
     user = User(
         id=user_id,
         account_id=test_account.id,
-        email=f"test-user-{str(user_id)[:8]}@example.com",
+        email=f"test-user-{str(user_id.uuid)[:8]}@example.com",
         display_name="Test User",
         created_at=now,
         updated_at=now,
@@ -214,7 +225,7 @@ async def test_game(db_session: AsyncSession, test_account: Account):
     from leadr.games.services.repositories import GameRepository
 
     game_repo = GameRepository(db_session)
-    game_id = uuid4()
+    game_id = GameID()
     now = datetime.now(UTC)
 
     game = Game(
@@ -238,7 +249,7 @@ async def test_device(db_session: AsyncSession, test_account: Account, test_game
     from leadr.auth.services.repositories import DeviceRepository
 
     device_repo = DeviceRepository(db_session)
-    device_id = uuid4()
+    device_id = DeviceID()
     now = datetime.now(UTC)
 
     device = Device(
@@ -265,7 +276,7 @@ async def test_board(db_session: AsyncSession, test_account: Account, test_game)
     from leadr.boards.services.repositories import BoardRepository
 
     board_repo = BoardRepository(db_session)
-    board_id = uuid4()
+    board_id = BoardID()
     now = datetime.now(UTC)
 
     board = Board(
@@ -274,7 +285,7 @@ async def test_board(db_session: AsyncSession, test_account: Account, test_game)
         game_id=test_game.id,
         name="Test Board",
         icon="trophy",
-        short_code=f"TEST{str(board_id)[:6]}".upper(),
+        short_code=f"TEST{str(board_id.uuid)[:6]}".upper(),
         unit="points",
         is_active=True,
         sort_direction=SortDirection.DESCENDING,
@@ -298,7 +309,7 @@ async def test_score(
     from leadr.scores.services.repositories import ScoreRepository
 
     score_repo = ScoreRepository(db_session)
-    score_id = uuid4()
+    score_id = ScoreID()
     now = datetime.now(UTC)
 
     score = Score(
@@ -327,13 +338,13 @@ async def test_api_key(db_session: AsyncSession) -> str:
     """
     # Create test account with unique slug to avoid conflicts
     account_repo = AccountRepository(db_session)
-    account_id = uuid4()
+    account_id = AccountID()
     now = datetime.now(UTC)
 
     account = Account(
         id=account_id,
         name="Test Account for Auth",
-        slug=f"test-auth-{str(account_id)[:8]}",  # Unique slug using UUID prefix
+        slug=f"test-auth-{str(account_id.uuid)[:8]}",  # Unique slug using UUID prefix
         status=AccountStatus.ACTIVE,
         created_at=now,
         updated_at=now,
@@ -344,7 +355,7 @@ async def test_api_key(db_session: AsyncSession) -> str:
     user_service = await get_user_service(db_session)
     user = await user_service.create_user(
         account_id=account_id,
-        email=f"test-{str(account_id)[:8]}@example.com",
+        email=f"test-{str(account_id.uuid)[:8]}@example.com",
         display_name="Test User",
         super_admin=True,
     )

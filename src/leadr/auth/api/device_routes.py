@@ -1,13 +1,12 @@
 """API routes for device management."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, HTTPException, status
 
 from leadr.auth.api.device_schemas import DeviceResponse, DeviceUpdateRequest
 from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
 from leadr.auth.domain.device import DeviceStatus
 from leadr.auth.services.dependencies import DeviceServiceDep
+from leadr.common.domain.ids import DeviceID, GameID
 
 router = APIRouter()
 
@@ -16,7 +15,7 @@ router = APIRouter()
 async def list_devices(
     account_id: QueryAccountIDDep,
     service: DeviceServiceDep,
-    game_id: UUID | None = None,
+    game_id: GameID | None = None,
     status: str | None = None,
 ) -> list[DeviceResponse]:
     """List devices for an account with optional filters.
@@ -51,14 +50,14 @@ async def list_devices(
 
 @router.get("/devices/{device_id}", response_model=DeviceResponse)
 async def get_device(
-    device_id: UUID,
+    device_id: DeviceID,
     service: DeviceServiceDep,
     auth: AuthContextDep,
 ) -> DeviceResponse:
     """Get a device by ID.
 
     Args:
-        device_id: UUID of the device to retrieve.
+        device_id: Device identifier to retrieve.
         service: Injected device service dependency.
         auth: Authentication context with user info.
 
@@ -83,7 +82,7 @@ async def get_device(
 
 @router.patch("/devices/{device_id}", response_model=DeviceResponse)
 async def update_device(
-    device_id: UUID,
+    device_id: DeviceID,
     request: DeviceUpdateRequest,
     service: DeviceServiceDep,
     auth: AuthContextDep,
@@ -93,7 +92,7 @@ async def update_device(
     Allows changing device status to ban, suspend, or activate devices.
 
     Args:
-        device_id: UUID of the device to update.
+        device_id: Device identifier to update.
         request: Update details (status).
         service: Injected device service dependency.
         auth: Authentication context with user info.

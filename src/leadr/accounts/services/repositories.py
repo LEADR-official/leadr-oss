@@ -8,6 +8,7 @@ from sqlalchemy import select
 from leadr.accounts.adapters.orm import AccountORM, AccountStatusEnum, UserORM
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
+from leadr.common.domain.ids import AccountID, PrefixedID, UserID
 from leadr.common.repositories import BaseRepository
 
 
@@ -17,7 +18,7 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
     def _to_domain(self, orm: AccountORM) -> Account:
         """Convert ORM model to domain entity."""
         return Account(
-            id=orm.id,
+            id=AccountID(orm.id),
             name=orm.name,
             slug=orm.slug,
             status=AccountStatus(orm.status.value),
@@ -29,7 +30,7 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
     def _to_orm(self, entity: Account) -> AccountORM:
         """Convert domain entity to ORM model."""
         return AccountORM(
-            id=entity.id,
+            id=entity.id.uuid,
             name=entity.name,
             slug=entity.slug,
             status=AccountStatusEnum(entity.status.value),
@@ -46,7 +47,9 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
         """Get account by slug, returns None if not found or soft-deleted."""
         return await self._get_by_field("slug", slug)
 
-    async def filter(self, account_id: UUID4 | None = None, **kwargs: Any) -> list[Account]:
+    async def filter(
+        self, account_id: UUID4 | PrefixedID | None = None, **kwargs: Any
+    ) -> list[Account]:
         """Filter accounts by optional criteria.
 
         Account is the top-level tenant boundary, so no account_id filtering is required.
@@ -85,8 +88,8 @@ class UserRepository(BaseRepository[User, UserORM]):
     def _to_domain(self, orm: UserORM) -> User:
         """Convert ORM model to domain entity."""
         return User(
-            id=orm.id,
-            account_id=orm.account_id,
+            id=UserID(orm.id),
+            account_id=AccountID(orm.account_id),
             email=orm.email,
             display_name=orm.display_name,
             super_admin=orm.super_admin,
@@ -98,8 +101,8 @@ class UserRepository(BaseRepository[User, UserORM]):
     def _to_orm(self, entity: User) -> UserORM:
         """Convert domain entity to ORM model."""
         return UserORM(
-            id=entity.id,
-            account_id=entity.account_id,
+            id=entity.id.uuid,
+            account_id=entity.account_id.uuid,
             email=entity.email,
             display_name=entity.display_name,
             super_admin=entity.super_admin,
@@ -116,7 +119,9 @@ class UserRepository(BaseRepository[User, UserORM]):
         """Get user by email, returns None if not found or soft-deleted."""
         return await self._get_by_field("email", email)
 
-    async def filter(self, account_id: UUID4, **kwargs: Any) -> list[User]:
+    async def filter(
+        self, account_id: UUID4 | PrefixedID | None = None, **kwargs: Any
+    ) -> list[User]:
         """Filter users by account and optional criteria.
 
         Args:
@@ -125,9 +130,15 @@ class UserRepository(BaseRepository[User, UserORM]):
 
         Returns:
             List of users for the account matching the filter criteria
+
+        Raises:
+            ValueError: If account_id is None (required for multi-tenant safety)
         """
+        if account_id is None:
+            raise ValueError("account_id is required for filtering users")
+        account_uuid = self._extract_uuid(account_id)
         query = select(UserORM).where(
-            UserORM.account_id == account_id,
+            UserORM.account_id == account_uuid,
             UserORM.deleted_at.is_(None),
         )
 

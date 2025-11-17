@@ -130,7 +130,7 @@ class TestDeviceSessionRoutes:
     async def test_get_session_not_found(self, client: AsyncClient, db_session, test_api_key):
         """Test getting a non-existent session returns 404."""
         response = await client.get(
-            "/device-sessions/00000000-0000-0000-0000-000000000000",
+            "/device-sessions/ses_00000000-0000-0000-0000-000000000000",
             headers={"leadr-api-key": test_api_key},
         )
 

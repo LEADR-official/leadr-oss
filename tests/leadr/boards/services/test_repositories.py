@@ -11,6 +11,7 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
 from leadr.boards.services.repositories import BoardRepository
+from leadr.common.domain.ids import AccountID, BoardID, GameID
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
 
@@ -23,7 +24,7 @@ class TestBoardRepository:
         """Test creating a board via repository."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -38,7 +39,7 @@ class TestBoardRepository:
 
         # Create game
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
             id=game_id,
@@ -51,7 +52,7 @@ class TestBoardRepository:
 
         # Create board
         board_repo = BoardRepository(db_session)
-        board_id = uuid4()
+        board_id = BoardID(uuid4())
 
         board = Board(
             id=board_id,
@@ -83,7 +84,7 @@ class TestBoardRepository:
         """Test retrieving a board by ID."""
         # Create account and game
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -97,7 +98,7 @@ class TestBoardRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
             id=game_id,
@@ -110,7 +111,7 @@ class TestBoardRepository:
 
         # Create board
         board_repo = BoardRepository(db_session)
-        board_id = uuid4()
+        board_id = BoardID(uuid4())
 
         board = Board(
             id=board_id,
@@ -149,7 +150,7 @@ class TestBoardRepository:
         """Test retrieving a board by short_code."""
         # Create account and game
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -163,7 +164,7 @@ class TestBoardRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
             id=game_id,
@@ -176,7 +177,7 @@ class TestBoardRepository:
 
         # Create board
         board_repo = BoardRepository(db_session)
-        board_id = uuid4()
+        board_id = BoardID(uuid4())
 
         board = Board(
             id=board_id,
@@ -213,7 +214,7 @@ class TestBoardRepository:
         """Test updating a board via repository."""
         # Create account and game
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -227,7 +228,7 @@ class TestBoardRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
             id=game_id,
@@ -240,7 +241,7 @@ class TestBoardRepository:
 
         # Create board
         board_repo = BoardRepository(db_session)
-        board_id = uuid4()
+        board_id = BoardID(uuid4())
 
         board = Board(
             id=board_id,
@@ -276,7 +277,7 @@ class TestBoardRepository:
         """Test deleting a board via repository."""
         # Create account and game
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -290,7 +291,7 @@ class TestBoardRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
             id=game_id,
@@ -303,7 +304,7 @@ class TestBoardRepository:
 
         # Create board
         board_repo = BoardRepository(db_session)
-        board_id = uuid4()
+        board_id = BoardID(uuid4())
 
         board = Board(
             id=board_id,
@@ -322,7 +323,7 @@ class TestBoardRepository:
         await board_repo.create(board)
 
         # Delete it
-        await board_repo.delete(board_id)
+        await board_repo.delete(board_id.uuid)
 
         # Verify it's gone
         retrieved = await board_repo.get_by_id(board_id)
@@ -332,7 +333,7 @@ class TestBoardRepository:
         """Test filtering boards by account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -347,7 +348,7 @@ class TestBoardRepository:
 
         # Create game
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
             id=game_id,
@@ -362,7 +363,7 @@ class TestBoardRepository:
         board_repo = BoardRepository(db_session)
 
         board1 = Board(
-            id=uuid4(),
+            id=BoardID(uuid4()),
             account_id=account_id,
             game_id=game_id,
             name="Board One",
@@ -376,7 +377,7 @@ class TestBoardRepository:
             updated_at=now,
         )
         board2 = Board(
-            id=uuid4(),
+            id=BoardID(uuid4()),
             account_id=account_id,
             game_id=game_id,
             name="Board Two",
@@ -410,7 +411,7 @@ class TestBoardRepository:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=account1_id,
+            id=AccountID(account1_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -418,7 +419,7 @@ class TestBoardRepository:
             updated_at=now,
         )
         account2 = Account(
-            id=account2_id,
+            id=AccountID(account2_id),
             name="Beta Industries",
             slug="beta-industries",
             status=AccountStatus.ACTIVE,
@@ -434,15 +435,15 @@ class TestBoardRepository:
         game2_id = uuid4()
 
         game1 = Game(
-            id=game1_id,
-            account_id=account1_id,
+            id=GameID(game1_id),
+            account_id=AccountID(account1_id),
             name="Game 1",
             created_at=now,
             updated_at=now,
         )
         game2 = Game(
-            id=game2_id,
-            account_id=account2_id,
+            id=GameID(game2_id),
+            account_id=AccountID(account2_id),
             name="Game 2",
             created_at=now,
             updated_at=now,
@@ -454,9 +455,9 @@ class TestBoardRepository:
         board_repo = BoardRepository(db_session)
 
         board1 = Board(
-            id=uuid4(),
-            account_id=account1_id,
-            game_id=game1_id,
+            id=BoardID(uuid4()),
+            account_id=AccountID(account1_id),
+            game_id=GameID(game1_id),
             name="Account 1 Board",
             icon="star",
             short_code="A1B1",
@@ -468,9 +469,9 @@ class TestBoardRepository:
             updated_at=now,
         )
         board2 = Board(
-            id=uuid4(),
-            account_id=account2_id,
-            game_id=game2_id,
+            id=BoardID(uuid4()),
+            account_id=AccountID(account2_id),
+            game_id=GameID(game2_id),
             name="Account 2 Board",
             icon="trophy",
             short_code="A2B1",
@@ -496,7 +497,7 @@ class TestBoardRepository:
         """Test that delete performs soft-delete, not hard-delete."""
         # Create account and game
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -510,7 +511,7 @@ class TestBoardRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
             id=game_id,
@@ -523,7 +524,7 @@ class TestBoardRepository:
 
         # Create board
         board_repo = BoardRepository(db_session)
-        board_id = uuid4()
+        board_id = BoardID(uuid4())
 
         board = Board(
             id=board_id,
@@ -542,7 +543,7 @@ class TestBoardRepository:
         await board_repo.create(board)
 
         # Soft-delete it
-        await board_repo.delete(board_id)
+        await board_repo.delete(board_id.uuid)
 
         # Verify it's not returned by normal queries
         retrieved = await board_repo.get_by_id(board_id)
@@ -552,7 +553,7 @@ class TestBoardRepository:
         """Test that filter() excludes soft-deleted boards."""
         # Create account and game
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -566,7 +567,7 @@ class TestBoardRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
             id=game_id,
@@ -581,7 +582,7 @@ class TestBoardRepository:
         board_repo = BoardRepository(db_session)
 
         board1 = Board(
-            id=uuid4(),
+            id=BoardID(uuid4()),
             account_id=account_id,
             game_id=game_id,
             name="Board One",
@@ -595,7 +596,7 @@ class TestBoardRepository:
             updated_at=now,
         )
         board2 = Board(
-            id=uuid4(),
+            id=BoardID(uuid4()),
             account_id=account_id,
             game_id=game_id,
             name="Board Two",
@@ -630,7 +631,7 @@ class TestBoardRepository:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=account1_id,
+            id=AccountID(account1_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -638,7 +639,7 @@ class TestBoardRepository:
             updated_at=now,
         )
         account2 = Account(
-            id=account2_id,
+            id=AccountID(account2_id),
             name="Beta Industries",
             slug="beta-industries",
             status=AccountStatus.ACTIVE,
@@ -653,15 +654,15 @@ class TestBoardRepository:
         game2_id = uuid4()
 
         game1 = Game(
-            id=game1_id,
-            account_id=account1_id,
+            id=GameID(game1_id),
+            account_id=AccountID(account1_id),
             name="Game 1",
             created_at=now,
             updated_at=now,
         )
         game2 = Game(
-            id=game2_id,
-            account_id=account2_id,
+            id=GameID(game2_id),
+            account_id=AccountID(account2_id),
             name="Game 2",
             created_at=now,
             updated_at=now,
@@ -673,9 +674,9 @@ class TestBoardRepository:
         board_repo = BoardRepository(db_session)
 
         board1 = Board(
-            id=uuid4(),
-            account_id=account1_id,
-            game_id=game1_id,
+            id=BoardID(uuid4()),
+            account_id=AccountID(account1_id),
+            game_id=GameID(game1_id),
             name="Board One",
             icon="star",
             short_code="GLOBAL",
@@ -690,9 +691,9 @@ class TestBoardRepository:
 
         # Try to create another board with same short_code (different account)
         board2 = Board(
-            id=uuid4(),
-            account_id=account2_id,
-            game_id=game2_id,
+            id=BoardID(uuid4()),
+            account_id=AccountID(account2_id),
+            game_id=GameID(game2_id),
             name="Board Two",
             icon="trophy",
             short_code="GLOBAL",  # Duplicate short_code

@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, Query
 
@@ -15,6 +14,7 @@ from leadr.auth.services.dependencies import (
     DeviceServiceDep,
     NonceServiceDep,
 )
+from leadr.common.domain.ids import AccountID
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,7 @@ class AuthContext:
         """
         return self.user.super_admin
 
-    def has_access_to_account(self, account_id: UUID) -> bool:
+    def has_access_to_account(self, account_id: AccountID) -> bool:
         """Check if the authenticated user has access to a specific account.
 
         Superadmins have access to all accounts. Regular users only have
@@ -236,11 +236,11 @@ AuthContextDep = Annotated[AuthContext, Depends(require_api_key)]
 
 async def resolve_query_account_id(
     auth: AuthContextDep,
-    account_id: UUID | None = Query(
+    account_id: AccountID | None = Query(
         None,
         description="Account ID (required for superadmins, auto-derived for regular users)",
     ),
-) -> UUID:
+) -> AccountID:
     """Resolve account ID from query parameters based on user role.
 
     For superadmin users:
@@ -299,7 +299,7 @@ async def resolve_query_account_id(
 
 def validate_body_account_id(
     auth: AuthContext,
-    account_id: UUID,
+    account_id: AccountID,
 ) -> None:
     """Validate that an account_id from request body matches user's authorized account.
 
@@ -339,4 +339,4 @@ def validate_body_account_id(
 
 # Additional type aliases for dependency injection
 DeviceTokenDep = Annotated[Device, Depends(require_device_token)]
-QueryAccountIDDep = Annotated[UUID, Depends(resolve_query_account_id)]
+QueryAccountIDDep = Annotated[AccountID, Depends(resolve_query_account_id)]

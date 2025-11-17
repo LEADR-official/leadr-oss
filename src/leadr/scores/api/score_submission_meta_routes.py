@@ -1,10 +1,9 @@
 """API routes for score submission metadata management."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, HTTPException, status
 
 from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
+from leadr.common.domain.ids import AccountID, BoardID, DeviceID, ScoreSubmissionMetaID
 from leadr.scores.api.score_submission_meta_schemas import ScoreSubmissionMetaResponse
 from leadr.scores.services.dependencies import ScoreSubmissionMetaServiceDep
 
@@ -15,8 +14,8 @@ router = APIRouter()
 async def list_submission_meta(
     account_id: QueryAccountIDDep,
     service: ScoreSubmissionMetaServiceDep,
-    board_id: UUID | None = None,
-    device_id: UUID | None = None,
+    board_id: BoardID | None = None,
+    device_id: DeviceID | None = None,
 ) -> list[ScoreSubmissionMetaResponse]:
     """List score submission metadata for an account with optional filters.
 
@@ -53,14 +52,14 @@ async def list_submission_meta(
     response_model=ScoreSubmissionMetaResponse,
 )
 async def get_submission_meta(
-    meta_id: UUID,
+    meta_id: ScoreSubmissionMetaID,
     service: ScoreSubmissionMetaServiceDep,
     auth: AuthContextDep,
 ) -> ScoreSubmissionMetaResponse:
     """Get score submission metadata by ID.
 
     Args:
-        meta_id: UUID of the submission metadata to retrieve.
+        meta_id: Submission metadata identifier to retrieve.
         service: Injected submission metadata service dependency.
         auth: Authentication context with user info.
 
@@ -76,7 +75,7 @@ async def get_submission_meta(
     meta = await service.get_by_id_or_raise(meta_id)
 
     # Get the associated score to check account access
-    score_orm = await service.repository.session.get(ScoreORM, meta.score_id)
+    score_orm = await service.repository.session.get(ScoreORM, meta.score_id.uuid)
     if not score_orm:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -84,7 +83,7 @@ async def get_submission_meta(
         )
 
     # Check authorization
-    if not auth.has_access_to_account(score_orm.account_id):
+    if not auth.has_access_to_account(AccountID(score_orm.account_id)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this metadata's account",

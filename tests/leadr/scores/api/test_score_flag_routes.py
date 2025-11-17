@@ -445,7 +445,7 @@ class TestScoreFlagRoutes:
     async def test_get_flag_not_found(self, client: AsyncClient, db_session, test_api_key):
         """Test getting a non-existent flag returns 404."""
         response = await client.get(
-            "/score-flags/00000000-0000-0000-0000-000000000000",
+            "/score-flags/flg_00000000-0000-0000-0000-000000000000",
             headers={"leadr-api-key": test_api_key},
         )
 

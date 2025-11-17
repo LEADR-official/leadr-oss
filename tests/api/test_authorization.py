@@ -11,6 +11,7 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.dependencies import get_user_service
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.auth.services.api_key_service import APIKeyService
+from leadr.common.domain.ids import AccountID, GameID
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
 
@@ -43,7 +44,7 @@ class TestSuperadminAuthorization:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="Account One",
             slug="account-one",
             status=AccountStatus.ACTIVE,
@@ -51,7 +52,7 @@ class TestSuperadminAuthorization:
             updated_at=now,
         )
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="Account Two",
             slug="account-two",
             status=AccountStatus.ACTIVE,
@@ -81,7 +82,7 @@ class TestSuperadminAuthorization:
         now = datetime.now(UTC)
 
         other_account = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="Other Account",
             slug="other-account",
             status=AccountStatus.ACTIVE,
@@ -106,7 +107,7 @@ class TestSuperadminAuthorization:
         now = datetime.now(UTC)
 
         other_account = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="Other Account",
             slug="other-account",
             status=AccountStatus.ACTIVE,
@@ -139,7 +140,7 @@ class TestSuperadminAuthorization:
         now = datetime.now(UTC)
 
         other_account = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="Other Account",
             slug="other-account",
             status=AccountStatus.ACTIVE,
@@ -177,7 +178,7 @@ class TestRegularUserAuthorization:
         now = datetime.now(UTC)
 
         account = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="User Account",
             slug="user-account",
             status=AccountStatus.ACTIVE,
@@ -226,7 +227,7 @@ class TestRegularUserAuthorization:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="User Account 1",
             slug="user-account-1",
             status=AccountStatus.ACTIVE,
@@ -234,7 +235,7 @@ class TestRegularUserAuthorization:
             updated_at=now,
         )
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="User Account 2",
             slug="user-account-2",
             status=AccountStatus.ACTIVE,
@@ -283,7 +284,7 @@ class TestRegularUserAuthorization:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="User Account 1",
             slug="user-account-1",
             status=AccountStatus.ACTIVE,
@@ -291,7 +292,7 @@ class TestRegularUserAuthorization:
             updated_at=now,
         )
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="User Account 2",
             slug="user-account-2",
             status=AccountStatus.ACTIVE,
@@ -337,7 +338,7 @@ class TestRegularUserAuthorization:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="User Account 1",
             slug="user-account-1",
             status=AccountStatus.ACTIVE,
@@ -345,7 +346,7 @@ class TestRegularUserAuthorization:
             updated_at=now,
         )
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="User Account 2",
             slug="user-account-2",
             status=AccountStatus.ACTIVE,
@@ -396,7 +397,7 @@ class TestRegularUserAuthorization:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="User Account 1",
             slug="user-account-1",
             status=AccountStatus.ACTIVE,
@@ -404,7 +405,7 @@ class TestRegularUserAuthorization:
             updated_at=now,
         )
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="User Account 2",
             slug="user-account-2",
             status=AccountStatus.ACTIVE,
@@ -450,7 +451,7 @@ class TestRegularUserAuthorization:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="User Account 1",
             slug="user-account-1",
             status=AccountStatus.ACTIVE,
@@ -458,7 +459,7 @@ class TestRegularUserAuthorization:
             updated_at=now,
         )
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="User Account 2",
             slug="user-account-2",
             status=AccountStatus.ACTIVE,
@@ -471,7 +472,7 @@ class TestRegularUserAuthorization:
         # Create game in account2
         game_repo = GameRepository(db_session)
         game = Game(
-            id=uuid4(),
+            id=GameID(),
             account_id=account2.id,
             name="Account 2 Game",
             created_at=now,
@@ -515,7 +516,7 @@ class TestRegularUserAuthorization:
         now = datetime.now(UTC)
 
         account = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="User Account",
             slug="user-account",
             status=AccountStatus.ACTIVE,
@@ -527,7 +528,7 @@ class TestRegularUserAuthorization:
         # Create game in same account
         game_repo = GameRepository(db_session)
         game = Game(
-            id=uuid4(),
+            id=GameID(),
             account_id=account.id,
             name="My Game",
             created_at=now,
@@ -590,7 +591,7 @@ class TestAPIKeyAuthorization:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="Account 1",
             slug="account-1",
             status=AccountStatus.ACTIVE,
@@ -598,7 +599,7 @@ class TestAPIKeyAuthorization:
             updated_at=now,
         )
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="Account 2",
             slug="account-2",
             status=AccountStatus.ACTIVE,
@@ -644,7 +645,7 @@ class TestAPIKeyAuthorization:
         now = datetime.now(UTC)
 
         other_account = Account(
-            id=uuid4(),
+            id=AccountID(),
             name="Other Account",
             slug="other-account",
             status=AccountStatus.ACTIVE,
@@ -693,7 +694,7 @@ class TestAccountIDResolution:
         now = datetime.now(UTC)
 
         account = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="User Account",
             slug="user-account",
             status=AccountStatus.ACTIVE,
@@ -704,7 +705,7 @@ class TestAccountIDResolution:
 
         game_repo = GameRepository(db_session)
         game = Game(
-            id=uuid4(),
+            id=GameID(uuid4()),
             account_id=account.id,
             name="Test Game",
             created_at=now,
@@ -760,7 +761,7 @@ class TestAccountIDResolution:
         now = datetime.now(UTC)
 
         account = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="Test Account",
             slug="test-account",
             status=AccountStatus.ACTIVE,
@@ -771,7 +772,7 @@ class TestAccountIDResolution:
 
         game_repo = GameRepository(db_session)
         game = Game(
-            id=uuid4(),
+            id=GameID(uuid4()),
             account_id=account.id,
             name="Test Game",
             created_at=now,
@@ -796,7 +797,7 @@ class TestAccountIDResolution:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="User Account",
             slug="user-account",
             status=AccountStatus.ACTIVE,
@@ -804,7 +805,7 @@ class TestAccountIDResolution:
             updated_at=now,
         )
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="Other Account",
             slug="other-account",
             status=AccountStatus.ACTIVE,
@@ -850,7 +851,7 @@ class TestAccountIDResolution:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="User Account",
             slug="user-account",
             status=AccountStatus.ACTIVE,
@@ -858,7 +859,7 @@ class TestAccountIDResolution:
             updated_at=now,
         )
         account2 = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="Other Account",
             slug="other-account",
             status=AccountStatus.ACTIVE,
@@ -909,7 +910,7 @@ class TestAccountIDResolution:
         now = datetime.now(UTC)
 
         account = Account(
-            id=uuid4(),
+            id=AccountID(uuid4()),
             name="User Account",
             slug="user-account",
             status=AccountStatus.ACTIVE,

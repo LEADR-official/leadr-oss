@@ -6,50 +6,24 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import DeviceORM, NonceORM
 from leadr.auth.domain.nonce import NonceStatus
 from leadr.auth.services.nonce_service import NonceService
-from leadr.games.adapters.orm import GameORM
+from leadr.common.domain.ids import DeviceID
 
 
 @pytest.mark.asyncio
 class TestNonceService:
     """Test suite for NonceService."""
 
-    async def test_generate_nonce_creates_nonce_with_default_ttl(self, db_session: AsyncSession):
+    async def test_generate_nonce_creates_nonce_with_default_ttl(
+        self, db_session: AsyncSession, device_orm
+    ):
         """Test generating a nonce with default TTL."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
 
         # Generate nonce
         service = NonceService(db_session)
-        nonce_value, expires_at = await service.generate_nonce(device_id=device.id)
+        nonce_value, expires_at = await service.generate_nonce(device_id=DeviceID(device_orm.id))
 
         # Verify nonce was created
         assert nonce_value is not None
@@ -60,78 +34,28 @@ class TestNonceService:
         time_diff = abs((expires_at - expected_expiry).total_seconds())
         assert time_diff < 2  # Within 2 seconds tolerance
 
-    async def test_generate_nonce_creates_nonce_with_custom_ttl(self, db_session: AsyncSession):
+    async def test_generate_nonce_creates_nonce_with_custom_ttl(
+        self, db_session: AsyncSession, device_orm
+    ):
         """Test generating a nonce with custom TTL."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
 
         # Generate nonce with 120 second TTL
         service = NonceService(db_session)
-        nonce_value, expires_at = await service.generate_nonce(device_id=device.id, ttl_seconds=120)
+        nonce_value, expires_at = await service.generate_nonce(
+            device_id=DeviceID(device_orm.id), ttl_seconds=120
+        )
 
         # Verify expiry is approximately 120 seconds from now
         expected_expiry = datetime.now(UTC) + timedelta(seconds=120)
         time_diff = abs((expires_at - expected_expiry).total_seconds())
         assert time_diff < 2
 
-    async def test_generate_nonce_stores_in_database(self, db_session: AsyncSession):
+    async def test_generate_nonce_stores_in_database(self, db_session: AsyncSession, device_orm):
         """Test that generated nonce is stored in database."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
 
         # Generate nonce
         service = NonceService(db_session)
-        nonce_value, _ = await service.generate_nonce(device_id=device.id)
+        nonce_value, _ = await service.generate_nonce(device_id=DeviceID(device_orm.id))
 
         # Verify nonce exists in database
         repository = service.repository
@@ -139,45 +63,18 @@ class TestNonceService:
 
         assert nonce is not None
         assert nonce.nonce_value == nonce_value
-        assert nonce.device_id == device.id
+        assert nonce.device_id == DeviceID(device_orm.id)
         assert nonce.status == NonceStatus.PENDING
 
-    async def test_validate_and_consume_nonce_success(self, db_session: AsyncSession):
+    async def test_validate_and_consume_nonce_success(self, db_session: AsyncSession, device_orm):
         """Test successfully validating and consuming a nonce."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
 
         # Generate nonce
         service = NonceService(db_session)
-        nonce_value, _ = await service.generate_nonce(device_id=device.id)
+        nonce_value, _ = await service.generate_nonce(device_id=DeviceID(device_orm.id))
 
         # Validate and consume
-        result = await service.validate_and_consume_nonce(nonce_value, device.id)
+        result = await service.validate_and_consume_nonce(nonce_value, DeviceID(device_orm.id))
 
         assert result is True
 
@@ -189,76 +86,25 @@ class TestNonceService:
         assert nonce.status == NonceStatus.USED
         assert nonce.used_at is not None
 
-    async def test_validate_and_consume_nonce_not_found(self, db_session: AsyncSession):
+    async def test_validate_and_consume_nonce_not_found(self, db_session: AsyncSession, device_orm):
         """Test that validating unknown nonce raises ValueError."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
 
         # Try to validate unknown nonce
         service = NonceService(db_session)
 
         with pytest.raises(ValueError, match="Nonce not found"):
-            await service.validate_and_consume_nonce("unknown-nonce", device.id)
+            await service.validate_and_consume_nonce("unknown-nonce", DeviceID(device_orm.id))
 
-    async def test_validate_and_consume_nonce_wrong_device(self, db_session: AsyncSession):
+    async def test_validate_and_consume_nonce_wrong_device(
+        self, db_session: AsyncSession, device_orm, game_orm
+    ):
         """Test that using nonce from different device raises ValueError."""
-        # Create account, game, and two devices
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device1 = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="device-1",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device1)
-
+        # Create second device
         device2 = DeviceORM(
             id=uuid4(),
-            game_id=game.id,
+            game_id=game_orm.id,
             device_id="device-2",
-            account_id=game.account_id,
+            account_id=game_orm.account_id,
             first_seen_at=datetime.now(UTC),
             last_seen_at=datetime.now(UTC),
         )
@@ -267,85 +113,33 @@ class TestNonceService:
 
         # Generate nonce for device1
         service = NonceService(db_session)
-        nonce_value, _ = await service.generate_nonce(device_id=device1.id)
+        nonce_value, _ = await service.generate_nonce(device_id=DeviceID(device_orm.id))
 
         # Try to use nonce with device2
         with pytest.raises(ValueError, match="Nonce does not belong to this device"):
-            await service.validate_and_consume_nonce(nonce_value, device2.id)
+            await service.validate_and_consume_nonce(nonce_value, DeviceID(device2.id))
 
-    async def test_validate_and_consume_nonce_already_used(self, db_session: AsyncSession):
+    async def test_validate_and_consume_nonce_already_used(
+        self, db_session: AsyncSession, device_orm
+    ):
         """Test that using nonce twice raises ValueError."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
 
         # Generate and use nonce
         service = NonceService(db_session)
-        nonce_value, _ = await service.generate_nonce(device_id=device.id)
-        await service.validate_and_consume_nonce(nonce_value, device.id)
+        nonce_value, _ = await service.generate_nonce(device_id=DeviceID(device_orm.id))
+        await service.validate_and_consume_nonce(nonce_value, DeviceID(device_orm.id))
 
         # Try to use same nonce again
         with pytest.raises(ValueError, match="Nonce already used"):
-            await service.validate_and_consume_nonce(nonce_value, device.id)
+            await service.validate_and_consume_nonce(nonce_value, DeviceID(device_orm.id))
 
-    async def test_validate_and_consume_nonce_expired(self, db_session: AsyncSession):
+    async def test_validate_and_consume_nonce_expired(self, db_session: AsyncSession, device_orm):
         """Test that using expired nonce raises ValueError."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
 
         # Create expired nonce directly in DB
         expired_nonce = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=device_orm.id,
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(seconds=1),  # Expired
             status="pending",
@@ -357,54 +151,31 @@ class TestNonceService:
         service = NonceService(db_session)
 
         with pytest.raises(ValueError, match="Nonce expired"):
-            await service.validate_and_consume_nonce(expired_nonce.nonce_value, device.id)
+            await service.validate_and_consume_nonce(
+                expired_nonce.nonce_value, DeviceID(device_orm.id)
+            )
 
-    async def test_cleanup_expired_nonces_deletes_old_nonces(self, db_session: AsyncSession):
+    async def test_cleanup_expired_nonces_deletes_old_nonces(
+        self, db_session: AsyncSession, device_orm
+    ):
         """Test that cleanup deletes old expired nonces."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
 
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
-        # Create old expired nonce (expired 25 hours ago)
+        # Create old expired nonce (expired 25 hours ago) - custom value
         old_nonce = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=device_orm.id,
             nonce_value=str(uuid4()),
-            expires_at=datetime.now(UTC) - timedelta(hours=25),
+            expires_at=datetime.now(UTC) - timedelta(hours=25),  # Custom
             status="pending",
         )
         db_session.add(old_nonce)
 
-        # Create recent expired nonce (expired 30 minutes ago)
+        # Create recent expired nonce (expired 30 minutes ago) - custom value
         recent_nonce = NonceORM(
             id=uuid4(),
-            device_id=device.id,
+            device_id=device_orm.id,
             nonce_value=str(uuid4()),
-            expires_at=datetime.now(UTC) - timedelta(minutes=30),
+            expires_at=datetime.now(UTC) - timedelta(minutes=30),  # Custom
             status="pending",
         )
         db_session.add(recent_nonce)
@@ -436,40 +207,16 @@ class TestNonceService:
 
         assert deleted_count == 0
 
-    async def test_multiple_devices_can_have_pending_nonces(self, db_session: AsyncSession):
+    async def test_multiple_devices_can_have_pending_nonces(
+        self, db_session: AsyncSession, device_orm, game_orm
+    ):
         """Test that multiple devices can have pending nonces simultaneously."""
-        # Create account, game, and two devices
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device1 = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="device-1",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device1)
-
+        # Create second device
         device2 = DeviceORM(
             id=uuid4(),
-            game_id=game.id,
+            game_id=game_orm.id,
             device_id="device-2",
-            account_id=game.account_id,
+            account_id=game_orm.account_id,
             first_seen_at=datetime.now(UTC),
             last_seen_at=datetime.now(UTC),
         )
@@ -478,15 +225,15 @@ class TestNonceService:
 
         # Generate nonces for both devices
         service = NonceService(db_session)
-        nonce1, _ = await service.generate_nonce(device_id=device1.id)
-        nonce2, _ = await service.generate_nonce(device_id=device2.id)
+        nonce1, _ = await service.generate_nonce(device_id=DeviceID(device_orm.id))
+        nonce2, _ = await service.generate_nonce(device_id=DeviceID(device2.id))
 
         # Both nonces should be unique and valid
         assert nonce1 != nonce2
 
         # Each device can use its own nonce
-        result1 = await service.validate_and_consume_nonce(nonce1, device1.id)
-        result2 = await service.validate_and_consume_nonce(nonce2, device2.id)
+        result1 = await service.validate_and_consume_nonce(nonce1, DeviceID(device_orm.id))
+        result2 = await service.validate_and_consume_nonce(nonce2, DeviceID(device2.id))
 
         assert result1 is True
         assert result2 is True

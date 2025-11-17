@@ -1,10 +1,10 @@
 """Anti-cheat service for detecting suspicious score submissions."""
 
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.domain.ids import BoardID, DeviceID
 from leadr.config import settings
 from leadr.scores.domain.anti_cheat.enums import FlagAction, FlagConfidence, FlagType, TrustTier
 from leadr.scores.domain.anti_cheat.models import AntiCheatResult, ScoreSubmissionMeta
@@ -36,8 +36,8 @@ class AntiCheatService:
         self,
         score: Score,
         trust_tier: TrustTier,
-        device_id: UUID,
-        board_id: UUID,
+        device_id: DeviceID,
+        board_id: BoardID,
     ) -> AntiCheatResult:
         """Check a score submission for suspicious patterns.
 

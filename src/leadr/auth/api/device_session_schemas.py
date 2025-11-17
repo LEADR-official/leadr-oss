@@ -1,18 +1,18 @@
 """API schemas for device sessions."""
 
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import BaseModel
 
 from leadr.auth.domain.device import DeviceSession
+from leadr.common.domain.ids import DeviceID, DeviceSessionID
 
 
 class DeviceSessionResponse(BaseModel):
     """Response model for device session."""
 
-    id: UUID
-    device_id: UUID
+    id: DeviceSessionID
+    device_id: DeviceID
     expires_at: datetime
     refresh_expires_at: datetime
     ip_address: str | None

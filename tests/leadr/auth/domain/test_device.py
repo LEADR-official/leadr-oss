@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
+from leadr.common.domain.ids import AccountID, DeviceID, DeviceSessionID, GameID
 
 
 class TestDeviceStatus:
@@ -25,12 +26,12 @@ class TestDevice:
     def test_create_device_with_valid_data(self):
         """Test creating a device with all required fields."""
         device_id_value = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         device = Device(
-            id=device_id_value,
+            id=DeviceID(device_id_value),
             game_id=game_id,
             device_id="test-device-123",
             account_id=account_id,
@@ -54,12 +55,12 @@ class TestDevice:
     def test_create_device_defaults_to_active_status(self):
         """Test that device status defaults to ACTIVE."""
         device_id_value = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         device = Device(
-            id=device_id_value,
+            id=DeviceID(device_id_value),
             game_id=game_id,
             device_id="test-device-123",
             account_id=account_id,
@@ -74,12 +75,12 @@ class TestDevice:
     def test_create_device_with_empty_metadata(self):
         """Test that device can be created with empty metadata."""
         device_id_value = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         device = Device(
-            id=device_id_value,
+            id=DeviceID(device_id_value),
             game_id=game_id,
             device_id="test-device-123",
             account_id=account_id,
@@ -95,13 +96,13 @@ class TestDevice:
     def test_device_id_required(self):
         """Test that device_id is required."""
         device_id_value = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Device(  # type: ignore[call-arg]
-                id=device_id_value,
+                id=DeviceID(device_id_value),
                 game_id=game_id,
                 account_id=account_id,
                 first_seen_at=now,
@@ -115,12 +116,12 @@ class TestDevice:
     def test_game_id_required(self):
         """Test that game_id is required."""
         device_id_value = uuid4()
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Device(  # type: ignore[call-arg]
-                id=device_id_value,
+                id=DeviceID(device_id_value),
                 device_id="test-device-123",
                 account_id=account_id,
                 first_seen_at=now,
@@ -134,12 +135,12 @@ class TestDevice:
     def test_account_id_required(self):
         """Test that account_id is required."""
         device_id_value = uuid4()
-        game_id = uuid4()
+        game_id = GameID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
             Device(  # type: ignore[call-arg]
-                id=device_id_value,
+                id=DeviceID(device_id_value),
                 game_id=game_id,
                 device_id="test-device-123",
                 first_seen_at=now,
@@ -153,12 +154,12 @@ class TestDevice:
     def test_is_active_when_status_active(self):
         """Test that is_active returns True when status is ACTIVE."""
         device_id_value = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         device = Device(
-            id=device_id_value,
+            id=DeviceID(device_id_value),
             game_id=game_id,
             device_id="test-device-123",
             account_id=account_id,
@@ -174,12 +175,12 @@ class TestDevice:
     def test_is_not_active_when_status_banned(self):
         """Test that is_active returns False when status is BANNED."""
         device_id_value = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         device = Device(
-            id=device_id_value,
+            id=DeviceID(device_id_value),
             game_id=game_id,
             device_id="test-device-123",
             account_id=account_id,
@@ -195,12 +196,12 @@ class TestDevice:
     def test_is_not_active_when_status_suspended(self):
         """Test that is_active returns False when status is SUSPENDED."""
         device_id_value = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         device = Device(
-            id=device_id_value,
+            id=DeviceID(device_id_value),
             game_id=game_id,
             device_id="test-device-123",
             account_id=account_id,
@@ -216,12 +217,12 @@ class TestDevice:
     def test_ban_device(self):
         """Test banning an active device."""
         device_id_value = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         device = Device(
-            id=device_id_value,
+            id=DeviceID(device_id_value),
             game_id=game_id,
             device_id="test-device-123",
             account_id=account_id,
@@ -239,12 +240,12 @@ class TestDevice:
     def test_suspend_device(self):
         """Test suspending an active device."""
         device_id_value = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         device = Device(
-            id=device_id_value,
+            id=DeviceID(device_id_value),
             game_id=game_id,
             device_id="test-device-123",
             account_id=account_id,
@@ -262,12 +263,12 @@ class TestDevice:
     def test_activate_device(self):
         """Test activating a banned device."""
         device_id_value = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         device = Device(
-            id=device_id_value,
+            id=DeviceID(device_id_value),
             game_id=game_id,
             device_id="test-device-123",
             account_id=account_id,
@@ -285,13 +286,13 @@ class TestDevice:
     def test_update_last_seen(self):
         """Test updating last_seen_at timestamp."""
         device_id_value = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
         earlier = now - timedelta(hours=1)
 
         device = Device(
-            id=device_id_value,
+            id=DeviceID(device_id_value),
             game_id=game_id,
             device_id="test-device-123",
             account_id=account_id,
@@ -312,12 +313,12 @@ class TestDevice:
     def test_device_equality_based_on_id(self):
         """Test that device equality is based on ID."""
         device_id_value = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         device1 = Device(
-            id=device_id_value,
+            id=DeviceID(device_id_value),
             game_id=game_id,
             device_id="device-1",
             account_id=account_id,
@@ -328,7 +329,7 @@ class TestDevice:
         )
 
         device2 = Device(
-            id=device_id_value,
+            id=DeviceID(device_id_value),
             game_id=game_id,
             device_id="device-2",
             account_id=account_id,
@@ -342,12 +343,12 @@ class TestDevice:
 
     def test_device_inequality_different_ids(self):
         """Test that devices with different IDs are not equal."""
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         device1 = Device(
-            id=uuid4(),
+            id=DeviceID(uuid4()),
             game_id=game_id,
             device_id="test-device-123",
             account_id=account_id,
@@ -358,7 +359,7 @@ class TestDevice:
         )
 
         device2 = Device(
-            id=uuid4(),
+            id=DeviceID(uuid4()),
             game_id=game_id,
             device_id="test-device-123",
             account_id=account_id,
@@ -376,8 +377,8 @@ class TestDeviceSession:
 
     def test_create_device_session_with_valid_data(self):
         """Test creating a device session with all required fields."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
         refresh_expires_at = now + timedelta(days=30)
@@ -406,8 +407,8 @@ class TestDeviceSession:
 
     def test_create_device_session_with_optional_fields_none(self):
         """Test that device session can be created with optional fields as None."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
 
@@ -431,7 +432,7 @@ class TestDeviceSession:
 
     def test_device_id_required(self):
         """Test that device_id is required."""
-        session_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
         now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
 
@@ -450,8 +451,8 @@ class TestDeviceSession:
 
     def test_access_token_hash_required(self):
         """Test that access_token_hash is required."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
 
@@ -468,8 +469,8 @@ class TestDeviceSession:
 
     def test_expires_at_required(self):
         """Test that expires_at is required."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
 
         with pytest.raises(ValidationError) as exc_info:
@@ -485,8 +486,8 @@ class TestDeviceSession:
 
     def test_is_expired_when_expiration_in_past(self):
         """Test that session is expired when expires_at is in the past."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         past_date = now - timedelta(hours=1)
 
@@ -505,8 +506,8 @@ class TestDeviceSession:
 
     def test_is_not_expired_when_expiration_in_future(self):
         """Test that session is not expired when expires_at is in the future."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         future_date = now + timedelta(hours=1)
 
@@ -525,8 +526,8 @@ class TestDeviceSession:
 
     def test_is_revoked_when_revoked_at_set(self):
         """Test that session is revoked when revoked_at is set."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
 
@@ -546,8 +547,8 @@ class TestDeviceSession:
 
     def test_is_not_revoked_when_revoked_at_none(self):
         """Test that session is not revoked when revoked_at is None."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
 
@@ -567,8 +568,8 @@ class TestDeviceSession:
 
     def test_is_valid_when_not_expired_and_not_revoked(self):
         """Test that session is valid when not expired and not revoked."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         future_date = now + timedelta(hours=1)
 
@@ -588,8 +589,8 @@ class TestDeviceSession:
 
     def test_is_not_valid_when_expired(self):
         """Test that session is not valid when expired."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         past_date = now - timedelta(hours=1)
 
@@ -609,8 +610,8 @@ class TestDeviceSession:
 
     def test_is_not_valid_when_revoked(self):
         """Test that session is not valid when revoked."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         future_date = now + timedelta(hours=1)
 
@@ -630,8 +631,8 @@ class TestDeviceSession:
 
     def test_revoke_session(self):
         """Test revoking an active session."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         future_date = now + timedelta(hours=1)
 
@@ -657,8 +658,8 @@ class TestDeviceSession:
 
     def test_session_equality_based_on_id(self):
         """Test that session equality is based on ID."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
 
@@ -688,8 +689,8 @@ class TestDeviceSession:
 
     def test_create_device_session_with_refresh_token_fields(self):
         """Test creating a device session with refresh token fields."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         access_expires_at = now + timedelta(minutes=15)
         refresh_expires_at = now + timedelta(days=30)
@@ -712,8 +713,8 @@ class TestDeviceSession:
 
     def test_token_version_defaults_to_one(self):
         """Test that token_version defaults to 1."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         access_expires_at = now + timedelta(minutes=15)
         refresh_expires_at = now + timedelta(days=30)
@@ -733,8 +734,8 @@ class TestDeviceSession:
 
     def test_refresh_token_hash_required(self):
         """Test that refresh_token_hash is required."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         access_expires_at = now + timedelta(minutes=15)
         refresh_expires_at = now + timedelta(days=30)
@@ -754,8 +755,8 @@ class TestDeviceSession:
 
     def test_refresh_expires_at_required(self):
         """Test that refresh_expires_at is required."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         access_expires_at = now + timedelta(minutes=15)
 
@@ -774,8 +775,8 @@ class TestDeviceSession:
 
     def test_is_refresh_expired_when_refresh_expiration_in_past(self):
         """Test that session refresh token is expired when refresh_expires_at is in the past."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         access_expires_at = now + timedelta(minutes=15)
         past_date = now - timedelta(days=1)
@@ -795,8 +796,8 @@ class TestDeviceSession:
 
     def test_is_refresh_not_expired_when_refresh_expiration_in_future(self):
         """Test that session refresh token is not expired when refresh_expires_at is in future."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         access_expires_at = now + timedelta(minutes=15)
         future_date = now + timedelta(days=30)
@@ -816,8 +817,8 @@ class TestDeviceSession:
 
     def test_rotate_tokens_increments_version(self):
         """Test that rotate_tokens increments token_version."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         access_expires_at = now + timedelta(minutes=15)
         refresh_expires_at = now + timedelta(days=30)
@@ -842,8 +843,8 @@ class TestDeviceSession:
 
     def test_rotate_tokens_multiple_times(self):
         """Test that rotate_tokens can be called multiple times."""
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         now = datetime.now(UTC)
         access_expires_at = now + timedelta(minutes=15)
         refresh_expires_at = now + timedelta(days=30)

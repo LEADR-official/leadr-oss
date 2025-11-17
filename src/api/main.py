@@ -9,15 +9,17 @@ from fastapi import APIRouter, Depends, FastAPI
 
 from api.middleware import GeoIPMiddleware
 from api.routes import router as api_router
-from leadr.accounts.api.routes import router as accounts_router
+from leadr.accounts.api.account_routes import router as account_router
+from leadr.accounts.api.user_routes import router as user_router
+from leadr.auth.api.api_key_routes import router as api_key_router
 from leadr.auth.api.client_routes import router as client_auth_router
 from leadr.auth.api.device_routes import router as device_router
 from leadr.auth.api.device_session_routes import router as device_session_router
-from leadr.auth.api.routes import router as auth_router
 from leadr.auth.bootstrap import ensure_superadmin_exists
 from leadr.auth.dependencies import require_api_key
 from leadr.auth.services.nonce_tasks import cleanup_expired_nonces
-from leadr.boards.api.routes import router as boards_router
+from leadr.boards.api.board_routes import router as board_router
+from leadr.boards.api.board_template_routes import router as board_template_router
 from leadr.boards.services.board_tasks import expire_boards, process_due_templates
 from leadr.common.api.exceptions import entity_not_found_handler
 from leadr.common.background_tasks import get_scheduler
@@ -25,9 +27,9 @@ from leadr.common.database import async_session_factory, engine
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.geoip import GeoIPService
 from leadr.config import settings
-from leadr.games.api.routes import router as games_router
-from leadr.scores.api.routes import router as scores_router
-from leadr.scores.api.score_flag_routes import router as score_flags_router
+from leadr.games.api.game_routes import router as game_router
+from leadr.scores.api.score_flag_routes import router as score_flag_router
+from leadr.scores.api.score_routes import router as score_router
 from leadr.scores.api.score_submission_meta_routes import router as score_submission_meta_router
 
 # Configure logging from YAML file
@@ -134,12 +136,14 @@ public_router.include_router(api_router)
 public_router.include_router(client_auth_router, tags=["Client Authentication"])
 
 # Admin routes - require API key authentication
-admin_router.include_router(accounts_router, tags=["Accounts"])
-admin_router.include_router(auth_router, tags=["API Keys"])
-admin_router.include_router(games_router, tags=["Games"])
-admin_router.include_router(boards_router, tags=["Boards"])
-admin_router.include_router(scores_router, tags=["Scores"])
-admin_router.include_router(score_flags_router, tags=["Score Flags"])
+admin_router.include_router(account_router, tags=["Accounts"])
+admin_router.include_router(user_router, tags=["Users"])
+admin_router.include_router(api_key_router, tags=["API Keys"])
+admin_router.include_router(game_router, tags=["Games"])
+admin_router.include_router(board_router, tags=["Boards"])
+admin_router.include_router(board_template_router, tags=["Board Templates"])
+admin_router.include_router(score_router, tags=["Scores"])
+admin_router.include_router(score_flag_router, tags=["Score Flags"])
 admin_router.include_router(score_submission_meta_router, tags=["Score Submission Metadata"])
 admin_router.include_router(device_router, tags=["Devices"])
 admin_router.include_router(device_session_router, tags=["Device Sessions"])

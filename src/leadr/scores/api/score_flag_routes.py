@@ -1,10 +1,9 @@
 """API routes for score flag management."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, HTTPException, status
 
 from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
+from leadr.common.domain.ids import BoardID, GameID, ScoreFlagID
 from leadr.scores.api.score_flag_schemas import ScoreFlagResponse, ScoreFlagUpdateRequest
 from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
 from leadr.scores.services.dependencies import ScoreFlagServiceDep
@@ -16,8 +15,8 @@ router = APIRouter()
 async def list_score_flags(
     account_id: QueryAccountIDDep,
     service: ScoreFlagServiceDep,
-    board_id: UUID | None = None,
-    game_id: UUID | None = None,
+    board_id: BoardID | None = None,
+    game_id: GameID | None = None,
     status: str | None = None,
     flag_type: str | None = None,
 ) -> list[ScoreFlagResponse]:
@@ -57,14 +56,14 @@ async def list_score_flags(
 
 @router.get("/score-flags/{flag_id}", response_model=ScoreFlagResponse)
 async def get_score_flag(
-    flag_id: UUID,
+    flag_id: ScoreFlagID,
     service: ScoreFlagServiceDep,
     auth: AuthContextDep,
 ) -> ScoreFlagResponse:
     """Get a score flag by ID.
 
     Args:
-        flag_id: UUID of the flag to retrieve.
+        flag_id: Flag identifier to retrieve.
         service: Injected score flag service dependency.
         auth: Authentication context with user info.
 
@@ -96,7 +95,7 @@ async def get_score_flag(
 
 @router.patch("/score-flags/{flag_id}", response_model=ScoreFlagResponse)
 async def update_score_flag(
-    flag_id: UUID,
+    flag_id: ScoreFlagID,
     request: ScoreFlagUpdateRequest,
     service: ScoreFlagServiceDep,
     auth: AuthContextDep,
@@ -107,7 +106,7 @@ async def update_score_flag(
     soft-deleting the flag.
 
     Args:
-        flag_id: UUID of the flag to update.
+        flag_id: Flag identifier to update.
         request: Update details (status, reviewer_decision, or deleted flag).
         service: Injected score flag service dependency.
         auth: Authentication context with user info.

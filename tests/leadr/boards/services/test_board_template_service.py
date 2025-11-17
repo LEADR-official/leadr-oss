@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.accounts.services.account_service import AccountService
 from leadr.boards.services.board_template_service import BoardTemplateService
 from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import BoardTemplateID, GameID
 from leadr.games.services.game_service import GameService
 
 
@@ -147,7 +148,7 @@ class TestBoardTemplateService:
         with pytest.raises(EntityNotFoundError):
             await template_service.create_board_template(
                 account_id=account.id,
-                game_id=non_existent_game_id,
+                game_id=GameID(non_existent_game_id),
                 name="Invalid Template",
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
@@ -194,7 +195,7 @@ class TestBoardTemplateService:
         template_service = BoardTemplateService(db_session)
         nonexistent_id = uuid4()
 
-        result = await template_service.get_board_template(nonexistent_id)
+        result = await template_service.get_board_template(BoardTemplateID(nonexistent_id))
 
         assert result is None
 
@@ -419,7 +420,7 @@ class TestBoardTemplateService:
 
         with pytest.raises(EntityNotFoundError):
             await template_service.update_board_template(
-                template_id=nonexistent_id,
+                template_id=BoardTemplateID(nonexistent_id),
                 name="New Name",
             )
 
@@ -459,7 +460,7 @@ class TestBoardTemplateService:
         assert deleted.is_deleted is False
 
         # Verify not retrievable after deletion
-        retrieved = await template_service.get_board_template(template.id)
+        retrieved = await template_service.get_board_template(BoardTemplateID(template.id))
         assert retrieved is None
 
         # Verify not in list after deletion
@@ -496,7 +497,7 @@ class TestBoardTemplateService:
         )
 
         # Advance schedule
-        updated = await template_service.advance_template_schedule(template.id)
+        updated = await template_service.advance_template_schedule(BoardTemplateID(template.id))
 
         # Should be advanced by 7 days
         expected_next_run = original_next_run + timedelta(days=7)
@@ -556,4 +557,4 @@ class TestBoardTemplateService:
         non_existent_id = uuid4()
 
         with pytest.raises(EntityNotFoundError):
-            await template_service.advance_template_schedule(non_existent_id)
+            await template_service.advance_template_schedule(BoardTemplateID(non_existent_id))

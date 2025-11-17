@@ -1,7 +1,8 @@
 """Common domain models and value objects."""
 
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
+from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -10,7 +11,7 @@ class Entity(BaseModel):
     """Base class for all domain entities with ID and timestamps.
 
     Provides common functionality for domain entities including:
-    - Auto-generated UUID primary key
+    - Auto-generated UUID primary key (or typed prefixed ID in subclasses)
     - Created/updated timestamps (UTC)
     - Soft delete support with deleted_at timestamp
     - Equality and hashing based on ID
@@ -18,14 +19,17 @@ class Entity(BaseModel):
     All domain entities should extend this base class. The ID and timestamps
     are automatically populated on entity creation and don't need to be
     provided by consumers.
+
+    Subclasses can override the `id` field with a typed PrefixedID for better
+    type safety and API clarity.
     """
 
     model_config = ConfigDict(validate_assignment=True)
 
-    id: UUID = Field(
+    id: Any = Field(
         frozen=True,
         default_factory=uuid4,
-        description="Unique identifier (auto-generated UUID)",
+        description="Unique identifier (auto-generated UUID or typed ID)",
     )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),

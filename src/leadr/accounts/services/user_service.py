@@ -1,11 +1,10 @@
 """User service for managing user operations."""
 
-from uuid import UUID
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.user import User
 from leadr.accounts.services.repositories import UserRepository
+from leadr.common.domain.ids import AccountID, UserID
 from leadr.common.services import BaseService
 
 
@@ -26,7 +25,7 @@ class UserService(BaseService[User, UserRepository]):
 
     async def create_user(
         self,
-        account_id: UUID,
+        account_id: AccountID,
         email: str,
         display_name: str,
         super_admin: bool = False,
@@ -58,7 +57,7 @@ class UserService(BaseService[User, UserRepository]):
 
         return await self.repository.create(user)
 
-    async def get_user(self, user_id: UUID) -> User | None:
+    async def get_user(self, user_id: UserID) -> User | None:
         """Get a user by its ID.
 
         Args:
@@ -80,7 +79,7 @@ class UserService(BaseService[User, UserRepository]):
         """
         return await self.repository.get_by_email(email)
 
-    async def list_users_by_account(self, account_id: UUID) -> list[User]:
+    async def list_users_by_account(self, account_id: AccountID) -> list[User]:
         """List all users for an account.
 
         Args:
@@ -93,7 +92,7 @@ class UserService(BaseService[User, UserRepository]):
 
     async def update_user(
         self,
-        user_id: UUID,
+        user_id: UserID,
         email: str | None = None,
         display_name: str | None = None,
         super_admin: bool | None = None,
@@ -124,7 +123,7 @@ class UserService(BaseService[User, UserRepository]):
 
         return await self.repository.update(user)
 
-    async def delete_user(self, user_id: UUID) -> None:
+    async def delete_user(self, user_id: UserID) -> None:
         """Soft-delete a user.
 
         Args:

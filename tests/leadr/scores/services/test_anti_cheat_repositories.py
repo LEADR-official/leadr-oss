@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.domain.ids import BoardID, DeviceID, ScoreID, UserID
 from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
 from leadr.scores.services.anti_cheat_repositories import (
@@ -22,7 +23,7 @@ class TestScoreSubmissionMetaRepository:
         """Test creating a submission meta via repository."""
         repo = ScoreSubmissionMetaRepository(db_session)
         now = datetime.now(UTC)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
 
         meta = ScoreSubmissionMeta(
             score_id=test_score.id,
@@ -45,7 +46,7 @@ class TestScoreSubmissionMetaRepository:
         """Test retrieving a submission meta by ID."""
         repo = ScoreSubmissionMetaRepository(db_session)
         now = datetime.now(UTC)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
 
         meta = ScoreSubmissionMeta(
             score_id=test_score.id,
@@ -65,7 +66,7 @@ class TestScoreSubmissionMetaRepository:
     async def test_get_submission_meta_by_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent submission meta returns None."""
         repo = ScoreSubmissionMetaRepository(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = ScoreID(uuid4())
 
         result = await repo.get_by_id(non_existent_id)
 
@@ -75,7 +76,7 @@ class TestScoreSubmissionMetaRepository:
         """Test updating a submission meta."""
         repo = ScoreSubmissionMetaRepository(db_session)
         now = datetime.now(UTC)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
 
         meta = ScoreSubmissionMeta(
             score_id=test_score.id,
@@ -99,7 +100,7 @@ class TestScoreSubmissionMetaRepository:
         """Test retrieving submission meta by device and board IDs."""
         repo = ScoreSubmissionMetaRepository(db_session)
         now = datetime.now(UTC)
-        device_id = uuid4()
+        device_id = DeviceID(uuid4())
 
         meta = ScoreSubmissionMeta(
             score_id=test_score.id,
@@ -121,7 +122,7 @@ class TestScoreSubmissionMetaRepository:
         """Test that get_by_device_and_board returns None when not found."""
         repo = ScoreSubmissionMetaRepository(db_session)
 
-        result = await repo.get_by_device_and_board(uuid4(), uuid4())
+        result = await repo.get_by_device_and_board(DeviceID(uuid4()), BoardID(uuid4()))
 
         assert result is None
 
@@ -174,7 +175,7 @@ class TestScoreFlagRepository:
     async def test_get_flag_by_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent flag returns None."""
         repo = ScoreFlagRepository(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = ScoreID(uuid4())
 
         result = await repo.get_by_id(non_existent_id)
 
@@ -195,10 +196,10 @@ class TestScoreFlagRepository:
 
         # Update it
         reviewed_at = datetime.now(UTC)
-        reviewer_id = uuid4()
+        reviewer_id = UserID(uuid4())
         flag.status = ScoreFlagStatus.FALSE_POSITIVE
         flag.reviewed_at = reviewed_at
-        flag.reviewer_id = reviewer_id
+        flag.reviewer_id = reviewer_id  # type: ignore[misc]
         flag.reviewer_decision = "Legitimate speed"
         updated = await repo.update(flag)
 

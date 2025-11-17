@@ -177,7 +177,7 @@ class TestDeviceRoutes:
     async def test_get_device_not_found(self, client: AsyncClient, db_session, test_api_key):
         """Test getting a non-existent device returns 404."""
         response = await client.get(
-            "/devices/00000000-0000-0000-0000-000000000000",
+            "/devices/dev_00000000-0000-0000-0000-000000000000",
             headers={"leadr-api-key": test_api_key},
         )
 

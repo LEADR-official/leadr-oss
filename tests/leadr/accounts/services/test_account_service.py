@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.accounts.domain.account import AccountStatus
 from leadr.accounts.services.account_service import AccountService
 from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import AccountID
 
 
 @pytest.mark.asyncio
@@ -50,7 +51,7 @@ class TestAccountService:
         service = AccountService(db_session)
         non_existent_id = uuid4()
 
-        account = await service.get_account(non_existent_id)
+        account = await service.get_account(AccountID(non_existent_id))
 
         assert account is None
 
@@ -127,7 +128,7 @@ class TestAccountService:
         non_existent_id = uuid4()
 
         with pytest.raises(EntityNotFoundError) as exc_info:
-            await service.suspend_account(non_existent_id)
+            await service.suspend_account(AccountID(non_existent_id))
 
         assert "Account not found" in str(exc_info.value)
 
@@ -158,7 +159,7 @@ class TestAccountService:
         non_existent_id = uuid4()
 
         with pytest.raises(EntityNotFoundError) as exc_info:
-            await service.activate_account(non_existent_id)
+            await service.activate_account(AccountID(non_existent_id))
 
         assert "Account not found" in str(exc_info.value)
 
@@ -185,7 +186,7 @@ class TestAccountService:
         non_existent_id = uuid4()
 
         with pytest.raises(EntityNotFoundError) as exc_info:
-            await service.delete_account(non_existent_id)
+            await service.delete_account(AccountID(non_existent_id))
 
         assert "Account not found" in str(exc_info.value)
 

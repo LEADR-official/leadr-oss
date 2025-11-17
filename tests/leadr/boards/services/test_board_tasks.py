@@ -66,7 +66,7 @@ class TestProcessDueTemplates:
 
         result = await db_session.execute(
             select(BoardORM).where(
-                BoardORM.template_id == template.id,
+                BoardORM.template_id == template.id.uuid,
             )
         )
         boards = result.scalars().all()
@@ -124,7 +124,7 @@ class TestProcessDueTemplates:
 
         result = await db_session.execute(
             select(BoardORM).where(
-                BoardORM.template_id == template.id,
+                BoardORM.template_id == template.id.uuid,
             )
         )
         boards = result.scalars().all()
@@ -262,8 +262,8 @@ class TestExpireBoards:
         # Create an expired board (ends_at in the past)
         past_time = datetime.now(UTC) - timedelta(hours=1)
         board_orm = BoardORM(
-            account_id=account.id,
-            game_id=game.id,
+            account_id=account.id.uuid,
+            game_id=game.id.uuid,
             name="Expired Board",
             icon="trophy",
             short_code="EXPIRED1",
@@ -307,8 +307,8 @@ class TestExpireBoards:
         # Create an active board that hasn't expired yet
         future_time = datetime.now(UTC) + timedelta(hours=1)
         board_orm = BoardORM(
-            account_id=account.id,
-            game_id=game.id,
+            account_id=account.id.uuid,
+            game_id=game.id.uuid,
             name="Active Board",
             icon="trophy",
             short_code="ACTIVE01",
@@ -365,8 +365,8 @@ class TestExpireBoards:
         # Create an expired board
         past_time = datetime.now(UTC) - timedelta(hours=1)
         board_orm = BoardORM(
-            account_id=account.id,
-            game_id=game.id,
+            account_id=account.id.uuid,
+            game_id=game.id.uuid,
             name="Expired Board",
             icon="trophy",
             short_code="EXPIRED2",

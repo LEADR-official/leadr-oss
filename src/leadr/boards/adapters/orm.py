@@ -104,11 +104,12 @@ class BoardTemplateORM(Base):
             BoardTemplate domain entity with all fields populated from ORM model.
         """
         from leadr.boards.domain.board_template import BoardTemplate
+        from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 
         return BoardTemplate(
-            id=self.id,
-            account_id=self.account_id,
-            game_id=self.game_id,
+            id=BoardTemplateID(self.id),
+            account_id=AccountID(self.account_id),
+            game_id=GameID(self.game_id),
             name=self.name,
             name_template=self.name_template,
             repeat_interval=self.repeat_interval,
@@ -133,9 +134,9 @@ class BoardTemplateORM(Base):
         """
 
         return cls(
-            id=entity.id,
-            account_id=entity.account_id,
-            game_id=entity.game_id,
+            id=entity.id.uuid,
+            account_id=entity.account_id.uuid,
+            game_id=entity.game_id.uuid,
             name=entity.name,
             name_template=entity.name_template,
             repeat_interval=entity.repeat_interval,

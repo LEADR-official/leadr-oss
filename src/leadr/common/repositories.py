@@ -10,6 +10,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import PrefixedID
 from leadr.common.domain.models import Entity
 from leadr.common.orm import Base
 
@@ -34,6 +35,24 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
             session: SQLAlchemy async session
         """
         self.session = session
+
+    @staticmethod
+    def _extract_uuid(id_value: UUID | PrefixedID | UUID4 | str) -> UUID:
+        """Extract UUID from various ID types.
+
+        Handles conversion from PrefixedID to UUID for database operations.
+
+        Args:
+            id_value: ID value that can be UUID, PrefixedID, UUID4, or string
+
+        Returns:
+            UUID instance for database querying
+        """
+        if isinstance(id_value, PrefixedID):
+            return id_value.uuid
+        if isinstance(id_value, UUID):
+            return id_value
+        return UUID(str(id_value))
 
     @abstractmethod
     def _to_domain(self, orm: ORMModelT) -> DomainEntityT:
@@ -81,7 +100,7 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
         return self._to_domain(orm)
 
     async def get_by_id(
-        self, entity_id: UUID4, include_deleted: bool = False
+        self, entity_id: UUID4 | PrefixedID, include_deleted: bool = False
     ) -> DomainEntityT | None:
         """Get an entity by its ID.
 
@@ -93,7 +112,7 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
             Domain entity if found, None otherwise
         """
         orm_class = self._get_orm_class()
-        query = select(orm_class).where(orm_class.id == UUID(str(entity_id)))
+        query = select(orm_class).where(orm_class.id == self._extract_uuid(entity_id))
 
         if not include_deleted:
             query = query.where(orm_class.deleted_at.is_(None))
@@ -116,9 +135,8 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
             EntityNotFoundError: If entity is not found
         """
         orm_class = self._get_orm_class()
-        result = await self.session.execute(
-            select(orm_class).where(orm_class.id == UUID(str(entity.id)))
-        )
+        entity_uuid = self._extract_uuid(entity.id)
+        result = await self.session.execute(select(orm_class).where(orm_class.id == entity_uuid))
         orm = result.scalar_one_or_none()
 
         if not orm:
@@ -136,7 +154,7 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
         await self.session.refresh(orm)
         return self._to_domain(orm)
 
-    async def delete(self, entity_id: UUID4) -> None:
+    async def delete(self, entity_id: UUID4 | PrefixedID) -> None:
         """Soft delete an entity by setting its deleted_at timestamp.
 
         Args:
@@ -146,11 +164,10 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
             EntityNotFoundError: If entity is not found
         """
         orm_class = self._get_orm_class()
+        entity_uuid = self._extract_uuid(entity_id)
 
         # Verify entity exists
-        result = await self.session.execute(
-            select(orm_class).where(orm_class.id == UUID(str(entity_id)))
-        )
+        result = await self.session.execute(select(orm_class).where(orm_class.id == entity_uuid))
         orm = result.scalar_one_or_none()
 
         if not orm:
@@ -161,13 +178,15 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
         # Perform soft delete
         await self.session.execute(
             update(orm_class)
-            .where(orm_class.id == UUID(str(entity_id)))
+            .where(orm_class.id == entity_uuid)
             .values(deleted_at=datetime.now(UTC))
         )
         await self.session.commit()
 
     @abstractmethod
-    async def filter(self, account_id: UUID4, **kwargs: Any) -> list[DomainEntityT]:
+    async def filter(
+        self, account_id: UUID4 | PrefixedID | None = None, **kwargs: Any
+    ) -> list[DomainEntityT]:
         """Filter entities based on criteria.
 
         For multi-tenant entities, implementations MUST override this to make
@@ -274,8 +293,9 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
                 return await self._list_by_account(account_id, filters)
         """
         orm_class = self._get_orm_class()
+        account_uuid = self._extract_uuid(account_id)
         query = select(orm_class).where(
-            orm_class.account_id == account_id,  # type: ignore[attr-defined]
+            orm_class.account_id == account_uuid,  # type: ignore[attr-defined]
             orm_class.deleted_at.is_(None),
         )
 

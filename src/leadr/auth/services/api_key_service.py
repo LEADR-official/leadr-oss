@@ -1,7 +1,6 @@
 """API Key service for managing API key operations."""
 
 from datetime import UTC, datetime
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +8,7 @@ from leadr.auth.domain.api_key import APIKey
 from leadr.auth.services.api_key_crypto import generate_api_key, hash_api_key, verify_api_key
 from leadr.auth.services.repositories import APIKeyRepository
 from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import AccountID, APIKeyID, UserID
 from leadr.common.services import BaseService
 from leadr.config import settings
 
@@ -31,8 +31,8 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
 
     async def create_api_key(
         self,
-        account_id: UUID,
-        user_id: UUID,
+        account_id: AccountID,
+        user_id: UserID,
         name: str,
         expires_at: datetime | None = None,
     ) -> tuple[APIKey, str]:
@@ -89,8 +89,8 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
 
     async def create_api_key_with_value(
         self,
-        account_id: UUID,
-        user_id: UUID,
+        account_id: AccountID,
+        user_id: UserID,
         name: str,
         key_value: str,
         expires_at: datetime | None = None,
@@ -187,7 +187,7 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
 
         return api_key
 
-    async def get_api_key(self, key_id: UUID) -> APIKey | None:
+    async def get_api_key(self, key_id: APIKeyID) -> APIKey | None:
         """Get an API key by its ID.
 
         Args:
@@ -200,7 +200,7 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
 
     async def list_api_keys(
         self,
-        account_id: UUID,
+        account_id: AccountID,
         status: str | None = None,
     ) -> list[APIKey]:
         """List API keys for an account with optional filters.
@@ -223,7 +223,7 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
 
     async def list_account_api_keys(
         self,
-        account_id: UUID,
+        account_id: AccountID,
         active_only: bool = False,
     ) -> list[APIKey]:
         """List all API keys for an account.
@@ -241,7 +241,7 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
 
         return await self.repository.filter(account_id, **kwargs)
 
-    async def count_active_api_keys(self, account_id: UUID) -> int:
+    async def count_active_api_keys(self, account_id: AccountID) -> int:
         """Count active API keys for an account.
 
         This is useful for enforcing limits on the number of active keys
@@ -255,7 +255,7 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         """
         return await self.repository.count_active_by_account(account_id)
 
-    async def update_api_key_status(self, key_id: UUID, status: str) -> APIKey:
+    async def update_api_key_status(self, key_id: APIKeyID, status: str) -> APIKey:
         """Update the status of an API key.
 
         Args:
@@ -285,7 +285,7 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
 
         return await self.repository.update(api_key)
 
-    async def revoke_api_key(self, key_id: UUID) -> APIKey:
+    async def revoke_api_key(self, key_id: APIKeyID) -> APIKey:
         """Revoke an API key, preventing further use.
 
         Args:
@@ -304,7 +304,7 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         api_key.revoke()
         return await self.repository.update(api_key)
 
-    async def record_usage(self, key_id: UUID, used_at: datetime) -> APIKey:
+    async def record_usage(self, key_id: APIKeyID, used_at: datetime) -> APIKey:
         """Record that an API key was used at a specific time.
 
         This is typically called automatically during validation, but can

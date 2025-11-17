@@ -12,6 +12,7 @@ from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM, DeviceStatusEnum, NonceORM
 from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
 from leadr.auth.domain.nonce import Nonce, NonceStatus
+from leadr.common.domain.ids import AccountID, DeviceID, DeviceSessionID, GameID, NonceID
 from leadr.games.adapters.orm import GameORM
 
 
@@ -19,32 +20,17 @@ from leadr.games.adapters.orm import GameORM
 class TestDeviceORM:
     """Test suite for Device ORM model."""
 
-    async def test_create_device(self, db_session: AsyncSession):
+    async def test_create_device(
+        self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
+    ):
         """Test creating a device in the database."""
-        # Create account and game first (foreign key requirements)
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        # Create device
+        # Create device with custom metadata
         device_id_val = uuid4()
         device = DeviceORM(
             id=device_id_val,
-            game_id=game.id,
+            game_id=game_orm.id,
             device_id="test-device-123",
-            account_id=game.account_id,
+            account_id=game_orm.account_id,
             status="active",
             first_seen_at=datetime.now(UTC),
             last_seen_at=datetime.now(UTC),
@@ -56,9 +42,9 @@ class TestDeviceORM:
         await db_session.refresh(device)
 
         assert device.id == device_id_val
-        assert device.game_id == game.id
+        assert device.game_id == game_orm.id
         assert device.device_id == "test-device-123"
-        assert device.account_id == game.account_id
+        assert device.account_id == game_orm.account_id
         assert device.status == "active"
         assert device.first_seen_at is not None
         assert device.last_seen_at is not None
@@ -66,104 +52,39 @@ class TestDeviceORM:
         assert device.created_at is not None
         assert device.updated_at is not None
 
-    async def test_device_status_defaults_to_active(self, db_session: AsyncSession):
+    async def test_device_status_defaults_to_active(self, device_orm: DeviceORM):
         """Test that device status defaults to active."""
-        # Create account and game first
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
+        assert device_orm.status == "active"
 
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        # Create device without explicit status
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device-123",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-
-        db_session.add(device)
-        await db_session.commit()
-        await db_session.refresh(device)
-
-        assert device.status == "active"
-
-    async def test_device_game_id_and_device_id_unique_together(self, db_session: AsyncSession):
+    async def test_device_game_id_and_device_id_unique_together(
+        self, db_session: AsyncSession, device_orm: DeviceORM
+    ):
         """Test that (game_id, device_id) must be unique together."""
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
         now = datetime.now(UTC)
 
-        device1 = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="duplicate-device",
-            account_id=game.account_id,
-            first_seen_at=now,
-            last_seen_at=now,
-        )
-
+        # Try to create duplicate device
         device2 = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="duplicate-device",  # Same device_id for same game
-            account_id=game.account_id,
+            game_id=device_orm.game_id,
+            device_id=device_orm.device_id,  # Same device_id for same game
+            account_id=device_orm.account_id,
             first_seen_at=now,
             last_seen_at=now,
         )
-
-        db_session.add(device1)
-        await db_session.commit()
 
         db_session.add(device2)
         with pytest.raises(IntegrityError):
             await db_session.commit()
 
-    async def test_device_same_device_id_different_games_allowed(self, db_session: AsyncSession):
+    async def test_device_same_device_id_different_games_allowed(
+        self, db_session: AsyncSession, account_orm: AccountORM
+    ):
         """Test that same device_id can exist for different games."""
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
         game1 = GameORM(
-            id=uuid4(),
-            account_id=account.id,
+            account_id=account_orm.id,
             name="Game 1",
         )
         game2 = GameORM(
-            id=uuid4(),
-            account_id=account.id,
+            account_id=account_orm.id,
             name="Game 2",
         )
         db_session.add(game1)
@@ -173,19 +94,17 @@ class TestDeviceORM:
         now = datetime.now(UTC)
 
         device1 = DeviceORM(
-            id=uuid4(),
             game_id=game1.id,
             device_id="same-device",
-            account_id=account.id,
+            account_id=account_orm.id,
             first_seen_at=now,
             last_seen_at=now,
         )
 
         device2 = DeviceORM(
-            id=uuid4(),
             game_id=game2.id,
             device_id="same-device",  # Same device_id but different game
-            account_id=account.id,
+            account_id=account_orm.id,
             first_seen_at=now,
             last_seen_at=now,
         )
@@ -201,39 +120,14 @@ class TestDeviceORM:
         assert device1.device_id == device2.device_id
         assert device1.game_id != device2.game_id
 
-    async def test_device_cascades_on_game_delete(self, db_session: AsyncSession):
+    async def test_device_cascades_on_game_delete(
+        self, db_session: AsyncSession, game_orm: GameORM, device_orm: DeviceORM
+    ):
         """Test that devices are deleted when their game is deleted."""
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
-        device_id = device.id
+        device_id = device_orm.id
 
         # Delete the game
-        await db_session.delete(game)
+        await db_session.delete(game_orm)
         await db_session.commit()
 
         # Device should be gone
@@ -241,43 +135,14 @@ class TestDeviceORM:
         deleted_device = result.scalar_one_or_none()
         assert deleted_device is None
 
-    async def test_device_metadata_defaults_to_empty_dict(self, db_session: AsyncSession):
+    async def test_device_metadata_defaults_to_empty_dict(self, device_orm: DeviceORM):
         """Test that metadata defaults to empty dict if not provided."""
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-
-        db_session.add(device)
-        await db_session.commit()
-        await db_session.refresh(device)
-
-        assert device.device_metadata == {}
+        # Fixture creates device without explicit metadata
+        assert device_orm.device_metadata == {}
 
     async def test_device_to_domain_conversion(self, db_session: AsyncSession):
         """Test converting Device ORM to domain entity."""
         account = AccountORM(
-            id=uuid4(),
             name="Test Account",
             slug="test-account",
         )
@@ -285,7 +150,6 @@ class TestDeviceORM:
         await db_session.commit()
 
         game = GameORM(
-            id=uuid4(),
             account_id=account.id,
             name="Test Game",
         )
@@ -325,11 +189,11 @@ class TestDeviceORM:
         """Test converting Device domain to ORM model."""
         now = datetime.now(UTC)
         device_id_val = uuid4()
-        game_id = uuid4()
-        account_id = uuid4()
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
 
         device_domain = Device(
-            id=device_id_val,
+            id=DeviceID(device_id_val),
             game_id=game_id,
             device_id="test-device",
             account_id=account_id,
@@ -345,9 +209,9 @@ class TestDeviceORM:
         device_orm = DeviceORM.from_domain(device_domain)
 
         assert device_orm.id == device_id_val
-        assert device_orm.game_id == game_id
+        assert device_orm.game_id == game_id.uuid
         assert device_orm.device_id == "test-device"
-        assert device_orm.account_id == account_id
+        assert device_orm.account_id == account_id.uuid
         assert device_orm.status == "banned"
         assert device_orm.first_seen_at == now
         assert device_orm.last_seen_at == now
@@ -358,36 +222,8 @@ class TestDeviceORM:
 class TestDeviceSessionORM:
     """Test suite for DeviceSession ORM model."""
 
-    async def test_create_device_session(self, db_session: AsyncSession):
+    async def test_create_device_session(self, db_session: AsyncSession, device_orm: DeviceORM):
         """Test creating a device session in the database."""
-        # Create account, game, and device first
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
         # Create session
         session_id = uuid4()
         now = datetime.now(UTC)
@@ -395,7 +231,7 @@ class TestDeviceSessionORM:
 
         session = DeviceSessionORM(
             id=session_id,
-            device_id=device.id,
+            device_id=device_orm.id,
             access_token_hash="hashed_token_value",
             refresh_token_hash="refresh_hash",
             token_version=1,
@@ -410,7 +246,7 @@ class TestDeviceSessionORM:
         await db_session.refresh(session)
 
         assert session.id == session_id
-        assert session.device_id == device.id
+        assert session.device_id == device_orm.id
         assert session.access_token_hash == "hashed_token_value"
         assert session.expires_at == expires_at
         assert session.ip_address == "192.168.1.1"
@@ -419,144 +255,35 @@ class TestDeviceSessionORM:
         assert session.created_at is not None
         assert session.updated_at is not None
 
-    async def test_device_session_cascades_on_device_delete(self, db_session: AsyncSession):
+    async def test_device_session_cascades_on_device_delete(
+        self, db_session: AsyncSession, device_orm: DeviceORM, device_session_orm: DeviceSessionORM
+    ):
         """Test that sessions are deleted when their device is deleted."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
-        # Create session
-        session = DeviceSessionORM(
-            id=uuid4(),
-            device_id=device.id,
-            access_token_hash="hash",
-            refresh_token_hash="refresh_hash",
-            token_version=1,
-            expires_at=datetime.now(UTC) + timedelta(hours=1),
-            refresh_expires_at=datetime.now(UTC) + timedelta(days=30),
-        )
-        db_session.add(session)
-        await db_session.commit()
-
-        session_id = session.id
+        session_id = device_session_orm.id
 
         # Delete device
-        await db_session.delete(device)
+        await db_session.delete(device_orm)
         await db_session.commit()
 
         # Session should be gone
         result = await db_session.get(DeviceSessionORM, session_id)
         assert result is None
 
-    async def test_device_session_optional_fields(self, db_session: AsyncSession):
+    async def test_device_session_optional_fields(self, device_session_orm: DeviceSessionORM):
         """Test that optional fields (ip_address, user_agent, revoked_at) can be null."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
+        # Fixture includes ip_address and user_agent, but revoked_at should be None
+        assert device_session_orm.revoked_at is None
 
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
-        # Create session without optional fields
-        session = DeviceSessionORM(
-            id=uuid4(),
-            device_id=device.id,
-            access_token_hash="hash",
-            refresh_token_hash="refresh_hash",
-            token_version=1,
-            expires_at=datetime.now(UTC) + timedelta(hours=1),
-            refresh_expires_at=datetime.now(UTC) + timedelta(days=30),
-        )
-
-        db_session.add(session)
-        await db_session.commit()
-        await db_session.refresh(session)
-
-        assert session.ip_address is None
-        assert session.user_agent is None
-        assert session.revoked_at is None
-
-    async def test_device_session_access_token_hash_indexed(self, db_session: AsyncSession):
+    async def test_device_session_access_token_hash_indexed(
+        self, db_session: AsyncSession, device_orm: DeviceORM
+    ):
         """Test that access_token_hash is indexed for fast lookups."""
         # This test verifies the index exists by checking we can create
         # sessions with different hashes quickly
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
         # Create multiple sessions
         for i in range(5):
             session = DeviceSessionORM(
-                id=uuid4(),
-                device_id=device.id,
+                device_id=device_orm.id,
                 access_token_hash=f"hash_{i}",
                 refresh_token_hash=f"refresh_hash_{i}",
                 token_version=1,
@@ -606,8 +333,8 @@ class TestDeviceSessionORM:
         """Test converting DeviceSession domain to ORM model."""
         now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
-        session_id = uuid4()
-        device_id = uuid4()
+        session_id = DeviceSessionID(uuid4())
+        device_id = DeviceID(uuid4())
         revoked_at = now + timedelta(minutes=30)
 
         session_domain = DeviceSession(
@@ -628,8 +355,8 @@ class TestDeviceSessionORM:
         # Convert to ORM
         session_orm = DeviceSessionORM.from_domain(session_domain)
 
-        assert session_orm.id == session_id
-        assert session_orm.device_id == device_id
+        assert session_orm.id == session_id.uuid
+        assert session_orm.device_id == device_id.uuid
         assert session_orm.access_token_hash == "hashed_token"
         assert session_orm.expires_at == expires_at
         assert session_orm.ip_address == "192.168.1.100"
@@ -641,36 +368,8 @@ class TestDeviceSessionORM:
 class TestNonceORM:
     """Test suite for Nonce ORM model."""
 
-    async def test_create_nonce(self, db_session: AsyncSession):
+    async def test_create_nonce(self, db_session: AsyncSession, device_orm: DeviceORM):
         """Test creating a nonce in the database."""
-        # Create account, game, and device first (foreign key requirements)
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
         # Create nonce
         nonce_id = uuid4()
         nonce_value = str(uuid4())
@@ -678,7 +377,7 @@ class TestNonceORM:
 
         nonce = NonceORM(
             id=nonce_id,
-            device_id=device.id,
+            device_id=device_orm.id,
             nonce_value=nonce_value,
             expires_at=expires_at,
             status="pending",
@@ -689,7 +388,7 @@ class TestNonceORM:
         await db_session.refresh(nonce)
 
         assert nonce.id == nonce_id
-        assert nonce.device_id == device.id
+        assert nonce.device_id == device_orm.id
         assert nonce.nonce_value == nonce_value
         assert nonce.expires_at == expires_at
         assert nonce.status == "pending"
@@ -697,97 +396,18 @@ class TestNonceORM:
         assert nonce.created_at is not None
         assert nonce.updated_at is not None
 
-    async def test_nonce_status_defaults_to_pending(self, db_session: AsyncSession):
+    async def test_nonce_status_defaults_to_pending(self, nonce_orm: NonceORM):
         """Test that nonce status defaults to pending."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
+        assert nonce_orm.status == "pending"
 
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
-        # Create nonce without explicit status
-        nonce = NonceORM(
-            id=uuid4(),
-            device_id=device.id,
-            nonce_value=str(uuid4()),
-            expires_at=datetime.now(UTC) + timedelta(seconds=60),
-        )
-
-        db_session.add(nonce)
-        await db_session.commit()
-        await db_session.refresh(nonce)
-
-        assert nonce.status == "pending"
-
-    async def test_nonce_value_unique_constraint(self, db_session: AsyncSession):
+    async def test_nonce_value_unique_constraint(
+        self, db_session: AsyncSession, nonce_orm: NonceORM
+    ):
         """Test that nonce_value must be unique."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
-        # Create first nonce
-        nonce_value = str(uuid4())
-        nonce1 = NonceORM(
-            id=uuid4(),
-            device_id=device.id,
-            nonce_value=nonce_value,
-            expires_at=datetime.now(UTC) + timedelta(seconds=60),
-        )
-
-        db_session.add(nonce1)
-        await db_session.commit()
-
         # Try to create second nonce with same nonce_value
         nonce2 = NonceORM(
-            id=uuid4(),
-            device_id=device.id,
-            nonce_value=nonce_value,  # Duplicate
+            device_id=nonce_orm.device_id,
+            nonce_value=nonce_orm.nonce_value,  # Duplicate
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
         )
 
@@ -795,50 +415,14 @@ class TestNonceORM:
         with pytest.raises(IntegrityError):
             await db_session.commit()
 
-    async def test_nonce_cascades_on_device_delete(self, db_session: AsyncSession):
+    async def test_nonce_cascades_on_device_delete(
+        self, db_session: AsyncSession, device_orm: DeviceORM, nonce_orm: NonceORM
+    ):
         """Test that nonces are deleted when their device is deleted."""
-        # Create account, game, and device
-        account = AccountORM(
-            id=uuid4(),
-            name="Test Account",
-            slug="test-account",
-        )
-        db_session.add(account)
-        await db_session.commit()
-
-        game = GameORM(
-            id=uuid4(),
-            account_id=account.id,
-            name="Test Game",
-        )
-        db_session.add(game)
-        await db_session.commit()
-
-        device = DeviceORM(
-            id=uuid4(),
-            game_id=game.id,
-            device_id="test-device",
-            account_id=game.account_id,
-            first_seen_at=datetime.now(UTC),
-            last_seen_at=datetime.now(UTC),
-        )
-        db_session.add(device)
-        await db_session.commit()
-
-        # Create nonce
-        nonce = NonceORM(
-            id=uuid4(),
-            device_id=device.id,
-            nonce_value=str(uuid4()),
-            expires_at=datetime.now(UTC) + timedelta(seconds=60),
-        )
-        db_session.add(nonce)
-        await db_session.commit()
-
-        nonce_id = nonce.id
+        nonce_id = nonce_orm.id
 
         # Delete device
-        await db_session.delete(device)
+        await db_session.delete(device_orm)
         await db_session.commit()
 
         # Nonce should be gone
@@ -880,8 +464,8 @@ class TestNonceORM:
         """Test converting Nonce domain to ORM model."""
         now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=60)
-        nonce_id = uuid4()
-        device_id = uuid4()
+        nonce_id = NonceID(uuid4())
+        device_id = DeviceID(uuid4())
         nonce_value = str(uuid4())
 
         nonce_domain = Nonce(
@@ -897,8 +481,8 @@ class TestNonceORM:
         # Convert to ORM
         nonce_orm = NonceORM.from_domain(nonce_domain)
 
-        assert nonce_orm.id == nonce_id
-        assert nonce_orm.device_id == device_id
+        assert nonce_orm.id == nonce_id.uuid
+        assert nonce_orm.device_id == device_id.uuid
         assert nonce_orm.nonce_value == nonce_value
         assert nonce_orm.expires_at == expires_at
         assert nonce_orm.status == "pending"

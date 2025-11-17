@@ -2,10 +2,17 @@
 
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from leadr.common.domain.ids import (
+    BoardID,
+    DeviceID,
+    ScoreFlagID,
+    ScoreID,
+    ScoreSubmissionMetaID,
+    UserID,
+)
 from leadr.common.domain.models import Entity
 from leadr.scores.domain.anti_cheat.enums import (
     FlagAction,
@@ -46,9 +53,14 @@ class ScoreSubmissionMeta(Entity):
     excessive submission rates.
     """
 
-    score_id: UUID = Field(description="ID of the most recent score submission")
-    device_id: UUID = Field(description="ID of the device submitting scores")
-    board_id: UUID = Field(description="ID of the board being submitted to")
+    id: ScoreSubmissionMetaID = Field(
+        frozen=True,
+        default_factory=ScoreSubmissionMetaID,
+        description="Unique submission metadata identifier",
+    )
+    score_id: ScoreID = Field(description="ID of the most recent score submission")
+    device_id: DeviceID = Field(description="ID of the device submitting scores")
+    board_id: BoardID = Field(description="ID of the board being submitted to")
     submission_count: int = Field(
         default=1, description="Total number of submissions by this device to this board"
     )
@@ -66,7 +78,12 @@ class ScoreFlag(Entity):
     Flags can be reviewed by admins to confirm or dismiss the detection.
     """
 
-    score_id: UUID = Field(description="ID of the flagged score")
+    id: ScoreFlagID = Field(
+        frozen=True,
+        default_factory=ScoreFlagID,
+        description="Unique score flag identifier",
+    )
+    score_id: ScoreID = Field(description="ID of the flagged score")
     flag_type: FlagType = Field(description="Type of suspicious behavior detected")
     confidence: FlagConfidence = Field(description="Confidence level of detection")
     metadata: dict[str, Any] = Field(
@@ -79,7 +96,7 @@ class ScoreFlag(Entity):
     reviewed_at: datetime | None = Field(
         default=None, description="When the flag was reviewed by an admin"
     )
-    reviewer_id: UUID | None = Field(
+    reviewer_id: UserID | None = Field(
         default=None, description="ID of the admin who reviewed the flag"
     )
     reviewer_decision: str | None = Field(

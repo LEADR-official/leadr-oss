@@ -162,7 +162,7 @@ class TestScoreRoutes:
             json={
                 "account_id": str(account.id),
                 "game_id": str(game.id),
-                "board_id": "00000000-0000-0000-0000-000000000000",
+                "board_id": "brd_00000000-0000-0000-0000-000000000000",
                 "device_id": str(device.id),
                 "player_name": "SpeedRunner99",
                 "value": 123.45,
@@ -356,7 +356,7 @@ class TestScoreRoutes:
     async def test_get_score_not_found(self, client: AsyncClient, db_session, test_api_key):
         """Test getting a non-existent score returns 404."""
         response = await client.get(
-            "/scores/00000000-0000-0000-0000-000000000000",
+            "/scores/scr_00000000-0000-0000-0000-000000000000",
             headers={"leadr-api-key": test_api_key},
         )
 
@@ -568,7 +568,7 @@ class TestScoreRoutes:
     async def test_update_score_not_found(self, client: AsyncClient, db_session, test_api_key):
         """Test updating a non-existent score returns 404."""
         response = await client.patch(
-            "/scores/00000000-0000-0000-0000-000000000000",
+            "/scores/scr_00000000-0000-0000-0000-000000000000",
             json={"player_name": "NewName"},
             headers={"leadr-api-key": test_api_key},
         )

@@ -1,9 +1,8 @@
 """Game service for managing game operations."""
 
-from uuid import UUID
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.domain.ids import AccountID, BoardID, GameID
 from leadr.common.services import BaseService
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
@@ -26,10 +25,10 @@ class GameService(BaseService[Game, GameRepository]):
 
     async def create_game(
         self,
-        account_id: UUID,
+        account_id: AccountID,
         name: str,
         steam_app_id: str | None = None,
-        default_board_id: UUID | None = None,
+        default_board_id: BoardID | None = None,
         anti_cheat_enabled: bool = True,
     ) -> Game:
         """Create a new game.
@@ -61,7 +60,7 @@ class GameService(BaseService[Game, GameRepository]):
 
         return await self.repository.create(game)
 
-    async def get_game(self, game_id: UUID) -> Game | None:
+    async def get_game(self, game_id: GameID) -> Game | None:
         """Get a game by its ID.
 
         Args:
@@ -72,7 +71,7 @@ class GameService(BaseService[Game, GameRepository]):
         """
         return await self.get_by_id(game_id)
 
-    async def list_games(self, account_id: UUID) -> list[Game]:
+    async def list_games(self, account_id: AccountID) -> list[Game]:
         """List all games for an account.
 
         Args:
@@ -85,10 +84,10 @@ class GameService(BaseService[Game, GameRepository]):
 
     async def update_game(
         self,
-        game_id: UUID,
+        game_id: GameID,
         name: str | None = None,
         steam_app_id: str | None = None,
-        default_board_id: UUID | None = None,
+        default_board_id: BoardID | None = None,
         anti_cheat_enabled: bool | None = None,
     ) -> Game:
         """Update game fields.

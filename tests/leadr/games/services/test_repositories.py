@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
+from leadr.common.domain.ids import AccountID, GameID
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
 
@@ -21,7 +22,7 @@ class TestGameRepository:
         """Test creating a game via repository."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -36,7 +37,7 @@ class TestGameRepository:
 
         # Create game
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
             id=game_id,
@@ -59,7 +60,7 @@ class TestGameRepository:
         """Test retrieving a game by ID."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -74,7 +75,7 @@ class TestGameRepository:
 
         # Create game
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
             id=game_id,
@@ -105,7 +106,7 @@ class TestGameRepository:
         """Test updating a game via repository."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -120,7 +121,7 @@ class TestGameRepository:
 
         # Create game
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
             id=game_id,
@@ -146,7 +147,7 @@ class TestGameRepository:
         """Test deleting a game via repository."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -161,7 +162,7 @@ class TestGameRepository:
 
         # Create game
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
             id=game_id,
@@ -173,7 +174,7 @@ class TestGameRepository:
         await game_repo.create(game)
 
         # Delete it
-        await game_repo.delete(game_id)
+        await game_repo.delete(game_id.uuid)
 
         # Verify it's gone
         retrieved = await game_repo.get_by_id(game_id)
@@ -183,7 +184,7 @@ class TestGameRepository:
         """Test listing all games for an account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -200,14 +201,14 @@ class TestGameRepository:
         game_repo = GameRepository(db_session)
 
         game1 = Game(
-            id=uuid4(),
+            id=GameID(uuid4()),
             account_id=account_id,
             name="Game One",
             created_at=now,
             updated_at=now,
         )
         game2 = Game(
-            id=uuid4(),
+            id=GameID(uuid4()),
             account_id=account_id,
             name="Game Two",
             created_at=now,
@@ -234,7 +235,7 @@ class TestGameRepository:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=account1_id,
+            id=AccountID(account1_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -242,7 +243,7 @@ class TestGameRepository:
             updated_at=now,
         )
         account2 = Account(
-            id=account2_id,
+            id=AccountID(account2_id),
             name="Beta Industries",
             slug="beta-industries",
             status=AccountStatus.ACTIVE,
@@ -256,15 +257,15 @@ class TestGameRepository:
         game_repo = GameRepository(db_session)
 
         game1 = Game(
-            id=uuid4(),
-            account_id=account1_id,
+            id=GameID(uuid4()),
+            account_id=AccountID(account1_id),
             name="Account 1 Game",
             created_at=now,
             updated_at=now,
         )
         game2 = Game(
-            id=uuid4(),
-            account_id=account2_id,
+            id=GameID(uuid4()),
+            account_id=AccountID(account2_id),
             name="Account 2 Game",
             created_at=now,
             updated_at=now,
@@ -284,7 +285,7 @@ class TestGameRepository:
         """Test that delete performs soft-delete, not hard-delete."""
         # Create account first
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -299,7 +300,7 @@ class TestGameRepository:
 
         # Create game
         game_repo = GameRepository(db_session)
-        game_id = uuid4()
+        game_id = GameID(uuid4())
 
         game = Game(
             id=game_id,
@@ -311,7 +312,7 @@ class TestGameRepository:
         await game_repo.create(game)
 
         # Soft-delete it
-        await game_repo.delete(game_id)
+        await game_repo.delete(game_id.uuid)
 
         # Verify it's not returned by normal queries
         retrieved = await game_repo.get_by_id(game_id)
@@ -321,7 +322,7 @@ class TestGameRepository:
         """Test that filter() excludes soft-deleted games."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -338,14 +339,14 @@ class TestGameRepository:
         game_repo = GameRepository(db_session)
 
         game1 = Game(
-            id=uuid4(),
+            id=GameID(uuid4()),
             account_id=account_id,
             name="Game One",
             created_at=now,
             updated_at=now,
         )
         game2 = Game(
-            id=uuid4(),
+            id=GameID(uuid4()),
             account_id=account_id,
             name="Game Two",
             created_at=now,
@@ -368,7 +369,7 @@ class TestGameRepository:
         """Test that game names must be unique within an account."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = uuid4()
+        account_id = AccountID(uuid4())
         now = datetime.now(UTC)
 
         account = Account(
@@ -385,7 +386,7 @@ class TestGameRepository:
         game_repo = GameRepository(db_session)
 
         game1 = Game(
-            id=uuid4(),
+            id=GameID(uuid4()),
             account_id=account_id,
             name="Duplicate Name Game",
             created_at=now,
@@ -395,7 +396,7 @@ class TestGameRepository:
 
         # Try to create another game with same name in same account
         game2 = Game(
-            id=uuid4(),
+            id=GameID(uuid4()),
             account_id=account_id,
             name="Duplicate Name Game",
             created_at=now,
@@ -414,7 +415,7 @@ class TestGameRepository:
         now = datetime.now(UTC)
 
         account1 = Account(
-            id=account1_id,
+            id=AccountID(account1_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -422,7 +423,7 @@ class TestGameRepository:
             updated_at=now,
         )
         account2 = Account(
-            id=account2_id,
+            id=AccountID(account2_id),
             name="Beta Industries",
             slug="beta-industries",
             status=AccountStatus.ACTIVE,
@@ -436,15 +437,15 @@ class TestGameRepository:
         game_repo = GameRepository(db_session)
 
         game1 = Game(
-            id=uuid4(),
-            account_id=account1_id,
+            id=GameID(uuid4()),
+            account_id=AccountID(account1_id),
             name="Popular Game",
             created_at=now,
             updated_at=now,
         )
         game2 = Game(
-            id=uuid4(),
-            account_id=account2_id,
+            id=GameID(uuid4()),
+            account_id=AccountID(account2_id),
             name="Popular Game",
             created_at=now,
             updated_at=now,

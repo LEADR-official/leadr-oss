@@ -16,6 +16,7 @@ from leadr.auth.services.device_token_crypto import (
 )
 from leadr.auth.services.repositories import DeviceRepository, DeviceSessionRepository
 from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import AccountID, DeviceID, DeviceSessionID, GameID
 from leadr.common.services import BaseService
 from leadr.config import settings
 from leadr.games.adapters.orm import GameORM
@@ -44,7 +45,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
 
     async def start_session(
         self,
-        game_id: UUID,
+        game_id: GameID,
         device_id: str,
         platform: str | None = None,
         ip_address: str | None = None,
@@ -73,11 +74,13 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             EntityNotFoundError: If game doesn't exist
         """
         # Verify game exists and get account_id
-        game_orm = await self.session.get(GameORM, game_id)
+        # Extract UUID from GameID if needed, otherwise use plain UUID
+        game_uuid = game_id.uuid if hasattr(game_id, "uuid") else game_id
+        game_orm = await self.session.get(GameORM, game_uuid)
         if not game_orm:
             raise EntityNotFoundError("Game", str(game_id))
 
-        account_id = game_orm.account_id
+        account_id = AccountID(game_orm.account_id)
 
         # Get or create device
         device = await self.repository.get_by_game_and_device_id(game_id, device_id)
@@ -159,7 +162,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
 
         # Extract claims
         device_id = claims["sub"]
-        game_id = UUID(claims["game_id"])
+        game_id = GameID(UUID(claims["game_id"]))
 
         # Get device
         device = await self.repository.get_by_game_and_device_id(game_id, device_id)
@@ -227,8 +230,8 @@ class DeviceService(BaseService[Device, DeviceRepository]):
 
         # Extract claims for token generation
         device_id = claims["sub"]
-        game_id = UUID(claims["game_id"])
-        account_id = UUID(claims["account_id"])
+        game_id = GameID(UUID(claims["game_id"]))
+        account_id = AccountID(UUID(claims["account_id"]))
 
         # Generate new access token
         access_expires_delta = timedelta(hours=settings.ACCESS_TOKEN_EXPIRY_HOURS)
@@ -264,8 +267,8 @@ class DeviceService(BaseService[Device, DeviceRepository]):
 
     async def list_devices(
         self,
-        account_id: UUID,
-        game_id: UUID | None = None,
+        account_id: AccountID,
+        game_id: GameID | None = None,
         status: str | None = None,
     ) -> list[Device]:
         """List devices for an account with optional filters.
@@ -304,7 +307,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         """
         return await self.get_by_id(device_id)
 
-    async def ban_device(self, device_id: UUID) -> Device:
+    async def ban_device(self, device_id: DeviceID) -> Device:
         """Ban a device, preventing further authentication.
 
         Args:
@@ -323,7 +326,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         device.ban()
         return await self.repository.update(device)
 
-    async def suspend_device(self, device_id: UUID) -> Device:
+    async def suspend_device(self, device_id: DeviceID) -> Device:
         """Suspend a device temporarily.
 
         Args:
@@ -342,7 +345,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         device.suspend()
         return await self.repository.update(device)
 
-    async def activate_device(self, device_id: UUID) -> Device:
+    async def activate_device(self, device_id: DeviceID) -> Device:
         """Activate a device, allowing authentication.
 
         Args:
@@ -363,8 +366,8 @@ class DeviceService(BaseService[Device, DeviceRepository]):
 
     async def list_sessions(
         self,
-        account_id: UUID,
-        device_id: UUID | None = None,
+        account_id: AccountID,
+        device_id: DeviceID | None = None,
     ) -> list[DeviceSession]:
         """List device sessions for an account with optional filters.
 
@@ -400,7 +403,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         """
         return await self.session_repo.get_by_id(session_id)
 
-    async def get_session_or_raise(self, session_id: UUID) -> DeviceSession:
+    async def get_session_or_raise(self, session_id: DeviceSessionID) -> DeviceSession:
         """Get a device session by its ID or raise EntityNotFoundError.
 
         Args:
@@ -420,7 +423,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             raise EntityNotFoundError("DeviceSession", str(session_id))
         return session
 
-    async def revoke_session(self, session_id: UUID) -> DeviceSession:
+    async def revoke_session(self, session_id: DeviceSessionID) -> DeviceSession:
         """Revoke a device session.
 
         Args:

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import PrefixedID
 from leadr.common.domain.models import Entity
 from leadr.common.orm import Base
 from leadr.common.repositories import BaseRepository
@@ -81,7 +82,9 @@ class TestRepository(BaseRepository[TestEntity, TestEntityORM]):
         """Get the ORM model class."""
         return TestEntityORM
 
-    async def filter(self, account_id: UUID4 | None = None, **kwargs: Any) -> list[TestEntity]:
+    async def filter(
+        self, account_id: UUID4 | PrefixedID | None = None, **kwargs: Any
+    ) -> list[TestEntity]:
         """Filter test entities.
 
         This test repository doesn't require account_id (top-level tenant).

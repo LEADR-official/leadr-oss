@@ -2,10 +2,10 @@
 
 from datetime import datetime
 from enum import Enum
-from uuid import UUID
 
 from pydantic import Field, field_validator
 
+from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
 from leadr.common.domain.models import Entity
 
 
@@ -37,10 +37,15 @@ class Board(Entity):
     tags for categorization.
     """
 
-    account_id: UUID = Field(
+    id: BoardID = Field(
+        frozen=True,
+        default_factory=BoardID,
+        description="Unique board identifier",
+    )
+    account_id: AccountID = Field(
         frozen=True, description="ID of the account this board belongs to (immutable)"
     )
-    game_id: UUID = Field(
+    game_id: GameID = Field(
         frozen=True, description="ID of the game this board belongs to (immutable)"
     )
     name: str = Field(description="Name of the board")
@@ -54,7 +59,7 @@ class Board(Entity):
     keep_strategy: KeepStrategy = Field(
         description="Strategy for keeping multiple scores from the same user"
     )
-    template_id: UUID | None = Field(
+    template_id: BoardTemplateID | None = Field(
         default=None, description="Optional template ID this board was created from"
     )
     template_name: str | None = Field(

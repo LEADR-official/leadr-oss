@@ -2,13 +2,13 @@
 
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.boards.domain.interval_parser import parse_interval_to_timedelta
 from leadr.boards.services.repositories import BoardTemplateRepository
+from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 from leadr.common.services import BaseService
 from leadr.games.services.game_service import GameService
 
@@ -31,8 +31,8 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
 
     async def create_board_template(
         self,
-        account_id: UUID,
-        game_id: UUID,
+        account_id: AccountID,
+        game_id: GameID,
         name: str,
         repeat_interval: str,
         next_run_at: datetime,
@@ -92,7 +92,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
 
         return await self.repository.create(template)
 
-    async def get_board_template(self, template_id: UUID) -> BoardTemplate | None:
+    async def get_board_template(self, template_id: BoardTemplateID) -> BoardTemplate | None:
         """Get a board template by its ID.
 
         Args:
@@ -103,7 +103,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         """
         return await self.get_by_id(template_id)
 
-    async def list_board_templates_by_account(self, account_id: UUID) -> list[BoardTemplate]:
+    async def list_board_templates_by_account(self, account_id: AccountID) -> list[BoardTemplate]:
         """List all board templates for an account.
 
         Args:
@@ -115,7 +115,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         return await self.repository.filter(account_id)
 
     async def list_board_templates_by_game(
-        self, account_id: UUID, game_id: UUID
+        self, account_id: AccountID, game_id: GameID
     ) -> list[BoardTemplate]:
         """List all board templates for a specific game.
 
@@ -130,7 +130,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
 
     async def update_board_template(
         self,
-        template_id: UUID,
+        template_id: BoardTemplateID,
         name: str | None = None,
         name_template: str | None = None,
         repeat_interval: str | None = None,
@@ -176,7 +176,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
 
         return await self.repository.update(template)
 
-    async def advance_template_schedule(self, template_id: UUID) -> BoardTemplate:
+    async def advance_template_schedule(self, template_id: BoardTemplateID) -> BoardTemplate:
         """Advance a template's next_run_at by its repeat_interval.
 
         This is typically called after successfully creating a board from the template.

@@ -10,6 +10,7 @@ from leadr.accounts.services.account_service import AccountService
 from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
 from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import BoardID, BoardTemplateID, GameID
 from leadr.games.services.game_service import GameService
 
 
@@ -71,7 +72,7 @@ class TestBoardService:
 
         # Create board with optional fields
         board_service = BoardService(db_session)
-        template_id = uuid4()
+        template_id = BoardTemplateID(uuid4())
 
         board = await board_service.create_board(
             account_id=account.id,
@@ -83,7 +84,7 @@ class TestBoardService:
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
             keep_strategy=KeepStrategy.BEST_ONLY,
-            template_id=template_id,
+            template_id=BoardTemplateID(template_id),
             template_name="Speed Run Template",
             tags=["speedrun", "no-damage"],
         )
@@ -146,7 +147,7 @@ class TestBoardService:
         with pytest.raises(EntityNotFoundError) as exc_info:
             await board_service.create_board(
                 account_id=account.id,
-                game_id=non_existent_game_id,
+                game_id=GameID(non_existent_game_id),
                 name="Invalid Board",
                 icon="star",
                 short_code="INVALID",
@@ -199,7 +200,7 @@ class TestBoardService:
         board_service = BoardService(db_session)
         non_existent_id = uuid4()
 
-        board = await board_service.get_board(non_existent_id)
+        board = await board_service.get_board(BoardID(non_existent_id))
 
         assert board is None
 
@@ -444,7 +445,7 @@ class TestBoardService:
 
         with pytest.raises(EntityNotFoundError) as exc_info:
             await board_service.update_board(
-                board_id=non_existent_id,
+                board_id=BoardID(non_existent_id),
                 name="New Name",
             )
 
@@ -771,10 +772,10 @@ class TestBoardService:
         new_template_id = uuid4()
         updated_board = await board_service.update_board(
             board_id=created_board.id,
-            template_id=new_template_id,
+            template_id=BoardTemplateID(new_template_id),
         )
 
-        assert updated_board.template_id == new_template_id
+        assert updated_board.template_id == BoardTemplateID(new_template_id)
         assert updated_board.name == "Speed Run Board"  # Unchanged
 
     async def test_update_board_template_name(self, db_session: AsyncSession):

@@ -1,7 +1,5 @@
 """API routes for device session management."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, HTTPException, status
 
 from leadr.auth.api.device_session_schemas import (
@@ -10,6 +8,7 @@ from leadr.auth.api.device_session_schemas import (
 )
 from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
 from leadr.auth.services.dependencies import DeviceServiceDep
+from leadr.common.domain.ids import DeviceID, DeviceSessionID
 
 router = APIRouter()
 
@@ -18,7 +17,7 @@ router = APIRouter()
 async def list_sessions(
     account_id: QueryAccountIDDep,
     service: DeviceServiceDep,
-    device_id: UUID | None = None,
+    device_id: DeviceID | None = None,
 ) -> list[DeviceSessionResponse]:
     """List device sessions for an account with optional filters.
 
@@ -50,14 +49,14 @@ async def list_sessions(
 
 @router.get("/device-sessions/{session_id}", response_model=DeviceSessionResponse)
 async def get_session(
-    session_id: UUID,
+    session_id: DeviceSessionID,
     service: DeviceServiceDep,
     auth: AuthContextDep,
 ) -> DeviceSessionResponse:
     """Get a device session by ID.
 
     Args:
-        session_id: UUID of the session to retrieve.
+        session_id: Session identifier to retrieve.
         service: Injected device service dependency.
         auth: Authentication context with user info.
 
@@ -85,7 +84,7 @@ async def get_session(
 
 @router.patch("/device-sessions/{session_id}", response_model=DeviceSessionResponse)
 async def update_session(
-    session_id: UUID,
+    session_id: DeviceSessionID,
     request: DeviceSessionUpdateRequest,
     service: DeviceServiceDep,
     auth: AuthContextDep,
@@ -95,7 +94,7 @@ async def update_session(
     Allows revoking a device session to invalidate authentication.
 
     Args:
-        session_id: UUID of the session to update.
+        session_id: Session identifier to update.
         request: Update details (revoked status).
         service: Injected device service dependency.
         auth: Authentication context with user info.

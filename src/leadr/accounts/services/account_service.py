@@ -1,11 +1,10 @@
 """Account service for managing account operations."""
 
-from uuid import UUID
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
+from leadr.common.domain.ids import AccountID
 from leadr.common.services import BaseService
 
 
@@ -53,7 +52,7 @@ class AccountService(BaseService[Account, AccountRepository]):
 
         return await self.repository.create(account)
 
-    async def get_account(self, account_id: UUID) -> Account | None:
+    async def get_account(self, account_id: AccountID) -> Account | None:
         """Get an account by its ID.
 
         Args:
@@ -83,7 +82,7 @@ class AccountService(BaseService[Account, AccountRepository]):
         """
         return await self.repository.filter()
 
-    async def suspend_account(self, account_id: UUID) -> Account:
+    async def suspend_account(self, account_id: AccountID) -> Account:
         """Suspend an account, preventing access.
 
         Args:
@@ -99,7 +98,7 @@ class AccountService(BaseService[Account, AccountRepository]):
         account.suspend()
         return await self.repository.update(account)
 
-    async def activate_account(self, account_id: UUID) -> Account:
+    async def activate_account(self, account_id: AccountID) -> Account:
         """Activate an account, allowing access.
 
         Args:
@@ -117,7 +116,7 @@ class AccountService(BaseService[Account, AccountRepository]):
 
     async def update_account(
         self,
-        account_id: UUID,
+        account_id: AccountID,
         name: str | None = None,
         slug: str | None = None,
     ) -> Account:
@@ -143,7 +142,7 @@ class AccountService(BaseService[Account, AccountRepository]):
 
         return await self.repository.update(account)
 
-    async def delete_account(self, account_id: UUID) -> None:
+    async def delete_account(self, account_id: AccountID) -> None:
         """Soft-delete an account.
 
         Args:
