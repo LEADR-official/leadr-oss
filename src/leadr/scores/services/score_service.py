@@ -1,12 +1,14 @@
 """Score service for managing score operations."""
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, overload
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.boards.services.board_service import BoardService
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.games.services.game_service import GameService
 from leadr.scores.domain.anti_cheat.enums import FlagAction, TrustTier
@@ -212,29 +214,52 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         """
         return await self.get_by_id(score_id)
 
+    @overload
     async def list_scores(
         self,
         account_id: AccountID,
         board_id: BoardID | None = None,
         game_id: GameID | None = None,
         device_id: DeviceID | None = None,
-    ) -> list[Score]:
-        """List scores for an account with optional filters.
+        pagination: None = None,
+    ) -> list[Score]: ...
+
+    @overload
+    async def list_scores(
+        self,
+        account_id: AccountID,
+        board_id: BoardID | None = None,
+        game_id: GameID | None = None,
+        device_id: DeviceID | None = None,
+        pagination: PaginationParams = ...,
+    ) -> PaginatedResult[Score]: ...
+
+    async def list_scores(
+        self,
+        account_id: AccountID,
+        board_id: BoardID | None = None,
+        game_id: GameID | None = None,
+        device_id: DeviceID | None = None,
+        pagination: PaginationParams | None = None,
+    ) -> list[Score] | PaginatedResult[Score]:
+        """List scores for an account with optional filters and pagination.
 
         Args:
             account_id: REQUIRED - Account ID to filter by (multi-tenant safety).
             board_id: Optional board ID to filter by.
             game_id: Optional game ID to filter by.
             device_id: Optional device ID to filter by.
+            pagination: Optional pagination parameters.
 
         Returns:
-            List of Score entities matching the filter criteria.
+            List of Score entities if no pagination, PaginatedResult if pagination provided.
         """
         return await self.repository.filter(
             account_id=account_id,
             board_id=board_id,
             game_id=game_id,
             device_id=device_id,
+            pagination=pagination,
         )
 
     async def update_score(

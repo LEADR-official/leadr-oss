@@ -1,11 +1,13 @@
 """Score repository services."""
 
-from typing import Any
+from typing import Any, overload
 
 from pydantic import UUID4
 from sqlalchemy import select
 
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, PrefixedID, ScoreID
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 from leadr.scores.adapters.orm import ScoreORM
 from leadr.scores.domain.score import Score
@@ -58,14 +60,49 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         """Get the ORM model class."""
         return ScoreORM
 
+    # Valid sortable fields for scores
+    SORTABLE_FIELDS = {
+        "id",
+        "value",
+        "player_name",
+        "filter_timezone",
+        "filter_country",
+        "filter_city",
+        "created_at",
+        "updated_at",
+    }
+
+    @overload
     async def filter(
         self,
         account_id: UUID4 | PrefixedID | None = None,
         board_id: BoardID | None = None,
         game_id: GameID | None = None,
         device_id: DeviceID | None = None,
+        pagination: None = None,
         **kwargs: Any,
-    ) -> list[Score]:
+    ) -> list[Score]: ...
+
+    @overload
+    async def filter(
+        self,
+        account_id: UUID4 | PrefixedID | None = None,
+        board_id: BoardID | None = None,
+        game_id: GameID | None = None,
+        device_id: DeviceID | None = None,
+        pagination: PaginationParams = ...,
+        **kwargs: Any,
+    ) -> PaginatedResult[Score]: ...
+
+    async def filter(
+        self,
+        account_id: UUID4 | PrefixedID | None = None,
+        board_id: BoardID | None = None,
+        game_id: GameID | None = None,
+        device_id: DeviceID | None = None,
+        pagination: PaginationParams | None = None,
+        **kwargs: Any,
+    ) -> list[Score] | PaginatedResult[Score]:
         """Filter scores by account and optional criteria.
 
         Args:
@@ -73,16 +110,21 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             board_id: Optional board ID to filter by
             game_id: Optional game ID to filter by
             device_id: Optional device ID to filter by
+            pagination: Optional pagination parameters
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of scores for the account matching the filter criteria
+            List of scores if no pagination, PaginatedResult if pagination provided
 
         Raises:
             ValueError: If account_id is None (required for multi-tenant safety)
+            ValueError: If sort field is not in SORTABLE_FIELDS
+            CursorValidationError: If cursor is invalid or state doesn't match
         """
         if account_id is None:
             raise ValueError("account_id is required for filtering scores")
+
+        # Build base query with filters
         account_uuid = self._extract_uuid(account_id)
         query = select(ScoreORM).where(
             ScoreORM.account_id == account_uuid,
@@ -90,18 +132,48 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         )
 
         # Apply optional filters
+        filters_dict = {}
         if board_id is not None:
             board_uuid = self._extract_uuid(board_id)
             query = query.where(ScoreORM.board_id == board_uuid)
+            filters_dict["board_id"] = str(board_id)
 
         if game_id is not None:
             game_uuid = self._extract_uuid(game_id)
             query = query.where(ScoreORM.game_id == game_uuid)
+            filters_dict["game_id"] = str(game_id)
 
         if device_id is not None:
             device_uuid = self._extract_uuid(device_id)
             query = query.where(ScoreORM.device_id == device_uuid)
+            filters_dict["device_id"] = str(device_id)
 
-        result = await self.session.execute(query)
-        orms = result.scalars().all()
-        return [self._to_domain(orm) for orm in orms]
+        # If no pagination, return list (old behavior)
+        if pagination is None:
+            result = await self.session.execute(query)
+            orms = result.scalars().all()
+            return [self._to_domain(orm) for orm in orms]
+
+        # Validate sort fields
+        for sort_field in pagination.sort_spec:
+            if sort_field.name not in self.SORTABLE_FIELDS:
+                raise ValueError(
+                    f"Unknown sort field: {sort_field.name}. "
+                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
+                )
+
+        # Handle cursor if present
+        cursor = None
+        if pagination.has_cursor():
+            cursor = pagination.decode_cursor()
+            # Validate cursor state matches current query
+            if cursor is not None:
+                cursor.validate_state(pagination.sort_spec, filters_dict)
+
+        # Execute paginated query
+        return await self._execute_paginated_query(
+            query=query,
+            sort_fields=pagination.sort_spec,
+            cursor=cursor,
+            limit=pagination.limit,
+        )

@@ -1,6 +1,8 @@
 """API routes for score management."""
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, status
+from typing import Annotated
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
@@ -8,7 +10,10 @@ from leadr.auth.dependencies import (
     QueryAccountIDDep,
     validate_body_account_id,
 )
+from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
+from leadr.common.domain.cursor import Cursor, CursorValidationError
 from leadr.common.domain.ids import BoardID, DeviceID, GameID, ScoreID
+from leadr.common.domain.pagination import PaginationDirection
 from leadr.scores.api.score_schemas import ScoreCreateRequest, ScoreResponse, ScoreUpdateRequest
 from leadr.scores.services.dependencies import ScoreServiceDep
 
@@ -122,43 +127,106 @@ async def get_score(
     return ScoreResponse.from_domain(score)
 
 
-@router.get("/scores", response_model=list[ScoreResponse])
+@router.get("/scores", response_model=PaginatedResponse[ScoreResponse])
 async def list_scores(
     account_id: QueryAccountIDDep,
     service: ScoreServiceDep,
+    pagination: Annotated[PaginationParams, Depends()],
     board_id: BoardID | None = None,
     game_id: GameID | None = None,
     device_id: DeviceID | None = None,
-) -> list[ScoreResponse]:
-    """List scores for an account with optional filters.
+) -> PaginatedResponse[ScoreResponse]:
+    """List scores for an account with optional filters and pagination.
 
-    Returns all non-deleted scores for the specified account, with optional
-    filtering by board, game, or device.
+    Returns paginated scores for the specified account, with optional
+    filtering by board, game, or device. Supports cursor-based pagination
+    with bidirectional navigation and custom sorting.
 
     For regular users, account_id is automatically derived from their API key.
     For superadmins, account_id must be explicitly provided as a query parameter.
 
+    Pagination:
+    - Default: 20 items per page, sorted by created_at:desc,id:asc
+    - Custom sort: Use ?sort=value:desc,created_at:asc
+    - Valid sort fields: id, value, player_name, filter_timezone, filter_country,
+      filter_city, created_at, updated_at
+    - Navigation: Use next_cursor/prev_cursor from response
+
+    Example:
+        GET /v1/scores?board_id=brd_123&limit=50&sort=value:desc,created_at:asc
+
     Args:
         account_id: Account ID (auto-resolved for regular users, required for superadmins).
         service: Injected score service dependency.
+        pagination: Pagination parameters (cursor, limit, sort).
         board_id: Optional board ID to filter by.
         game_id: Optional game ID to filter by.
         device_id: Optional device ID to filter by.
 
     Returns:
-        List of ScoreResponse objects matching the filter criteria.
+        PaginatedResponse with scores and pagination metadata.
 
     Raises:
-        400: Superadmin did not provide account_id.
+        400: Invalid cursor, sort field, or cursor state mismatch.
         403: User does not have access to the specified account.
     """
-    scores = await service.list_scores(
-        account_id=account_id,
-        board_id=board_id,
-        game_id=game_id,
-        device_id=device_id,
+    try:
+        result = await service.list_scores(
+            account_id=account_id,
+            board_id=board_id,
+            game_id=game_id,
+            device_id=device_id,
+            pagination=pagination,
+        )
+    except (CursorValidationError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+
+    # Since we always pass pagination, result is always PaginatedResult (via overload)
+    # Build filter dict for cursors
+    filters_dict = {}
+    if board_id is not None:
+        filters_dict["board_id"] = str(board_id)
+    if game_id is not None:
+        filters_dict["game_id"] = str(game_id)
+    if device_id is not None:
+        filters_dict["device_id"] = str(device_id)
+
+    # Build cursors from result positions
+    next_cursor_str = None
+    prev_cursor_str = None
+
+    if result.next_position is not None:
+        next_cursor = Cursor(
+            position=result.next_position,
+            sort_fields=pagination.sort_spec,
+            filters=filters_dict,
+            direction=PaginationDirection.FORWARD,
+        )
+        next_cursor_str = next_cursor.encode()
+
+    if result.prev_position is not None:
+        prev_cursor = Cursor(
+            position=result.prev_position,
+            sort_fields=pagination.sort_spec,
+            filters=filters_dict,
+            direction=PaginationDirection.BACKWARD,
+        )
+        prev_cursor_str = prev_cursor.encode()
+
+    # Convert domain entities to response models
+    response_items = [ScoreResponse.from_domain(score) for score in result.items]
+
+    # Build paginated response
+    return PaginatedResponse(
+        data=response_items,
+        pagination=PaginationMeta(
+            next_cursor=next_cursor_str,
+            prev_cursor=prev_cursor_str,
+            has_next=result.has_next,
+            has_prev=result.has_prev,
+            count=result.count,
+        ),
     )
-    return [ScoreResponse.from_domain(score) for score in scores]
 
 
 @router.patch("/scores/{score_id}", response_model=ScoreResponse)
