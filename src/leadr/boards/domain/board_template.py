@@ -37,6 +37,12 @@ class BoardTemplate(Entity):
     name_template: str | None = Field(
         default=None, description="Optional template string for generating board names"
     )
+    series: str | None = Field(
+        default=None,
+        description=(
+            "Optional series identifier for sequential board naming (e.g., 'weekly', 'seasonal')"
+        ),
+    )
     repeat_interval: str = Field(
         description="PostgreSQL interval syntax for repeat frequency (e.g., '7 days', '1 month')"
     )
@@ -104,3 +110,80 @@ class BoardTemplate(Entity):
             )
 
         return value.strip()
+
+    def generate_name(self, timestamp: datetime, series_value: int | None) -> str:
+        """Generate a board name using the name template.
+
+        If name_template is None, returns the template's name.
+        Otherwise, substitutes placeholders with values derived from the timestamp and series.
+
+        Supported placeholders:
+        - {year}: 4-digit year (e.g., 2025)
+        - {month}: Full month name (e.g., July)
+        - {month_short}: Abbreviated month (e.g., Jul)
+        - {week}: ISO week number (e.g., 29)
+        - {quarter}: Quarter (e.g., Q1, Q2, Q3, Q4)
+        - {date}: ISO date (e.g., 2025-07-15)
+        - {series}: Sequential series value
+
+        Args:
+            timestamp: The datetime to use for generating time-based placeholders.
+            series_value: Optional series value for {series} placeholder.
+
+        Returns:
+            The generated board name.
+
+        Raises:
+            ValueError: If the name_template contains invalid placeholders or if
+                       {series} is used but series_value is None.
+        """
+        if self.name_template is None:
+            return self.name
+
+        # Define valid placeholders
+        valid_placeholders = {
+            "year",
+            "month",
+            "month_short",
+            "week",
+            "quarter",
+            "date",
+            "series",
+        }
+
+        # Extract all placeholders from the template
+        placeholder_pattern = r"\{(\w+)\}"
+        found_placeholders = set(re.findall(placeholder_pattern, self.name_template))
+
+        # Check for invalid placeholders
+        invalid_placeholders = found_placeholders - valid_placeholders
+        if invalid_placeholders:
+            invalid_str = ", ".join(sorted(invalid_placeholders))
+            valid_str = ", ".join(sorted(valid_placeholders))
+            raise ValueError(
+                f"Invalid placeholder(s) in name_template: {invalid_str}. "
+                f"Valid placeholders are: {valid_str}"
+            )
+
+        # Check if series is required but not provided
+        if "series" in found_placeholders and series_value is None:
+            raise ValueError(
+                "Template contains {series} placeholder but series_value was not provided"
+            )
+
+        # Calculate quarter (Q1, Q2, Q3, Q4)
+        quarter = f"Q{(timestamp.month - 1) // 3 + 1}"
+
+        # Build context for string formatting
+        context = {
+            "year": timestamp.year,
+            "month": timestamp.strftime("%B"),  # Full month name
+            "month_short": timestamp.strftime("%b"),  # Abbreviated month
+            "week": timestamp.isocalendar()[1],  # ISO week number
+            "quarter": quarter,
+            "date": timestamp.strftime("%Y-%m-%d"),  # ISO date
+            "series": series_value,
+        }
+
+        # Generate the board name
+        return self.name_template.format(**context)

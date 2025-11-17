@@ -22,7 +22,7 @@ class BoardCreateRequest(BaseModel):
     keep_strategy: KeepStrategy = Field(
         description="Strategy for keeping multiple scores from the same user"
     )
-    template_id: BoardTemplateID | None = Field(
+    created_from_template_id: BoardTemplateID | None = Field(
         default=None, description="Optional template ID this board was created from"
     )
     template_name: str | None = Field(
@@ -49,7 +49,9 @@ class BoardUpdateRequest(BaseModel):
     is_active: bool | None = Field(default=None, description="Updated active status")
     sort_direction: SortDirection | None = Field(default=None, description="Updated sort direction")
     keep_strategy: KeepStrategy | None = Field(default=None, description="Updated keep strategy")
-    template_id: BoardTemplateID | None = Field(default=None, description="Updated template ID")
+    created_from_template_id: BoardTemplateID | None = Field(
+        default=None, description="Updated template ID"
+    )
     template_name: str | None = Field(default=None, description="Updated template name")
     starts_at: datetime | None = Field(default=None, description="Updated start time")
     ends_at: datetime | None = Field(default=None, description="Updated end time")
@@ -70,7 +72,7 @@ class BoardResponse(BaseModel):
     is_active: bool = Field(description="Whether the board is currently active")
     sort_direction: SortDirection = Field(description="Direction to sort scores")
     keep_strategy: KeepStrategy = Field(description="Strategy for keeping scores from same user")
-    template_id: BoardTemplateID | None = Field(
+    created_from_template_id: BoardTemplateID | None = Field(
         default=None, description="Template ID this board was created from, or null"
     )
     template_name: str | None = Field(
@@ -107,7 +109,7 @@ class BoardResponse(BaseModel):
             is_active=board.is_active,
             sort_direction=board.sort_direction,
             keep_strategy=board.keep_strategy,
-            template_id=board.template_id,
+            created_from_template_id=board.created_from_template_id,
             template_name=board.template_name,
             starts_at=board.starts_at,
             ends_at=board.ends_at,

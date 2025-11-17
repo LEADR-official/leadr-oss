@@ -59,6 +59,7 @@ async def create_board_template(
             next_run_at=request.next_run_at,
             is_active=request.is_active,
             name_template=request.name_template,
+            series=request.series,
             config=request.config,
             config_template=request.config_template,
         )
@@ -175,6 +176,7 @@ async def update_board_template(
         template_id=template_id,
         name=request.name,
         name_template=request.name_template,
+        series=request.series,
         repeat_interval=request.repeat_interval,
         config=request.config,
         config_template=request.config_template,

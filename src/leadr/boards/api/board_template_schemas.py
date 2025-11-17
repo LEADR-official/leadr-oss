@@ -25,6 +25,9 @@ class BoardTemplateCreateRequest(BaseModel):
     name_template: str | None = Field(
         default=None, description="Optional template string for generating board names"
     )
+    series: str | None = Field(
+        default=None, description="Optional series identifier for sequential board naming"
+    )
     config: dict[str, Any] | None = Field(
         default=None, description="Optional configuration for boards created from this template"
     )
@@ -38,6 +41,7 @@ class BoardTemplateUpdateRequest(BaseModel):
 
     name: str | None = Field(default=None, description="Updated template name")
     name_template: str | None = Field(default=None, description="Updated name template")
+    series: str | None = Field(default=None, description="Updated series identifier")
     repeat_interval: str | None = Field(default=None, description="Updated repeat interval")
     config: dict[str, Any] | None = Field(default=None, description="Updated config")
     config_template: dict[str, Any] | None = Field(
@@ -59,6 +63,9 @@ class BoardTemplateResponse(BaseModel):
     name: str = Field(description="Name of the template")
     name_template: str | None = Field(
         default=None, description="Template string for generating board names, or null"
+    )
+    series: str | None = Field(
+        default=None, description="Series identifier for sequential board naming, or null"
     )
     repeat_interval: str = Field(description="Repeat frequency in PostgreSQL interval syntax")
     config: dict[str, Any] = Field(
@@ -88,6 +95,7 @@ class BoardTemplateResponse(BaseModel):
             game_id=template.game_id,
             name=template.name,
             name_template=template.name_template,
+            series=template.series,
             repeat_interval=template.repeat_interval,
             config=template.config,
             config_template=template.config_template,

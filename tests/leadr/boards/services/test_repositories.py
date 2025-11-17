@@ -11,7 +11,7 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
 from leadr.boards.services.repositories import BoardRepository
-from leadr.common.domain.ids import AccountID, BoardID, GameID
+from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
 
@@ -28,7 +28,7 @@ class TestBoardRepository:
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -42,8 +42,8 @@ class TestBoardRepository:
         game_id = GameID(uuid4())
 
         game = Game(
-            id=game_id,
-            account_id=account_id,
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
             name="Test Game",
             created_at=now,
             updated_at=now,
@@ -56,8 +56,8 @@ class TestBoardRepository:
 
         board = Board(
             id=board_id,
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Speed Run Board",
             icon="trophy",
             short_code="SR2025",
@@ -88,7 +88,7 @@ class TestBoardRepository:
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -101,8 +101,8 @@ class TestBoardRepository:
         game_id = GameID(uuid4())
 
         game = Game(
-            id=game_id,
-            account_id=account_id,
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
             name="Test Game",
             created_at=now,
             updated_at=now,
@@ -115,8 +115,8 @@ class TestBoardRepository:
 
         board = Board(
             id=board_id,
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Speed Run Board",
             icon="trophy",
             short_code="SR2025",
@@ -154,7 +154,7 @@ class TestBoardRepository:
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -167,8 +167,8 @@ class TestBoardRepository:
         game_id = GameID(uuid4())
 
         game = Game(
-            id=game_id,
-            account_id=account_id,
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
             name="Test Game",
             created_at=now,
             updated_at=now,
@@ -181,8 +181,8 @@ class TestBoardRepository:
 
         board = Board(
             id=board_id,
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Speed Run Board",
             icon="trophy",
             short_code="SR2025",
@@ -218,7 +218,7 @@ class TestBoardRepository:
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -231,8 +231,8 @@ class TestBoardRepository:
         game_id = GameID(uuid4())
 
         game = Game(
-            id=game_id,
-            account_id=account_id,
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
             name="Test Game",
             created_at=now,
             updated_at=now,
@@ -245,8 +245,8 @@ class TestBoardRepository:
 
         board = Board(
             id=board_id,
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Speed Run Board",
             icon="trophy",
             short_code="SR2025",
@@ -281,7 +281,7 @@ class TestBoardRepository:
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -294,8 +294,8 @@ class TestBoardRepository:
         game_id = GameID(uuid4())
 
         game = Game(
-            id=game_id,
-            account_id=account_id,
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
             name="Test Game",
             created_at=now,
             updated_at=now,
@@ -308,8 +308,8 @@ class TestBoardRepository:
 
         board = Board(
             id=board_id,
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Speed Run Board",
             icon="trophy",
             short_code="SR2025",
@@ -337,7 +337,7 @@ class TestBoardRepository:
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -351,8 +351,8 @@ class TestBoardRepository:
         game_id = GameID(uuid4())
 
         game = Game(
-            id=game_id,
-            account_id=account_id,
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
             name="Test Game",
             created_at=now,
             updated_at=now,
@@ -364,8 +364,8 @@ class TestBoardRepository:
 
         board1 = Board(
             id=BoardID(uuid4()),
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Board One",
             icon="star",
             short_code="B001",
@@ -378,8 +378,8 @@ class TestBoardRepository:
         )
         board2 = Board(
             id=BoardID(uuid4()),
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Board Two",
             icon="trophy",
             short_code="B002",
@@ -501,7 +501,7 @@ class TestBoardRepository:
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -514,8 +514,8 @@ class TestBoardRepository:
         game_id = GameID(uuid4())
 
         game = Game(
-            id=game_id,
-            account_id=account_id,
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
             name="Test Game",
             created_at=now,
             updated_at=now,
@@ -528,8 +528,8 @@ class TestBoardRepository:
 
         board = Board(
             id=board_id,
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Speed Run Board",
             icon="trophy",
             short_code="SR2025",
@@ -557,7 +557,7 @@ class TestBoardRepository:
         now = datetime.now(UTC)
 
         account = Account(
-            id=account_id,
+            id=AccountID(account_id),
             name="Acme Corporation",
             slug="acme-corp",
             status=AccountStatus.ACTIVE,
@@ -570,8 +570,8 @@ class TestBoardRepository:
         game_id = GameID(uuid4())
 
         game = Game(
-            id=game_id,
-            account_id=account_id,
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
             name="Test Game",
             created_at=now,
             updated_at=now,
@@ -583,8 +583,8 @@ class TestBoardRepository:
 
         board1 = Board(
             id=BoardID(uuid4()),
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Board One",
             icon="star",
             short_code="B001",
@@ -597,8 +597,8 @@ class TestBoardRepository:
         )
         board2 = Board(
             id=BoardID(uuid4()),
-            account_id=account_id,
-            game_id=game_id,
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
             name="Board Two",
             icon="trophy",
             short_code="B002",
@@ -707,3 +707,109 @@ class TestBoardRepository:
 
         with pytest.raises(IntegrityError):
             await board_repo.create(board2)
+
+    async def test_count_boards_by_template_with_no_boards(self, db_session: AsyncSession):
+        """Test counting boards by template ID when no boards exist."""
+        board_repo = BoardRepository(db_session)
+        template_id = uuid4()
+
+        count = await board_repo.count_boards_by_template(BoardTemplateID(template_id))
+
+        assert count == 0
+
+    async def test_count_boards_by_template_with_boards(self, db_session: AsyncSession):
+        """Test counting boards created from a specific template."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = uuid4()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=AccountID(account_id),
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create game
+        game_repo = GameRepository(db_session)
+        game_id = uuid4()
+
+        game = Game(
+            id=GameID(game_id),
+            account_id=AccountID(account_id),
+            name="Test Game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create boards with template reference
+        board_repo = BoardRepository(db_session)
+        template_id = uuid4()
+
+        # Create 3 boards from the same template
+        for i in range(3):
+            board = Board(
+                id=BoardID(uuid4()),
+                account_id=AccountID(account_id),
+                game_id=GameID(game_id),
+                name=f"Board {i + 1}",
+                icon="trophy",
+                short_code=f"CODE{i + 1}",
+                unit="points",
+                is_active=True,
+                sort_direction=SortDirection.DESCENDING,
+                keep_strategy=KeepStrategy.BEST_ONLY,
+                created_from_template_id=BoardTemplateID(template_id),
+                created_at=now,
+                updated_at=now,
+            )
+            await board_repo.create(board)
+
+        # Create a board from a different template
+        other_template_id = uuid4()
+        other_board = Board(
+            id=BoardID(uuid4()),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Other Board",
+            icon="star",
+            short_code="OTHER",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_from_template_id=BoardTemplateID(other_template_id),
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(other_board)
+
+        # Create a board with no template
+        no_template_board = Board(
+            id=BoardID(uuid4()),
+            account_id=AccountID(account_id),
+            game_id=GameID(game_id),
+            name="Manual Board",
+            icon="medal",
+            short_code="MANUAL",
+            unit="time",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.LATEST_ONLY,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(no_template_board)
+
+        # Count boards from the first template
+        count = await board_repo.count_boards_by_template(BoardTemplateID(template_id))
+        assert count == 3
+
+        # Count boards from the other template
+        other_count = await board_repo.count_boards_by_template(BoardTemplateID(other_template_id))
+        assert other_count == 1

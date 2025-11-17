@@ -36,7 +36,7 @@ class TestBoardORM:
             is_active=True,
             sort_direction="ASCENDING",
             keep_strategy="BEST_ONLY",
-            template_id=template_id,
+            created_from_template_id=template_id,
             template_name="Speed Run Template",
             starts_at=starts_at,
             ends_at=ends_at,
@@ -57,7 +57,7 @@ class TestBoardORM:
         assert board.is_active is True
         assert board.sort_direction == "ASCENDING"  # type: ignore[comparison-overlap]
         assert board.keep_strategy == "BEST_ONLY"  # type: ignore[comparison-overlap]
-        assert board.template_id == template_id
+        assert board.created_from_template_id == template_id
         assert board.template_name == "Speed Run Template"  # type: ignore[comparison-overlap]
         assert board.starts_at == starts_at
         assert board.ends_at == ends_at
@@ -89,7 +89,7 @@ class TestBoardORM:
         assert board.id is not None
         assert board.account_id == account_orm.id
         assert board.game_id == game_orm.id
-        assert board.template_id is None
+        assert board.created_from_template_id is None
         assert board.template_name is None
         assert board.starts_at is None
         assert board.ends_at is None

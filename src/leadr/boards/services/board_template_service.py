@@ -1,5 +1,6 @@
 """BoardTemplate service for managing board template operations."""
 
+import re
 from datetime import datetime
 from typing import Any
 
@@ -29,6 +30,44 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         """Get entity name for error messages."""
         return "BoardTemplate"
 
+    @staticmethod
+    def _validate_name_template(name_template: str | None) -> None:
+        """Validate name_template contains only valid placeholders.
+
+        Args:
+            name_template: The name template string to validate.
+
+        Raises:
+            ValueError: If the name_template contains invalid placeholders.
+        """
+        if name_template is None:
+            return
+
+        # Define valid placeholders
+        valid_placeholders = {
+            "year",
+            "month",
+            "month_short",
+            "week",
+            "quarter",
+            "date",
+            "series",
+        }
+
+        # Extract all placeholders from the template
+        placeholder_pattern = r"\{(\w+)\}"
+        found_placeholders = set(re.findall(placeholder_pattern, name_template))
+
+        # Check for invalid placeholders
+        invalid_placeholders = found_placeholders - valid_placeholders
+        if invalid_placeholders:
+            invalid_str = ", ".join(sorted(invalid_placeholders))
+            valid_str = ", ".join(sorted(valid_placeholders))
+            raise ValueError(
+                f"Invalid placeholder(s) in name_template: {invalid_str}. "
+                f"Valid placeholders are: {valid_str}"
+            )
+
     async def create_board_template(
         self,
         account_id: AccountID,
@@ -38,6 +77,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         next_run_at: datetime,
         is_active: bool,
         name_template: str | None = None,
+        series: str | None = None,
         config: dict[str, Any] | None = None,
         config_template: dict[str, Any] | None = None,
     ) -> BoardTemplate:
@@ -51,6 +91,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             next_run_at: Next scheduled time to create a board.
             is_active: Whether the template is currently active.
             name_template: Optional template string for generating board names.
+            series: Optional series identifier for sequential board naming.
             config: Optional configuration object for boards created from this template.
             config_template: Optional template configuration for random generation.
 
@@ -59,13 +100,16 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
 
         Raises:
             EntityNotFoundError: If the game doesn't exist.
-            ValueError: If the game doesn't belong to the specified account.
+            ValueError: If the game doesn't belong to the specified account or
+                       if name_template contains invalid placeholders.
 
         Example:
             >>> template = await service.create_board_template(
             ...     account_id=account.id,
             ...     game_id=game.id,
             ...     name="Weekly Speed Run Template",
+            ...     name_template="Week {series} - {year}",
+            ...     series="weekly",
             ...     repeat_interval="7 days",
             ...     next_run_at=datetime.now(UTC) + timedelta(days=7),
             ...     is_active=True,
@@ -78,11 +122,15 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         if game.account_id != account_id:
             raise ValueError(f"Game {game_id} does not belong to account {account_id}")
 
+        # Validate name_template placeholders
+        self._validate_name_template(name_template)
+
         template = BoardTemplate(
             account_id=account_id,
             game_id=game_id,
             name=name,
             name_template=name_template,
+            series=series,
             repeat_interval=repeat_interval,
             config=config or {},
             config_template=config_template or {},
@@ -133,6 +181,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         template_id: BoardTemplateID,
         name: str | None = None,
         name_template: str | None = None,
+        series: str | None = None,
         repeat_interval: str | None = None,
         config: dict[str, Any] | None = None,
         config_template: dict[str, Any] | None = None,
@@ -145,6 +194,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             template_id: The ID of the template to update.
             name: New template name, if provided.
             name_template: New name template, if provided.
+            series: New series identifier, if provided.
             repeat_interval: New repeat interval, if provided.
             config: New config, if provided.
             config_template: New config template, if provided.
@@ -156,13 +206,20 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
 
         Raises:
             EntityNotFoundError: If the template doesn't exist.
+            ValueError: If name_template contains invalid placeholders.
         """
         template = await self.get_by_id_or_raise(template_id)
+
+        # Validate name_template if provided
+        if name_template is not None:
+            self._validate_name_template(name_template)
 
         if name is not None:
             template.name = name
         if name_template is not None:
             template.name_template = name_template
+        if series is not None:
+            template.series = series
         if repeat_interval is not None:
             template.repeat_interval = repeat_interval
         if config is not None:

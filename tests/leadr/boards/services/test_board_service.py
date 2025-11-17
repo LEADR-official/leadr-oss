@@ -84,12 +84,12 @@ class TestBoardService:
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
             keep_strategy=KeepStrategy.BEST_ONLY,
-            template_id=BoardTemplateID(template_id),
+            created_from_template_id=BoardTemplateID(template_id),
             template_name="Speed Run Template",
             tags=["speedrun", "no-damage"],
         )
 
-        assert board.template_id == template_id
+        assert board.created_from_template_id == BoardTemplateID(template_id)
         assert board.template_name == "Speed Run Template"
         assert board.tags == ["speedrun", "no-damage"]
 
@@ -772,10 +772,10 @@ class TestBoardService:
         new_template_id = uuid4()
         updated_board = await board_service.update_board(
             board_id=created_board.id,
-            template_id=BoardTemplateID(new_template_id),
+            created_from_template_id=BoardTemplateID(new_template_id),
         )
 
-        assert updated_board.template_id == BoardTemplateID(new_template_id)
+        assert updated_board.created_from_template_id == BoardTemplateID(new_template_id)
         assert updated_board.name == "Speed Run Board"  # Unchanged
 
     async def test_update_board_template_name(self, db_session: AsyncSession):
@@ -989,7 +989,7 @@ class TestBoardService:
         assert board.is_active is True
         assert board.sort_direction == SortDirection.DESCENDING
         assert board.keep_strategy == KeepStrategy.BEST_ONLY
-        assert board.template_id == template.id
+        assert board.created_from_template_id == template.id
         assert board.template_name == "Weekly Challenge"
         assert board.starts_at == next_run
         assert board.ends_at == next_run + timedelta(days=7)

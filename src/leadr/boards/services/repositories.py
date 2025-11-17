@@ -3,7 +3,7 @@
 from typing import Any
 
 from pydantic import UUID4
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
@@ -28,7 +28,9 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             is_active=orm.is_active,
             sort_direction=SortDirection(orm.sort_direction),
             keep_strategy=KeepStrategy(orm.keep_strategy),
-            template_id=BoardTemplateID(orm.template_id) if orm.template_id else None,
+            created_from_template_id=BoardTemplateID(orm.created_from_template_id)
+            if orm.created_from_template_id
+            else None,
             template_name=orm.template_name,
             starts_at=orm.starts_at,
             ends_at=orm.ends_at,
@@ -51,7 +53,9 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             is_active=entity.is_active,
             sort_direction=entity.sort_direction.value,
             keep_strategy=entity.keep_strategy.value,
-            template_id=entity.template_id.uuid if entity.template_id else None,
+            created_from_template_id=entity.created_from_template_id.uuid
+            if entity.created_from_template_id
+            else None,
             template_name=entity.template_name,
             starts_at=entity.starts_at,
             ends_at=entity.ends_at,
@@ -131,6 +135,24 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         result = await self.session.execute(query)
         orms = result.scalars().all()
         return [self._to_domain(orm) for orm in orms]
+
+    async def count_boards_by_template(self, template_id: BoardTemplateID) -> int:
+        """Count boards created from a specific template.
+
+        Args:
+            template_id: The template ID to count boards for
+
+        Returns:
+            Number of boards created from this template
+        """
+        query = select(func.count()).where(
+            BoardORM.created_from_template_id == template_id.uuid,
+            BoardORM.deleted_at.is_(None),
+        )
+
+        result = await self.session.execute(query)
+        count = result.scalar()
+        return count or 0
 
 
 class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
