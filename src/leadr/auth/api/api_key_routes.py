@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
-from leadr.auth.api.schemas import (
+from leadr.auth.api.api_key_schemas import (
     APIKeyResponse,
     CreateAPIKeyRequest,
     CreateAPIKeyResponse,

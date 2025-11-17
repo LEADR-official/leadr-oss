@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, status
 
-from leadr.auth.api.schemas import (
+from leadr.auth.api.client_schemas import (
     NonceResponse,
     RefreshTokenRequest,
     RefreshTokenResponse,

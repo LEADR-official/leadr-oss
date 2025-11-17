@@ -9,7 +9,7 @@ from leadr.auth.dependencies import (
     validate_body_account_id,
 )
 from leadr.common.domain.ids import BoardID, DeviceID, GameID, ScoreID
-from leadr.scores.api.schemas import ScoreCreateRequest, ScoreResponse, ScoreUpdateRequest
+from leadr.scores.api.score_schemas import ScoreCreateRequest, ScoreResponse, ScoreUpdateRequest
 from leadr.scores.services.dependencies import ScoreServiceDep
 
 router = APIRouter()

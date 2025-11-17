@@ -9,7 +9,7 @@ from leadr.auth.dependencies import (
     validate_body_account_id,
 )
 from leadr.common.domain.ids import GameID
-from leadr.games.api.schemas import (
+from leadr.games.api.game_schemas import (
     GameCreateRequest,
     GameResponse,
     GameUpdateRequest,

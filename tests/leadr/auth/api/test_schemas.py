@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from leadr.auth.api.schemas import (
+from leadr.auth.api.api_key_schemas import (
     APIKeyResponse,
     CreateAPIKeyRequest,
     CreateAPIKeyResponse,
