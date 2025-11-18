@@ -55,7 +55,7 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create scores
@@ -140,7 +140,7 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
         board2 = await board_service.create_board(
             account_id=account.id,
@@ -234,7 +234,7 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create scores
@@ -320,7 +320,7 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create scores
@@ -403,7 +403,7 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create score
@@ -482,7 +482,7 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create score
@@ -556,7 +556,7 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create score
@@ -627,7 +627,7 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create score
@@ -701,7 +701,7 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create score

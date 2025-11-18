@@ -5,6 +5,7 @@ from typing import Any, overload
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
@@ -37,6 +38,46 @@ class ScoreService(BaseService[Score, ScoreRepository]):
     def _get_entity_name(self) -> str:
         """Get entity name for error messages."""
         return "Score"
+
+    async def _get_active_score_for_device(
+        self, account_id: AccountID, device_id: DeviceID, board_id: BoardID
+    ) -> Score | None:
+        """Get the active (non-deleted) score for a device on a board.
+
+        Args:
+            account_id: The account ID to filter by (multi-tenant safety).
+            device_id: The device ID to search for.
+            board_id: The board ID to search for.
+
+        Returns:
+            The first active Score for this device/board combo, or None.
+        """
+        scores = await self.repository.filter(
+            account_id=account_id,
+            board_id=board_id,
+            device_id=device_id,
+        )
+        return scores[0] if scores else None
+
+    def _is_better_score(
+        self, new_value: float, existing_value: float, sort_direction: SortDirection
+    ) -> bool:
+        """Determine if new score is better than existing based on sort direction.
+
+        Args:
+            new_value: The value of the new score.
+            existing_value: The value of the existing score.
+            sort_direction: The sort direction of the board.
+
+        Returns:
+            True if new score is better (should replace existing), False otherwise.
+        """
+        if sort_direction == SortDirection.ASCENDING:
+            # Lower is better for ascending (e.g., race times)
+            return new_value < existing_value
+        else:  # DESCENDING
+            # Higher is better for descending (e.g., points/kills)
+            return new_value > existing_value
 
     async def create_score(
         self,
@@ -99,6 +140,41 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         # 3. Validate that game_id matches board's game_id
         if board.game_id != game_id:
             raise ValueError(f"Game {game_id} does not match board's game {board.game_id}")
+
+        # 4. Check keep_strategy before creating new score
+        if board.keep_strategy == KeepStrategy.FIRST_ONLY:
+            existing_score = await self._get_active_score_for_device(
+                account_id=account_id,
+                device_id=device_id,
+                board_id=board_id,
+            )
+            if existing_score is not None:
+                # Return existing first score, don't create new one
+                return existing_score, None
+        elif board.keep_strategy == KeepStrategy.LATEST_ONLY:
+            existing_score = await self._get_active_score_for_device(
+                account_id=account_id,
+                device_id=device_id,
+                board_id=board_id,
+            )
+            if existing_score is not None:
+                # Soft-delete the old score before creating new one
+                await self.soft_delete(existing_score.id)
+        elif board.keep_strategy == KeepStrategy.BEST_ONLY:
+            existing_score = await self._get_active_score_for_device(
+                account_id=account_id,
+                device_id=device_id,
+                board_id=board_id,
+            )
+            if existing_score is not None:
+                # Check if new score is better
+                is_better = self._is_better_score(value, existing_score.value, board.sort_direction)
+                if not is_better:
+                    # New score is worse or equal, return existing better score
+                    return existing_score, None
+                else:
+                    # New score is better, soft-delete old one before creating new
+                    await self.soft_delete(existing_score.id)
 
         # Create score entity (before anti-cheat so we can pass it for checking)
         score = Score(
