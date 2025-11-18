@@ -5,6 +5,7 @@ from typing import Any, overload
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.boards.domain.board import KeepStrategy
 from leadr.boards.services.board_service import BoardService
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
@@ -37,6 +38,26 @@ class ScoreService(BaseService[Score, ScoreRepository]):
     def _get_entity_name(self) -> str:
         """Get entity name for error messages."""
         return "Score"
+
+    async def _get_active_score_for_device(
+        self, account_id: AccountID, device_id: DeviceID, board_id: BoardID
+    ) -> Score | None:
+        """Get the active (non-deleted) score for a device on a board.
+
+        Args:
+            account_id: The account ID to filter by (multi-tenant safety).
+            device_id: The device ID to search for.
+            board_id: The board ID to search for.
+
+        Returns:
+            The first active Score for this device/board combo, or None.
+        """
+        scores = await self.repository.filter(
+            account_id=account_id,
+            board_id=board_id,
+            device_id=device_id,
+        )
+        return scores[0] if scores else None
 
     async def create_score(
         self,
@@ -99,6 +120,17 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         # 3. Validate that game_id matches board's game_id
         if board.game_id != game_id:
             raise ValueError(f"Game {game_id} does not match board's game {board.game_id}")
+
+        # 4. Check keep_strategy before creating new score
+        if board.keep_strategy == KeepStrategy.FIRST_ONLY:
+            existing_score = await self._get_active_score_for_device(
+                account_id=account_id,
+                device_id=device_id,
+                board_id=board_id,
+            )
+            if existing_score is not None:
+                # Return existing first score, don't create new one
+                return existing_score, None
 
         # Create score entity (before anti-cheat so we can pass it for checking)
         score = Score(
