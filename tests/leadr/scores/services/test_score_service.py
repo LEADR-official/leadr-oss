@@ -775,3 +775,83 @@ class TestScoreService:
 
         assert updated.metadata == new_metadata
         assert updated.metadata["level"] == 10  # type: ignore[index]
+
+    async def test_keep_strategy_all_keeps_all_scores(self, db_session: AsyncSession):
+        """Test that ALL strategy keeps all scores from the same device."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-all-strategy",
+        )
+
+        # Create board with ALL strategy
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="All Scores Board",
+            icon="trophy",
+            short_code="ALL1",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        # Create multiple scores from the same device
+        score_service = ScoreService(db_session)
+        score1, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="TestPlayer",
+            value=100.0,
+        )
+        score2, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="TestPlayer",
+            value=200.0,
+        )
+        score3, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="TestPlayer",
+            value=150.0,
+        )
+
+        # Verify all scores were saved
+        assert score1.id is not None
+        assert score2.id is not None
+        assert score3.id is not None
+        assert score1.id != score2.id
+        assert score2.id != score3.id
+
+        # List scores for this board and device - should get all 3
+        all_scores = await score_service.list_scores(
+            account_id=account.id,
+            board_id=board.id,
+            device_id=device.id,
+        )
+
+        assert len(all_scores) == 3
+        values = {s.value for s in all_scores}
+        assert values == {100.0, 200.0, 150.0}
