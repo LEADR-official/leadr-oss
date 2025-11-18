@@ -20,7 +20,7 @@ from leadr.common.repositories import BaseRepository
 
 
 # Test fixtures - Domain Entity
-class TestStatus(str, Enum):
+class MockStatus(str, Enum):
     """Test status enum."""
 
     ACTIVE = "ACTIVE"
@@ -31,11 +31,11 @@ class TestEntity(Entity):
     """Test domain entity for BaseRepository testing."""
 
     name: str
-    status: TestStatus
+    status: MockStatus
 
 
 # Test fixtures - ORM Model
-class TestStatusEnum(str, Enum):
+class MockStatusEnum(str, Enum):
     """Test ORM status enum."""
 
     ACTIVE = "ACTIVE"
@@ -48,7 +48,7 @@ class TestEntityORM(Base):
     __tablename__ = "test_entities"
 
     name: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[TestStatusEnum] = mapped_column(nullable=False)
+    status: Mapped[MockStatusEnum] = mapped_column(nullable=False)
 
 
 # Test Repository Implementation
@@ -60,7 +60,7 @@ class TestRepository(BaseRepository[TestEntity, TestEntityORM]):
         return TestEntity(
             id=orm.id,
             name=orm.name,
-            status=TestStatus(orm.status.value),
+            status=MockStatus(orm.status.value),
             created_at=orm.created_at,
             updated_at=orm.updated_at,
             deleted_at=orm.deleted_at,
@@ -71,7 +71,7 @@ class TestRepository(BaseRepository[TestEntity, TestEntityORM]):
         orm = TestEntityORM(
             id=entity.id,
             name=entity.name,
-            status=TestStatusEnum(entity.status.value),
+            status=MockStatusEnum(entity.status.value),
             created_at=entity.created_at,
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,
@@ -93,9 +93,9 @@ class TestRepository(BaseRepository[TestEntity, TestEntityORM]):
 
         if "status" in kwargs and kwargs["status"] is not None:
             status_value = kwargs["status"]
-            if isinstance(status_value, TestStatus):
+            if isinstance(status_value, MockStatus):
                 status_value = status_value.value
-            query = query.where(TestEntityORM.status == TestStatusEnum(status_value))
+            query = query.where(TestEntityORM.status == MockStatusEnum(status_value))
 
         result = await self.session.execute(query)
         orms = result.scalars().all()
@@ -121,7 +121,7 @@ class TestBaseRepository:
         entity = TestEntity(
             id=entity_id,
             name="Test Entity",
-            status=TestStatus.ACTIVE,
+            status=MockStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -130,7 +130,7 @@ class TestBaseRepository:
 
         assert created.id == entity_id
         assert created.name == "Test Entity"
-        assert created.status == TestStatus.ACTIVE
+        assert created.status == MockStatus.ACTIVE
         assert created.deleted_at is None
 
     async def test_get_by_id_found(self, db_session: AsyncSession):
@@ -143,7 +143,7 @@ class TestBaseRepository:
         entity = TestEntity(
             id=entity_id,
             name="Test Entity",
-            status=TestStatus.ACTIVE,
+            status=MockStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -175,7 +175,7 @@ class TestBaseRepository:
         entity = TestEntity(
             id=entity_id,
             name="Test Entity",
-            status=TestStatus.ACTIVE,
+            status=MockStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -196,7 +196,7 @@ class TestBaseRepository:
         entity = TestEntity(
             id=entity_id,
             name="Test Entity",
-            status=TestStatus.ACTIVE,
+            status=MockStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -219,7 +219,7 @@ class TestBaseRepository:
         entity = TestEntity(
             id=entity_id,
             name="Test Entity",
-            status=TestStatus.ACTIVE,
+            status=MockStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -227,17 +227,17 @@ class TestBaseRepository:
 
         # Update it
         entity.name = "Updated Entity"
-        entity.status = TestStatus.INACTIVE
+        entity.status = MockStatus.INACTIVE
         updated = await repo.update(entity)
 
         assert updated.name == "Updated Entity"
-        assert updated.status == TestStatus.INACTIVE
+        assert updated.status == MockStatus.INACTIVE
 
         # Verify in database
         retrieved = await repo.get_by_id(entity_id)
         assert retrieved is not None
         assert retrieved.name == "Updated Entity"
-        assert retrieved.status == TestStatus.INACTIVE
+        assert retrieved.status == MockStatus.INACTIVE
 
     async def test_update_non_existent_raises_error(self, db_session: AsyncSession):
         """Test that updating a non-existent entity raises an error."""
@@ -248,7 +248,7 @@ class TestBaseRepository:
         entity = TestEntity(
             id=entity_id,
             name="Test Entity",
-            status=TestStatus.ACTIVE,
+            status=MockStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -266,7 +266,7 @@ class TestBaseRepository:
         entity = TestEntity(
             id=entity_id,
             name="Test Entity",
-            status=TestStatus.ACTIVE,
+            status=MockStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -299,11 +299,11 @@ class TestBaseRepository:
         # Create multiple entities
         entity1 = TestEntity(
             name="Entity 1",
-            status=TestStatus.ACTIVE,
+            status=MockStatus.ACTIVE,
         )
         entity2 = TestEntity(
             name="Entity 2",
-            status=TestStatus.INACTIVE,
+            status=MockStatus.INACTIVE,
         )
 
         await repo.create(entity1)
@@ -324,11 +324,11 @@ class TestBaseRepository:
         # Create entities
         entity1 = TestEntity(
             name="Entity 1",
-            status=TestStatus.ACTIVE,
+            status=MockStatus.ACTIVE,
         )
         entity2 = TestEntity(
             name="Entity 2",
-            status=TestStatus.INACTIVE,
+            status=MockStatus.INACTIVE,
         )
 
         await repo.create(entity1)
@@ -350,19 +350,19 @@ class TestBaseRepository:
         # Create entities
         entity1 = TestEntity(
             name="Entity 1",
-            status=TestStatus.ACTIVE,
+            status=MockStatus.ACTIVE,
         )
         entity2 = TestEntity(
             name="Entity 2",
-            status=TestStatus.INACTIVE,
+            status=MockStatus.INACTIVE,
         )
 
         await repo.create(entity1)
         await repo.create(entity2)
 
         # Filter by status
-        active_entities = await repo.filter(status=TestStatus.ACTIVE)
+        active_entities = await repo.filter(status=MockStatus.ACTIVE)
 
         assert len(active_entities) == 1
         assert active_entities[0].name == "Entity 1"
-        assert active_entities[0].status == TestStatus.ACTIVE
+        assert active_entities[0].status == MockStatus.ACTIVE
