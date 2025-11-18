@@ -2,6 +2,7 @@
 
 import base64
 import json
+import logging
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -13,7 +14,7 @@ from leadr.common.domain.pagination import (
     SortField,
 )
 
-# Note: datetime and UUID imports are kept for _serialize_cursor_value() function
+logger = logging.getLogger(__name__)
 
 
 class CursorValidationError(ValueError):
@@ -114,17 +115,23 @@ class Cursor:
         }
         try:
             json_str = json.dumps(data, separators=(",", ":"))
-        except TypeError as e:
-            # Debug: print what failed to serialize
-            import sys
+        except (TypeError, json.JSONDecodeError, UnicodeDecodeError) as e:
+            logger.debug(
+                "Error encoding cursor: %s\n%s\n%s\n%s\n%s",
+                self.position.values,
+                serialized_values,
+                self.filters,
+                serialized_filters,
+                e,
+            )
+            raise CursorValidationError(f"Error creating cursor: {e}") from e
 
-            print(f"ERROR encoding cursor: {e}", file=sys.stderr)
-            print(f"  position.values: {self.position.values}", file=sys.stderr)
-            print(f"  serialized_values: {serialized_values}", file=sys.stderr)
-            print(f"  filters: {self.filters}", file=sys.stderr)
-            print(f"  serialized_filters: {serialized_filters}", file=sys.stderr)
-            raise
-        encoded = base64.urlsafe_b64encode(json_str.encode()).decode()
+        try:
+            encoded = base64.urlsafe_b64encode(json_str.encode()).decode()
+        except (TypeError, ValueError) as e:
+            logger.debug("Error encoding cursor: %s\n%s", json_str, e)
+            raise CursorValidationError(f"Error creating cursor: {e}") from e
+
         return encoded
 
     @classmethod
@@ -173,17 +180,7 @@ class Cursor:
                 direction=direction,
             )
         except UnicodeDecodeError as e:
-            # Debug: Show what we got
-            import sys
-
-            print(f"ERROR decoding cursor: {e}", file=sys.stderr)
-            print(f"  cursor_str (first 100 chars): {cursor_str[:100]}", file=sys.stderr)
-            try:
-                decoded_bytes = base64.urlsafe_b64decode(cursor_str.encode())
-                print(f"  decoded_bytes (first 100): {decoded_bytes[:100]}", file=sys.stderr)
-                print(f"  decoded_bytes hex: {decoded_bytes[:50].hex()}", file=sys.stderr)
-            except Exception:  # noqa: S110
-                pass  # Best-effort debug output, ignore any errors
+            logger.error("Error decoding cursor: %s\n%s", cursor_str, e)
             raise CursorValidationError(f"Invalid pagination cursor: {e}") from e
         except (ValueError, KeyError, json.JSONDecodeError) as e:
             raise CursorValidationError(f"Invalid pagination cursor: {e}") from e

@@ -1,6 +1,6 @@
 # 👑 LEADR - Lightweight Game Leaderboard API
 
-> **LEADR is the cross-platform leadboard backend for indie game devs that turns any game into a social experience**
+> **LEADR is the lightweight cross-platform leaderboard backend that turns any game into a social experience**
 
 Whether you're building a retro arcade game, puzzle platformer, or competitive multiplayer experience, LEADR handles your leaderboard needs without the bloat and complexity - for any engine, any platform, any team.
 

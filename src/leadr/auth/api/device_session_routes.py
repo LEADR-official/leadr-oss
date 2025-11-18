@@ -10,10 +10,9 @@ from leadr.auth.api.device_session_schemas import (
 )
 from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
 from leadr.auth.services.dependencies import DeviceServiceDep
-from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
-from leadr.common.domain.cursor import Cursor, CursorValidationError
+from leadr.common.api.pagination import PaginatedResponse, PaginationParams
+from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import DeviceID, DeviceSessionID
-from leadr.common.domain.pagination import PaginationDirection
 
 router = APIRouter()
 
@@ -70,41 +69,11 @@ async def list_sessions(
     if device_id is not None:
         filters_dict["device_id"] = str(device_id)
 
-    # Build cursors from result positions
-    next_cursor_str = None
-    prev_cursor_str = None
-
-    if result.next_position is not None:
-        next_cursor = Cursor(
-            position=result.next_position,
-            sort_fields=pagination.sort_spec,
-            filters=filters_dict,
-            direction=PaginationDirection.FORWARD,
-        )
-        next_cursor_str = next_cursor.encode()
-
-    if result.prev_position is not None:
-        prev_cursor = Cursor(
-            position=result.prev_position,
-            sort_fields=pagination.sort_spec,
-            filters=filters_dict,
-            direction=PaginationDirection.BACKWARD,
-        )
-        prev_cursor_str = prev_cursor.encode()
-
-    # Convert domain entities to response models
-    response_items = [DeviceSessionResponse.from_domain(session) for session in result.items]
-
-    # Build paginated response
-    return PaginatedResponse(
-        data=response_items,
-        pagination=PaginationMeta(
-            next_cursor=next_cursor_str,
-            prev_cursor=prev_cursor_str,
-            has_next=result.has_next,
-            has_prev=result.has_prev,
-            count=result.count,
-        ),
+    return PaginatedResponse.from_paginated_result(
+        result=result,
+        pagination=pagination,
+        filters=filters_dict,
+        response_model=DeviceSessionResponse,
     )
 
 

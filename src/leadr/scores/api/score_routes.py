@@ -10,10 +10,9 @@ from leadr.auth.dependencies import (
     QueryAccountIDDep,
     validate_body_account_id,
 )
-from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
-from leadr.common.domain.cursor import Cursor, CursorValidationError
+from leadr.common.api.pagination import PaginatedResponse, PaginationParams
+from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import BoardID, DeviceID, GameID, ScoreID
-from leadr.common.domain.pagination import PaginationDirection
 from leadr.scores.api.score_schemas import ScoreCreateRequest, ScoreResponse, ScoreUpdateRequest
 from leadr.scores.services.dependencies import ScoreServiceDep
 
@@ -191,41 +190,11 @@ async def list_scores(
     if device_id is not None:
         filters_dict["device_id"] = str(device_id)
 
-    # Build cursors from result positions
-    next_cursor_str = None
-    prev_cursor_str = None
-
-    if result.next_position is not None:
-        next_cursor = Cursor(
-            position=result.next_position,
-            sort_fields=pagination.sort_spec,
-            filters=filters_dict,
-            direction=PaginationDirection.FORWARD,
-        )
-        next_cursor_str = next_cursor.encode()
-
-    if result.prev_position is not None:
-        prev_cursor = Cursor(
-            position=result.prev_position,
-            sort_fields=pagination.sort_spec,
-            filters=filters_dict,
-            direction=PaginationDirection.BACKWARD,
-        )
-        prev_cursor_str = prev_cursor.encode()
-
-    # Convert domain entities to response models
-    response_items = [ScoreResponse.from_domain(score) for score in result.items]
-
-    # Build paginated response
-    return PaginatedResponse(
-        data=response_items,
-        pagination=PaginationMeta(
-            next_cursor=next_cursor_str,
-            prev_cursor=prev_cursor_str,
-            has_next=result.has_next,
-            has_prev=result.has_prev,
-            count=result.count,
-        ),
+    return PaginatedResponse.from_paginated_result(
+        result=result,
+        pagination=pagination,
+        filters=filters_dict,
+        response_model=ScoreResponse,
     )
 
 

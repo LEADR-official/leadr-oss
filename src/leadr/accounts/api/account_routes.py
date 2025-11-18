@@ -13,9 +13,8 @@ from leadr.accounts.domain.account import AccountStatus
 from leadr.accounts.services.dependencies import AccountServiceDep
 from leadr.auth.dependencies import AuthContextDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
-from leadr.common.domain.cursor import Cursor, CursorValidationError
+from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID
-from leadr.common.domain.pagination import PaginationDirection
 
 router = APIRouter()
 
@@ -124,44 +123,11 @@ async def list_accounts(
         except (CursorValidationError, ValueError) as e:
             raise HTTPException(status_code=400, detail=str(e)) from None
 
-        # Build filter dict for cursors
-        filters_dict = {}
-
-        # Build cursors from result positions
-        next_cursor_str = None
-        prev_cursor_str = None
-
-        if result.next_position is not None:
-            next_cursor = Cursor(
-                position=result.next_position,
-                sort_fields=pagination.sort_spec,
-                filters=filters_dict,
-                direction=PaginationDirection.FORWARD,
-            )
-            next_cursor_str = next_cursor.encode()
-
-        if result.prev_position is not None:
-            prev_cursor = Cursor(
-                position=result.prev_position,
-                sort_fields=pagination.sort_spec,
-                filters=filters_dict,
-                direction=PaginationDirection.BACKWARD,
-            )
-            prev_cursor_str = prev_cursor.encode()
-
-        # Convert domain entities to response models
-        response_items = [AccountResponse.from_domain(acc) for acc in result.items]
-
-        # Build paginated response
-        return PaginatedResponse(
-            data=response_items,
-            pagination=PaginationMeta(
-                next_cursor=next_cursor_str,
-                prev_cursor=prev_cursor_str,
-                has_next=result.has_next,
-                has_prev=result.has_prev,
-                count=result.count,
-            ),
+        return PaginatedResponse.from_paginated_result(
+            result=result,
+            pagination=pagination,
+            filters={},
+            response_model=AccountResponse,
         )
     else:
         # Regular users see only their own account (no pagination needed)

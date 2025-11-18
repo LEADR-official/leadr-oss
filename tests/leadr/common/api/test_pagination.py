@@ -1,6 +1,7 @@
 """Tests for API pagination models and dependencies."""
 
 import pytest
+from pydantic import BaseModel, Field
 
 from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
 from leadr.common.domain.cursor import Cursor
@@ -10,6 +11,7 @@ from leadr.common.domain.pagination import (
     SortDirection,
     SortField,
 )
+from leadr.common.domain.pagination_result import PaginatedResult
 
 
 class TestPaginationParams:
@@ -170,3 +172,273 @@ class TestPaginatedResponse:
 
         with pytest.raises(ValidationError):
             PaginatedResponse(data="not-a-list", pagination=pagination)  # type: ignore[arg-type]
+
+    def test_from_paginated_result_with_next_and_prev_cursors(self) -> None:
+        """Test creating response from result with both next and prev cursors."""
+
+        # Create test domain entity
+        class TestDomain(BaseModel):
+            id: str
+            value: int
+
+        # Create test response model
+        class TestResponse(BaseModel):
+            id: str = Field()
+            value: int = Field()
+
+            @classmethod
+            def from_domain(cls, domain: TestDomain) -> "TestResponse":
+                return cls(id=domain.id, value=domain.value)
+
+        # Create paginated result
+        items = [TestDomain(id="1", value=100), TestDomain(id="2", value=200)]
+        result = PaginatedResult(
+            items=items,
+            has_next=True,
+            has_prev=True,
+            next_position=CursorPosition(values=(200,), entity_id="2"),
+            prev_position=CursorPosition(values=(100,), entity_id="1"),
+        )
+
+        # Create pagination params
+        pagination = PaginationParams(cursor=None, limit=20, sort="value:desc")
+
+        # Create filters
+        filters = {"game_id": "game_123", "status": "active"}
+
+        # Create response using factory method
+        response = PaginatedResponse.from_paginated_result(
+            result=result,
+            pagination=pagination,
+            filters=filters,
+            response_model=TestResponse,
+        )
+
+        # Verify response data
+        assert len(response.data) == 2
+        assert response.data[0].id == "1"
+        assert response.data[0].value == 100
+        assert response.data[1].id == "2"
+        assert response.data[1].value == 200
+
+        # Verify pagination metadata
+        assert response.pagination.has_next is True
+        assert response.pagination.has_prev is True
+        assert response.pagination.count == 2
+
+        # Verify cursors are encoded strings
+        assert response.pagination.next_cursor is not None
+        assert isinstance(response.pagination.next_cursor, str)
+        assert response.pagination.prev_cursor is not None
+        assert isinstance(response.pagination.prev_cursor, str)
+
+        # Decode and verify next cursor
+        next_cursor = Cursor.decode(response.pagination.next_cursor)
+        assert next_cursor.position == CursorPosition(values=(200,), entity_id="2")
+        assert next_cursor.direction == PaginationDirection.FORWARD
+        assert next_cursor.filters == filters
+
+        # Decode and verify prev cursor
+        prev_cursor = Cursor.decode(response.pagination.prev_cursor)
+        assert prev_cursor.position == CursorPosition(values=(100,), entity_id="1")
+        assert prev_cursor.direction == PaginationDirection.BACKWARD
+        assert prev_cursor.filters == filters
+
+    def test_from_paginated_result_with_only_next_cursor(self) -> None:
+        """Test creating response from result with only next cursor."""
+
+        class TestDomain(BaseModel):
+            id: str
+            value: int
+
+        class TestResponse(BaseModel):
+            id: str = Field()
+            value: int = Field()
+
+            @classmethod
+            def from_domain(cls, domain: TestDomain) -> "TestResponse":
+                return cls(id=domain.id, value=domain.value)
+
+        items = [TestDomain(id="1", value=100)]
+        result = PaginatedResult(
+            items=items,
+            has_next=True,
+            has_prev=False,
+            next_position=CursorPosition(values=(100,), entity_id="1"),
+            prev_position=None,
+        )
+
+        pagination = PaginationParams(cursor=None, limit=20, sort=None)
+        filters: dict[str, str] = {}
+
+        response = PaginatedResponse.from_paginated_result(
+            result=result,
+            pagination=pagination,
+            filters=filters,
+            response_model=TestResponse,
+        )
+
+        assert response.pagination.has_next is True
+        assert response.pagination.has_prev is False
+        assert response.pagination.next_cursor is not None
+        assert response.pagination.prev_cursor is None
+
+    def test_from_paginated_result_with_only_prev_cursor(self) -> None:
+        """Test creating response from result with only prev cursor."""
+
+        class TestDomain(BaseModel):
+            id: str
+            value: int
+
+        class TestResponse(BaseModel):
+            id: str = Field()
+            value: int = Field()
+
+            @classmethod
+            def from_domain(cls, domain: TestDomain) -> "TestResponse":
+                return cls(id=domain.id, value=domain.value)
+
+        items = [TestDomain(id="1", value=100)]
+        result = PaginatedResult(
+            items=items,
+            has_next=False,
+            has_prev=True,
+            next_position=None,
+            prev_position=CursorPosition(values=(100,), entity_id="1"),
+        )
+
+        pagination = PaginationParams(cursor=None, limit=20, sort=None)
+        filters: dict[str, str] = {}
+
+        response = PaginatedResponse.from_paginated_result(
+            result=result,
+            pagination=pagination,
+            filters=filters,
+            response_model=TestResponse,
+        )
+
+        assert response.pagination.has_next is False
+        assert response.pagination.has_prev is True
+        assert response.pagination.next_cursor is None
+        assert response.pagination.prev_cursor is not None
+
+    def test_from_paginated_result_with_no_cursors(self) -> None:
+        """Test creating response from result with no cursors (single page)."""
+
+        class TestDomain(BaseModel):
+            id: str
+            value: int
+
+        class TestResponse(BaseModel):
+            id: str = Field()
+            value: int = Field()
+
+            @classmethod
+            def from_domain(cls, domain: TestDomain) -> "TestResponse":
+                return cls(id=domain.id, value=domain.value)
+
+        items = [TestDomain(id="1", value=100)]
+        result = PaginatedResult(
+            items=items,
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+
+        pagination = PaginationParams(cursor=None, limit=20, sort=None)
+        filters: dict[str, str] = {}
+
+        response = PaginatedResponse.from_paginated_result(
+            result=result,
+            pagination=pagination,
+            filters=filters,
+            response_model=TestResponse,
+        )
+
+        assert response.pagination.has_next is False
+        assert response.pagination.has_prev is False
+        assert response.pagination.next_cursor is None
+        assert response.pagination.prev_cursor is None
+        assert response.pagination.count == 1
+
+    def test_from_paginated_result_with_empty_items(self) -> None:
+        """Test creating response from result with no items."""
+
+        class TestDomain(BaseModel):
+            id: str
+            value: int
+
+        class TestResponse(BaseModel):
+            id: str = Field()
+            value: int = Field()
+
+            @classmethod
+            def from_domain(cls, domain: TestDomain) -> "TestResponse":
+                return cls(id=domain.id, value=domain.value)
+
+        result = PaginatedResult(
+            items=[],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+
+        pagination = PaginationParams(cursor=None, limit=20, sort=None)
+        filters: dict[str, str] = {}
+
+        response = PaginatedResponse.from_paginated_result(
+            result=result,
+            pagination=pagination,
+            filters=filters,
+            response_model=TestResponse,
+        )
+
+        assert len(response.data) == 0
+        assert response.pagination.count == 0
+        assert response.pagination.has_next is False
+        assert response.pagination.has_prev is False
+
+    def test_from_paginated_result_filters_included_in_cursors(self) -> None:
+        """Test that filters are correctly included in encoded cursors."""
+
+        class TestDomain(BaseModel):
+            id: str
+            value: int
+
+        class TestResponse(BaseModel):
+            id: str = Field()
+            value: int = Field()
+
+            @classmethod
+            def from_domain(cls, domain: TestDomain) -> "TestResponse":
+                return cls(id=domain.id, value=domain.value)
+
+        items = [TestDomain(id="1", value=100)]
+        result = PaginatedResult(
+            items=items,
+            has_next=True,
+            has_prev=False,
+            next_position=CursorPosition(values=(100,), entity_id="1"),
+            prev_position=None,
+        )
+
+        pagination = PaginationParams(cursor=None, limit=20, sort=None)
+        filters = {
+            "game_id": "game_123",
+            "board_id": "board_456",
+            "device_id": "device_789",
+        }
+
+        response = PaginatedResponse.from_paginated_result(
+            result=result,
+            pagination=pagination,
+            filters=filters,
+            response_model=TestResponse,
+        )
+
+        # Decode cursor and verify filters
+        assert response.pagination.next_cursor is not None
+        next_cursor = Cursor.decode(response.pagination.next_cursor)
+        assert next_cursor.filters == filters

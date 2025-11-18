@@ -1,14 +1,17 @@
 """API pagination models and dependencies."""
 
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from fastapi import Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from leadr.common.domain.cursor import Cursor
-from leadr.common.domain.pagination import SortDirection, SortField
+from leadr.common.domain.pagination import PaginationDirection, SortDirection, SortField
+from leadr.common.domain.pagination_result import PaginatedResult
 
 T = TypeVar("T")
+DomainT = TypeVar("DomainT")
+ResponseT = TypeVar("ResponseT", bound=BaseModel)
 
 
 class PaginationParams:
@@ -159,3 +162,76 @@ class PaginatedResponse(BaseModel, Generic[T]):
     pagination: PaginationMeta = Field(
         description="Pagination metadata",
     )
+
+    @classmethod
+    def from_paginated_result(
+        cls,
+        result: PaginatedResult[DomainT],
+        pagination: PaginationParams,
+        filters: dict[str, Any],
+        response_model: type[ResponseT],
+    ) -> "PaginatedResponse[ResponseT]":
+        """
+        Create a PaginatedResponse from a PaginatedResult.
+
+        This factory method abstracts away cursor construction, converting a repository-layer
+        PaginatedResult into an API-layer PaginatedResponse with encoded cursors.
+
+        Args:
+            result: The paginated result from the repository layer
+            pagination: The pagination parameters from the request
+            filters: Dict of active filters to include in cursors (e.g., {"game_id": "123"})
+            response_model: The response model class with a from_domain() method
+
+        Returns:
+            A fully constructed PaginatedResponse with encoded cursors and converted items
+
+        Example:
+            >>> return PaginatedResponse.from_paginated_result(
+            ...     result=result,
+            ...     pagination=pagination,
+            ...     filters={"game_id": str(game_id)} if game_id else {},
+            ...     response_model=ScoreResponse,
+            ... )
+        """
+        # Build cursors from result positions
+        next_cursor_str = None
+        prev_cursor_str = None
+
+        if result.next_position is not None:
+            next_cursor = Cursor(
+                position=result.next_position,
+                sort_fields=pagination.sort_spec,
+                filters=filters,
+                direction=PaginationDirection.FORWARD,
+            )
+            next_cursor_str = next_cursor.encode()
+
+        if result.prev_position is not None:
+            prev_cursor = Cursor(
+                position=result.prev_position,
+                sort_fields=pagination.sort_spec,
+                filters=filters,
+                direction=PaginationDirection.BACKWARD,
+            )
+            prev_cursor_str = prev_cursor.encode()
+
+        # Convert domain entities to response models
+        # Type checker doesn't know response_model has from_domain, so we use type: ignore
+        response_items: list[ResponseT] = [
+            response_model.from_domain(item)  # type: ignore[attr-defined]
+            for item in result.items
+        ]
+
+        # Build paginated response
+        # Construct directly to avoid variance issues with generic type parameter
+        return PaginatedResponse[ResponseT](
+            data=response_items,
+            pagination=PaginationMeta(
+                next_cursor=next_cursor_str,
+                prev_cursor=prev_cursor_str,
+                has_next=result.has_next,
+                has_prev=result.has_prev,
+                count=result.count,
+            ),
+        )

@@ -15,10 +15,9 @@ from leadr.boards.api.board_schemas import (
     BoardUpdateRequest,
 )
 from leadr.boards.services.dependencies import BoardServiceDep
-from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
-from leadr.common.domain.cursor import Cursor, CursorValidationError
+from leadr.common.api.pagination import PaginatedResponse, PaginationParams
+from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, BoardID
-from leadr.common.domain.pagination import PaginationDirection
 
 router = APIRouter()
 
@@ -178,48 +177,27 @@ async def list_boards(
     if code is not None:
         filters_dict["code"] = code
 
-    # Build cursors from result positions
-    next_cursor_str = None
-    prev_cursor_str = None
-
-    if result.next_position is not None:
-        next_cursor = Cursor(
-            position=result.next_position,
-            sort_fields=pagination.sort_spec,
-            filters=filters_dict,
-            direction=PaginationDirection.FORWARD,
-        )
-        next_cursor_str = next_cursor.encode()
-
-    if result.prev_position is not None:
-        prev_cursor = Cursor(
-            position=result.prev_position,
-            sort_fields=pagination.sort_spec,
-            filters=filters_dict,
-            direction=PaginationDirection.BACKWARD,
-        )
-        prev_cursor_str = prev_cursor.encode()
-
-    # Convert domain entities to response models
     # If filtering by code only, check authorization on results
     if account_id is None and code is not None:
+        from leadr.common.domain.pagination_result import PaginatedResult
+
         filtered_boards = [
             board for board in result.items if auth.has_access_to_account(board.account_id)
         ]
-        response_items = [BoardResponse.from_domain(board) for board in filtered_boards]
-    else:
-        response_items = [BoardResponse.from_domain(board) for board in result.items]
-
-    # Build paginated response
-    return PaginatedResponse(
-        data=response_items,
-        pagination=PaginationMeta(
-            next_cursor=next_cursor_str,
-            prev_cursor=prev_cursor_str,
+        # Create new result with filtered items
+        result = PaginatedResult(
+            items=filtered_boards,
             has_next=result.has_next,
             has_prev=result.has_prev,
-            count=result.count,
-        ),
+            next_position=result.next_position,
+            prev_position=result.prev_position,
+        )
+
+    return PaginatedResponse.from_paginated_result(
+        result=result,
+        pagination=pagination,
+        filters=filters_dict,
+        response_model=BoardResponse,
     )
 
 
