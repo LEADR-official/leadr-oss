@@ -1223,3 +1223,103 @@ class TestScoreService:
             device_id=device.id,
         )
         assert len(active_scores) == 1
+
+    async def test_keep_strategy_best_only_descending_keeps_best_score(
+        self, db_session: AsyncSession
+    ):
+        """Test BEST_ONLY with DESCENDING sort keeps highest value (better score)."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-best-desc",
+        )
+
+        # Create board with BEST_ONLY + DESCENDING (higher is better)
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Best Only Board (DESC)",
+            icon="medal",
+            short_code="BEST-DESC",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        score_service = ScoreService(db_session)
+
+        # Create first score (100)
+        first_score, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="TestPlayer",
+            value=100.0,
+        )
+        assert first_score.value == 100.0
+
+        # Submit better score (150 > 100) - should save and delete old
+        better_score, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="TestPlayer",
+            value=150.0,
+        )
+        assert better_score.id is not None
+        assert better_score.value == 150.0
+        assert better_score.id != first_score.id
+
+        # Verify old score is soft-deleted
+        first_check = await score_service.get_score(first_score.id)
+        assert first_check is None
+
+        # Verify only better score is active
+        active_scores = await score_service.list_scores(
+            account_id=account.id,
+            board_id=board.id,
+            device_id=device.id,
+        )
+        assert len(active_scores) == 1
+        assert active_scores[0].id == better_score.id
+        assert active_scores[0].value == 150.0
+
+        # Submit worse score (50 < 150) - should return existing, not save new
+        returned_score, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="TestPlayer",
+            value=50.0,
+        )
+
+        # Should return the existing better score
+        assert returned_score.id == better_score.id
+        assert returned_score.value == 150.0
+
+        # Verify still only one active score
+        active_scores = await score_service.list_scores(
+            account_id=account.id,
+            board_id=board.id,
+            device_id=device.id,
+        )
+        assert len(active_scores) == 1
+        assert active_scores[0].id == better_score.id
