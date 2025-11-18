@@ -1,6 +1,6 @@
 """Account and User repository services."""
 
-from typing import Any
+from typing import Any, overload
 
 from pydantic import UUID4
 from sqlalchemy import select
@@ -8,12 +8,23 @@ from sqlalchemy import select
 from leadr.accounts.adapters.orm import AccountORM, AccountStatusEnum, UserORM
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, PrefixedID, UserID
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 
 
 class AccountRepository(BaseRepository[Account, AccountORM]):
     """Account repository for managing account persistence."""
+
+    # Valid sortable fields for accounts
+    SORTABLE_FIELDS = {
+        "id",
+        "name",
+        "slug",
+        "created_at",
+        "updated_at",
+    }
 
     def _to_domain(self, orm: AccountORM) -> Account:
         """Convert ORM model to domain entity."""
@@ -47,25 +58,52 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
         """Get account by slug, returns None if not found or soft-deleted."""
         return await self._get_by_field("slug", slug)
 
+    @overload
     async def filter(
-        self, account_id: UUID4 | PrefixedID | None = None, **kwargs: Any
-    ) -> list[Account]:
-        """Filter accounts by optional criteria.
+        self,
+        account_id: UUID4 | PrefixedID | None = None,
+        pagination: None = None,
+        **kwargs: Any,
+    ) -> list[Account]: ...
+
+    @overload
+    async def filter(
+        self,
+        account_id: UUID4 | PrefixedID | None = None,
+        pagination: PaginationParams = ...,
+        **kwargs: Any,
+    ) -> PaginatedResult[Account]: ...
+
+    async def filter(
+        self,
+        account_id: UUID4 | PrefixedID | None = None,
+        pagination: PaginationParams | None = None,
+        **kwargs: Any,
+    ) -> list[Account] | PaginatedResult[Account]:
+        """Filter accounts by optional criteria with optional pagination.
 
         Account is the top-level tenant boundary, so no account_id filtering is required.
         The account_id parameter is accepted for interface compatibility but is not used.
 
         Args:
             account_id: Not used. Account is the top-level tenant.
+            pagination: Optional pagination parameters
             status: Optional AccountStatus to filter by
             slug: Optional slug to filter by
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of accounts matching the filter criteria
+            List of accounts if no pagination, PaginatedResult if pagination provided
+
+        Raises:
+            ValueError: If sort field is not in SORTABLE_FIELDS
+            CursorValidationError: If cursor is invalid or state doesn't match
         """
         # Note: account_id is intentionally unused - Account is the tenant boundary
         query = select(AccountORM).where(AccountORM.deleted_at.is_(None))
+
+        # Build filters dict for cursor validation
+        filters_dict = {}
 
         # Apply optional filters
         if "status" in kwargs and kwargs["status"] is not None:
@@ -73,17 +111,53 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
             if isinstance(status_value, AccountStatus):
                 status_value = status_value.value
             query = query.where(AccountORM.status == AccountStatusEnum(status_value))
+            filters_dict["status"] = status_value
 
         if "slug" in kwargs and kwargs["slug"] is not None:
             query = query.where(AccountORM.slug == kwargs["slug"])
+            filters_dict["slug"] = kwargs["slug"]
 
-        result = await self.session.execute(query)
-        orms = result.scalars().all()
-        return [self._to_domain(orm) for orm in orms]
+        # If no pagination, return list (backward compatibility)
+        if pagination is None:
+            result = await self.session.execute(query)
+            orms = result.scalars().all()
+            return [self._to_domain(orm) for orm in orms]
+
+        # Validate sort fields
+        for sort_field in pagination.sort_spec:
+            if sort_field.name not in self.SORTABLE_FIELDS:
+                raise ValueError(
+                    f"Unknown sort field: {sort_field.name}. "
+                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
+                )
+
+        # Handle cursor if present
+        cursor = None
+        if pagination.has_cursor():
+            cursor = pagination.decode_cursor()
+            if cursor is not None:
+                cursor.validate_state(pagination.sort_spec, filters_dict)
+
+        # Execute paginated query
+        return await self._execute_paginated_query(
+            query=query,
+            sort_fields=pagination.sort_spec,
+            cursor=cursor,
+            limit=pagination.limit,
+        )
 
 
 class UserRepository(BaseRepository[User, UserORM]):
     """User repository for managing user persistence."""
+
+    # Valid sortable fields for users
+    SORTABLE_FIELDS = {
+        "id",
+        "email",
+        "display_name",
+        "created_at",
+        "updated_at",
+    }
 
     def _to_domain(self, orm: UserORM) -> User:
         """Convert ORM model to domain entity."""
@@ -119,36 +193,88 @@ class UserRepository(BaseRepository[User, UserORM]):
         """Get user by email, returns None if not found or soft-deleted."""
         return await self._get_by_field("email", email)
 
+    @overload
     async def filter(
-        self, account_id: UUID4 | PrefixedID | None = None, **kwargs: Any
-    ) -> list[User]:
-        """Filter users by account and optional criteria.
+        self,
+        account_id: UUID4 | PrefixedID | None = None,
+        pagination: None = None,
+        **kwargs: Any,
+    ) -> list[User]: ...
+
+    @overload
+    async def filter(
+        self,
+        account_id: UUID4 | PrefixedID | None = None,
+        pagination: PaginationParams = ...,
+        **kwargs: Any,
+    ) -> PaginatedResult[User]: ...
+
+    async def filter(
+        self,
+        account_id: UUID4 | PrefixedID | None = None,
+        pagination: PaginationParams | None = None,
+        **kwargs: Any,
+    ) -> list[User] | PaginatedResult[User]:
+        """Filter users by account and optional criteria with optional pagination.
 
         Args:
             account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            pagination: Optional pagination parameters
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of users for the account matching the filter criteria
+            List of users if no pagination, PaginatedResult if pagination provided
 
         Raises:
             ValueError: If account_id is None (required for multi-tenant safety)
+            ValueError: If sort field is not in SORTABLE_FIELDS
+            CursorValidationError: If cursor is invalid or state doesn't match
         """
         if account_id is None:
             raise ValueError("account_id is required for filtering users")
+
         account_uuid = self._extract_uuid(account_id)
         query = select(UserORM).where(
             UserORM.account_id == account_uuid,
             UserORM.deleted_at.is_(None),
         )
 
+        # Build filters dict for cursor validation
+        filters_dict = {}
+
         # Future: Add additional filters here as needed
         # if "status" in kwargs:
         #     query = query.where(UserORM.status == kwargs["status"])
+        #     filters_dict["status"] = kwargs["status"]
 
-        result = await self.session.execute(query)
-        orms = result.scalars().all()
-        return [self._to_domain(orm) for orm in orms]
+        # If no pagination, return list (backward compatibility)
+        if pagination is None:
+            result = await self.session.execute(query)
+            orms = result.scalars().all()
+            return [self._to_domain(orm) for orm in orms]
+
+        # Validate sort fields
+        for sort_field in pagination.sort_spec:
+            if sort_field.name not in self.SORTABLE_FIELDS:
+                raise ValueError(
+                    f"Unknown sort field: {sort_field.name}. "
+                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
+                )
+
+        # Handle cursor if present
+        cursor = None
+        if pagination.has_cursor():
+            cursor = pagination.decode_cursor()
+            if cursor is not None:
+                cursor.validate_state(pagination.sort_spec, filters_dict)
+
+        # Execute paginated query
+        return await self._execute_paginated_query(
+            query=query,
+            sort_fields=pagination.sort_spec,
+            cursor=cursor,
+            limit=pagination.limit,
+        )
 
     async def find_superadmins(self) -> list[User]:
         """Find all superadmin users.

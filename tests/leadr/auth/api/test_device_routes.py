@@ -48,8 +48,10 @@ class TestDeviceRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 2
-        device_ids = {d["device_id"] for d in data}
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 2
+        device_ids = {d["device_id"] for d in data["data"]}
         assert "test-device-001" in device_ids
         assert "test-device-002" in device_ids
 
@@ -91,8 +93,10 @@ class TestDeviceRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["device_id"] == "game1-device"
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["device_id"] == "game1-device"
 
     async def test_list_devices_filter_by_status(
         self, client: AsyncClient, db_session, test_api_key
@@ -134,9 +138,11 @@ class TestDeviceRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["device_id"] == "active-device"
-        assert data[0]["status"] == "active"
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["device_id"] == "active-device"
+        assert data["data"][0]["status"] == "active"
 
     async def test_get_device(self, client: AsyncClient, db_session, test_api_key):
         """Test getting a single device by ID via API."""
@@ -294,4 +300,4 @@ class TestDeviceRoutes:
         )
 
         assert response.status_code == 400
-        assert "account_id" in response.json()["detail"].lower()
+        assert "account_id" in response.json()["error"].lower()

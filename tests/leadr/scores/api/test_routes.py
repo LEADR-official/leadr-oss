@@ -171,7 +171,7 @@ class TestScoreRoutes:
         )
 
         assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        assert "not found" in response.json()["error"].lower()
 
     async def test_create_score_with_board_from_different_account(
         self, client: AsyncClient, db_session, test_api_key
@@ -235,7 +235,7 @@ class TestScoreRoutes:
         )
 
         assert response.status_code == 400
-        assert "does not belong to account" in response.json()["detail"].lower()
+        assert "does not belong to account" in response.json()["error"].lower()
 
     async def test_create_score_with_mismatched_game_id(
         self, client: AsyncClient, db_session, test_api_key
@@ -295,7 +295,7 @@ class TestScoreRoutes:
         )
 
         assert response.status_code == 400
-        assert "does not match board" in response.json()["detail"].lower()
+        assert "does not match board" in response.json()["error"].lower()
 
     async def test_get_score(self, client: AsyncClient, db_session, test_api_key):
         """Test getting a score by ID via API."""
@@ -423,8 +423,10 @@ class TestScoreRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 2
-        names = {s["player_name"] for s in data}
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 2
+        names = {s["player_name"] for s in data["data"]}
         assert "Player1" in names
         assert "Player2" in names
 
@@ -502,8 +504,10 @@ class TestScoreRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["player_name"] == "Board1Score"
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["player_name"] == "Board1Score"
 
     async def test_update_score(self, client: AsyncClient, db_session, test_api_key):
         """Test updating a score via API."""
@@ -636,7 +640,10 @@ class TestScoreRoutes:
         )
 
         assert response.status_code == 200
-        assert len(response.json()) == 0
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 0
 
     async def test_list_scores_excludes_deleted(
         self, client: AsyncClient, db_session, test_api_key
@@ -704,5 +711,7 @@ class TestScoreRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["player_name"] == "Score2"
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["player_name"] == "Score2"

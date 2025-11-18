@@ -29,7 +29,7 @@ class TestAPIAuthentication:
         )
 
         assert response.status_code == 401
-        assert "required" in response.json()["detail"].lower()
+        assert "required" in response.json()["error"].lower()
 
     async def test_protected_endpoint_with_invalid_api_key_returns_401(self, client: AsyncClient):
         """Test that protected endpoints return 401 with invalid API key."""
@@ -44,7 +44,7 @@ class TestAPIAuthentication:
         )
 
         assert response.status_code == 401
-        assert "invalid" in response.json()["detail"].lower()
+        assert "invalid" in response.json()["error"].lower()
 
     async def test_protected_endpoint_with_valid_api_key_succeeds(
         self, client: AsyncClient, db_session: AsyncSession

@@ -362,6 +362,38 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
             raise ValueError(f"Unknown sort field: {field_name}")
         return getattr(orm_class, field_name)
 
+    def _convert_cursor_value(self, value: Any, column: Any) -> Any:
+        """Convert cursor value to match ORM column type.
+
+        Cursor values are stored as JSON primitives. This method converts them back
+        to the Python types expected by SQLAlchemy for proper SQL comparisons.
+
+        Args:
+            value: Cursor value (JSON primitive: str, int, float, bool, None)
+            column: SQLAlchemy column object
+
+        Returns:
+            Value converted to match column's Python type
+        """
+        from datetime import datetime
+        from uuid import UUID
+
+        from sqlalchemy import DateTime, Uuid
+
+        # Get the column type
+        column_type = column.type
+
+        # Convert based on column type
+        if isinstance(column_type, DateTime) and isinstance(value, str):
+            # Convert ISO format string to datetime
+            return datetime.fromisoformat(value)
+        elif isinstance(column_type, Uuid) and isinstance(value, str):
+            # Convert string to UUID
+            return UUID(value)
+        else:
+            # Keep as-is for other types (int, float, str, bool, None)
+            return value
+
     def _build_cursor_where_clause(
         self,
         cursor: Cursor,
@@ -411,12 +443,12 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
             for j in range(i):
                 prev_field = sort_fields[j]
                 prev_column = self._get_orm_column(prev_field.name)
-                prev_value = position_values[j]
+                prev_value = self._convert_cursor_value(position_values[j], prev_column)
                 equality_conditions.append(prev_column == prev_value)
 
             # Add comparison condition for current field
             current_column = self._get_orm_column(sort_field.name)
-            current_value = position_values[i]
+            current_value = self._convert_cursor_value(position_values[i], current_column)
             comparison = getattr(current_column, comp_op)(current_value)
 
             # Combine: all previous equals AND current comparison

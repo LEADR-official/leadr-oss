@@ -66,7 +66,10 @@ class TestSuperadminAuthorization:
         response = await authenticated_client.get("/accounts")
 
         assert response.status_code == 200
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         # Should see at least the two we just created plus the auth fixture account
         assert len(data) >= 3
         account_names = {acc["name"] for acc in data}
@@ -216,7 +219,7 @@ class TestRegularUserAuthorization:
 
         # Should be forbidden
         assert response.status_code == 403
-        assert "superadmin" in response.json()["detail"].lower()
+        assert "superadmin" in response.json()["error"].lower()
 
     async def test_regular_user_can_only_see_own_account(
         self, db_session: AsyncSession, client: AsyncClient
@@ -269,7 +272,10 @@ class TestRegularUserAuthorization:
         )
 
         assert response.status_code == 200
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         # Should only see their own account
         assert len(data) == 1
         assert data[0]["id"] == str(account1.id)
@@ -327,7 +333,7 @@ class TestRegularUserAuthorization:
 
         # Should be forbidden
         assert response.status_code == 403
-        assert "access" in response.json()["detail"].lower()
+        assert "access" in response.json()["error"].lower()
 
     async def test_regular_user_cannot_create_users_in_other_accounts(
         self, db_session: AsyncSession, client: AsyncClient
@@ -386,7 +392,7 @@ class TestRegularUserAuthorization:
 
         # Should be forbidden
         assert response.status_code == 403
-        assert "access" in response.json()["detail"].lower()
+        assert "access" in response.json()["error"].lower()
 
     async def test_regular_user_cannot_list_users_from_other_accounts(
         self, db_session: AsyncSession, client: AsyncClient
@@ -440,7 +446,7 @@ class TestRegularUserAuthorization:
 
         # Should be forbidden
         assert response.status_code == 403
-        assert "access" in response.json()["detail"].lower()
+        assert "access" in response.json()["error"].lower()
 
     async def test_regular_user_cannot_access_games_from_other_accounts(
         self, db_session: AsyncSession, client: AsyncClient
@@ -505,7 +511,7 @@ class TestRegularUserAuthorization:
 
         # Should be forbidden
         assert response.status_code == 403
-        assert "access" in response.json()["detail"].lower()
+        assert "access" in response.json()["error"].lower()
 
     async def test_regular_user_can_access_own_account_resources(
         self, db_session: AsyncSession, client: AsyncClient
@@ -573,7 +579,10 @@ class TestRegularUserAuthorization:
             headers={"leadr-api-key": plain_key},
         )
         assert response.status_code == 200
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         assert len(data) == 1
         assert data[0]["name"] == "My Game"
 
@@ -634,7 +643,7 @@ class TestAPIKeyAuthorization:
 
         # Should be forbidden
         assert response.status_code == 403
-        assert "access" in response.json()["detail"].lower()
+        assert "access" in response.json()["error"].lower()
 
     async def test_superadmin_can_create_api_keys_for_any_account(
         self, authenticated_client: AsyncClient, db_session: AsyncSession
@@ -737,7 +746,10 @@ class TestAccountIDResolution:
         )
 
         assert response.status_code == 200
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         assert len(data) == 1
         assert data[0]["name"] == "Test Game"
 
@@ -750,7 +762,7 @@ class TestAccountIDResolution:
 
         # Should return 400 Bad Request
         assert response.status_code == 400
-        assert "must explicitly specify account_id" in response.json()["detail"]
+        assert "must explicitly specify account_id" in response.json()["error"]
 
     async def test_superadmin_list_with_account_id_succeeds(
         self, authenticated_client: AsyncClient, db_session: AsyncSession
@@ -784,7 +796,10 @@ class TestAccountIDResolution:
         response = await authenticated_client.get(f"/games?account_id={account.id}")
 
         assert response.status_code == 200
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         assert len(data) == 1
         assert data[0]["name"] == "Test Game"
 
@@ -840,7 +855,7 @@ class TestAccountIDResolution:
 
         # Should be forbidden
         assert response.status_code == 403
-        assert "access denied" in response.json()["detail"].lower()
+        assert "access denied" in response.json()["error"].lower()
 
     async def test_regular_user_create_with_wrong_account_id_returns_403(
         self, db_session: AsyncSession, client: AsyncClient
@@ -899,7 +914,7 @@ class TestAccountIDResolution:
 
         # Should be forbidden
         assert response.status_code == 403
-        assert "access denied" in response.json()["detail"].lower()
+        assert "access denied" in response.json()["error"].lower()
 
     async def test_regular_user_list_users_without_account_id_succeeds(
         self, db_session: AsyncSession, client: AsyncClient
@@ -943,6 +958,9 @@ class TestAccountIDResolution:
         )
 
         assert response.status_code == 200
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         assert len(data) >= 1
         assert any(u["email"] == "user@test.com" for u in data)

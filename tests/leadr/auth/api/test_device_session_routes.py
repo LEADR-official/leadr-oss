@@ -46,7 +46,9 @@ class TestDeviceSessionRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 2
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 2
 
     async def test_list_sessions_filter_by_device(
         self, client: AsyncClient, db_session, test_api_key
@@ -84,8 +86,10 @@ class TestDeviceSessionRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["device_id"] == str(device1.id)
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["device_id"] == str(device1.id)
 
     async def test_get_session(self, client: AsyncClient, db_session, test_api_key):
         """Test getting a single device session by ID via API."""
@@ -186,4 +190,4 @@ class TestDeviceSessionRoutes:
         )
 
         assert response.status_code == 400
-        assert "account_id" in response.json()["detail"].lower()
+        assert "account_id" in response.json()["error"].lower()

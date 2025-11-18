@@ -149,8 +149,10 @@ class TestAccountAPI:
         response = await authenticated_client.get("/accounts")
 
         assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         # Should include 2 test accounts + 1 from auth fixture
         assert len(data) >= 2
         slugs = {acc["slug"] for acc in data}
@@ -192,7 +194,10 @@ class TestAccountAPI:
         response = await authenticated_client.get("/accounts")
 
         assert response.status_code == 200
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         # Should include 1 test account + 1 from auth fixture (acme-corp was deleted)
         assert len(data) >= 1
         slugs = {acc["slug"] for acc in data}
@@ -286,7 +291,7 @@ class TestAccountAPI:
 
         assert response.status_code == 422
         data = response.json()
-        assert "detail" in data  # FastAPI validation error
+        assert "error" in data  # FastAPI validation error
 
     async def test_update_account_invalid_uuid(self, authenticated_client: AsyncClient):
         """Test updating account with invalid UUID returns 422."""
@@ -297,7 +302,7 @@ class TestAccountAPI:
 
         assert response.status_code == 422
         data = response.json()
-        assert "detail" in data  # FastAPI validation error
+        assert "error" in data  # FastAPI validation error
 
     async def test_update_account_partial(self, authenticated_client: AsyncClient, db_session):
         """Test updating only some fields of an account."""

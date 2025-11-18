@@ -1,7 +1,7 @@
 """Device authentication service."""
 
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, overload
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,8 +15,10 @@ from leadr.auth.services.device_token_crypto import (
     validate_refresh_token,
 )
 from leadr.auth.services.repositories import DeviceRepository, DeviceSessionRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import AccountID, DeviceID, DeviceSessionID, GameID
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.config import settings
 from leadr.games.adapters.orm import GameORM
@@ -265,21 +267,41 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         expires_in_seconds = int(access_expires_delta.total_seconds())
         return access_token_plain, new_refresh_token_plain, expires_in_seconds
 
+    @overload
     async def list_devices(
         self,
         account_id: AccountID,
         game_id: GameID | None = None,
         status: str | None = None,
-    ) -> list[Device]:
-        """List devices for an account with optional filters.
+        pagination: None = None,
+    ) -> list[Device]: ...
+
+    @overload
+    async def list_devices(
+        self,
+        account_id: AccountID,
+        game_id: GameID | None = None,
+        status: str | None = None,
+        pagination: PaginationParams = ...,
+    ) -> PaginatedResult[Device]: ...
+
+    async def list_devices(
+        self,
+        account_id: AccountID,
+        game_id: GameID | None = None,
+        status: str | None = None,
+        pagination: PaginationParams | None = None,
+    ) -> list[Device] | PaginatedResult[Device]:
+        """List devices for an account with optional filters and pagination.
 
         Args:
             account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
             game_id: Optional game ID to filter by
             status: Optional status to filter by (active, banned, suspended)
+            pagination: Optional pagination parameters
 
         Returns:
-            List of devices matching the filter criteria
+            List of Device entities if no pagination, PaginatedResult if pagination provided
 
         Example:
             >>> devices = await service.list_devices(
@@ -291,6 +313,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             account_id=account_id,
             game_id=game_id,
             status=status,
+            pagination=pagination,
         )
 
     async def get_device(self, device_id: UUID) -> Device | None:
@@ -364,19 +387,37 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         device.activate()
         return await self.repository.update(device)
 
+    @overload
     async def list_sessions(
         self,
         account_id: AccountID,
         device_id: DeviceID | None = None,
-    ) -> list[DeviceSession]:
-        """List device sessions for an account with optional filters.
+        pagination: None = None,
+    ) -> list[DeviceSession]: ...
+
+    @overload
+    async def list_sessions(
+        self,
+        account_id: AccountID,
+        device_id: DeviceID | None = None,
+        pagination: PaginationParams = ...,
+    ) -> PaginatedResult[DeviceSession]: ...
+
+    async def list_sessions(
+        self,
+        account_id: AccountID,
+        device_id: DeviceID | None = None,
+        pagination: PaginationParams | None = None,
+    ) -> list[DeviceSession] | PaginatedResult[DeviceSession]:
+        """List device sessions for an account with optional filters and pagination.
 
         Args:
             account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
             device_id: Optional device ID to filter by
+            pagination: Optional pagination parameters
 
         Returns:
-            List of device sessions matching the filter criteria
+            List of DeviceSession entities if no pagination, PaginatedResult if pagination provided
 
         Example:
             >>> sessions = await service.list_sessions(
@@ -387,6 +428,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         return await self.session_repo.filter(
             account_id=account_id,
             device_id=device_id,
+            pagination=pagination,
         )
 
     async def get_session(self, session_id: UUID) -> DeviceSession | None:

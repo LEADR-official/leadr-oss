@@ -1,24 +1,32 @@
 """API routes for device management."""
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from leadr.auth.api.device_schemas import DeviceResponse, DeviceUpdateRequest
 from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
 from leadr.auth.domain.device import DeviceStatus
 from leadr.auth.services.dependencies import DeviceServiceDep
+from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
+from leadr.common.domain.cursor import Cursor, CursorValidationError
 from leadr.common.domain.ids import DeviceID, GameID
+from leadr.common.domain.pagination import PaginationDirection
 
 router = APIRouter()
 
 
-@router.get("/devices", response_model=list[DeviceResponse])
+@router.get("/devices", response_model=PaginatedResponse[DeviceResponse])
 async def list_devices(
     account_id: QueryAccountIDDep,
     service: DeviceServiceDep,
-    game_id: GameID | None = None,
-    status: str | None = None,
-) -> list[DeviceResponse]:
-    """List devices for an account with optional filters.
+    pagination: Annotated[PaginationParams, Depends()],
+    game_id: Annotated[GameID | None, Query(description="Filter by game ID")] = None,
+    device_status: Annotated[
+        str | None, Query(alias="status", description="Filter by status")
+    ] = None,
+) -> PaginatedResponse[DeviceResponse]:
+    """List devices for an account with optional filters and pagination.
 
     Returns all non-deleted devices for the specified account, with optional
     filtering by game or status.
@@ -26,26 +34,83 @@ async def list_devices(
     For regular users, account_id is automatically derived from their API key.
     For superadmins, account_id must be explicitly provided as a query parameter.
 
+    Pagination:
+    - Default: 20 items per page, sorted by created_at:desc,id:asc
+    - Custom sort: Use ?sort=name:asc,created_at:desc
+    - Valid sort fields: id, platform, created_at, updated_at
+    - Navigation: Use next_cursor/prev_cursor from response
+
+    Example:
+        GET /v1/devices?account_id=acc_123&game_id=game_456&status=active&limit=50
+
     Args:
         account_id: Account ID (auto-resolved for regular users, required for superadmins).
         service: Injected device service dependency.
+        pagination: Pagination parameters (cursor, limit, sort).
         game_id: Optional game ID to filter by.
-        status: Optional status to filter by (active, banned, suspended).
+        device_status: Optional status to filter by (active, banned, suspended).
 
     Returns:
-        List of DeviceResponse objects matching the filter criteria.
+        PaginatedResponse with devices and pagination metadata.
 
     Raises:
+        400: Invalid cursor, sort field, or cursor state mismatch.
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
-    devices = await service.list_devices(
-        account_id=account_id,
-        game_id=game_id,
-        status=status,
-    )
+    try:
+        result = await service.list_devices(
+            account_id=account_id,
+            game_id=game_id,
+            status=device_status,
+            pagination=pagination,
+        )
+    except (CursorValidationError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
-    return [DeviceResponse.from_domain(device) for device in devices]
+    # Build filter dict for cursors
+    filters_dict = {}
+    if game_id is not None:
+        filters_dict["game_id"] = str(game_id)
+    if device_status is not None:
+        filters_dict["status"] = device_status
+
+    # Build cursors from result positions
+    next_cursor_str = None
+    prev_cursor_str = None
+
+    if result.next_position is not None:
+        next_cursor = Cursor(
+            position=result.next_position,
+            sort_fields=pagination.sort_spec,
+            filters=filters_dict,
+            direction=PaginationDirection.FORWARD,
+        )
+        next_cursor_str = next_cursor.encode()
+
+    if result.prev_position is not None:
+        prev_cursor = Cursor(
+            position=result.prev_position,
+            sort_fields=pagination.sort_spec,
+            filters=filters_dict,
+            direction=PaginationDirection.BACKWARD,
+        )
+        prev_cursor_str = prev_cursor.encode()
+
+    # Convert domain entities to response models
+    response_items = [DeviceResponse.from_domain(device) for device in result.items]
+
+    # Build paginated response
+    return PaginatedResponse(
+        data=response_items,
+        pagination=PaginationMeta(
+            next_cursor=next_cursor_str,
+            prev_cursor=prev_cursor_str,
+            has_next=result.has_next,
+            has_prev=result.has_prev,
+            count=result.count,
+        ),
+    )
 
 
 @router.get("/devices/{device_id}", response_model=DeviceResponse)

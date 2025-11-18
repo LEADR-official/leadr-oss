@@ -318,7 +318,10 @@ class TestListAPIKeys:
         response = await authenticated_client.get(f"/api-keys?account_id={account1_id}")
         assert response.status_code == 200
 
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         assert len(data) == 3
         for item in data:
             assert item["account_id"] == str(account1_id)
@@ -329,7 +332,10 @@ class TestListAPIKeys:
         response = await authenticated_client.get(f"/api-keys?account_id={account2_id}")
         assert response.status_code == 200
 
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         assert len(data) == 2
         for item in data:
             assert item["account_id"] == str(account2_id)
@@ -383,7 +389,10 @@ class TestListAPIKeys:
         )
         assert response.status_code == 200
 
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         assert len(data) == 3  # Exactly our 3 keys (filtered by account and status)
         for item in data:
             assert item["status"] == "active"
@@ -432,7 +441,10 @@ class TestListAPIKeys:
         )
         assert response.status_code == 200
 
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         assert len(data) == 2
         for item in data:
             assert item["account_id"] == str(account_id)
@@ -480,7 +492,10 @@ class TestListAPIKeys:
         response = await authenticated_client.get(f"/api-keys?account_id={account_id}")
         assert response.status_code == 200
 
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         assert len(data) == 3  # Exactly our 3 keys (filtered by account)
 
     async def test_list_api_keys_empty_result(self, authenticated_client: AsyncClient):
@@ -490,7 +505,10 @@ class TestListAPIKeys:
         response = await authenticated_client.get(f"/api-keys?account_id={non_existent_id}")
         assert response.status_code == 200
 
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         assert data == []
 
     async def test_list_api_keys_invalid_account_id_format(self, authenticated_client: AsyncClient):

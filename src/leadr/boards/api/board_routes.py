@@ -1,6 +1,8 @@
 """Board API routes."""
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
@@ -13,7 +15,10 @@ from leadr.boards.api.board_schemas import (
     BoardUpdateRequest,
 )
 from leadr.boards.services.dependencies import BoardServiceDep
+from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
+from leadr.common.domain.cursor import Cursor, CursorValidationError
 from leadr.common.domain.ids import AccountID, BoardID
+from leadr.common.domain.pagination import PaginationDirection
 
 router = APIRouter()
 
@@ -100,14 +105,15 @@ async def get_board(
     return BoardResponse.from_domain(board)
 
 
-@router.get("/boards", response_model=list[BoardResponse])
+@router.get("/boards", response_model=PaginatedResponse[BoardResponse])
 async def list_boards(
     service: BoardServiceDep,
     auth: AuthContextDep,
+    pagination: Annotated[PaginationParams, Depends()],
     account_id: AccountID | None = None,
     code: str | None = None,
-) -> list[BoardResponse]:
-    """List boards filtered by account_id and/or short code.
+) -> PaginatedResponse[BoardResponse]:
+    """List boards filtered by account_id and/or short code with pagination.
 
     For regular users:
     - If account_id not provided, defaults to their API key's account
@@ -117,16 +123,27 @@ async def list_boards(
     - Can provide any account_id or search by code only
     - At least one of account_id or code is required
 
+    Pagination:
+    - Default: 20 items per page, sorted by created_at:desc,id:asc
+    - Custom sort: Use ?sort=name:asc,created_at:desc
+    - Valid sort fields: id, name, short_code, created_at, updated_at
+    - Navigation: Use next_cursor/prev_cursor from response
+
+    Example:
+        GET /v1/boards?account_id=acc_123&limit=50&sort=name:asc
+
     Args:
         service: Injected board service dependency.
         auth: Authentication context with user info.
+        pagination: Pagination parameters (cursor, limit, sort).
         account_id: Optional account ID to filter boards by.
         code: Optional short code to filter boards by.
 
     Returns:
-        List of boards matching the filter criteria.
+        PaginatedResponse with boards and pagination metadata.
 
     Raises:
+        400: Invalid cursor, sort field, or cursor state mismatch.
         403: User does not have access to the specified account.
         422: Neither account_id nor code parameter provided (superadmins only).
     """
@@ -149,13 +166,61 @@ async def list_boards(
                 detail="At least one of account_id or code parameter is required",
             )
 
-    boards = await service.list_boards(account_id=account_id, code=code)
+    try:
+        result = await service.list_boards(account_id=account_id, code=code, pagination=pagination)
+    except (CursorValidationError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
+    # Build filter dict for cursors
+    filters_dict = {}
+    if account_id is not None:
+        filters_dict["account_id"] = str(account_id)
+    if code is not None:
+        filters_dict["code"] = code
+
+    # Build cursors from result positions
+    next_cursor_str = None
+    prev_cursor_str = None
+
+    if result.next_position is not None:
+        next_cursor = Cursor(
+            position=result.next_position,
+            sort_fields=pagination.sort_spec,
+            filters=filters_dict,
+            direction=PaginationDirection.FORWARD,
+        )
+        next_cursor_str = next_cursor.encode()
+
+    if result.prev_position is not None:
+        prev_cursor = Cursor(
+            position=result.prev_position,
+            sort_fields=pagination.sort_spec,
+            filters=filters_dict,
+            direction=PaginationDirection.BACKWARD,
+        )
+        prev_cursor_str = prev_cursor.encode()
+
+    # Convert domain entities to response models
     # If filtering by code only, check authorization on results
     if account_id is None and code is not None:
-        boards = [board for board in boards if auth.has_access_to_account(board.account_id)]
+        filtered_boards = [
+            board for board in result.items if auth.has_access_to_account(board.account_id)
+        ]
+        response_items = [BoardResponse.from_domain(board) for board in filtered_boards]
+    else:
+        response_items = [BoardResponse.from_domain(board) for board in result.items]
 
-    return [BoardResponse.from_domain(board) for board in boards]
+    # Build paginated response
+    return PaginatedResponse(
+        data=response_items,
+        pagination=PaginationMeta(
+            next_cursor=next_cursor_str,
+            prev_cursor=prev_cursor_str,
+            has_next=result.has_next,
+            has_prev=result.has_prev,
+            count=result.count,
+        ),
+    )
 
 
 @router.patch("/boards/{board_id}", response_model=BoardResponse)
