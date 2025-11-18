@@ -384,7 +384,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,  # Use ALL to keep both scores
         )
 
         # Create multiple scores
