@@ -1004,3 +1004,103 @@ class TestScoreService:
         assert len(all_scores) == 2
         values = {s.value for s in all_scores}
         assert values == {100.0, 200.0}
+
+    async def test_keep_strategy_latest_only_keeps_latest_score(self, db_session: AsyncSession):
+        """Test that LATEST_ONLY strategy keeps only the latest score, soft-deleting old ones."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            device_id="test-device-latest-only",
+        )
+
+        # Create board with LATEST_ONLY strategy
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Latest Only Board",
+            icon="star",
+            short_code="LATEST1",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.LATEST_ONLY,
+        )
+
+        # Create first score
+        score_service = ScoreService(db_session)
+        first_score, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="TestPlayer",
+            value=100.0,
+        )
+
+        assert first_score.id is not None
+        assert first_score.value == 100.0
+
+        # Create second score - should soft-delete first
+        second_score, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="TestPlayer",
+            value=200.0,
+        )
+
+        assert second_score.id is not None
+        assert second_score.value == 200.0
+        assert second_score.id != first_score.id
+
+        # Verify first score is soft-deleted
+        first_score_check = await score_service.get_score(first_score.id)
+        assert first_score_check is None  # Soft-deleted scores not returned by get
+
+        # Verify only second score is active
+        active_scores = await score_service.list_scores(
+            account_id=account.id,
+            board_id=board.id,
+            device_id=device.id,
+        )
+        assert len(active_scores) == 1
+        assert active_scores[0].id == second_score.id
+
+        # Create third score - should soft-delete second
+        third_score, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="TestPlayer",
+            value=150.0,
+        )
+
+        assert third_score.id is not None
+        assert third_score.value == 150.0
+        assert third_score.id != second_score.id
+
+        # Verify only third score is active
+        active_scores = await score_service.list_scores(
+            account_id=account.id,
+            board_id=board.id,
+            device_id=device.id,
+        )
+        assert len(active_scores) == 1
+        assert active_scores[0].id == third_score.id
+        assert active_scores[0].value == 150.0
