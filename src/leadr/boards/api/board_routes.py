@@ -20,6 +20,7 @@ from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, BoardID
 
 router = APIRouter()
+client_router = APIRouter()
 
 
 @router.post("/boards", status_code=status.HTTP_201_CREATED, response_model=BoardResponse)
@@ -105,6 +106,7 @@ async def get_board(
 
 
 @router.get("/boards", response_model=PaginatedResponse[BoardResponse])
+@client_router.get("/boards", response_model=PaginatedResponse[BoardResponse])
 async def list_boards(
     service: BoardServiceDep,
     auth: AuthContextDep,

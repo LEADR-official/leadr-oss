@@ -17,9 +17,11 @@ from leadr.scores.api.score_schemas import ScoreCreateRequest, ScoreResponse, Sc
 from leadr.scores.services.dependencies import ScoreServiceDep
 
 router = APIRouter()
+client_router = APIRouter()
 
 
 @router.post("/scores", status_code=status.HTTP_201_CREATED)
+@client_router.post("/scores", status_code=status.HTTP_201_CREATED)
 async def create_score(
     score_request: ScoreCreateRequest,
     request: Request,
@@ -127,6 +129,7 @@ async def get_score(
 
 
 @router.get("/scores", response_model=PaginatedResponse[ScoreResponse])
+@client_router.get("/scores", response_model=PaginatedResponse[ScoreResponse])
 async def list_scores(
     account_id: QueryAccountIDDep,
     service: ScoreServiceDep,

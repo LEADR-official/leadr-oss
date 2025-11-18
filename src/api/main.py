@@ -24,6 +24,7 @@ from leadr.auth.api.device_session_routes import router as device_session_router
 from leadr.auth.bootstrap import ensure_superadmin_exists
 from leadr.auth.dependencies import require_api_key
 from leadr.auth.services.nonce_tasks import cleanup_expired_nonces
+from leadr.boards.api.board_routes import client_router as board_client_router
 from leadr.boards.api.board_routes import router as board_router
 from leadr.boards.api.board_template_routes import router as board_template_router
 from leadr.boards.services.board_tasks import expire_boards, process_due_templates
@@ -40,6 +41,7 @@ from leadr.common.geoip import GeoIPService
 from leadr.config import settings
 from leadr.games.api.game_routes import router as game_router
 from leadr.scores.api.score_flag_routes import router as score_flag_router
+from leadr.scores.api.score_routes import client_router as score_client_router
 from leadr.scores.api.score_routes import router as score_router
 from leadr.scores.api.score_submission_meta_routes import router as score_submission_meta_router
 
@@ -176,6 +178,8 @@ if settings.ENABLE_ADMIN_API:
 # Include client router only when Client API is enabled
 if settings.ENABLE_CLIENT_API:
     app.include_router(client_router, prefix=settings.API_PREFIX)
+    app.include_router(board_client_router, prefix=settings.API_PREFIX, tags=["Scores"])
+    app.include_router(score_client_router, prefix=settings.API_PREFIX, tags=["Scores"])
 
 
 if __name__ == "__main__":
