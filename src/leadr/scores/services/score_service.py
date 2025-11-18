@@ -131,6 +131,15 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             if existing_score is not None:
                 # Return existing first score, don't create new one
                 return existing_score, None
+        elif board.keep_strategy == KeepStrategy.LATEST_ONLY:
+            existing_score = await self._get_active_score_for_device(
+                account_id=account_id,
+                device_id=device_id,
+                board_id=board_id,
+            )
+            if existing_score is not None:
+                # Soft-delete the old score before creating new one
+                await self.soft_delete(existing_score.id)
 
         # Create score entity (before anti-cheat so we can pass it for checking)
         score = Score(
