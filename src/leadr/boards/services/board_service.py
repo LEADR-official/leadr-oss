@@ -1,7 +1,7 @@
 """Board service for managing board operations."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,7 +9,9 @@ from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
 from leadr.boards.domain.interval_parser import parse_interval_to_timedelta
 from leadr.boards.services.repositories import BoardRepository
 from leadr.boards.services.short_code_generator import generate_unique_short_code
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.games.services.game_service import GameService
 
@@ -233,19 +235,41 @@ class BoardService(BaseService[Board, BoardRepository]):
         """
         return await self.repository.filter(account_id)
 
+    @overload
     async def list_boards(
-        self, account_id: AccountID | None = None, code: str | None = None
-    ) -> list[Board]:
+        self,
+        account_id: AccountID | None = None,
+        code: str | None = None,
+        pagination: None = None,
+    ) -> list[Board]: ...
+
+    @overload
+    async def list_boards(
+        self,
+        account_id: AccountID | None = None,
+        code: str | None = None,
+        pagination: PaginationParams = ...,
+    ) -> PaginatedResult[Board]: ...
+
+    async def list_boards(
+        self,
+        account_id: AccountID | None = None,
+        code: str | None = None,
+        pagination: PaginationParams | None = None,
+    ) -> list[Board] | PaginatedResult[Board]:
         """List boards with optional filtering by account_id and/or code.
 
         Args:
             account_id: Optional account ID to filter by
             code: Optional short code to filter by
+            pagination: Optional pagination parameters
 
         Returns:
-            List of Board domain entities matching the filter criteria.
+            List of Board entities if no pagination, PaginatedResult if pagination provided.
         """
-        return await self.repository.list_boards(account_id=account_id, code=code)
+        return await self.repository.list_boards(
+            account_id=account_id, code=code, pagination=pagination
+        )
 
     async def update_board(
         self,

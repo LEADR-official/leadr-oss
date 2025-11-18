@@ -1,8 +1,12 @@
 """Game service for managing game operations."""
 
+from typing import overload
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, GameID
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
@@ -71,16 +75,35 @@ class GameService(BaseService[Game, GameRepository]):
         """
         return await self.get_by_id(game_id)
 
-    async def list_games(self, account_id: AccountID) -> list[Game]:
-        """List all games for an account.
+    @overload
+    async def list_games(
+        self,
+        account_id: AccountID,
+        pagination: None = None,
+    ) -> list[Game]: ...
+
+    @overload
+    async def list_games(
+        self,
+        account_id: AccountID,
+        pagination: PaginationParams = ...,
+    ) -> PaginatedResult[Game]: ...
+
+    async def list_games(
+        self,
+        account_id: AccountID,
+        pagination: PaginationParams | None = None,
+    ) -> list[Game] | PaginatedResult[Game]:
+        """List all games for an account with optional pagination.
 
         Args:
             account_id: The ID of the account to list games for.
+            pagination: Optional pagination parameters.
 
         Returns:
-            List of Game domain entities for the account.
+            List of Game entities if no pagination, PaginatedResult if pagination provided.
         """
-        return await self.repository.filter(account_id)
+        return await self.repository.filter(account_id, pagination=pagination)
 
     async def update_game(
         self,

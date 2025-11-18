@@ -342,4 +342,4 @@ class TestScoreSubmissionMetaRoutes:
         )
 
         assert response.status_code == 400
-        assert "account_id" in response.json()["detail"].lower()
+        assert "account_id" in response.json()["error"].lower()

@@ -1,6 +1,8 @@
 """API routes for device session management."""
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from leadr.auth.api.device_session_schemas import (
     DeviceSessionResponse,
@@ -8,18 +10,21 @@ from leadr.auth.api.device_session_schemas import (
 )
 from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
 from leadr.auth.services.dependencies import DeviceServiceDep
+from leadr.common.api.pagination import PaginatedResponse, PaginationParams
+from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import DeviceID, DeviceSessionID
 
 router = APIRouter()
 
 
-@router.get("/device-sessions", response_model=list[DeviceSessionResponse])
+@router.get("/device-sessions", response_model=PaginatedResponse[DeviceSessionResponse])
 async def list_sessions(
     account_id: QueryAccountIDDep,
     service: DeviceServiceDep,
-    device_id: DeviceID | None = None,
-) -> list[DeviceSessionResponse]:
-    """List device sessions for an account with optional filters.
+    pagination: Annotated[PaginationParams, Depends()],
+    device_id: Annotated[DeviceID | None, Query(description="Filter by device ID")] = None,
+) -> PaginatedResponse[DeviceSessionResponse]:
+    """List device sessions for an account with optional filters and pagination.
 
     Returns all non-deleted device sessions for the specified account, with optional
     filtering by device.
@@ -27,24 +32,49 @@ async def list_sessions(
     For regular users, account_id is automatically derived from their API key.
     For superadmins, account_id must be explicitly provided as a query parameter.
 
+    Pagination:
+    - Default: 20 items per page, sorted by created_at:desc,id:asc
+    - Custom sort: Use ?sort=created_at:asc,id:desc
+    - Valid sort fields: id, created_at, updated_at
+    - Navigation: Use next_cursor/prev_cursor from response
+
+    Example:
+        GET /v1/device-sessions?account_id=acc_123&device_id=dev_456&limit=50
+
     Args:
         account_id: Account ID (auto-resolved for regular users, required for superadmins).
         service: Injected device service dependency.
+        pagination: Pagination parameters (cursor, limit, sort).
         device_id: Optional device ID to filter by.
 
     Returns:
-        List of DeviceSessionResponse objects matching the filter criteria.
+        PaginatedResponse with device sessions and pagination metadata.
 
     Raises:
+        400: Invalid cursor, sort field, or cursor state mismatch.
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
-    sessions = await service.list_sessions(
-        account_id=account_id,
-        device_id=device_id,
-    )
+    try:
+        result = await service.list_sessions(
+            account_id=account_id,
+            device_id=device_id,
+            pagination=pagination,
+        )
+    except (CursorValidationError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
-    return [DeviceSessionResponse.from_domain(session) for session in sessions]
+    # Build filter dict for cursors
+    filters_dict = {}
+    if device_id is not None:
+        filters_dict["device_id"] = str(device_id)
+
+    return PaginatedResponse.from_paginated_result(
+        result=result,
+        pagination=pagination,
+        filters=filters_dict,
+        response_model=DeviceSessionResponse,
+    )
 
 
 @router.get("/device-sessions/{session_id}", response_model=DeviceSessionResponse)

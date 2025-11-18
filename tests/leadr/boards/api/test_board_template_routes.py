@@ -221,7 +221,9 @@ class TestBoardTemplateRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 2
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 2
 
     async def test_list_board_templates_by_game(
         self, client: AsyncClient, db_session, test_api_key
@@ -278,8 +280,10 @@ class TestBoardTemplateRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["game_id"] == str(game1.id)
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["game_id"] == str(game1.id)
 
     async def test_update_board_template(self, client: AsyncClient, db_session, test_api_key):
         """Test updating a board template via API."""

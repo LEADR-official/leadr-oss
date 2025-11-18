@@ -1,6 +1,8 @@
 """User API routes."""
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.accounts.api.user_schemas import (
@@ -14,6 +16,8 @@ from leadr.auth.dependencies import (
     QueryAccountIDDep,
     validate_body_account_id,
 )
+from leadr.common.api.pagination import PaginatedResponse, PaginationParams
+from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import UserID
 
 router = APIRouter()
@@ -94,29 +98,50 @@ async def get_user(
     return UserResponse.from_domain(user)
 
 
-@router.get("/users", response_model=list[UserResponse])
+@router.get("/users", response_model=PaginatedResponse[UserResponse])
 async def list_users(
     service: UserServiceDep,
     account_id: QueryAccountIDDep,
-) -> list[UserResponse]:
-    """List users for an account.
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[UserResponse]:
+    """List users for an account with pagination.
 
     For regular users, account_id is automatically derived from their API key.
     For superadmins, account_id must be explicitly provided as a query parameter.
 
+    Pagination:
+    - Default: 20 items per page, sorted by created_at:desc,id:asc
+    - Custom sort: Use ?sort=email:asc,created_at:desc
+    - Valid sort fields: id, email, display_name, created_at, updated_at
+    - Navigation: Use next_cursor/prev_cursor from response
+
+    Example:
+        GET /v1/users?account_id=acc_123&limit=50&sort=email:asc
+
     Args:
         service: Injected user service dependency.
         account_id: Account ID (auto-resolved for regular users, required for superadmins).
+        pagination: Pagination parameters (cursor, limit, sort).
 
     Returns:
-        List of users for the account.
+        PaginatedResponse with users and pagination metadata.
 
     Raises:
+        400: Invalid cursor, sort field, or cursor state mismatch.
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
-    users = await service.list_users_by_account(account_id)
-    return [UserResponse.from_domain(user) for user in users]
+    try:
+        result = await service.list_users_by_account(account_id, pagination=pagination)
+    except (CursorValidationError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+
+    return PaginatedResponse.from_paginated_result(
+        result=result,
+        pagination=pagination,
+        filters={},
+        response_model=UserResponse,
+    )
 
 
 @router.patch("/users/{user_id}", response_model=UserResponse)

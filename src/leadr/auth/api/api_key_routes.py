@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.api.api_key_schemas import (
@@ -18,6 +18,8 @@ from leadr.auth.dependencies import (
 )
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.dependencies import APIKeyServiceDep
+from leadr.common.api.pagination import PaginatedResponse, PaginationParams
+from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import APIKeyID
 
 router = APIRouter()
@@ -70,39 +72,64 @@ async def create_api_key(
 
 @router.get(
     "/api-keys",
-    response_model=list[APIKeyResponse],
+    response_model=PaginatedResponse[APIKeyResponse],
 )
 async def list_api_keys(
     service: APIKeyServiceDep,
     account_id: QueryAccountIDDep,
+    pagination: Annotated[PaginationParams, Depends()],
     key_status: Annotated[
         APIKeyStatus | None, Query(alias="status", description="Filter by status")
     ] = None,
-) -> list[APIKeyResponse]:
-    """List API keys for an account with optional filters.
+) -> PaginatedResponse[APIKeyResponse]:
+    """List API keys for an account with optional filters and pagination.
 
     For regular users, account_id is automatically derived from their API key.
     For superadmins, account_id must be explicitly provided as a query parameter.
 
+    Pagination:
+    - Default: 20 items per page, sorted by created_at:desc,id:asc
+    - Custom sort: Use ?sort=name:asc,created_at:desc
+    - Valid sort fields: id, name, created_at, updated_at
+    - Navigation: Use next_cursor/prev_cursor from response
+
+    Example:
+        GET /v1/api-keys?account_id=acc_123&status=active&limit=50&sort=name:asc
+
     Args:
         service: Injected API key service dependency.
         account_id: Account ID (auto-resolved for regular users, required for superadmins).
+        pagination: Pagination parameters (cursor, limit, sort).
         key_status: Optional status to filter results (active or revoked).
 
     Returns:
-        List of API keys matching the filters.
+        PaginatedResponse with API keys and pagination metadata.
 
     Raises:
+        400: Invalid cursor, sort field, or cursor state mismatch.
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
-    # Get filtered list from service
-    api_keys = await service.list_api_keys(
-        account_id=account_id,
-        status=key_status.value if key_status else None,
-    )
+    try:
+        result = await service.list_api_keys(
+            account_id=account_id,
+            status=key_status.value if key_status else None,
+            pagination=pagination,
+        )
+    except (CursorValidationError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
-    return [APIKeyResponse.from_domain(key) for key in api_keys]
+    # Build filter dict for cursors
+    filters_dict = {}
+    if key_status is not None:
+        filters_dict["status"] = key_status.value
+
+    return PaginatedResponse.from_paginated_result(
+        result=result,
+        pagination=pagination,
+        filters=filters_dict,
+        response_model=APIKeyResponse,
+    )
 
 
 @router.get(

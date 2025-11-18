@@ -6,12 +6,20 @@ from typing import Any, Generic, TypeVar
 from uuid import UUID
 
 from pydantic import UUID4
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.domain.cursor import Cursor
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import PrefixedID
 from leadr.common.domain.models import Entity
+from leadr.common.domain.pagination import (
+    CursorPosition,
+    PaginationDirection,
+    SortDirection,
+    SortField,
+)
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.orm import Base
 
 # Type variables for generic repository
@@ -334,3 +342,232 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
 
         result = await self.session.execute(query)
         return result.scalar_one()
+
+    # Pagination support methods
+
+    def _get_orm_column(self, field_name: str) -> Any:
+        """Get ORM column by field name.
+
+        Args:
+            field_name: Name of the field
+
+        Returns:
+            SQLAlchemy column object
+
+        Raises:
+            ValueError: If field doesn't exist on ORM model
+        """
+        orm_class = self._get_orm_class()
+        if not hasattr(orm_class, field_name):
+            raise ValueError(f"Unknown sort field: {field_name}")
+        return getattr(orm_class, field_name)
+
+    def _convert_cursor_value(self, value: Any, column: Any) -> Any:
+        """Convert cursor value to match ORM column type.
+
+        Cursor values are stored as JSON primitives. This method converts them back
+        to the Python types expected by SQLAlchemy for proper SQL comparisons.
+
+        Args:
+            value: Cursor value (JSON primitive: str, int, float, bool, None)
+            column: SQLAlchemy column object
+
+        Returns:
+            Value converted to match column's Python type
+        """
+        from datetime import datetime
+        from uuid import UUID
+
+        from sqlalchemy import DateTime, Uuid
+
+        # Get the column type
+        column_type = column.type
+
+        # Convert based on column type
+        if isinstance(column_type, DateTime) and isinstance(value, str):
+            # Convert ISO format string to datetime
+            return datetime.fromisoformat(value)
+        elif isinstance(column_type, Uuid) and isinstance(value, str):
+            # Convert string to UUID
+            return UUID(value)
+        else:
+            # Keep as-is for other types (int, float, str, bool, None)
+            return value
+
+    def _build_cursor_where_clause(
+        self,
+        cursor: Cursor,
+        sort_fields: list[SortField],
+    ) -> Any:
+        """Build WHERE clause for cursor-based pagination.
+
+        Generates complex WHERE conditions for compound sorts with mixed ASC/DESC.
+
+        For example, with cursor at (score=100, created_at='2025-01-01', id=42)
+        and sort spec (score DESC, created_at ASC, id ASC):
+
+        Forward: WHERE score < 100
+                OR (score = 100 AND created_at > '2025-01-01')
+                OR (score = 100 AND created_at = '2025-01-01' AND id > 42)
+
+        Backward: WHERE score > 100
+                 OR (score = 100 AND created_at < '2025-01-01')
+                 OR (score = 100 AND created_at = '2025-01-01' AND id < 42)
+
+        Args:
+            cursor: Cursor containing position and sort information
+            sort_fields: List of sort fields
+
+        Returns:
+            SQLAlchemy WHERE clause condition
+        """
+        position_values = cursor.position.values
+        is_backward = cursor.direction == PaginationDirection.BACKWARD
+
+        # Build OR conditions for each level of the compound sort
+        or_conditions = []
+
+        for i, sort_field in enumerate(sort_fields):
+            # Get the comparison operator for this field
+            # For forward pagination: DESC uses <, ASC uses >
+            # For backward pagination: DESC uses >, ASC uses <
+            if is_backward:
+                # Backward: flip the operators
+                comp_op = "__gt__" if sort_field.direction == SortDirection.DESC else "__lt__"
+            else:
+                # Forward: normal operators
+                comp_op = "__lt__" if sort_field.direction == SortDirection.DESC else "__gt__"
+
+            # Build equality conditions for all previous fields
+            equality_conditions = []
+            for j in range(i):
+                prev_field = sort_fields[j]
+                prev_column = self._get_orm_column(prev_field.name)
+                prev_value = self._convert_cursor_value(position_values[j], prev_column)
+                equality_conditions.append(prev_column == prev_value)
+
+            # Add comparison condition for current field
+            current_column = self._get_orm_column(sort_field.name)
+            current_value = self._convert_cursor_value(position_values[i], current_column)
+            comparison = getattr(current_column, comp_op)(current_value)
+
+            # Combine: all previous equals AND current comparison
+            if equality_conditions:
+                or_conditions.append(and_(*equality_conditions, comparison))
+            else:
+                or_conditions.append(comparison)
+
+        return or_(*or_conditions)
+
+    def _apply_sort(self, query: Any, sort_fields: list[SortField]) -> Any:
+        """Apply sorting to a query.
+
+        Args:
+            query: SQLAlchemy query to sort
+            sort_fields: List of sort fields
+
+        Returns:
+            Query with sorting applied
+        """
+        for sort_field in sort_fields:
+            column = self._get_orm_column(sort_field.name)
+            if sort_field.direction == SortDirection.DESC:
+                query = query.order_by(column.desc())
+            else:
+                query = query.order_by(column.asc())
+        return query
+
+    def _extract_cursor_position(
+        self,
+        orm: ORMModelT,
+        sort_fields: list[SortField],
+    ) -> CursorPosition:
+        """Extract cursor position from an ORM model.
+
+        Args:
+            orm: ORM model instance
+            sort_fields: List of sort fields to extract values for
+
+        Returns:
+            CursorPosition with values for each sort field
+        """
+        values = []
+        for sort_field in sort_fields:
+            value = getattr(orm, sort_field.name)
+            values.append(value)
+
+        entity_id = str(orm.id)
+        return CursorPosition(values=tuple(values), entity_id=entity_id)
+
+    async def _execute_paginated_query(
+        self,
+        query: Any,
+        sort_fields: list[SortField],
+        cursor: Cursor | None,
+        limit: int,
+    ) -> PaginatedResult[DomainEntityT]:
+        """Execute a paginated query and return results with metadata.
+
+        Fetches limit+1 records to determine has_next efficiently.
+
+        Args:
+            query: Base SQLAlchemy query (with filters applied)
+            sort_fields: List of sort fields
+            cursor: Optional cursor for pagination
+            limit: Number of items to return
+
+        Returns:
+            PaginatedResult with items and pagination metadata
+        """
+        # Apply cursor WHERE clause if present
+        if cursor is not None:
+            cursor_where = self._build_cursor_where_clause(cursor, sort_fields)
+            query = query.where(cursor_where)
+
+        # Apply sorting
+        query = self._apply_sort(query, sort_fields)
+
+        # Fetch limit+1 to detect has_next
+        query = query.limit(limit + 1)
+
+        # Execute query
+        result = await self.session.execute(query)
+        orms = list(result.scalars().all())
+
+        # Determine if there are more results
+        has_more = len(orms) > limit
+
+        # Trim to limit
+        if has_more:
+            orms = orms[:limit]
+
+        # Convert to domain entities
+        items = [self._to_domain(orm) for orm in orms]
+
+        # Determine pagination metadata
+        if cursor is not None and cursor.direction == PaginationDirection.BACKWARD:
+            # For backward pagination, we have has_prev if there are more results
+            has_next = True  # We came from ahead, so there's always a next
+            has_prev = has_more
+            next_position = self._extract_cursor_position(orms[-1], sort_fields) if orms else None
+            prev_position = (
+                self._extract_cursor_position(orms[0], sort_fields) if orms and has_prev else None
+            )
+        else:
+            # For forward pagination (or no cursor)
+            has_next = has_more
+            has_prev = cursor is not None  # If we have a cursor, we can go back
+            next_position = (
+                self._extract_cursor_position(orms[-1], sort_fields) if orms and has_next else None
+            )
+            prev_position = (
+                self._extract_cursor_position(orms[0], sort_fields) if orms and has_prev else None
+            )
+
+        return PaginatedResult(
+            items=items,
+            has_next=has_next,
+            has_prev=has_prev,
+            next_position=next_position,
+            prev_position=prev_position,
+        )

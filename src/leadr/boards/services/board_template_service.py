@@ -2,14 +2,16 @@
 
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, overload
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.boards.domain.interval_parser import parse_interval_to_timedelta
 from leadr.boards.services.repositories import BoardTemplateRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.games.services.game_service import GameService
 
@@ -151,30 +153,69 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         """
         return await self.get_by_id(template_id)
 
-    async def list_board_templates_by_account(self, account_id: AccountID) -> list[BoardTemplate]:
-        """List all board templates for an account.
+    @overload
+    async def list_board_templates_by_account(
+        self,
+        account_id: AccountID,
+        pagination: None = None,
+    ) -> list[BoardTemplate]: ...
+
+    @overload
+    async def list_board_templates_by_account(
+        self,
+        account_id: AccountID,
+        pagination: PaginationParams = ...,
+    ) -> PaginatedResult[BoardTemplate]: ...
+
+    async def list_board_templates_by_account(
+        self,
+        account_id: AccountID,
+        pagination: PaginationParams | None = None,
+    ) -> list[BoardTemplate] | PaginatedResult[BoardTemplate]:
+        """List all board templates for an account with optional pagination.
 
         Args:
             account_id: The ID of the account to list templates for.
+            pagination: Optional pagination parameters.
 
         Returns:
-            List of BoardTemplate domain entities for the account.
+            List of BoardTemplate entities if no pagination, PaginatedResult if pagination provided.
         """
-        return await self.repository.filter(account_id)
+        return await self.repository.filter(account_id, pagination=pagination)
+
+    @overload
+    async def list_board_templates_by_game(
+        self,
+        account_id: AccountID,
+        game_id: GameID,
+        pagination: None = None,
+    ) -> list[BoardTemplate]: ...
+
+    @overload
+    async def list_board_templates_by_game(
+        self,
+        account_id: AccountID,
+        game_id: GameID,
+        pagination: PaginationParams = ...,
+    ) -> PaginatedResult[BoardTemplate]: ...
 
     async def list_board_templates_by_game(
-        self, account_id: AccountID, game_id: GameID
-    ) -> list[BoardTemplate]:
-        """List all board templates for a specific game.
+        self,
+        account_id: AccountID,
+        game_id: GameID,
+        pagination: PaginationParams | None = None,
+    ) -> list[BoardTemplate] | PaginatedResult[BoardTemplate]:
+        """List all board templates for a specific game with optional pagination.
 
         Args:
             account_id: The ID of the account (for multi-tenant safety).
             game_id: The ID of the game to list templates for.
+            pagination: Optional pagination parameters.
 
         Returns:
-            List of BoardTemplate domain entities for the game.
+            List of BoardTemplate entities if no pagination, PaginatedResult if pagination provided.
         """
-        return await self.repository.filter(account_id, game_id=game_id)
+        return await self.repository.filter(account_id, game_id=game_id, pagination=pagination)
 
     async def update_board_template(
         self,

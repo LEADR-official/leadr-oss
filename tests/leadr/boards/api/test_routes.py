@@ -1,10 +1,14 @@
 """Tests for Board API routes."""
 
+import logging
+
 import pytest
 from httpx import AsyncClient
 
 from leadr.accounts.services.account_service import AccountService
 from leadr.games.services.game_service import GameService
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.mark.asyncio
@@ -121,7 +125,7 @@ class TestBoardRoutes:
         )
 
         assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        assert "not found" in response.json()["error"].lower()
 
     async def test_create_board_with_game_from_different_account(
         self, client: AsyncClient, db_session, test_api_key
@@ -162,8 +166,10 @@ class TestBoardRoutes:
             headers={"leadr-api-key": test_api_key},
         )
 
+        logger.warning(response.json())
+
         assert response.status_code == 400
-        assert "does not belong to account" in response.json()["detail"].lower()
+        assert "does not belong to account" in response.json()["error"].lower()
 
     async def test_get_board(self, client: AsyncClient, db_session, test_api_key):
         """Test retrieving a board by ID via API."""
@@ -213,7 +219,7 @@ class TestBoardRoutes:
         )
 
         assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        assert "not found" in response.json()["error"].lower()
 
     async def test_list_boards_by_code(self, client: AsyncClient, db_session, test_api_key):
         """Test listing boards filtered by short code via API."""
@@ -252,10 +258,11 @@ class TestBoardRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 1
-        assert data[0]["id"] == board_id
-        assert data[0]["short_code"] == "SR2025"
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["id"] == board_id
+        assert data["data"][0]["short_code"] == "SR2025"
 
     async def test_list_boards_by_code_not_found(self, client: AsyncClient, test_api_key):
         """Test listing boards by non-existent short code returns empty list."""
@@ -265,8 +272,9 @@ class TestBoardRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 0
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 0
 
     async def test_list_boards_by_account_and_code(
         self, client: AsyncClient, db_session, test_api_key
@@ -335,9 +343,11 @@ class TestBoardRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["id"] == board2_id
-        assert data[0]["name"] == "Account 2 Board"
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["id"] == board2_id
+        assert data["data"][0]["name"] == "Account 2 Board"
 
     async def test_list_boards(self, client: AsyncClient, db_session, test_api_key):
         """Test listing boards for an account via API."""
@@ -393,8 +403,10 @@ class TestBoardRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 2
-        names = {b["name"] for b in data}
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 2
+        names = {b["name"] for b in data["data"]}
         assert "Board One" in names
         assert "Board Two" in names
 
@@ -403,7 +415,7 @@ class TestBoardRoutes:
         response = await client.get("/boards", headers={"leadr-api-key": test_api_key})
 
         assert response.status_code == 422  # Validation error
-        assert "account_id" in response.json()["detail"].lower()
+        assert "account_id" in response.json()["error"].lower()
 
     async def test_list_boards_filters_by_account(
         self, client: AsyncClient, db_session, test_api_key
@@ -470,8 +482,10 @@ class TestBoardRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["name"] == "Account 1 Board"
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["name"] == "Account 1 Board"
 
     async def test_update_board(self, client: AsyncClient, db_session, test_api_key):
         """Test updating a board via API."""
@@ -530,7 +544,7 @@ class TestBoardRoutes:
         )
 
         assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        assert "not found" in response.json()["error"].lower()
 
     async def test_soft_delete_board(self, client: AsyncClient, db_session, test_api_key):
         """Test soft-deleting a board via API."""
@@ -644,5 +658,7 @@ class TestBoardRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["name"] == "Board Two"
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["name"] == "Board Two"

@@ -160,7 +160,10 @@ class TestUserAPI:
         response = await authenticated_client.get(f"/users?account_id={account_id}")
 
         assert response.status_code == 200
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         assert isinstance(data, list)
         assert len(data) == 2
         emails = {u["email"] for u in data}
@@ -174,8 +177,8 @@ class TestUserAPI:
         # Superadmins must provide account_id, so this returns 400
         assert response.status_code == 400
         data = response.json()
-        assert "detail" in data
-        assert "must explicitly specify account_id" in data["detail"]
+        assert "error" in data
+        assert "must explicitly specify account_id" in data["error"]
 
     async def test_update_user(self, authenticated_client: AsyncClient, db_session):
         """Test updating user via PATCH /users/{id}."""
@@ -289,7 +292,7 @@ class TestUserAPI:
 
         assert response.status_code == 422
         data = response.json()
-        assert "detail" in data  # FastAPI validation error
+        assert "error" in data  # FastAPI validation error
 
     async def test_update_user_invalid_uuid(self, authenticated_client: AsyncClient):
         """Test updating user with invalid UUID returns 422."""
@@ -300,7 +303,7 @@ class TestUserAPI:
 
         assert response.status_code == 422
         data = response.json()
-        assert "detail" in data  # FastAPI validation error
+        assert "error" in data  # FastAPI validation error
 
     async def test_create_user_invalid_account_id(self, authenticated_client: AsyncClient):
         """Test creating user with invalid account ID returns 422."""
@@ -321,7 +324,7 @@ class TestUserAPI:
 
         assert response.status_code == 422
         data = response.json()
-        assert "detail" in data  # FastAPI validation error
+        assert "error" in data  # FastAPI validation error
 
     async def test_update_user_partial_email_only(
         self, authenticated_client: AsyncClient, db_session
@@ -460,7 +463,10 @@ class TestUserAPI:
         response = await authenticated_client.get(f"/users?account_id={account_id}")
 
         assert response.status_code == 200
-        data = response.json()
+        response_data = response.json()
+        assert "data" in response_data
+        assert "pagination" in response_data
+        data = response_data["data"]
         assert len(data) == 1
         assert data[0]["email"] == "user2@example.com"
 

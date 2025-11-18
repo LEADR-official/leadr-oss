@@ -128,6 +128,7 @@ class GeoIPService:
         # Download databases with basic auth
         async with httpx.AsyncClient(
             auth=(self.account_id, self.license_key),
+            follow_redirects=True,
             timeout=300.0,  # 5 minutes for large files
         ) as client:
             if city_needs_download:

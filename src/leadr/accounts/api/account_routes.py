@@ -1,6 +1,8 @@
 """Account API routes."""
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from leadr.accounts.api.account_schemas import (
     AccountCreateRequest,
@@ -10,6 +12,8 @@ from leadr.accounts.api.account_schemas import (
 from leadr.accounts.domain.account import AccountStatus
 from leadr.accounts.services.dependencies import AccountServiceDep
 from leadr.auth.dependencies import AuthContextDep
+from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
+from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID
 
 router = APIRouter()
@@ -82,31 +86,62 @@ async def get_account(
     return AccountResponse.from_domain(account)
 
 
-@router.get("/accounts", response_model=list[AccountResponse])
+@router.get("/accounts", response_model=PaginatedResponse[AccountResponse])
 async def list_accounts(
     service: AccountServiceDep,
     auth: AuthContextDep,
-) -> list[AccountResponse]:
-    """List accounts.
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[AccountResponse]:
+    """List accounts with pagination.
 
-    Superadmins see all accounts. Regular users see only their own account.
+    Superadmins see all accounts (paginated). Regular users see only their own account.
+
+    Pagination:
+    - Default: 20 items per page, sorted by created_at:desc,id:asc
+    - Custom sort: Use ?sort=name:asc,created_at:desc
+    - Valid sort fields: id, name, slug, created_at, updated_at
+    - Navigation: Use next_cursor/prev_cursor from response
+
+    Example:
+        GET /v1/accounts?limit=50&sort=name:asc
 
     Args:
         service: Injected account service dependency.
         auth: Authentication context with user info.
+        pagination: Pagination parameters (cursor, limit, sort).
 
     Returns:
-        List of accounts the user has access to.
+        PaginatedResponse with accounts and pagination metadata.
+
+    Raises:
+        400: Invalid cursor, sort field, or cursor state mismatch.
     """
     if auth.is_superadmin:
-        # Superadmins can see all accounts
-        accounts = await service.list_accounts()
-    else:
-        # Regular users see only their own account
-        account = await service.get_by_id_or_raise(auth.api_key.account_id)
-        accounts = [account]
+        # Superadmins can see all accounts (paginated)
+        try:
+            result = await service.list_accounts(pagination=pagination)
+        except (CursorValidationError, ValueError) as e:
+            raise HTTPException(status_code=400, detail=str(e)) from None
 
-    return [AccountResponse.from_domain(acc) for acc in accounts]
+        return PaginatedResponse.from_paginated_result(
+            result=result,
+            pagination=pagination,
+            filters={},
+            response_model=AccountResponse,
+        )
+    else:
+        # Regular users see only their own account (no pagination needed)
+        account = await service.get_by_id_or_raise(auth.api_key.account_id)
+        return PaginatedResponse(
+            data=[AccountResponse.from_domain(account)],
+            pagination=PaginationMeta(
+                next_cursor=None,
+                prev_cursor=None,
+                has_next=False,
+                has_prev=False,
+                count=1,
+            ),
+        )
 
 
 @router.patch("/accounts/{account_id}", response_model=AccountResponse)

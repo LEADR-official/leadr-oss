@@ -1,10 +1,14 @@
 """Account service for managing account operations."""
 
+from typing import overload
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 
 
@@ -74,13 +78,26 @@ class AccountService(BaseService[Account, AccountRepository]):
         """
         return await self.repository.get_by_slug(slug)
 
-    async def list_accounts(self) -> list[Account]:
-        """List all accounts.
+    @overload
+    async def list_accounts(self, pagination: None = None) -> list[Account]: ...
+
+    @overload
+    async def list_accounts(
+        self, pagination: PaginationParams = ...
+    ) -> PaginatedResult[Account]: ...
+
+    async def list_accounts(
+        self, pagination: PaginationParams | None = None
+    ) -> list[Account] | PaginatedResult[Account]:
+        """List all accounts with optional pagination.
+
+        Args:
+            pagination: Optional pagination parameters.
 
         Returns:
-            List of Account domain entities.
+            List of Account entities if no pagination, PaginatedResult if pagination provided.
         """
-        return await self.repository.filter()
+        return await self.repository.filter(pagination=pagination)
 
     async def suspend_account(self, account_id: AccountID) -> Account:
         """Suspend an account, preventing access.

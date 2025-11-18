@@ -50,7 +50,7 @@ class TestGameRoutes:
         )
 
         assert response.status_code == 404
-        assert "Account not found" in response.json()["detail"]
+        assert "Account not found" in response.json()["error"]
 
     async def test_get_game(self, client: AsyncClient, db_session, test_api_key):
         """Test retrieving a game by ID via API."""
@@ -87,7 +87,7 @@ class TestGameRoutes:
         )
 
         assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        assert "not found" in response.json()["error"].lower()
 
     async def test_list_games(self, client: AsyncClient, db_session, test_api_key):
         """Test listing games for an account via API."""
@@ -117,8 +117,10 @@ class TestGameRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 2
-        names = {g["name"] for g in data}
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 2
+        names = {g["name"] for g in data["data"]}
         assert "Game One" in names
         assert "Game Two" in names
 
@@ -163,8 +165,10 @@ class TestGameRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["name"] == "Account 1 Game"
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["name"] == "Account 1 Game"
 
     async def test_update_game(self, client: AsyncClient, db_session, test_api_key):
         """Test updating a game via API."""
@@ -209,7 +213,7 @@ class TestGameRoutes:
         )
 
         assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        assert "not found" in response.json()["error"].lower()
 
     async def test_soft_delete_game(self, client: AsyncClient, db_session, test_api_key):
         """Test soft-deleting a game via API."""
@@ -282,8 +286,10 @@ class TestGameRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["name"] == "Game Two"
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["name"] == "Game Two"
 
     async def test_create_game_with_anti_cheat_enabled_default(
         self, client: AsyncClient, db_session, test_api_key

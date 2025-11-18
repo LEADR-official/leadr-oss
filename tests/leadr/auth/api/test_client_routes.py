@@ -173,7 +173,7 @@ class TestClientSessionRoutes:
         )
 
         assert response.status_code == 404
-        assert "game" in response.json()["detail"].lower()
+        assert "game" in response.json()["error"].lower()
 
     async def test_start_session_requires_game_id(self, client: AsyncClient):
         """Test starting a session without game_id returns 422."""
@@ -261,7 +261,7 @@ class TestClientSessionRoutes:
         )
 
         assert response.status_code == 401
-        assert "invalid" in response.json()["detail"].lower()
+        assert "invalid" in response.json()["error"].lower()
 
     async def test_refresh_session_with_expired_token(self, client: AsyncClient, db_session):
         """Test refreshing a session with an expired token returns 401."""
@@ -367,7 +367,7 @@ class TestClientNonceRoutes:
         response = await client.get("/client/nonce")
 
         assert response.status_code == 401
-        assert "required" in response.json()["detail"].lower()
+        assert "required" in response.json()["error"].lower()
 
     async def test_generate_nonce_with_invalid_token_returns_401(self, client: AsyncClient):
         """Test generating a nonce with invalid token returns 401."""
@@ -377,7 +377,7 @@ class TestClientNonceRoutes:
         )
 
         assert response.status_code == 401
-        assert "invalid" in response.json()["detail"].lower()
+        assert "invalid" in response.json()["error"].lower()
 
     async def test_generate_multiple_nonces_for_same_device(self, client: AsyncClient, db_session):
         """Test that a device can generate multiple nonces."""

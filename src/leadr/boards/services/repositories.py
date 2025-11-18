@@ -1,6 +1,6 @@
 """Board repository services."""
 
-from typing import Any
+from typing import Any, overload
 
 from pydantic import UUID4
 from sqlalchemy import func, select
@@ -8,12 +8,23 @@ from sqlalchemy import func, select
 from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID, PrefixedID
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 
 
 class BoardRepository(BaseRepository[Board, BoardORM]):
     """Board repository for managing board persistence."""
+
+    # Valid sortable fields for boards
+    SORTABLE_FIELDS = {
+        "id",
+        "name",
+        "short_code",
+        "created_at",
+        "updated_at",
+    }
 
     def _to_domain(self, orm: BoardORM) -> Board:
         """Convert ORM model to domain entity."""
@@ -111,30 +122,86 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         """
         return await self._get_by_field("short_code", short_code)
 
+    @overload
     async def list_boards(
-        self, account_id: UUID4 | AccountID | None = None, code: str | None = None
-    ) -> list[Board]:
+        self,
+        account_id: UUID4 | AccountID | None = None,
+        code: str | None = None,
+        pagination: None = None,
+    ) -> list[Board]: ...
+
+    @overload
+    async def list_boards(
+        self,
+        account_id: UUID4 | AccountID | None = None,
+        code: str | None = None,
+        pagination: PaginationParams = ...,
+    ) -> PaginatedResult[Board]: ...
+
+    async def list_boards(
+        self,
+        account_id: UUID4 | AccountID | None = None,
+        code: str | None = None,
+        pagination: PaginationParams | None = None,
+    ) -> list[Board] | PaginatedResult[Board]:
         """List boards with optional filtering by account_id and/or code.
+
+        This method supports special behavior for superadmins filtering by code only.
 
         Args:
             account_id: Optional account ID to filter by
             code: Optional short code to filter by
+            pagination: Optional pagination parameters
 
         Returns:
-            List of boards matching the filter criteria (excludes soft-deleted)
+            List of boards if no pagination, PaginatedResult if pagination provided
+
+        Raises:
+            ValueError: If sort field is not in SORTABLE_FIELDS
+            CursorValidationError: If cursor is invalid or state doesn't match
         """
         query = select(BoardORM).where(BoardORM.deleted_at.is_(None))
+
+        # Build filters dict for cursor validation
+        filters_dict = {}
 
         if account_id is not None:
             account_uuid = self._extract_uuid(account_id)
             query = query.where(BoardORM.account_id == account_uuid)
+            filters_dict["account_id"] = str(account_id)
 
         if code is not None:
             query = query.where(BoardORM.short_code == code)
+            filters_dict["code"] = code
 
-        result = await self.session.execute(query)
-        orms = result.scalars().all()
-        return [self._to_domain(orm) for orm in orms]
+        # If no pagination, return list (backward compatibility)
+        if pagination is None:
+            result = await self.session.execute(query)
+            orms = result.scalars().all()
+            return [self._to_domain(orm) for orm in orms]
+
+        # Validate sort fields
+        for sort_field in pagination.sort_spec:
+            if sort_field.name not in self.SORTABLE_FIELDS:
+                raise ValueError(
+                    f"Unknown sort field: {sort_field.name}. "
+                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
+                )
+
+        # Handle cursor if present
+        cursor = None
+        if pagination.has_cursor():
+            cursor = pagination.decode_cursor()
+            if cursor is not None:
+                cursor.validate_state(pagination.sort_spec, filters_dict)
+
+        # Execute paginated query
+        return await self._execute_paginated_query(
+            query=query,
+            sort_fields=pagination.sort_spec,
+            cursor=cursor,
+            limit=pagination.limit,
+        )
 
     async def count_boards_by_template(self, template_id: BoardTemplateID) -> int:
         """Count boards created from a specific template.
@@ -158,6 +225,14 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
 class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
     """BoardTemplate repository for managing board template persistence."""
 
+    # Valid sortable fields for board templates
+    SORTABLE_FIELDS = {
+        "id",
+        "name",
+        "created_at",
+        "updated_at",
+    }
+
     def _to_domain(self, orm: BoardTemplateORM) -> BoardTemplate:
         """Convert ORM model to domain entity."""
         return orm.to_domain()
@@ -170,24 +245,46 @@ class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
         """Get the ORM model class."""
         return BoardTemplateORM
 
+    @overload
+    async def filter(
+        self,
+        account_id: AccountID | None = None,
+        game_id: GameID | None = None,
+        pagination: None = None,
+        **kwargs: Any,
+    ) -> list[BoardTemplate]: ...
+
+    @overload
+    async def filter(
+        self,
+        account_id: AccountID | None = None,
+        game_id: GameID | None = None,
+        pagination: PaginationParams = ...,
+        **kwargs: Any,
+    ) -> PaginatedResult[BoardTemplate]: ...
+
     async def filter(  # type: ignore[override]
         self,
         account_id: AccountID | None = None,
         game_id: GameID | None = None,
+        pagination: PaginationParams | None = None,
         **kwargs: Any,
-    ) -> list[BoardTemplate]:
+    ) -> list[BoardTemplate] | PaginatedResult[BoardTemplate]:
         """Filter board templates by account and optional game.
 
         Args:
             account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
             game_id: OPTIONAL - Game ID to filter by
+            pagination: Optional pagination parameters
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of board templates for the account matching the filter criteria
+            List of board templates if no pagination, PaginatedResult if pagination provided
 
         Raises:
             ValueError: If account_id is None (required for multi-tenant safety)
+            ValueError: If sort field is not in SORTABLE_FIELDS
+            CursorValidationError: If cursor is invalid or state doesn't match
         """
         if account_id is None:
             raise ValueError("account_id is required for filtering board templates")
@@ -197,10 +294,39 @@ class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
             BoardTemplateORM.deleted_at.is_(None),
         )
 
+        # Build filters dict for cursor validation
+        filters_dict = {}
+
         if game_id is not None:
             game_uuid = self._extract_uuid(game_id)
             query = query.where(BoardTemplateORM.game_id == game_uuid)
+            filters_dict["game_id"] = str(game_id)
 
-        result = await self.session.execute(query)
-        orms = result.scalars().all()
-        return [self._to_domain(orm) for orm in orms]
+        # If no pagination, return list (backward compatibility)
+        if pagination is None:
+            result = await self.session.execute(query)
+            orms = result.scalars().all()
+            return [self._to_domain(orm) for orm in orms]
+
+        # Validate sort fields
+        for sort_field in pagination.sort_spec:
+            if sort_field.name not in self.SORTABLE_FIELDS:
+                raise ValueError(
+                    f"Unknown sort field: {sort_field.name}. "
+                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
+                )
+
+        # Handle cursor if present
+        cursor = None
+        if pagination.has_cursor():
+            cursor = pagination.decode_cursor()
+            if cursor is not None:
+                cursor.validate_state(pagination.sort_spec, filters_dict)
+
+        # Execute paginated query
+        return await self._execute_paginated_query(
+            query=query,
+            sort_fields=pagination.sort_spec,
+            cursor=cursor,
+            limit=pagination.limit,
+        )

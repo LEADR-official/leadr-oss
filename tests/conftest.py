@@ -59,6 +59,39 @@ def ensure_test_environment():
         sys.exit(1)
 
 
+def pytest_sessionfinish(session, exitstatus):
+    """
+    Clean up test database even on keyboard interrupt.
+
+    This hook is called after all tests finish, including when tests are
+    interrupted with Ctrl+C. It ensures the test database is dropped
+    regardless of how pytest exits.
+    """
+    test_database_name = session.config.cache.get("test_database_name", None)
+
+    if test_database_name:
+        from sqlalchemy import create_engine
+
+        admin_url = f"postgresql+psycopg://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/postgres"
+
+        try:
+            admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
+            with admin_engine.connect() as conn:
+                # Terminate active connections
+                conn.execute(
+                    text(f"""
+                    SELECT pg_terminate_backend(pid)
+                    FROM pg_stat_activity
+                    WHERE datname = '{test_database_name}' AND pid <> pg_backend_pid()
+                """)
+                )
+                conn.execute(text(f'DROP DATABASE IF EXISTS "{test_database_name}"'))
+            admin_engine.dispose()
+        except Exception as e:
+            # Don't let cleanup errors break the test run
+            print(f"\nWarning: Failed to cleanup test database {test_database_name}: {e}")
+
+
 @pytest.fixture(scope="session")
 def test_database_name():
     """Generate unique test database name for the session."""
@@ -66,10 +99,13 @@ def test_database_name():
 
 
 @pytest.fixture(scope="session", autouse=True)
-def setup_test_database(test_database_name: str):
+def setup_test_database(test_database_name: str, request):
     """Create and destroy test database for the session (sync fixture)."""
     # Use sync psycopg for database creation/destruction to avoid event loop issues
     from sqlalchemy import create_engine
+
+    # Store database name in pytest config for cleanup hook
+    request.config.cache.set("test_database_name", test_database_name)
 
     admin_url = f"postgresql+psycopg://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/postgres"
     admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
@@ -96,6 +132,9 @@ def setup_test_database(test_database_name: str):
         )
         conn.execute(text(f'DROP DATABASE IF EXISTS "{test_database_name}"'))
     admin_engine.dispose()
+
+    # Clear from cache after successful cleanup
+    request.config.cache.set("test_database_name", None)
 
 
 @pytest_asyncio.fixture(scope="function")

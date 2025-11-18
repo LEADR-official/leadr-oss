@@ -1,6 +1,8 @@
 """Board template API routes."""
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
@@ -14,6 +16,8 @@ from leadr.boards.api.board_template_schemas import (
     BoardTemplateUpdateRequest,
 )
 from leadr.boards.services.dependencies import BoardTemplateServiceDep
+from leadr.common.api.pagination import PaginatedResponse, PaginationParams
+from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import BoardTemplateID, GameID
 
 router = APIRouter()
@@ -101,35 +105,64 @@ async def get_board_template(
     return BoardTemplateResponse.from_domain(template)
 
 
-@router.get("/board-templates", response_model=list[BoardTemplateResponse])
+@router.get("/board-templates", response_model=PaginatedResponse[BoardTemplateResponse])
 async def list_board_templates(
     account_id: QueryAccountIDDep,
     service: BoardTemplateServiceDep,
+    pagination: Annotated[PaginationParams, Depends()],
     game_id: GameID | None = None,
-) -> list[BoardTemplateResponse]:
-    """List board templates for an account, optionally filtered by game.
+) -> PaginatedResponse[BoardTemplateResponse]:
+    """List board templates for an account with pagination, optionally filtered by game.
 
     For regular users, account_id is automatically derived from their API key.
     For superadmins, account_id must be explicitly provided as a query parameter.
 
+    Pagination:
+    - Default: 20 items per page, sorted by created_at:desc,id:asc
+    - Custom sort: Use ?sort=name:asc,created_at:desc
+    - Valid sort fields: id, name, created_at, updated_at
+    - Navigation: Use next_cursor/prev_cursor from response
+
+    Example:
+        GET /v1/board-templates?account_id=acc_123&game_id=gam_456&limit=50&sort=name:asc
+
     Args:
         account_id: Account ID (auto-resolved for regular users, required for superadmins).
         service: Injected board template service dependency.
+        pagination: Pagination parameters (cursor, limit, sort).
         game_id: Optional game ID to filter templates by.
 
     Returns:
-        List of board templates matching the filter criteria.
+        PaginatedResponse with board templates and pagination metadata.
 
     Raises:
+        400: Invalid cursor, sort field, or cursor state mismatch.
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
-    if game_id is not None:
-        templates = await service.list_board_templates_by_game(account_id, game_id)
-    else:
-        templates = await service.list_board_templates_by_account(account_id)
+    try:
+        if game_id is not None:
+            result = await service.list_board_templates_by_game(
+                account_id, game_id, pagination=pagination
+            )
+        else:
+            result = await service.list_board_templates_by_account(
+                account_id, pagination=pagination
+            )
+    except (CursorValidationError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
-    return [BoardTemplateResponse.from_domain(template) for template in templates]
+    # Build filter dict for cursors
+    filters_dict = {}
+    if game_id is not None:
+        filters_dict["game_id"] = str(game_id)
+
+    return PaginatedResponse.from_paginated_result(
+        result=result,
+        pagination=pagination,
+        filters=filters_dict,
+        response_model=BoardTemplateResponse,
+    )
 
 
 @router.patch("/board-templates/{template_id}", response_model=BoardTemplateResponse)

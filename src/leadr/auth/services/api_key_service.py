@@ -1,14 +1,17 @@
 """API Key service for managing API key operations."""
 
 from datetime import UTC, datetime
+from typing import overload
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.auth.domain.api_key import APIKey
 from leadr.auth.services.api_key_crypto import generate_api_key, hash_api_key, verify_api_key
 from leadr.auth.services.repositories import APIKeyRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import AccountID, APIKeyID, UserID
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.config import settings
 
@@ -198,19 +201,37 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         """
         return await self.get_by_id(key_id)
 
+    @overload
     async def list_api_keys(
         self,
         account_id: AccountID,
         status: str | None = None,
-    ) -> list[APIKey]:
-        """List API keys for an account with optional filters.
+        pagination: None = None,
+    ) -> list[APIKey]: ...
+
+    @overload
+    async def list_api_keys(
+        self,
+        account_id: AccountID,
+        status: str | None = None,
+        pagination: PaginationParams = ...,
+    ) -> PaginatedResult[APIKey]: ...
+
+    async def list_api_keys(
+        self,
+        account_id: AccountID,
+        status: str | None = None,
+        pagination: PaginationParams | None = None,
+    ) -> list[APIKey] | PaginatedResult[APIKey]:
+        """List API keys for an account with optional filters and pagination.
 
         Args:
             account_id: REQUIRED - Account ID to filter by (multi-tenant safety).
             status: Optional status string to filter by.
+            pagination: Optional pagination parameters.
 
         Returns:
-            List of APIKey domain entities matching the filters.
+            List of APIKey entities if no pagination, PaginatedResult if pagination provided.
         """
         from leadr.auth.domain.api_key import APIKeyStatus
 
@@ -219,7 +240,7 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         if status is not None:
             kwargs["status"] = APIKeyStatus(status)
 
-        return await self.repository.filter(account_id, **kwargs)
+        return await self.repository.filter(account_id, pagination=pagination, **kwargs)
 
     async def list_account_api_keys(
         self,
