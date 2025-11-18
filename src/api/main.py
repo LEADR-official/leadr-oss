@@ -23,6 +23,7 @@ from leadr.boards.api.board_routes import router as board_router
 from leadr.boards.api.board_template_routes import router as board_template_router
 from leadr.boards.services.board_tasks import expire_boards, process_due_templates
 from leadr.common.api.exceptions import (
+    catchall_exception_handler,
     entity_not_found_handler,
     http_exception_handler,
     validation_error_handler,
@@ -130,6 +131,7 @@ app = FastAPI(
 app.add_exception_handler(EntityNotFoundError, entity_not_found_handler)  # type: ignore[arg-type]
 app.add_exception_handler(RequestValidationError, validation_error_handler)  # type: ignore[arg-type]
 app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
+app.add_exception_handler(Exception, catchall_exception_handler)  # type: ignore[arg-type]
 
 # Add GeoIP middleware (will use app.state.geoip_service from lifespan)
 app.add_middleware(GeoIPMiddleware, dev_override_ip=settings.DEV_OVERRIDE_IP)

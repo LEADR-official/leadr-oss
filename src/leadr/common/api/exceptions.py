@@ -13,9 +13,9 @@ from leadr.config import settings
 logger = logging.getLogger(__name__)
 
 
-async def http_exception_handler(
+async def catchall_exception_handler(
     request: Request,
-    exc: HTTPException,
+    exc: Exception,
 ) -> JSONResponse:
     """Convert all unhandled Exceptions to a 500 HTTP response with
     our response envelope.
@@ -29,15 +29,32 @@ async def http_exception_handler(
     """
     logger.exception(exc)
     if settings.DEBUG:
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={"error": exc.detail},
-        )
+        return JSONResponse(status_code=500, content={"error": exc})
     else:
         return JSONResponse(
-            status_code=exc.status_code,
+            status_code=500,
             content={"error": "Internal server error"},
         )
+
+
+async def http_exception_handler(
+    request: Request,
+    exc: HTTPException,
+) -> JSONResponse:
+    """Convert all FastAPI HTTPExceptions to ensure our response envelope.
+
+    Args:
+        request: The incoming request
+        exc: The exception
+
+    Returns:
+        JSONResponse with HTTP status code and error detail
+    """
+    logger.exception(exc)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": exc.detail},
+    )
 
 
 async def entity_not_found_handler(
