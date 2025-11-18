@@ -46,7 +46,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create score
@@ -107,7 +107,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create score with optional fields (geo fields auto-populated by middleware)
@@ -277,7 +277,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Try to create score with game2 (mismatched)
@@ -328,7 +328,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create score
@@ -393,7 +393,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create multiple scores
@@ -463,7 +463,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
         board2 = await board_service.create_board(
             account_id=account.id,
@@ -540,7 +540,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create score
@@ -610,7 +610,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create score
@@ -678,7 +678,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.ALL,
         )
 
         # Create two scores

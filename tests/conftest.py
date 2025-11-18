@@ -328,7 +328,7 @@ async def test_board(db_session: AsyncSession, test_account: Account, test_game)
         unit="points",
         is_active=True,
         sort_direction=SortDirection.DESCENDING,
-        keep_strategy=KeepStrategy.BEST_ONLY,
+        keep_strategy=KeepStrategy.ALL,  # Use ALL to keep all scores for testing
         created_at=now,
         updated_at=now,
     )
