@@ -46,7 +46,7 @@ class TestScoreSubmissionMetaRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Submit a score to create submission metadata
@@ -122,7 +122,7 @@ class TestScoreSubmissionMetaRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Submit scores to both boards
@@ -200,11 +200,11 @@ class TestScoreSubmissionMetaRoutes:
         device_service = DeviceService(db_session)
         device1, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
         device2, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-002",
+            client_fingerprint="f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89",
         )
 
         # Submit scores from both devices
@@ -280,7 +280,7 @@ class TestScoreSubmissionMetaRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         score_service = ScoreService(db_session)

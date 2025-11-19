@@ -1,5 +1,6 @@
 """Tests for DeviceService."""
 
+import hashlib
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 from uuid import uuid4
@@ -26,7 +27,7 @@ class TestDeviceService:
         """Test starting a session creates a new device if it doesn't exist."""
         # Start session for new device
         service = DeviceService(db_session)
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
 
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
             mock_gen_access.return_value = ("mock_token", "mock_hash")
@@ -37,14 +38,14 @@ class TestDeviceService:
 
                 device, access_token, refresh_token, expires_in = await service.start_session(
                     game_id=GameID(game_orm.id),
-                    device_id=device_id,
+                    client_fingerprint=device_id,
                     platform="ios",
                     ip_address="192.168.1.1",
                     user_agent="TestApp/1.0",
                 )
 
         assert device is not None
-        assert device.device_id == device_id
+        assert device.client_fingerprint == device_id
         assert device.game_id == game_orm.id
         assert device.account_id == account_orm.id
         assert device.platform == "ios"
@@ -59,7 +60,7 @@ class TestDeviceService:
         """Test starting a session updates last_seen_at for existing device."""
         # Create initial device and session
         service = DeviceService(db_session)
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
 
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
             mock_gen_access.return_value = ("token1", "hash1")
@@ -69,7 +70,7 @@ class TestDeviceService:
                 mock_gen_refresh.return_value = ("refresh1", "refresh_hash1")
                 device1, _, _, _ = await service.start_session(
                     game_id=GameID(game_orm.id),
-                    device_id=device_id,
+                    client_fingerprint=device_id,
                     platform="ios",
                 )
                 first_seen = device1.last_seen_at
@@ -83,7 +84,7 @@ class TestDeviceService:
                 mock_gen_refresh.return_value = ("refresh2", "refresh_hash2")
                 device2, _, _, _ = await service.start_session(
                     game_id=GameID(game_orm.id),
-                    device_id=device_id,
+                    client_fingerprint=device_id,
                     platform="ios",
                 )
 
@@ -95,7 +96,7 @@ class TestDeviceService:
     ):
         """Test that starting a session creates a DeviceSession record."""
         service = DeviceService(db_session)
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
 
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
             mock_gen_access.return_value = ("test_token", "test_hash")
@@ -106,7 +107,7 @@ class TestDeviceService:
 
                 device, access_token, refresh_token, expires_in = await service.start_session(
                     game_id=GameID(game_orm.id),
-                    device_id=device_id,
+                    client_fingerprint=device_id,
                     platform="android",
                     ip_address="10.0.0.1",
                     user_agent="TestApp/2.0",
@@ -132,7 +133,7 @@ class TestDeviceService:
         with pytest.raises(EntityNotFoundError):
             await service.start_session(
                 game_id=GameID(uuid4()),
-                device_id=str(uuid4()),
+                client_fingerprint=str(uuid4()),
                 platform="ios",
             )
 
@@ -151,7 +152,7 @@ class TestDeviceService:
 
                 _, _, _, expires_in = await service.start_session(
                     game_id=GameID(game_orm.id),
-                    device_id=str(uuid4()),
+                    client_fingerprint=hashlib.sha256(str(uuid4()).encode()).hexdigest(),
                     platform="ios",
                 )
 
@@ -167,7 +168,7 @@ class TestDeviceService:
     ):
         """Test that valid token returns associated device."""
         service = DeviceService(db_session)
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
 
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen_access:
             mock_gen_access.return_value = ("test_token", "test_hash")
@@ -177,7 +178,7 @@ class TestDeviceService:
                 mock_gen_refresh.return_value = ("test_refresh", "test_refresh_hash")
                 created_device, access_token, refresh_token, _ = await service.start_session(
                     game_id=GameID(game_orm.id),
-                    device_id=device_id,
+                    client_fingerprint=device_id,
                     platform="ios",
                 )
 
@@ -195,7 +196,7 @@ class TestDeviceService:
 
         assert device is not None
         assert device.id == created_device.id
-        assert device.device_id == device_id
+        assert device.client_fingerprint == device_id
 
     async def test_validate_device_token_returns_none_for_invalid_token(
         self, db_session: AsyncSession
@@ -231,7 +232,7 @@ class TestDeviceService:
 
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
             mock_val.return_value = {
-                "sub": device_orm.device_id,
+                "sub": device_orm.client_fingerprint,
                 "game_id": str(device_orm.game_id),
                 "account_id": str(device_orm.account_id),
             }
@@ -264,7 +265,7 @@ class TestDeviceService:
 
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
             mock_val.return_value = {
-                "sub": device_orm.device_id,
+                "sub": device_orm.client_fingerprint,
                 "game_id": str(device_orm.game_id),
                 "account_id": str(device_orm.account_id),
             }
@@ -283,7 +284,7 @@ class TestDeviceService:
         banned_device = DeviceORM(
             id=uuid4(),
             game_id=game_orm.id,
-            device_id=str(uuid4()),
+            client_fingerprint=hashlib.sha256(str(uuid4()).encode()).hexdigest(),
             account_id=account_orm.id,
             platform="ios",
             status=DeviceStatusEnum.BANNED,
@@ -310,7 +311,7 @@ class TestDeviceService:
 
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
             mock_val.return_value = {
-                "sub": banned_device.device_id,
+                "sub": banned_device.client_fingerprint,
                 "game_id": str(game_orm.id),
                 "account_id": str(account_orm.id),
             }
@@ -330,7 +331,7 @@ class TestDeviceService:
         # Mock crypto functions
         with patch("leadr.auth.services.device_service.validate_refresh_token") as mock_val:
             mock_val.return_value = {
-                "sub": device_orm.device_id,
+                "sub": device_orm.client_fingerprint,
                 "game_id": str(device_orm.game_id),
                 "account_id": str(device_orm.account_id),
                 "token_version": 1,
@@ -397,7 +398,7 @@ class TestDeviceService:
         # JWT claims have token_version=1 (old token)
         with patch("leadr.auth.services.device_service.validate_refresh_token") as mock_val:
             mock_val.return_value = {
-                "sub": device_orm.device_id,
+                "sub": device_orm.client_fingerprint,
                 "game_id": str(device_orm.game_id),
                 "account_id": str(device_orm.account_id),
                 "token_version": 1,  # Mismatched version
@@ -433,7 +434,7 @@ class TestDeviceService:
 
         with patch("leadr.auth.services.device_service.validate_refresh_token") as mock_val:
             mock_val.return_value = {
-                "sub": device_orm.device_id,
+                "sub": device_orm.client_fingerprint,
                 "game_id": str(device_orm.game_id),
                 "account_id": str(device_orm.account_id),
                 "token_version": 1,
@@ -470,7 +471,7 @@ class TestDeviceService:
 
         with patch("leadr.auth.services.device_service.validate_refresh_token") as mock_val:
             mock_val.return_value = {
-                "sub": device_orm.device_id,
+                "sub": device_orm.client_fingerprint,
                 "game_id": str(device_orm.game_id),
                 "account_id": str(device_orm.account_id),
                 "token_version": 1,

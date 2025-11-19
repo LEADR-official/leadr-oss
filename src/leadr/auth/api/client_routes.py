@@ -48,7 +48,7 @@ async def start_session(
     try:
         device, access_token, refresh_token, expires_in = await service.start_session(
             game_id=request.game_id,
-            device_id=request.device_id,
+            client_fingerprint=request.client_fingerprint,
             platform=request.platform,
             metadata=request.metadata,
         )

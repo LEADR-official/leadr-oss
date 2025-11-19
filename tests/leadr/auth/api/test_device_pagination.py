@@ -26,7 +26,7 @@ class TestDevicePagination:
         for i in range(25):
             await device_service.start_session(
                 game_id=test_game.id,
-                device_id=f"device-{i:03d}",
+                client_fingerprint=f"{i:064x}",
                 platform="ios",
             )
 
@@ -68,7 +68,7 @@ class TestDevicePagination:
         for i in range(30):
             await device_service.start_session(
                 game_id=test_game.id,
-                device_id=f"device-{i:03d}",
+                client_fingerprint=f"{i:064x}",
                 platform="android",
             )
 
@@ -107,7 +107,7 @@ class TestDevicePagination:
         for i in range(30):
             await device_service.start_session(
                 game_id=test_game.id,
-                device_id=f"device-{i:03d}",
+                client_fingerprint=f"{i:064x}",
                 platform="web",
             )
 
@@ -151,7 +151,7 @@ class TestDevicePagination:
         for i, platform in enumerate(platforms):
             await device_service.start_session(
                 game_id=test_game.id,
-                device_id=f"device-{platform}-{i}",
+                client_fingerprint=f"{i:064x}",
                 platform=platform,
             )
 
@@ -194,7 +194,7 @@ class TestDevicePagination:
         for i in range(20):
             await device_service.start_session(
                 game_id=test_game.id,
-                device_id=f"device-{i:03d}",
+                client_fingerprint=f"{i:064x}",
                 platform="ios",
             )
 
@@ -240,7 +240,7 @@ class TestDevicePagination:
         for i in range(10):
             await device_service.start_session(
                 game_id=test_game.id,
-                device_id=f"game1-device-{i:03d}",
+                client_fingerprint=f"{i + 100:064x}",  # Offset to avoid collisions
                 platform="ios",
             )
 
@@ -248,7 +248,7 @@ class TestDevicePagination:
         for i in range(5):
             await device_service.start_session(
                 game_id=second_game_id,
-                device_id=f"game2-device-{i:03d}",
+                client_fingerprint=f"{i + 200:064x}",  # Different offset
                 platform="android",
             )
 
@@ -281,7 +281,7 @@ class TestDevicePagination:
         for i in range(10):
             device, _, _, _ = await device_service.start_session(
                 game_id=test_game.id,
-                device_id=f"device-{i:03d}",
+                client_fingerprint=f"{i:064x}",
                 platform="ios",
             )
             device_ids.append(device.id)

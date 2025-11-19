@@ -23,7 +23,9 @@ class DeviceResponse(BaseModel):
 
     id: DeviceID = Field(description="Unique identifier for the device")
     game_id: GameID = Field(description="ID of the game this device belongs to")
-    device_id: str = Field(description="Client-generated device identifier")
+    client_fingerprint: str = Field(
+        description="Client-generated SHA256 device fingerprint (64 hex characters)"
+    )
     account_id: AccountID = Field(description="ID of the account this device belongs to")
     platform: str | None = Field(default=None, description="Platform (iOS, Android, etc.), or null")
     status: str = Field(description="Device status: active, banned, or suspended")
@@ -46,7 +48,7 @@ class DeviceResponse(BaseModel):
         return cls(
             id=device.id,
             game_id=device.game_id,
-            device_id=device.device_id,
+            client_fingerprint=device.client_fingerprint,
             account_id=device.account_id,
             platform=device.platform,
             status=device.status.value,

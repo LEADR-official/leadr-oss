@@ -33,7 +33,7 @@ class TestScoreRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)
@@ -94,7 +94,7 @@ class TestScoreRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)
@@ -153,7 +153,7 @@ class TestScoreRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Try to create score with non-existent board
@@ -203,7 +203,7 @@ class TestScoreRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game1.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Create board for account2
@@ -263,7 +263,7 @@ class TestScoreRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game1.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Create board for game1
@@ -315,7 +315,7 @@ class TestScoreRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)
@@ -380,7 +380,7 @@ class TestScoreRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)
@@ -450,7 +450,7 @@ class TestScoreRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)
@@ -527,7 +527,7 @@ class TestScoreRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)
@@ -597,7 +597,7 @@ class TestScoreRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)
@@ -665,7 +665,7 @@ class TestScoreRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)

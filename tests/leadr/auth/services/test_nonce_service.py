@@ -99,11 +99,11 @@ class TestNonceService:
         self, db_session: AsyncSession, device_orm, game_orm
     ):
         """Test that using nonce from different device raises ValueError."""
-        # Create second device
+        # Create second device with different fingerprint
         device2 = DeviceORM(
             id=uuid4(),
             game_id=game_orm.id,
-            device_id="device-2",
+            client_fingerprint="abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
             account_id=game_orm.account_id,
             first_seen_at=datetime.now(UTC),
             last_seen_at=datetime.now(UTC),
@@ -211,11 +211,11 @@ class TestNonceService:
         self, db_session: AsyncSession, device_orm, game_orm
     ):
         """Test that multiple devices can have pending nonces simultaneously."""
-        # Create second device
+        # Create second device with different fingerprint
         device2 = DeviceORM(
             id=uuid4(),
             game_id=game_orm.id,
-            device_id="device-2",
+            client_fingerprint="abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
             account_id=game_orm.account_id,
             first_seen_at=datetime.now(UTC),
             last_seen_at=datetime.now(UTC),

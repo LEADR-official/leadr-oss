@@ -26,7 +26,7 @@ class TestDeviceRepository:
         now = datetime.now(UTC)
         device = Device(
             game_id=GameID(game_orm.id),
-            device_id="test-device-123",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
             account_id=AccountID(account_orm.id),
             platform="ios",
             first_seen_at=now,
@@ -39,7 +39,10 @@ class TestDeviceRepository:
 
         assert created_device.id is not None
         assert created_device.game_id == game_orm.id
-        assert created_device.device_id == "test-device-123"
+        assert (
+            created_device.client_fingerprint
+            == "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+        )
         assert created_device.account_id == account_orm.id
         assert created_device.platform == "ios"
         assert created_device.status == DeviceStatus.ACTIVE
@@ -52,7 +55,7 @@ class TestDeviceRepository:
 
         assert device is not None
         assert device.id == device_orm.id
-        assert device.device_id == device_orm.device_id
+        assert device.client_fingerprint == device_orm.client_fingerprint
         assert device.platform == device_orm.platform
 
     async def test_get_device_by_id_not_found(self, db_session: AsyncSession):
@@ -67,18 +70,18 @@ class TestDeviceRepository:
         """Test retrieving a device by game_id and device_id."""
         # Retrieve via repository
         repository = DeviceRepository(db_session)
-        device = await repository.get_by_game_and_device_id(
-            GameID(device_orm.game_id), device_orm.device_id
+        device = await repository.get_by_game_and_fingerprint(
+            GameID(device_orm.game_id), device_orm.client_fingerprint
         )
 
         assert device is not None
         assert device.game_id == device_orm.game_id
-        assert device.device_id == device_orm.device_id
+        assert device.client_fingerprint == device_orm.client_fingerprint
 
     async def test_get_device_by_game_and_device_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent device by game and device_id returns None."""
         repository = DeviceRepository(db_session)
-        device = await repository.get_by_game_and_device_id(GameID(uuid4()), "nonexistent")
+        device = await repository.get_by_game_and_fingerprint(GameID(uuid4()), "nonexistent")
         assert device is None
 
     async def test_update_device(
@@ -89,7 +92,7 @@ class TestDeviceRepository:
         now = datetime.now(UTC)
         device = Device(
             game_id=GameID(game_orm.id),
-            device_id="test-device",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
             account_id=AccountID(account_orm.id),
             first_seen_at=now,
             last_seen_at=now,
@@ -142,7 +145,7 @@ class TestDeviceRepository:
         device1 = DeviceORM(
             id=uuid4(),
             game_id=game1.id,
-            device_id="device1",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
             account_id=account1.id,
             first_seen_at=now,
             last_seen_at=now,
@@ -150,7 +153,7 @@ class TestDeviceRepository:
         device2 = DeviceORM(
             id=uuid4(),
             game_id=game2.id,
-            device_id="device2",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
             account_id=account2.id,
             first_seen_at=now,
             last_seen_at=now,
@@ -165,7 +168,10 @@ class TestDeviceRepository:
 
         assert len(devices) == 1
         assert devices[0].account_id == account1.id
-        assert devices[0].device_id == "device1"
+        assert (
+            devices[0].client_fingerprint
+            == "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+        )
 
 
 @pytest.mark.asyncio

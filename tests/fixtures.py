@@ -170,7 +170,7 @@ async def device_orm(
     device = DeviceORM(
         account_id=account_orm.id,  # Raw UUID
         game_id=game_orm.id,  # Raw UUID
-        device_id="test-device-001",
+        client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         status=DeviceStatusEnum.ACTIVE,
         first_seen_at=now,
         last_seen_at=now,

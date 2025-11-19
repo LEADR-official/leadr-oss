@@ -28,7 +28,7 @@ class TestGenerateAccessToken:
         secret = "test-secret"
 
         token, token_hash = generate_access_token(
-            device_id=device_id,
+            client_fingerprint=device_id,
             game_id=game_id,
             account_id=account_id,
             expires_delta=expires_delta,
@@ -49,7 +49,7 @@ class TestGenerateAccessToken:
         secret = "test-secret"
 
         token, _ = generate_access_token(
-            device_id=device_id,
+            client_fingerprint=device_id,
             game_id=game_id,
             account_id=account_id,
             expires_delta=expires_delta,
@@ -76,7 +76,7 @@ class TestGenerateAccessToken:
 
         before = datetime.now(UTC)
         token, _ = generate_access_token(
-            device_id=device_id,
+            client_fingerprint=device_id,
             game_id=game_id,
             account_id=account_id,
             expires_delta=expires_delta,
@@ -100,7 +100,7 @@ class TestGenerateAccessToken:
         secret = "test-secret"
 
         result = generate_access_token(
-            device_id=device_id,
+            client_fingerprint=device_id,
             game_id=game_id,
             account_id=account_id,
             expires_delta=expires_delta,
@@ -123,7 +123,7 @@ class TestGenerateAccessToken:
         secret = "test-secret"
 
         _, token_hash = generate_access_token(
-            device_id=device_id,
+            client_fingerprint=device_id,
             game_id=game_id,
             account_id=account_id,
             expires_delta=expires_delta,
@@ -323,7 +323,7 @@ class TestGenerateRefreshToken:
         secret = "test-secret"
 
         token, token_hash = generate_refresh_token(
-            device_id=device_id,
+            client_fingerprint=device_id,
             game_id=game_id,
             account_id=account_id,
             token_version=token_version,
@@ -346,7 +346,7 @@ class TestGenerateRefreshToken:
         secret = "test-secret"
 
         token, _ = generate_refresh_token(
-            device_id=device_id,
+            client_fingerprint=device_id,
             game_id=game_id,
             account_id=account_id,
             token_version=token_version,
@@ -376,7 +376,7 @@ class TestGenerateRefreshToken:
 
         before = datetime.now(UTC)
         token, _ = generate_refresh_token(
-            device_id=device_id,
+            client_fingerprint=device_id,
             game_id=game_id,
             account_id=account_id,
             token_version=token_version,
@@ -402,7 +402,7 @@ class TestGenerateRefreshToken:
         secret = "test-secret"
 
         result = generate_refresh_token(
-            device_id=device_id,
+            client_fingerprint=device_id,
             game_id=game_id,
             account_id=account_id,
             token_version=token_version,
@@ -427,7 +427,7 @@ class TestGenerateRefreshToken:
         secret = "test-secret"
 
         _, token_hash = generate_refresh_token(
-            device_id=device_id,
+            client_fingerprint=device_id,
             game_id=game_id,
             account_id=account_id,
             token_version=token_version,

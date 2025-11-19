@@ -39,7 +39,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Create board
@@ -95,7 +95,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Create board
@@ -152,7 +152,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Try to create score with non-existent board
@@ -204,7 +204,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game1.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Create board for account2
@@ -260,7 +260,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game1.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Create board for game1
@@ -310,7 +310,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)
@@ -371,7 +371,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)
@@ -432,7 +432,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)
@@ -502,7 +502,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)
@@ -557,7 +557,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)
@@ -613,7 +613,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         board_service = BoardService(db_session)
@@ -680,7 +680,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Create board
@@ -734,7 +734,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Create board
@@ -794,7 +794,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-all-strategy",
+            client_fingerprint="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
         )
 
         # Create board with ALL strategy
@@ -874,7 +874,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-first-only",
+            client_fingerprint="b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3",
         )
 
         # Create board with FIRST_ONLY strategy
@@ -950,11 +950,11 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device1, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-1",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
         device2, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-2",
+            client_fingerprint="f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89",
         )
 
         # Create board with FIRST_ONLY strategy
@@ -1023,7 +1023,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-latest-only",
+            client_fingerprint="c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4",
         )
 
         # Create board with LATEST_ONLY strategy
@@ -1125,7 +1125,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-best-asc",
+            client_fingerprint="d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5",
         )
 
         # Create board with BEST_ONLY + ASCENDING (lower is better)
@@ -1244,7 +1244,7 @@ class TestScoreService:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-best-desc",
+            client_fingerprint="e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6",
         )
 
         # Create board with BEST_ONLY + DESCENDING (higher is better)

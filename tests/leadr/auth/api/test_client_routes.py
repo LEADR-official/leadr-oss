@@ -1,5 +1,6 @@
 """Tests for Client Authentication API routes."""
 
+import hashlib
 from uuid import uuid4
 
 import pytest
@@ -30,19 +31,19 @@ class TestClientSessionRoutes:
         )
 
         # Start session
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         response = await client.post(
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "device_id": device_id,
+                "client_fingerprint": device_id,
                 "platform": "ios",
             },
         )
 
         assert response.status_code == 201
         data = response.json()
-        assert data["device_id"] == device_id
+        assert data["client_fingerprint"] == device_id
         assert data["game_id"] == str(game.id)
         assert data["platform"] == "ios"
         assert "access_token" in data
@@ -66,12 +67,12 @@ class TestClientSessionRoutes:
         )
 
         # Start first session
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         response1 = await client.post(
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "device_id": device_id,
+                "client_fingerprint": device_id,
                 "platform": "android",
             },
         )
@@ -83,7 +84,7 @@ class TestClientSessionRoutes:
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "device_id": device_id,
+                "client_fingerprint": device_id,
                 "platform": "android",
             },
         )
@@ -92,7 +93,7 @@ class TestClientSessionRoutes:
         data = response2.json()
         # Should be same device entity
         assert data["id"] == device_id_from_first
-        assert data["device_id"] == device_id
+        assert data["client_fingerprint"] == device_id
         # But new access token
         assert data["access_token"] != response1.json()["access_token"]
 
@@ -112,7 +113,7 @@ class TestClientSessionRoutes:
         )
 
         # Start session with metadata
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         metadata = {
             "device_model": "iPhone 14 Pro",
             "os_version": "iOS 17.2",
@@ -122,7 +123,7 @@ class TestClientSessionRoutes:
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "device_id": device_id,
+                "client_fingerprint": device_id,
                 "platform": "ios",
                 "metadata": metadata,
             },
@@ -148,18 +149,18 @@ class TestClientSessionRoutes:
         )
 
         # Start session without platform
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         response = await client.post(
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "device_id": device_id,
+                "client_fingerprint": device_id,
             },
         )
 
         assert response.status_code == 201
         data = response.json()
-        assert data["device_id"] == device_id
+        assert data["client_fingerprint"] == device_id
         assert data["platform"] is None
 
     async def test_start_session_with_nonexistent_game_returns_404(self, client: AsyncClient):
@@ -168,7 +169,7 @@ class TestClientSessionRoutes:
             "/client/sessions",
             json={
                 "game_id": "gam_00000000-0000-0000-0000-000000000000",
-                "device_id": str(uuid4()),
+                "client_fingerprint": str(uuid4()),
             },
         )
 
@@ -180,7 +181,7 @@ class TestClientSessionRoutes:
         response = await client.post(
             "/client/sessions",
             json={
-                "device_id": str(uuid4()),
+                "client_fingerprint": str(uuid4()),
             },
         )
 
@@ -203,7 +204,7 @@ class TestClientSessionRoutes:
             "/client/sessions",
             json={
                 "game_id": "not-a-uuid",
-                "device_id": str(uuid4()),
+                "client_fingerprint": str(uuid4()),
             },
         )
 
@@ -225,12 +226,12 @@ class TestClientSessionRoutes:
         )
 
         # Start session
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         response = await client.post(
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "device_id": device_id,
+                "client_fingerprint": device_id,
             },
         )
         assert response.status_code == 201
@@ -288,7 +289,7 @@ class TestClientSessionRoutes:
             id=uuid4(),
             account_id=account.id.uuid,
             game_id=game.id.uuid,
-            device_id="test-device-expired",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
             first_seen_at=now,
             last_seen_at=now,
             status="active",
@@ -338,12 +339,12 @@ class TestClientNonceRoutes:
         )
 
         # Start session to get device token
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         session_response = await client.post(
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "device_id": device_id,
+                "client_fingerprint": device_id,
                 "platform": "ios",
             },
         )
@@ -395,12 +396,12 @@ class TestClientNonceRoutes:
         )
 
         # Start session
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         session_response = await client.post(
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "device_id": device_id,
+                "client_fingerprint": device_id,
             },
         )
         access_token = session_response.json()["access_token"]
@@ -447,12 +448,12 @@ class TestNonceIntegration:
         )
 
         # 2. Start device session
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         session_response = await client.post(
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "device_id": device_id,
+                "client_fingerprint": device_id,
             },
         )
         assert session_response.status_code == 201
@@ -477,7 +478,7 @@ class TestNonceIntegration:
         device_service = DeviceService(db_session)
 
         # Get device entity
-        device = await device_service.repository.get_by_game_and_device_id(game.id, device_id)
+        device = await device_service.repository.get_by_game_and_fingerprint(game.id, device_id)
         assert device is not None
 
         # Validate and consume the nonce
@@ -520,20 +521,22 @@ class TestNonceIntegration:
             name="Test Game",
         )
 
-        # Start sessions for two devices
-        device1_id = str(uuid4())
-        device2_id = str(uuid4())
+        # Start sessions for two devices (use SHA256 hashes as fingerprints)
+        import hashlib
+
+        device1_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        device2_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
 
         session1 = await client.post(
             "/client/sessions",
-            json={"game_id": str(game.id), "device_id": device1_id},
+            json={"game_id": str(game.id), "client_fingerprint": device1_id},
         )
         access_token1 = session1.json()["access_token"]
 
         # Start session for device 2
         await client.post(
             "/client/sessions",
-            json={"game_id": str(game.id), "device_id": device2_id},
+            json={"game_id": str(game.id), "client_fingerprint": device2_id},
         )
 
         # Generate nonce for device 1
@@ -545,7 +548,7 @@ class TestNonceIntegration:
 
         # Try to use device1's nonce with device2
         device_service = DeviceService(db_session)
-        device2 = await device_service.repository.get_by_game_and_device_id(game.id, device2_id)
+        device2 = await device_service.repository.get_by_game_and_fingerprint(game.id, device2_id)
         assert device2 is not None
 
         nonce_service = NonceService(db_session)
@@ -573,14 +576,14 @@ class TestNonceIntegration:
         )
 
         # Get device via session
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         await client.post(
             "/client/sessions",
-            json={"game_id": str(game.id), "device_id": device_id},
+            json={"game_id": str(game.id), "client_fingerprint": device_id},
         )
 
         device_service = DeviceService(db_session)
-        device = await device_service.repository.get_by_game_and_device_id(game.id, device_id)
+        device = await device_service.repository.get_by_game_and_fingerprint(game.id, device_id)
         assert device is not None
 
         # Manually create an expired nonce

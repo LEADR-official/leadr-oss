@@ -12,7 +12,7 @@ from leadr.common.domain.ids import AccountID, GameID
 
 
 def generate_access_token(
-    device_id: str,
+    client_fingerprint: str,
     game_id: GameID,
     account_id: AccountID,
     expires_delta: timedelta,
@@ -24,7 +24,7 @@ def generate_access_token(
     and returns both the plain token and its SHA-256 hash for storage.
 
     Args:
-        device_id: Client-generated device identifier
+        device_id: Client-generated SHA256 device fingerprint
         game_id: Game UUID
         account_id: Account UUID (for multi-tenant isolation)
         expires_delta: Time until token expires
@@ -49,7 +49,7 @@ def generate_access_token(
     exp = now + expires_delta
 
     payload = {
-        "sub": device_id,  # Subject: device_id
+        "sub": client_fingerprint,  # Subject: client fingerprint
         "game_id": str(game_id.uuid),
         "account_id": str(account_id.uuid),
         "exp": int(exp.timestamp()),
@@ -96,7 +96,7 @@ def validate_access_token(token: str, secret: str) -> dict[str, Any] | None:
 
 
 def generate_refresh_token(
-    device_id: str,
+    client_fingerprint: str,
     game_id: GameID,
     account_id: AccountID,
     token_version: int,
@@ -112,7 +112,7 @@ def generate_refresh_token(
     the version is incremented and old tokens with lower versions are invalidated.
 
     Args:
-        device_id: Client-generated device identifier
+        device_id: Client-generated SHA256 device fingerprint
         game_id: Game UUID
         account_id: Account UUID (for multi-tenant isolation)
         token_version: Current token version for rotation tracking
@@ -138,7 +138,7 @@ def generate_refresh_token(
     exp = now + expires_delta
 
     payload = {
-        "sub": device_id,  # Subject: device_id
+        "sub": client_fingerprint,  # Subject: client fingerprint
         "game_id": str(game_id.uuid),
         "account_id": str(account_id.uuid),
         "token_version": token_version,  # For token rotation

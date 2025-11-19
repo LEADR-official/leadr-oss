@@ -28,7 +28,7 @@ class TestRequireNonce:
         device = Device(
             id=DeviceID(device_orm.id),
             game_id=GameID(device_orm.game_id),
-            device_id=device_orm.device_id,
+            client_fingerprint=device_orm.client_fingerprint,
             account_id=AccountID(device_orm.account_id),
             first_seen_at=device_orm.first_seen_at,
             last_seen_at=device_orm.last_seen_at,
@@ -55,7 +55,7 @@ class TestRequireNonce:
         device = Device(
             id=DeviceID(uuid4()),
             game_id=GameID(uuid4()),
-            device_id="test-device",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
             account_id=AccountID(uuid4()),
             first_seen_at=datetime.now(UTC),
             last_seen_at=datetime.now(UTC),
@@ -74,7 +74,7 @@ class TestRequireNonce:
         device = Device(
             id=DeviceID(device_orm.id),
             game_id=GameID(device_orm.game_id),
-            device_id=device_orm.device_id,
+            client_fingerprint=device_orm.client_fingerprint,
             account_id=AccountID(device_orm.account_id),
             first_seen_at=device_orm.first_seen_at,
             last_seen_at=device_orm.last_seen_at,
@@ -105,7 +105,7 @@ class TestRequireNonce:
         device = Device(
             id=DeviceID(device_orm.id),
             game_id=GameID(device_orm.game_id),
-            device_id=device_orm.device_id,
+            client_fingerprint=device_orm.client_fingerprint,
             account_id=AccountID(device_orm.account_id),
             first_seen_at=device_orm.first_seen_at,
             last_seen_at=device_orm.last_seen_at,
@@ -139,7 +139,7 @@ class TestRequireNonce:
         device = Device(
             id=DeviceID(device_orm.id),
             game_id=GameID(device_orm.game_id),
-            device_id=device_orm.device_id,
+            client_fingerprint=device_orm.client_fingerprint,
             account_id=AccountID(device_orm.account_id),
             first_seen_at=device_orm.first_seen_at,
             last_seen_at=device_orm.last_seen_at,
@@ -172,11 +172,11 @@ class TestRequireNonce:
         db_session.add(game)
         await db_session.commit()
 
-        # Create two devices
+        # Create two devices with different fingerprints
         device1_orm = DeviceORM(
             id=uuid4(),
             game_id=game.id,
-            device_id="device-1",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
             account_id=game.account_id,
             first_seen_at=datetime.now(UTC),
             last_seen_at=datetime.now(UTC),
@@ -186,7 +186,7 @@ class TestRequireNonce:
         device2_orm = DeviceORM(
             id=uuid4(),
             game_id=game.id,
-            device_id="device-2",
+            client_fingerprint="f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89",
             account_id=game.account_id,
             first_seen_at=datetime.now(UTC),
             last_seen_at=datetime.now(UTC),
@@ -210,7 +210,7 @@ class TestRequireNonce:
         device2 = Device(
             id=DeviceID(device2_orm.id),
             game_id=GameID(device2_orm.game_id),
-            device_id=device2_orm.device_id,
+            client_fingerprint=device2_orm.client_fingerprint,
             account_id=AccountID(device2_orm.account_id),
             first_seen_at=device2_orm.first_seen_at,
             last_seen_at=device2_orm.last_seen_at,

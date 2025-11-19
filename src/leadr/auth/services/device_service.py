@@ -48,7 +48,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
     async def start_session(
         self,
         game_id: GameID,
-        device_id: str,
+        client_fingerprint: str,
         platform: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
@@ -62,7 +62,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
 
         Args:
             game_id: Game UUID
-            device_id: Client-generated device identifier
+            client_fingerprint: Client-generated SHA256 device fingerprint
             platform: Device platform (ios, android, etc.)
             ip_address: Client IP address
             user_agent: Client user agent string
@@ -85,7 +85,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         account_id = AccountID(game_orm.account_id)
 
         # Get or create device
-        device = await self.repository.get_by_game_and_device_id(game_id, device_id)
+        device = await self.repository.get_by_game_and_fingerprint(game_id, client_fingerprint)
 
         if device:
             # Update existing device
@@ -98,7 +98,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             now = datetime.now(UTC)
             device = Device(
                 game_id=game_id,
-                device_id=device_id,
+                client_fingerprint=client_fingerprint,
                 account_id=account_id,
                 platform=platform,
                 first_seen_at=now,
@@ -110,7 +110,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         # Generate access token
         access_expires_delta = timedelta(hours=settings.ACCESS_TOKEN_EXPIRY_HOURS)
         access_token_plain, access_token_hash = generate_access_token(
-            device_id=device_id,
+            client_fingerprint=client_fingerprint,
             game_id=game_id,
             account_id=account_id,
             expires_delta=access_expires_delta,
@@ -120,7 +120,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         # Generate refresh token
         refresh_expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRY_DAYS)
         refresh_token_plain, refresh_token_hash = generate_refresh_token(
-            device_id=device_id,
+            client_fingerprint=client_fingerprint,
             game_id=game_id,
             account_id=account_id,
             token_version=1,  # Initial version
@@ -163,11 +163,11 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             return None
 
         # Extract claims
-        device_id = claims["sub"]
+        client_fingerprint = claims["sub"]
         game_id = GameID(UUID(claims["game_id"]))
 
         # Get device
-        device = await self.repository.get_by_game_and_device_id(game_id, device_id)
+        device = await self.repository.get_by_game_and_fingerprint(game_id, client_fingerprint)
         if not device:
             return None
 
@@ -231,14 +231,14 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             return None
 
         # Extract claims for token generation
-        device_id = claims["sub"]
+        client_fingerprint = claims["sub"]
         game_id = GameID(UUID(claims["game_id"]))
         account_id = AccountID(UUID(claims["account_id"]))
 
         # Generate new access token
         access_expires_delta = timedelta(hours=settings.ACCESS_TOKEN_EXPIRY_HOURS)
         access_token_plain, access_token_hash = generate_access_token(
-            device_id=device_id,
+            client_fingerprint=client_fingerprint,
             game_id=game_id,
             account_id=account_id,
             expires_delta=access_expires_delta,
@@ -248,7 +248,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         # Generate new refresh token with incremented version
         refresh_expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRY_DAYS)
         new_refresh_token_plain, new_refresh_token_hash = generate_refresh_token(
-            device_id=device_id,
+            client_fingerprint=client_fingerprint,
             game_id=game_id,
             account_id=account_id,
             token_version=session.token_version + 1,

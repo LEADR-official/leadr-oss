@@ -1,5 +1,6 @@
 """Tests for require_device_token dependency."""
 
+import hashlib
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 from uuid import uuid4
@@ -49,7 +50,7 @@ class TestRequireDeviceToken:
             mock_gen.return_value = ("valid_token", "valid_hash")
             await service.start_session(
                 game_id=GameID(game_orm.id),
-                device_id=str(uuid4()),
+                client_fingerprint=hashlib.sha256(str(uuid4()).encode()).hexdigest(),
                 platform="ios",
             )
 
@@ -66,7 +67,7 @@ class TestRequireDeviceToken:
         """Test that a valid device token returns the Device entity."""
         # Create device and session
         service = await get_device_service(db_session)
-        device_id = str(uuid4())
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
 
         with patch("leadr.auth.services.device_service.generate_access_token") as mock_gen:
             mock_gen.return_value = ("test_token", "test_hash")
@@ -76,7 +77,7 @@ class TestRequireDeviceToken:
                 mock_gen_refresh.return_value = ("test_refresh_token", "test_refresh_hash")
                 device, plain_token, _, _ = await service.start_session(
                     game_id=GameID(game_orm.id),
-                    device_id=device_id,
+                    client_fingerprint=device_id,
                     platform="android",
                 )
 
@@ -97,7 +98,7 @@ class TestRequireDeviceToken:
 
         # Should return the Device entity
         assert result.id == device.id
-        assert result.device_id == device_id
+        assert result.client_fingerprint == device_id
         assert result.game_id == game_orm.id
         assert result.account_id == account_orm.id
 
@@ -127,7 +128,7 @@ class TestRequireDeviceToken:
 
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
             mock_val.return_value = {
-                "sub": device_orm.device_id,
+                "sub": device_orm.client_fingerprint,
                 "game_id": str(game_orm.id),
                 "account_id": str(account_orm.id),
             }
@@ -169,7 +170,7 @@ class TestRequireDeviceToken:
 
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
             mock_val.return_value = {
-                "sub": device_orm.device_id,
+                "sub": device_orm.client_fingerprint,
                 "game_id": str(game_orm.id),
                 "account_id": str(account_orm.id),
             }
@@ -193,7 +194,7 @@ class TestRequireDeviceToken:
         device_orm = DeviceORM(
             id=uuid4(),
             game_id=game_orm.id,
-            device_id=str(uuid4()),
+            client_fingerprint=hashlib.sha256(str(uuid4()).encode()).hexdigest(),
             account_id=account_orm.id,
             platform="ios",
             status=DeviceStatusEnum.BANNED,
@@ -220,7 +221,7 @@ class TestRequireDeviceToken:
 
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
             mock_val.return_value = {
-                "sub": device_orm.device_id,
+                "sub": device_orm.client_fingerprint,
                 "game_id": str(game_orm.id),
                 "account_id": str(account_orm.id),
             }
@@ -244,7 +245,7 @@ class TestRequireDeviceToken:
         device_orm = DeviceORM(
             id=uuid4(),
             game_id=game_orm.id,
-            device_id=str(uuid4()),
+            client_fingerprint=hashlib.sha256(str(uuid4()).encode()).hexdigest(),
             account_id=account_orm.id,
             platform="android",
             first_seen_at=datetime.now(UTC),
@@ -258,7 +259,7 @@ class TestRequireDeviceToken:
 
         with patch("leadr.auth.services.device_service.validate_access_token") as mock_val:
             mock_val.return_value = {
-                "sub": device_orm.device_id,
+                "sub": device_orm.client_fingerprint,
                 "game_id": str(game_orm.id),
                 "account_id": str(account_orm.id),
             }
