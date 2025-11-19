@@ -1,6 +1,7 @@
-"""Tests for require_api_key dependency."""
+"""Tests for admin auth dependency (require_admin_auth)."""
 
 from datetime import UTC, datetime, timedelta
+from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
@@ -10,27 +11,40 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.accounts.services.user_service import UserService
-from leadr.auth.dependencies import require_api_key
+from leadr.auth.dependencies import require_admin_auth
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.api_key_service import APIKeyService
+from leadr.auth.services.device_service import DeviceService
+from leadr.auth.services.nonce_service import NonceService
 from leadr.common.domain.ids import AccountID
 
 
 @pytest.mark.asyncio
-class TestRequireAPIKey:
-    """Test suite for require_api_key dependency."""
+class TestRequireAdminAuth:
+    """Test suite for require_admin_auth dependency."""
 
     async def test_missing_api_key_header_raises_401(self, db_session: AsyncSession):
         """Test that missing API key header raises 401 Unauthorized."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
+        device_service = DeviceService(db_session)
+        nonce_service = NonceService(db_session)
+        mock_request = Mock()
+
         with pytest.raises(HTTPException) as exc_info:
-            await require_api_key(
-                api_key_service=api_key_service, user_service=user_service, api_key=None
+            await require_admin_auth(
+                request=mock_request,
+                api_key_service=api_key_service,
+                user_service=user_service,
+                device_service=device_service,
+                nonce_service=nonce_service,
+                api_key=None,
+                authorization=None,
+                leadr_client_nonce=None,
             )
 
         assert exc_info.value.status_code == 401
-        assert "required" in exc_info.value.detail.lower()
+        assert "require" in exc_info.value.detail.lower()
 
     async def test_invalid_api_key_raises_401(self, db_session: AsyncSession):
         """Test that an invalid/unknown API key raises 401 Unauthorized."""
@@ -66,11 +80,20 @@ class TestRequireAPIKey:
         )
 
         # Try with a completely invalid key
+        device_service = DeviceService(db_session)
+        nonce_service = NonceService(db_session)
+        mock_request = Mock()
+
         with pytest.raises(HTTPException) as exc_info:
-            await require_api_key(
+            await require_admin_auth(
+                request=mock_request,
                 api_key_service=api_key_service,
                 user_service=user_service,
+                device_service=device_service,
+                nonce_service=nonce_service,
                 api_key="ldr_invalidkey123456",
+                authorization=None,
+                leadr_client_nonce=None,
             )
 
         assert exc_info.value.status_code == 401
@@ -111,15 +134,28 @@ class TestRequireAPIKey:
         )
 
         # Use the dependency
-        result = await require_api_key(
-            api_key_service=api_key_service, user_service=user_service, api_key=plain_key
+        device_service = DeviceService(db_session)
+        nonce_service = NonceService(db_session)
+        mock_request = Mock()
+
+        result = await require_admin_auth(
+            request=mock_request,
+            api_key_service=api_key_service,
+            user_service=user_service,
+            device_service=device_service,
+            nonce_service=nonce_service,
+            api_key=plain_key,
+            authorization=None,
+            leadr_client_nonce=None,
         )
 
         # Should return AuthContext with APIKey and User
+        assert result.api_key is not None
         assert result.api_key.id == api_key.id
-        assert result.api_key.account_id == account_id
+        assert result.account_id == account_id
         assert result.api_key.name == "Test Key"
         assert result.api_key.status == APIKeyStatus.ACTIVE
+        assert result.user is not None
         assert result.user.id == user.id
 
     async def test_expired_api_key_raises_401(self, db_session: AsyncSession):
@@ -158,9 +194,20 @@ class TestRequireAPIKey:
         )
 
         # Try to use expired key
+        device_service = DeviceService(db_session)
+        nonce_service = NonceService(db_session)
+        mock_request = Mock()
+
         with pytest.raises(HTTPException) as exc_info:
-            await require_api_key(
-                api_key_service=api_key_service, user_service=user_service, api_key=plain_key
+            await require_admin_auth(
+                request=mock_request,
+                api_key_service=api_key_service,
+                user_service=user_service,
+                device_service=device_service,
+                nonce_service=nonce_service,
+                api_key=plain_key,
+                authorization=None,
+                leadr_client_nonce=None,
             )
 
         assert exc_info.value.status_code == 401
@@ -206,9 +253,20 @@ class TestRequireAPIKey:
         await api_key_service.revoke_api_key(api_key.id)
 
         # Try to use revoked key
+        device_service = DeviceService(db_session)
+        nonce_service = NonceService(db_session)
+        mock_request = Mock()
+
         with pytest.raises(HTTPException) as exc_info:
-            await require_api_key(
-                api_key_service=api_key_service, user_service=user_service, api_key=plain_key
+            await require_admin_auth(
+                request=mock_request,
+                api_key_service=api_key_service,
+                user_service=user_service,
+                device_service=device_service,
+                nonce_service=nonce_service,
+                api_key=plain_key,
+                authorization=None,
+                leadr_client_nonce=None,
             )
 
         assert exc_info.value.status_code == 401
@@ -254,9 +312,20 @@ class TestRequireAPIKey:
         await api_key_service.soft_delete(api_key.id)
 
         # Try to use deleted key
+        device_service = DeviceService(db_session)
+        nonce_service = NonceService(db_session)
+        mock_request = Mock()
+
         with pytest.raises(HTTPException) as exc_info:
-            await require_api_key(
-                api_key_service=api_key_service, user_service=user_service, api_key=plain_key
+            await require_admin_auth(
+                request=mock_request,
+                api_key_service=api_key_service,
+                user_service=user_service,
+                device_service=device_service,
+                nonce_service=nonce_service,
+                api_key=plain_key,
+                authorization=None,
+                leadr_client_nonce=None,
             )
 
         assert exc_info.value.status_code == 401
@@ -300,8 +369,19 @@ class TestRequireAPIKey:
         assert api_key.last_used_at is None
 
         # Use the dependency
-        await require_api_key(
-            api_key_service=api_key_service, user_service=user_service, api_key=plain_key
+        device_service = DeviceService(db_session)
+        nonce_service = NonceService(db_session)
+        mock_request = Mock()
+
+        await require_admin_auth(
+            request=mock_request,
+            api_key_service=api_key_service,
+            user_service=user_service,
+            device_service=device_service,
+            nonce_service=nonce_service,
+            api_key=plain_key,
+            authorization=None,
+            leadr_client_nonce=None,
         )
 
         # Refresh the key from DB to get updated timestamp

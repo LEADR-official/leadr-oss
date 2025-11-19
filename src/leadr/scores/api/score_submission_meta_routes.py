@@ -1,8 +1,10 @@
 """API routes for score submission metadata management."""
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
 
-from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
+from fastapi import APIRouter, HTTPException, Query, status
+
+from leadr.auth.dependencies import AdminAuthContextDep, resolve_query_account_id
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, ScoreSubmissionMetaID
 from leadr.scores.api.score_submission_meta_schemas import ScoreSubmissionMetaResponse
 from leadr.scores.services.dependencies import ScoreSubmissionMetaServiceDep
@@ -12,8 +14,9 @@ router = APIRouter()
 
 @router.get("/score-submission-metadata", response_model=list[ScoreSubmissionMetaResponse])
 async def list_submission_meta(
-    account_id: QueryAccountIDDep,
+    auth: AdminAuthContextDep,
     service: ScoreSubmissionMetaServiceDep,
+    account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     board_id: BoardID | None = None,
     device_id: DeviceID | None = None,
 ) -> list[ScoreSubmissionMetaResponse]:
@@ -26,8 +29,9 @@ async def list_submission_meta(
     For superadmins, account_id must be explicitly provided as a query parameter.
 
     Args:
-        account_id: Account ID (auto-resolved for regular users, required for superadmins).
+        auth: Authentication context with user info.
         service: Injected submission metadata service dependency.
+        account_id: Optional account_id query parameter (required for superadmins).
         board_id: Optional board ID to filter by.
         device_id: Optional device ID to filter by.
 
@@ -38,8 +42,10 @@ async def list_submission_meta(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    resolved_account_id = resolve_query_account_id(auth, account_id)
+
     metas = await service.list_submission_meta(
-        account_id=account_id,
+        account_id=resolved_account_id,
         board_id=board_id,
         device_id=device_id,
     )
@@ -54,7 +60,7 @@ async def list_submission_meta(
 async def get_submission_meta(
     meta_id: ScoreSubmissionMetaID,
     service: ScoreSubmissionMetaServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> ScoreSubmissionMetaResponse:
     """Get score submission metadata by ID.
 

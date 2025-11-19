@@ -2,17 +2,17 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
-    AuthContextDep,
-    QueryAccountIDDep,
+    AdminAuthContextDep,
+    resolve_query_account_id,
     validate_body_account_id,
 )
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
-from leadr.common.domain.ids import BoardID, DeviceID, GameID, ScoreID
+from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.scores.api.score_schemas import ScoreCreateRequest, ScoreResponse, ScoreUpdateRequest
 from leadr.scores.services.dependencies import ScoreServiceDep
 
@@ -27,7 +27,7 @@ async def create_score(
     request: Request,
     service: ScoreServiceDep,
     background_tasks: BackgroundTasks,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> ScoreResponse:
     """Create a new score.
 
@@ -100,7 +100,7 @@ async def create_score(
 async def get_score(
     score_id: ScoreID,
     service: ScoreServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> ScoreResponse:
     """Get a score by ID.
 
@@ -131,9 +131,10 @@ async def get_score(
 @router.get("/scores", response_model=PaginatedResponse[ScoreResponse])
 @client_router.get("/scores", response_model=PaginatedResponse[ScoreResponse])
 async def list_scores(
-    account_id: QueryAccountIDDep,
+    auth: AdminAuthContextDep,
     service: ScoreServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
+    account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     board_id: BoardID | None = None,
     game_id: GameID | None = None,
     device_id: DeviceID | None = None,
@@ -158,9 +159,10 @@ async def list_scores(
         GET /v1/scores?board_id=brd_123&limit=50&sort=value:desc,created_at:asc
 
     Args:
-        account_id: Account ID (auto-resolved for regular users, required for superadmins).
+        auth: Authentication context with user info.
         service: Injected score service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
+        account_id: Optional account_id query parameter (required for superadmins).
         board_id: Optional board ID to filter by.
         game_id: Optional game ID to filter by.
         device_id: Optional device ID to filter by.
@@ -170,11 +172,14 @@ async def list_scores(
 
     Raises:
         400: Invalid cursor, sort field, or cursor state mismatch.
+        400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    resolved_account_id = resolve_query_account_id(auth, account_id)
+
     try:
         result = await service.list_scores(
-            account_id=account_id,
+            account_id=resolved_account_id,
             board_id=board_id,
             game_id=game_id,
             device_id=device_id,
@@ -206,7 +211,7 @@ async def update_score(
     score_id: ScoreID,
     request: ScoreUpdateRequest,
     service: ScoreServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> ScoreResponse:
     """Update a score.
 

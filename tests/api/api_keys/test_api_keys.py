@@ -516,11 +516,31 @@ class TestListAPIKeys:
         response = await authenticated_client.get("/api-keys?account_id=not-a-uuid")
         assert response.status_code == 422
 
-    async def test_list_api_keys_invalid_status(self, authenticated_client: AsyncClient):
-        """Test listing API keys without account_id returns 400 (superadmin)."""
-        response = await authenticated_client.get("/api-keys?status=invalid-status")
-        # Superadmins must provide account_id, so this returns 400
-        assert response.status_code == 400
+    async def test_list_api_keys_invalid_status(
+        self, authenticated_client: AsyncClient, db_session: AsyncSession
+    ):
+        """Test listing API keys with invalid status parameter returns 422."""
+        # Create an account to provide valid account_id
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Query with valid account_id but invalid status enum value
+        response = await authenticated_client.get(
+            f"/api-keys?account_id={account_id}&status=invalid-status"
+        )
+        # FastAPI validates enum values and returns 422 for invalid enum
+        assert response.status_code == 422
 
 
 @pytest.mark.asyncio

@@ -22,7 +22,7 @@ from leadr.auth.api.client_routes import (
 from leadr.auth.api.device_routes import router as device_router
 from leadr.auth.api.device_session_routes import router as device_session_router
 from leadr.auth.bootstrap import ensure_superadmin_exists
-from leadr.auth.dependencies import require_api_key
+from leadr.auth.dependencies import require_admin_auth
 from leadr.auth.services.nonce_tasks import cleanup_expired_nonces
 from leadr.boards.api.board_routes import client_router as board_client_router
 from leadr.boards.api.board_routes import router as board_router
@@ -45,7 +45,6 @@ from leadr.scores.api.score_routes import client_router as score_client_router
 from leadr.scores.api.score_routes import router as score_router
 from leadr.scores.api.score_submission_meta_routes import router as score_submission_meta_router
 
-# Configure logging from YAML file
 log_config_path = Path(__file__).parent / "logging.yaml"
 with log_config_path.open() as f:
     log_config = yaml.safe_load(f)
@@ -55,8 +54,11 @@ for formatter in log_config["formatters"].values():
     if "fmt" in formatter:
         formatter["fmt"] = formatter["fmt"].format(app=settings.APP, env=settings.ENV)
 
-# Apply logging configuration
 logging.config.dictConfig(log_config)
+logger = logging.getLogger(__name__)
+if settings.DEBUG:
+    logger.setLevel(logging.DEBUG)
+logger.warning("Logging level is %s", logging.getLevelName(logger.level))
 
 
 @asynccontextmanager
@@ -146,7 +148,7 @@ app.add_middleware(GeoIPMiddleware, dev_override_ip=settings.DEV_OVERRIDE_IP)
 # Create public and admin routers with separate authentication requirements
 public_router = APIRouter()
 client_router = APIRouter()
-admin_router = APIRouter(dependencies=[Depends(require_api_key)])
+admin_router = APIRouter(dependencies=[Depends(require_admin_auth)])
 
 # Public routes - accessible without authentication
 public_router.include_router(api_router)

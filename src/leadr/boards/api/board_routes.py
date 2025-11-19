@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
-    AuthContextDep,
+    AdminAuthContextDep,
     validate_body_account_id,
 )
 from leadr.boards.api.board_schemas import (
@@ -25,7 +25,7 @@ client_router = APIRouter()
 
 @router.post("/boards", status_code=status.HTTP_201_CREATED, response_model=BoardResponse)
 async def create_board(
-    request: BoardCreateRequest, service: BoardServiceDep, auth: AuthContextDep
+    request: BoardCreateRequest, service: BoardServiceDep, auth: AdminAuthContextDep
 ) -> BoardResponse:
     """Create a new board.
 
@@ -77,7 +77,7 @@ async def create_board(
 
 @router.get("/boards/{board_id}", response_model=BoardResponse)
 async def get_board(
-    board_id: BoardID, service: BoardServiceDep, auth: AuthContextDep
+    board_id: BoardID, service: BoardServiceDep, auth: AdminAuthContextDep
 ) -> BoardResponse:
     """Get a board by ID.
 
@@ -109,7 +109,7 @@ async def get_board(
 @client_router.get("/boards", response_model=PaginatedResponse[BoardResponse])
 async def list_boards(
     service: BoardServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: AccountID | None = None,
     code: str | None = None,
@@ -151,7 +151,7 @@ async def list_boards(
     # Handle account_id resolution based on user role
     if not auth.is_superadmin:
         # Regular users: auto-derive account_id if not provided
-        user_account_id = auth.api_key.account_id
+        user_account_id = auth.account_id
         if account_id is None:
             account_id = user_account_id
         elif account_id != user_account_id:
@@ -205,7 +205,10 @@ async def list_boards(
 
 @router.patch("/boards/{board_id}", response_model=BoardResponse)
 async def update_board(
-    board_id: BoardID, request: BoardUpdateRequest, service: BoardServiceDep, auth: AuthContextDep
+    board_id: BoardID,
+    request: BoardUpdateRequest,
+    service: BoardServiceDep,
+    auth: AdminAuthContextDep,
 ) -> BoardResponse:
     """Update a board.
 

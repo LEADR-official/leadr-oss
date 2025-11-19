@@ -2,17 +2,17 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
-    AuthContextDep,
-    QueryAccountIDDep,
+    AdminAuthContextDep,
+    resolve_query_account_id,
     validate_body_account_id,
 )
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
-from leadr.common.domain.ids import GameID
+from leadr.common.domain.ids import AccountID, GameID
 from leadr.games.api.game_schemas import (
     GameCreateRequest,
     GameResponse,
@@ -25,7 +25,7 @@ router = APIRouter()
 
 @router.post("/games", status_code=status.HTTP_201_CREATED, response_model=GameResponse)
 async def create_game(
-    request: GameCreateRequest, service: GameServiceDep, auth: AuthContextDep
+    request: GameCreateRequest, service: GameServiceDep, auth: AdminAuthContextDep
 ) -> GameResponse:
     """Create a new game.
 
@@ -64,7 +64,9 @@ async def create_game(
 
 
 @router.get("/games/{game_id}", response_model=GameResponse)
-async def get_game(game_id: GameID, service: GameServiceDep, auth: AuthContextDep) -> GameResponse:
+async def get_game(
+    game_id: GameID, service: GameServiceDep, auth: AdminAuthContextDep
+) -> GameResponse:
     """Get a game by ID.
 
     Args:
@@ -93,9 +95,10 @@ async def get_game(game_id: GameID, service: GameServiceDep, auth: AuthContextDe
 
 @router.get("/games", response_model=PaginatedResponse[GameResponse])
 async def list_games(
-    account_id: QueryAccountIDDep,
+    auth: AdminAuthContextDep,
     service: GameServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
+    account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
 ) -> PaginatedResponse[GameResponse]:
     """List all games for an account with pagination.
 
@@ -115,19 +118,23 @@ async def list_games(
         GET /v1/games?account_id=acc_123&limit=50&sort=name:asc
 
     Args:
-        account_id: Account ID (auto-resolved for regular users, required for superadmins).
+        auth: Authentication context with user info.
         service: Injected game service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
+        account_id: Optional account_id query parameter (required for superadmins).
 
     Returns:
         PaginatedResponse with games and pagination metadata.
 
     Raises:
         400: Invalid cursor, sort field, or cursor state mismatch.
+        400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    resolved_account_id = resolve_query_account_id(auth, account_id)
+
     try:
-        result = await service.list_games(account_id, pagination=pagination)
+        result = await service.list_games(resolved_account_id, pagination=pagination)
     except (CursorValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
@@ -141,7 +148,7 @@ async def list_games(
 
 @router.patch("/games/{game_id}", response_model=GameResponse)
 async def update_game(
-    game_id: GameID, request: GameUpdateRequest, service: GameServiceDep, auth: AuthContextDep
+    game_id: GameID, request: GameUpdateRequest, service: GameServiceDep, auth: AdminAuthContextDep
 ) -> GameResponse:
     """Update a game.
 

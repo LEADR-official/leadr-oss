@@ -1,9 +1,11 @@
 """API routes for score flag management."""
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
 
-from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
-from leadr.common.domain.ids import BoardID, GameID, ScoreFlagID
+from fastapi import APIRouter, HTTPException, Query, status
+
+from leadr.auth.dependencies import AdminAuthContextDep, resolve_query_account_id
+from leadr.common.domain.ids import AccountID, BoardID, GameID, ScoreFlagID
 from leadr.scores.api.score_flag_schemas import ScoreFlagResponse, ScoreFlagUpdateRequest
 from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
 from leadr.scores.services.dependencies import ScoreFlagServiceDep
@@ -13,8 +15,9 @@ router = APIRouter()
 
 @router.get("/score-flags", response_model=list[ScoreFlagResponse])
 async def list_score_flags(
-    account_id: QueryAccountIDDep,
+    auth: AdminAuthContextDep,
     service: ScoreFlagServiceDep,
+    account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     board_id: BoardID | None = None,
     game_id: GameID | None = None,
     status: str | None = None,
@@ -29,8 +32,9 @@ async def list_score_flags(
     For superadmins, account_id must be explicitly provided as a query parameter.
 
     Args:
-        account_id: Account ID (auto-resolved for regular users, required for superadmins).
+        auth: Authentication context with user info.
         service: Injected score flag service dependency.
+        account_id: Optional account_id query parameter (required for superadmins).
         board_id: Optional board ID to filter by.
         game_id: Optional game ID to filter by.
         status: Optional status to filter by (PENDING, CONFIRMED_CHEAT, etc.).
@@ -43,8 +47,10 @@ async def list_score_flags(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    resolved_account_id = resolve_query_account_id(auth, account_id)
+
     flags = await service.list_flags(
-        account_id=account_id,
+        account_id=resolved_account_id,
         board_id=board_id,
         game_id=game_id,
         status=status,
@@ -58,7 +64,7 @@ async def list_score_flags(
 async def get_score_flag(
     flag_id: ScoreFlagID,
     service: ScoreFlagServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> ScoreFlagResponse:
     """Get a score flag by ID.
 
@@ -98,7 +104,7 @@ async def update_score_flag(
     flag_id: ScoreFlagID,
     request: ScoreFlagUpdateRequest,
     service: ScoreFlagServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> ScoreFlagResponse:
     """Update a score flag (review or soft-delete).
 
@@ -153,6 +159,7 @@ async def update_score_flag(
                 ),
             ) from None
 
+        # AuthContextDep (AdminAuthContext) guarantees user is non-None
         flag = await service.review_flag(
             flag_id=flag_id,
             status=status_enum,

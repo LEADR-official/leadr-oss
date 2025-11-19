@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.accounts.api.user_schemas import (
@@ -12,13 +12,13 @@ from leadr.accounts.api.user_schemas import (
 )
 from leadr.accounts.services.dependencies import UserServiceDep
 from leadr.auth.dependencies import (
-    AuthContextDep,
-    QueryAccountIDDep,
+    AdminAuthContextDep,
+    resolve_query_account_id,
     validate_body_account_id,
 )
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
-from leadr.common.domain.ids import UserID
+from leadr.common.domain.ids import AccountID, UserID
 
 router = APIRouter()
 
@@ -27,7 +27,7 @@ router = APIRouter()
 async def create_user(
     request: UserCreateRequest,
     service: UserServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> UserResponse:
     """Create a new user.
 
@@ -70,7 +70,7 @@ async def create_user(
 async def get_user(
     user_id: UserID,
     service: UserServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> UserResponse:
     """Get a user by ID.
 
@@ -100,9 +100,10 @@ async def get_user(
 
 @router.get("/users", response_model=PaginatedResponse[UserResponse])
 async def list_users(
+    auth: AdminAuthContextDep,
     service: UserServiceDep,
-    account_id: QueryAccountIDDep,
     pagination: Annotated[PaginationParams, Depends()],
+    account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
 ) -> PaginatedResponse[UserResponse]:
     """List users for an account with pagination.
 
@@ -119,9 +120,10 @@ async def list_users(
         GET /v1/users?account_id=acc_123&limit=50&sort=email:asc
 
     Args:
+        auth: Authentication context with user info.
         service: Injected user service dependency.
-        account_id: Account ID (auto-resolved for regular users, required for superadmins).
         pagination: Pagination parameters (cursor, limit, sort).
+        account_id: Optional account_id query parameter (required for superadmins).
 
     Returns:
         PaginatedResponse with users and pagination metadata.
@@ -131,8 +133,10 @@ async def list_users(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    resolved_account_id = resolve_query_account_id(auth, account_id)
+
     try:
-        result = await service.list_users_by_account(account_id, pagination=pagination)
+        result = await service.list_users_by_account(resolved_account_id, pagination=pagination)
     except (CursorValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
@@ -149,7 +153,7 @@ async def update_user(
     user_id: UserID,
     request: UserUpdateRequest,
     service: UserServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> UserResponse:
     """Update a user.
 
