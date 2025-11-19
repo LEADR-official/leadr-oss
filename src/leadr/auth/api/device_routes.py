@@ -5,21 +5,22 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from leadr.auth.api.device_schemas import DeviceResponse, DeviceUpdateRequest
-from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
+from leadr.auth.dependencies import AdminAuthContextDep, resolve_query_account_id
 from leadr.auth.domain.device import DeviceStatus
 from leadr.auth.services.dependencies import DeviceServiceDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
-from leadr.common.domain.ids import DeviceID, GameID
+from leadr.common.domain.ids import AccountID, DeviceID, GameID
 
 router = APIRouter()
 
 
 @router.get("/devices", response_model=PaginatedResponse[DeviceResponse])
 async def list_devices(
-    account_id: QueryAccountIDDep,
+    auth: AdminAuthContextDep,
     service: DeviceServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
+    account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     game_id: Annotated[GameID | None, Query(description="Filter by game ID")] = None,
     device_status: Annotated[
         str | None, Query(alias="status", description="Filter by status")
@@ -43,9 +44,10 @@ async def list_devices(
         GET /v1/devices?account_id=acc_123&game_id=game_456&status=active&limit=50
 
     Args:
-        account_id: Account ID (auto-resolved for regular users, required for superadmins).
+        auth: Authentication context with user info.
         service: Injected device service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
+        account_id: Optional account_id query parameter (required for superadmins).
         game_id: Optional game ID to filter by.
         device_status: Optional status to filter by (active, banned, suspended).
 
@@ -57,9 +59,11 @@ async def list_devices(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    resolved_account_id = resolve_query_account_id(auth, account_id)
+
     try:
         result = await service.list_devices(
-            account_id=account_id,
+            account_id=resolved_account_id,
             game_id=game_id,
             status=device_status,
             pagination=pagination,
@@ -86,7 +90,7 @@ async def list_devices(
 async def get_device(
     device_id: DeviceID,
     service: DeviceServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> DeviceResponse:
     """Get a device by ID.
 
@@ -119,7 +123,7 @@ async def update_device(
     device_id: DeviceID,
     request: DeviceUpdateRequest,
     service: DeviceServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> DeviceResponse:
     """Update a device (change status).
 

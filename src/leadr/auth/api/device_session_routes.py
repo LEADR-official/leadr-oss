@@ -8,20 +8,21 @@ from leadr.auth.api.device_session_schemas import (
     DeviceSessionResponse,
     DeviceSessionUpdateRequest,
 )
-from leadr.auth.dependencies import AuthContextDep, QueryAccountIDDep
+from leadr.auth.dependencies import AdminAuthContextDep, resolve_query_account_id
 from leadr.auth.services.dependencies import DeviceServiceDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
-from leadr.common.domain.ids import DeviceID, DeviceSessionID
+from leadr.common.domain.ids import AccountID, DeviceID, DeviceSessionID
 
 router = APIRouter()
 
 
 @router.get("/device-sessions", response_model=PaginatedResponse[DeviceSessionResponse])
 async def list_sessions(
-    account_id: QueryAccountIDDep,
+    auth: AdminAuthContextDep,
     service: DeviceServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
+    account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     device_id: Annotated[DeviceID | None, Query(description="Filter by device ID")] = None,
 ) -> PaginatedResponse[DeviceSessionResponse]:
     """List device sessions for an account with optional filters and pagination.
@@ -42,9 +43,10 @@ async def list_sessions(
         GET /v1/device-sessions?account_id=acc_123&device_id=dev_456&limit=50
 
     Args:
-        account_id: Account ID (auto-resolved for regular users, required for superadmins).
+        auth: Authentication context with user info.
         service: Injected device service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
+        account_id: Optional account_id query parameter (required for superadmins).
         device_id: Optional device ID to filter by.
 
     Returns:
@@ -55,9 +57,11 @@ async def list_sessions(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    resolved_account_id = resolve_query_account_id(auth, account_id)
+
     try:
         result = await service.list_sessions(
-            account_id=account_id,
+            account_id=resolved_account_id,
             device_id=device_id,
             pagination=pagination,
         )
@@ -81,7 +85,7 @@ async def list_sessions(
 async def get_session(
     session_id: DeviceSessionID,
     service: DeviceServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> DeviceSessionResponse:
     """Get a device session by ID.
 
@@ -117,7 +121,7 @@ async def update_session(
     session_id: DeviceSessionID,
     request: DeviceSessionUpdateRequest,
     service: DeviceServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> DeviceSessionResponse:
     """Update a device session (revoke).
 

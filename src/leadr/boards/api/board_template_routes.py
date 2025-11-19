@@ -2,12 +2,12 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
-    AuthContextDep,
-    QueryAccountIDDep,
+    AdminAuthContextDep,
+    resolve_query_account_id,
     validate_body_account_id,
 )
 from leadr.boards.api.board_template_schemas import (
@@ -18,7 +18,7 @@ from leadr.boards.api.board_template_schemas import (
 from leadr.boards.services.dependencies import BoardTemplateServiceDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
-from leadr.common.domain.ids import BoardTemplateID, GameID
+from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 
 router = APIRouter()
 
@@ -29,7 +29,7 @@ router = APIRouter()
     response_model=BoardTemplateResponse,
 )
 async def create_board_template(
-    request: BoardTemplateCreateRequest, service: BoardTemplateServiceDep, auth: AuthContextDep
+    request: BoardTemplateCreateRequest, service: BoardTemplateServiceDep, auth: AdminAuthContextDep
 ) -> BoardTemplateResponse:
     """Create a new board template.
 
@@ -77,7 +77,7 @@ async def create_board_template(
 
 @router.get("/board-templates/{template_id}", response_model=BoardTemplateResponse)
 async def get_board_template(
-    template_id: BoardTemplateID, service: BoardTemplateServiceDep, auth: AuthContextDep
+    template_id: BoardTemplateID, service: BoardTemplateServiceDep, auth: AdminAuthContextDep
 ) -> BoardTemplateResponse:
     """Get a board template by ID.
 
@@ -107,10 +107,11 @@ async def get_board_template(
 
 @router.get("/board-templates", response_model=PaginatedResponse[BoardTemplateResponse])
 async def list_board_templates(
-    account_id: QueryAccountIDDep,
+    auth: AdminAuthContextDep,
     service: BoardTemplateServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
-    game_id: GameID | None = None,
+    account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
+    game_id: Annotated[GameID | None, Query(description="Filter by game ID")] = None,
 ) -> PaginatedResponse[BoardTemplateResponse]:
     """List board templates for an account with pagination, optionally filtered by game.
 
@@ -127,9 +128,10 @@ async def list_board_templates(
         GET /v1/board-templates?account_id=acc_123&game_id=gam_456&limit=50&sort=name:asc
 
     Args:
-        account_id: Account ID (auto-resolved for regular users, required for superadmins).
+        auth: Authentication context with user info.
         service: Injected board template service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
+        account_id: Optional account_id query parameter (required for superadmins).
         game_id: Optional game ID to filter templates by.
 
     Returns:
@@ -140,14 +142,16 @@ async def list_board_templates(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    resolved_account_id = resolve_query_account_id(auth, account_id)
+
     try:
         if game_id is not None:
             result = await service.list_board_templates_by_game(
-                account_id, game_id, pagination=pagination
+                resolved_account_id, game_id, pagination=pagination
             )
         else:
             result = await service.list_board_templates_by_account(
-                account_id, pagination=pagination
+                resolved_account_id, pagination=pagination
             )
     except (CursorValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
@@ -170,7 +174,7 @@ async def update_board_template(
     template_id: BoardTemplateID,
     request: BoardTemplateUpdateRequest,
     service: BoardTemplateServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> BoardTemplateResponse:
     """Update a board template.
 

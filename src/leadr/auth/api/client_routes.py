@@ -9,7 +9,7 @@ from leadr.auth.api.client_schemas import (
     StartSessionRequest,
     StartSessionResponse,
 )
-from leadr.auth.dependencies import DeviceTokenDep
+from leadr.auth.dependencies import ClientAuthContextDep
 from leadr.auth.services.dependencies import DeviceServiceDep, NonceServiceDep
 from leadr.common.domain.exceptions import EntityNotFoundError
 
@@ -113,7 +113,7 @@ async def refresh_session(
     status_code=status.HTTP_200_OK,
 )
 async def generate_nonce(
-    device: DeviceTokenDep,
+    auth: ClientAuthContextDep,
     service: NonceServiceDep,
 ) -> NonceResponse:
     """Generate a fresh nonce for replay protection.
@@ -125,7 +125,7 @@ async def generate_nonce(
     Requires device authentication via access token.
 
     Args:
-        device: Authenticated device from require_device_token dependency
+        auth: Authenticated client auth context (device guaranteed non-None)
         service: NonceService dependency
 
     Returns:
@@ -140,7 +140,8 @@ async def generate_nonce(
         3. Client includes nonce in leadr-client-nonce header for mutations
         4. Server validates and consumes nonce (single-use)
     """
-    nonce_value, expires_at = await service.generate_nonce(device_id=device.id)
+    # Access device from auth context (guaranteed non-None by ClientAuthContext)
+    nonce_value, expires_at = await service.generate_nonce(device_id=auth.device.id)
 
     return NonceResponse(
         nonce_value=nonce_value,

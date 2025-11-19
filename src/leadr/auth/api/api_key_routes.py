@@ -12,15 +12,15 @@ from leadr.auth.api.api_key_schemas import (
     UpdateAPIKeyRequest,
 )
 from leadr.auth.dependencies import (
-    AuthContextDep,
-    QueryAccountIDDep,
+    AdminAuthContextDep,
+    resolve_query_account_id,
     validate_body_account_id,
 )
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.dependencies import APIKeyServiceDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
-from leadr.common.domain.ids import APIKeyID
+from leadr.common.domain.ids import AccountID, APIKeyID
 
 router = APIRouter()
 
@@ -33,7 +33,7 @@ router = APIRouter()
 async def create_api_key(
     request: CreateAPIKeyRequest,
     service: APIKeyServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> CreateAPIKeyResponse:
     """Create a new API key for an account.
 
@@ -75,9 +75,10 @@ async def create_api_key(
     response_model=PaginatedResponse[APIKeyResponse],
 )
 async def list_api_keys(
+    auth: AdminAuthContextDep,
     service: APIKeyServiceDep,
-    account_id: QueryAccountIDDep,
     pagination: Annotated[PaginationParams, Depends()],
+    account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     key_status: Annotated[
         APIKeyStatus | None, Query(alias="status", description="Filter by status")
     ] = None,
@@ -97,9 +98,10 @@ async def list_api_keys(
         GET /v1/api-keys?account_id=acc_123&status=active&limit=50&sort=name:asc
 
     Args:
+        auth: Authentication context with user info.
         service: Injected API key service dependency.
-        account_id: Account ID (auto-resolved for regular users, required for superadmins).
         pagination: Pagination parameters (cursor, limit, sort).
+        account_id: Optional account_id query parameter (required for superadmins).
         key_status: Optional status to filter results (active or revoked).
 
     Returns:
@@ -110,9 +112,11 @@ async def list_api_keys(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    resolved_account_id = resolve_query_account_id(auth, account_id)
+
     try:
         result = await service.list_api_keys(
-            account_id=account_id,
+            account_id=resolved_account_id,
             status=key_status.value if key_status else None,
             pagination=pagination,
         )
@@ -139,7 +143,7 @@ async def list_api_keys(
 async def get_api_key(
     key_id: APIKeyID,
     service: APIKeyServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> APIKeyResponse:
     """Get a single API key by ID.
 
@@ -175,7 +179,7 @@ async def update_api_key(
     key_id: APIKeyID,
     request: UpdateAPIKeyRequest,
     service: APIKeyServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> APIKeyResponse:
     """Update an API key.
 

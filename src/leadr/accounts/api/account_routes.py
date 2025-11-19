@@ -11,7 +11,7 @@ from leadr.accounts.api.account_schemas import (
 )
 from leadr.accounts.domain.account import AccountStatus
 from leadr.accounts.services.dependencies import AccountServiceDep
-from leadr.auth.dependencies import AuthContextDep
+from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID
@@ -23,7 +23,7 @@ router = APIRouter()
 async def create_account(
     request: AccountCreateRequest,
     service: AccountServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> AccountResponse:
     """Create a new account.
 
@@ -59,7 +59,7 @@ async def create_account(
 async def get_account(
     account_id: AccountID,
     service: AccountServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> AccountResponse:
     """Get an account by ID.
 
@@ -89,7 +89,7 @@ async def get_account(
 @router.get("/accounts", response_model=PaginatedResponse[AccountResponse])
 async def list_accounts(
     service: AccountServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
     pagination: Annotated[PaginationParams, Depends()],
 ) -> PaginatedResponse[AccountResponse]:
     """List accounts with pagination.
@@ -131,7 +131,7 @@ async def list_accounts(
         )
     else:
         # Regular users see only their own account (no pagination needed)
-        account = await service.get_by_id_or_raise(auth.api_key.account_id)
+        account = await service.get_by_id_or_raise(auth.account_id)
         return PaginatedResponse(
             data=[AccountResponse.from_domain(account)],
             pagination=PaginationMeta(
@@ -149,7 +149,7 @@ async def update_account(
     account_id: AccountID,
     request: AccountUpdateRequest,
     service: AccountServiceDep,
-    auth: AuthContextDep,
+    auth: AdminAuthContextDep,
 ) -> AccountResponse:
     """Update an account.
 
