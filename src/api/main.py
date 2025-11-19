@@ -13,12 +13,18 @@ from api.routes import router as api_router
 from leadr.accounts.api.account_routes import router as account_router
 from leadr.accounts.api.user_routes import router as user_router
 from leadr.auth.api.api_key_routes import router as api_key_router
-from leadr.auth.api.client_routes import router as client_auth_router
+from leadr.auth.api.client_routes import (
+    protected_router as client_protected_router,
+)
+from leadr.auth.api.client_routes import (
+    public_router as client_public_router,
+)
 from leadr.auth.api.device_routes import router as device_router
 from leadr.auth.api.device_session_routes import router as device_session_router
 from leadr.auth.bootstrap import ensure_superadmin_exists
 from leadr.auth.dependencies import require_api_key
 from leadr.auth.services.nonce_tasks import cleanup_expired_nonces
+from leadr.boards.api.board_routes import client_router as board_client_router
 from leadr.boards.api.board_routes import router as board_router
 from leadr.boards.api.board_template_routes import router as board_template_router
 from leadr.boards.services.board_tasks import expire_boards, process_due_templates
@@ -35,6 +41,7 @@ from leadr.common.geoip import GeoIPService
 from leadr.config import settings
 from leadr.games.api.game_routes import router as game_router
 from leadr.scores.api.score_flag_routes import router as score_flag_router
+from leadr.scores.api.score_routes import client_router as score_client_router
 from leadr.scores.api.score_routes import router as score_router
 from leadr.scores.api.score_submission_meta_routes import router as score_submission_meta_router
 
@@ -138,11 +145,15 @@ app.add_middleware(GeoIPMiddleware, dev_override_ip=settings.DEV_OVERRIDE_IP)
 
 # Create public and admin routers with separate authentication requirements
 public_router = APIRouter()
+client_router = APIRouter()
 admin_router = APIRouter(dependencies=[Depends(require_api_key)])
 
 # Public routes - accessible without authentication
 public_router.include_router(api_router)
-public_router.include_router(client_auth_router, tags=["Client Authentication"])
+public_router.include_router(client_public_router, tags=["Client Authentication"])
+
+# Client routes - require client auth flow
+client_router.include_router(client_protected_router, tags=["Client Authentication"])
 
 # Admin routes - require API key authentication
 admin_router.include_router(account_router, tags=["Accounts"])
@@ -163,6 +174,12 @@ app.include_router(public_router, prefix=settings.API_PREFIX)
 # Include admin router only when Admin API is enabled
 if settings.ENABLE_ADMIN_API:
     app.include_router(admin_router, prefix=settings.API_PREFIX)
+
+# Include client router only when Client API is enabled
+if settings.ENABLE_CLIENT_API:
+    app.include_router(client_router, prefix=settings.API_PREFIX)
+    app.include_router(board_client_router, prefix=settings.API_PREFIX, tags=["Scores"])
+    app.include_router(score_client_router, prefix=settings.API_PREFIX, tags=["Scores"])
 
 
 if __name__ == "__main__":
