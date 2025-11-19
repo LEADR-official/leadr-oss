@@ -218,12 +218,14 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
         """Get the ORM model class."""
         return DeviceORM
 
-    async def get_by_game_and_device_id(self, game_id: GameID, device_id: str) -> Device | None:
-        """Get device by game_id and device_id, returns None if not found or soft-deleted.
+    async def get_by_game_and_fingerprint(
+        self, game_id: GameID, client_fingerprint: str
+    ) -> Device | None:
+        """Get device by game_id and client_fingerprint, returns None if not found or soft-deleted.
 
         Args:
             game_id: The game ID
-            device_id: The client-generated device identifier
+            client_fingerprint: The client-generated SHA256 device fingerprint
 
         Returns:
             Device if found and not deleted, None otherwise
@@ -231,7 +233,7 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
         game_uuid = self._extract_uuid(game_id)
         query = select(DeviceORM).where(
             DeviceORM.game_id == game_uuid,
-            DeviceORM.device_id == device_id,
+            DeviceORM.client_fingerprint == client_fingerprint,
             DeviceORM.deleted_at.is_(None),
         )
         result = await self.session.execute(query)

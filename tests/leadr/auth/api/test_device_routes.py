@@ -29,14 +29,16 @@ class TestDeviceRoutes:
 
         # Create devices
         device_service = DeviceService(db_session)
+        hash1 = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+        hash2 = "f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89"
         device1, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint=hash1,
             platform="iOS",
         )
         device2, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-002",
+            client_fingerprint=hash2,
             platform="Android",
         )
 
@@ -51,9 +53,9 @@ class TestDeviceRoutes:
         assert "data" in data
         assert "pagination" in data
         assert len(data["data"]) == 2
-        device_ids = {d["device_id"] for d in data["data"]}
-        assert "test-device-001" in device_ids
-        assert "test-device-002" in device_ids
+        device_ids = {d["client_fingerprint"] for d in data["data"]}
+        assert hash1 in device_ids
+        assert hash2 in device_ids
 
     async def test_list_devices_filter_by_game(self, client: AsyncClient, db_session, test_api_key):
         """Test filtering devices by game_id via API."""
@@ -76,13 +78,15 @@ class TestDeviceRoutes:
 
         # Create devices for both games
         device_service = DeviceService(db_session)
+        hash1 = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+        hash2 = "f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89"
         await device_service.start_session(
             game_id=game1.id,
-            device_id="game1-device",
+            client_fingerprint=hash1,
         )
         await device_service.start_session(
             game_id=game2.id,
-            device_id="game2-device",
+            client_fingerprint=hash2,
         )
 
         # Filter by game1
@@ -96,7 +100,7 @@ class TestDeviceRoutes:
         assert "data" in data
         assert "pagination" in data
         assert len(data["data"]) == 1
-        assert data["data"][0]["device_id"] == "game1-device"
+        assert data["data"][0]["client_fingerprint"] == hash1
 
     async def test_list_devices_filter_by_status(
         self, client: AsyncClient, db_session, test_api_key
@@ -117,13 +121,15 @@ class TestDeviceRoutes:
 
         # Create devices
         device_service = DeviceService(db_session)
+        hash1 = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+        hash2 = "f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89"
         device1, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="active-device",
+            client_fingerprint=hash1,
         )
         device2, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="banned-device",
+            client_fingerprint=hash2,
         )
 
         # Ban one device
@@ -141,7 +147,7 @@ class TestDeviceRoutes:
         assert "data" in data
         assert "pagination" in data
         assert len(data["data"]) == 1
-        assert data["data"][0]["device_id"] == "active-device"
+        assert data["data"][0]["client_fingerprint"] == hash1
         assert data["data"][0]["status"] == "active"
 
     async def test_get_device(self, client: AsyncClient, db_session, test_api_key):
@@ -161,9 +167,10 @@ class TestDeviceRoutes:
 
         # Create device
         device_service = DeviceService(db_session)
+        hash1 = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint=hash1,
             platform="iOS",
         )
 
@@ -176,7 +183,7 @@ class TestDeviceRoutes:
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == str(device.id)
-        assert data["device_id"] == "test-device-001"
+        assert data["client_fingerprint"] == hash1
         assert data["platform"] == "iOS"
         assert data["status"] == "active"
 
@@ -208,7 +215,7 @@ class TestDeviceRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Ban device
@@ -241,7 +248,7 @@ class TestDeviceRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Suspend device
@@ -274,7 +281,7 @@ class TestDeviceRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
         device.suspend()
         await device_service.repository.update(device)

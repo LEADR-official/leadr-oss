@@ -16,8 +16,8 @@ class StartSessionRequest(BaseModel):
     """
 
     game_id: GameID = Field(description="ID of the game this device belongs to")
-    device_id: str = Field(
-        description="Client-generated unique device identifier (e.g., UUID, hardware ID)"
+    client_fingerprint: str = Field(
+        description="Client-generated SHA256 device fingerprint (64 hex characters)"
     )
     platform: str | None = Field(
         default=None, description="Device platform (e.g., 'ios', 'android', 'pc', 'console')"
@@ -37,7 +37,9 @@ class StartSessionResponse(BaseModel):
 
     id: DeviceID = Field(description="Unique identifier for the device")
     game_id: GameID = Field(description="ID of the game")
-    device_id: str = Field(description="Client-generated device identifier")
+    client_fingerprint: str = Field(
+        description="Client-generated SHA256 device fingerprint (64 hex characters)"
+    )
     account_id: AccountID = Field(description="ID of the account that owns the game")
     platform: str | None = Field(default=None, description="Device platform")
     status: DeviceStatus = Field(description="Device status (active, suspended, banned)")
@@ -66,7 +68,7 @@ class StartSessionResponse(BaseModel):
         return cls(
             id=device.id,
             game_id=device.game_id,
-            device_id=device.device_id,
+            client_fingerprint=device.client_fingerprint,
             account_id=device.account_id,
             platform=device.platform,
             status=device.status,

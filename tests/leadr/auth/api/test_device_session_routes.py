@@ -29,13 +29,15 @@ class TestDeviceSessionRoutes:
 
         # Create devices and sessions
         device_service = DeviceService(db_session)
+        hash1 = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+        hash2 = "f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89"
         device1, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint=hash1,
         )
         device2, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-002",
+            client_fingerprint=hash2,
         )
 
         # List sessions
@@ -69,13 +71,15 @@ class TestDeviceSessionRoutes:
 
         # Create devices and sessions
         device_service = DeviceService(db_session)
+        hash1 = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+        hash2 = "f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89"
         device1, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint=hash1,
         )
         await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-002",
+            client_fingerprint=hash2,
         )
 
         # Filter by device1
@@ -110,7 +114,7 @@ class TestDeviceSessionRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Get the session
@@ -159,7 +163,7 @@ class TestDeviceSessionRoutes:
         device_service = DeviceService(db_session)
         device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            device_id="test-device-001",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
 
         # Get the session

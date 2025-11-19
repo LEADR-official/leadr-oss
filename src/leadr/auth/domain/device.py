@@ -1,10 +1,11 @@
 """Device domain models for client authentication."""
 
+import re
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from leadr.common.domain.ids import AccountID, DeviceID, DeviceSessionID, GameID
 from leadr.common.domain.models import Entity
@@ -23,7 +24,7 @@ class Device(Entity):
 
     Represents a game client device (e.g., mobile device, PC, console).
     Devices are scoped per-game and used for client authentication.
-    Each device is identified by a client-generated device_id.
+    Each device is identified by a client-generated SHA256 fingerprint.
     """
 
     id: DeviceID = Field(
@@ -32,13 +33,33 @@ class Device(Entity):
         description="Unique device identifier",
     )
     game_id: GameID
-    device_id: str
+    client_fingerprint: str = Field(
+        description="Client-generated SHA256 device fingerprint (64 hex characters)"
+    )
     account_id: AccountID
     platform: str | None = None
     status: DeviceStatus = DeviceStatus.ACTIVE
     first_seen_at: datetime
     last_seen_at: datetime
     metadata: dict[str, Any] = {}
+
+    @field_validator("client_fingerprint")
+    @classmethod
+    def validate_sha256(cls, v: str) -> str:
+        """Validate that client_fingerprint is a valid SHA256 hash.
+
+        Args:
+            v: The client_fingerprint value to validate.
+
+        Returns:
+            The normalized (lowercase) client_fingerprint.
+
+        Raises:
+            ValueError: If the fingerprint is not a valid 64-character hex string.
+        """
+        if not re.match(r"^[a-f0-9]{64}$", v.lower()):
+            raise ValueError("client_fingerprint must be a 64-character SHA256 hash (hex)")
+        return v.lower()  # Normalize to lowercase
 
     def is_active(self) -> bool:
         """Check if the device is active.

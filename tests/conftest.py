@@ -295,7 +295,7 @@ async def test_device(db_session: AsyncSession, test_account: Account, test_game
         id=device_id,
         account_id=test_account.id,
         game_id=test_game.id,
-        device_id="test-device-001",
+        client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         first_seen_at=now,
         last_seen_at=now,
         created_at=now,

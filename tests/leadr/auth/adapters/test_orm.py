@@ -29,7 +29,7 @@ class TestDeviceORM:
         device = DeviceORM(
             id=device_id_val,
             game_id=game_orm.id,
-            device_id="test-device-123",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
             account_id=game_orm.account_id,
             status="active",
             first_seen_at=datetime.now(UTC),
@@ -43,7 +43,10 @@ class TestDeviceORM:
 
         assert device.id == device_id_val
         assert device.game_id == game_orm.id
-        assert device.device_id == "test-device-123"
+        assert (
+            device.client_fingerprint
+            == "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+        )
         assert device.account_id == game_orm.account_id
         assert device.status == "active"
         assert device.first_seen_at is not None
@@ -56,16 +59,16 @@ class TestDeviceORM:
         """Test that device status defaults to active."""
         assert device_orm.status == "active"
 
-    async def test_device_game_id_and_device_id_unique_together(
+    async def test_device_game_id_and_client_fingerprint_unique_together(
         self, db_session: AsyncSession, device_orm: DeviceORM
     ):
-        """Test that (game_id, device_id) must be unique together."""
+        """Test that (game_id, client_fingerprint) must be unique together."""
         now = datetime.now(UTC)
 
         # Try to create duplicate device
         device2 = DeviceORM(
             game_id=device_orm.game_id,
-            device_id=device_orm.device_id,  # Same device_id for same game
+            client_fingerprint=device_orm.client_fingerprint,  # Same fingerprint for same game
             account_id=device_orm.account_id,
             first_seen_at=now,
             last_seen_at=now,
@@ -75,10 +78,10 @@ class TestDeviceORM:
         with pytest.raises(IntegrityError):
             await db_session.commit()
 
-    async def test_device_same_device_id_different_games_allowed(
+    async def test_device_same_client_fingerprint_different_games_allowed(
         self, db_session: AsyncSession, account_orm: AccountORM
     ):
-        """Test that same device_id can exist for different games."""
+        """Test that same client_fingerprint can exist for different games."""
         game1 = GameORM(
             account_id=account_orm.id,
             name="Game 1",
@@ -95,7 +98,7 @@ class TestDeviceORM:
 
         device1 = DeviceORM(
             game_id=game1.id,
-            device_id="same-device",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
             account_id=account_orm.id,
             first_seen_at=now,
             last_seen_at=now,
@@ -103,7 +106,8 @@ class TestDeviceORM:
 
         device2 = DeviceORM(
             game_id=game2.id,
-            device_id="same-device",  # Same device_id but different game
+            # Same fingerprint but different game
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
             account_id=account_orm.id,
             first_seen_at=now,
             last_seen_at=now,
@@ -117,7 +121,7 @@ class TestDeviceORM:
         await db_session.refresh(device1)
         await db_session.refresh(device2)
 
-        assert device1.device_id == device2.device_id
+        assert device1.client_fingerprint == device2.client_fingerprint
         assert device1.game_id != device2.game_id
 
     async def test_device_cascades_on_game_delete(
@@ -162,7 +166,7 @@ class TestDeviceORM:
         device_orm = DeviceORM(
             id=device_id_val,
             game_id=game.id,
-            device_id="test-device",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
             account_id=game.account_id,
             status=DeviceStatusEnum.ACTIVE,
             first_seen_at=now,
@@ -178,7 +182,10 @@ class TestDeviceORM:
         assert isinstance(device_domain, Device)
         assert device_domain.id == device_id_val
         assert device_domain.game_id == game.id
-        assert device_domain.device_id == "test-device"
+        assert (
+            device_domain.client_fingerprint
+            == "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+        )
         assert device_domain.account_id == game.account_id
         assert device_domain.status == DeviceStatus.ACTIVE
         assert device_domain.first_seen_at == now
@@ -195,7 +202,7 @@ class TestDeviceORM:
         device_domain = Device(
             id=DeviceID(device_id_val),
             game_id=game_id,
-            device_id="test-device",
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
             account_id=account_id,
             status=DeviceStatus.BANNED,
             first_seen_at=now,
@@ -210,7 +217,10 @@ class TestDeviceORM:
 
         assert device_orm.id == device_id_val
         assert device_orm.game_id == game_id.uuid
-        assert device_orm.device_id == "test-device"
+        assert (
+            device_orm.client_fingerprint
+            == "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+        )
         assert device_orm.account_id == account_id.uuid
         assert device_orm.status == "banned"
         assert device_orm.first_seen_at == now

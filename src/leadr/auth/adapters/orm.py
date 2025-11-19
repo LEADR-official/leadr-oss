@@ -91,8 +91,8 @@ class DeviceORM(Base):
         nullable=False,
         index=True,
     )
-    device_id: Mapped[str] = mapped_column(
-        String,
+    client_fingerprint: Mapped[str] = mapped_column(
+        String(64),  # Fixed length for SHA256 hash
         nullable=False,
     )
     account_id: Mapped[UUID] = mapped_column(
@@ -144,8 +144,8 @@ class DeviceORM(Base):
 
     # Indexes
     __table_args__ = (
-        # Composite unique index on (game_id, device_id)
-        Index("ix_devices_game_device", "game_id", "device_id", unique=True),
+        # Composite unique index on (game_id, client_fingerprint)
+        Index("ix_devices_game_device", "game_id", "client_fingerprint", unique=True),
     )
 
     @classmethod
@@ -157,7 +157,7 @@ class DeviceORM(Base):
             updated_at=device.updated_at,
             deleted_at=device.deleted_at,
             game_id=device.game_id.uuid,
-            device_id=device.device_id,
+            client_fingerprint=device.client_fingerprint,
             account_id=device.account_id.uuid,
             platform=device.platform,
             status=DeviceStatusEnum(device.status.value),
@@ -174,7 +174,7 @@ class DeviceORM(Base):
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
             game_id=GameID(self.game_id),
-            device_id=self.device_id,
+            client_fingerprint=self.client_fingerprint,
             account_id=AccountID(self.account_id),
             platform=self.platform,
             status=DeviceStatus(self.status.value),

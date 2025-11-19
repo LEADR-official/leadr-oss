@@ -31,7 +31,7 @@ class TestNonceRepository:
         created_nonce = await repository.create(nonce)
 
         assert created_nonce.id == nonce.id
-        assert created_nonce.device_id == device_orm.id
+        assert created_nonce.device_id == DeviceID(device_orm.id)
         assert created_nonce.nonce_value == nonce.nonce_value
         assert created_nonce.status == NonceStatus.PENDING
 
@@ -43,7 +43,7 @@ class TestNonceRepository:
 
         assert retrieved is not None
         assert retrieved.id == nonce_orm.id
-        assert retrieved.device_id == nonce_orm.device_id
+        assert retrieved.device_id == DeviceID(nonce_orm.device_id)
         assert retrieved.nonce_value == nonce_orm.nonce_value
 
     async def test_get_by_nonce_value_returns_nonce(
@@ -68,7 +68,7 @@ class TestNonceRepository:
 
         assert retrieved is not None
         assert retrieved.nonce_value == nonce_value
-        assert retrieved.device_id == device_orm.id
+        assert retrieved.device_id == DeviceID(device_orm.id)
         assert retrieved.status == NonceStatus.PENDING
 
     async def test_get_by_nonce_value_returns_none_for_unknown_value(
