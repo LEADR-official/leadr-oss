@@ -1,10 +1,13 @@
 name: Build image
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_run:
+    workflows: ["CI", "Migrations"]
+    types:
+      - completed
+    branches:
+      - main
+      - '**'  # Include all branches (for PRs)
 
 permissions:
   packages: write
@@ -13,10 +16,14 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Only run if both prerequisite workflows succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -47,10 +54,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Get PR number
+        if: github.event.workflow_run.event == 'pull_request'
+        id: pr
+        run: |
+          PR_NUMBER=$(echo '${{ toJson(github.event.workflow_run.pull_requests) }}' | jq -r '.[0].number')
+          echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+
       - name: Comment on PR with image location
-        if: github.event_name == 'pull_request'
+        if: github.event.workflow_run.event == 'pull_request' && steps.pr.outputs.number != ''
         uses: thollander/actions-comment-pull-request@v2
         with:
+          pr_number: ${{ steps.pr.outputs.number }}
           message: |
             ## 🐳 Docker Image Built
 
