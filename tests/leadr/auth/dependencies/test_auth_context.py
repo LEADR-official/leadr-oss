@@ -70,7 +70,7 @@ class TestAuthContext:
             id=device_id,
             account_id=account_id,
             game_id=GameID(),
-            client_fingerprint="test_device_123",
+            client_fingerprint="a" * 64,  # Valid SHA256 hash
             platform="test",
             status=DeviceStatus.ACTIVE,
             first_seen_at=now,
@@ -294,7 +294,7 @@ class TestAuthContext:
             id=device_id,
             account_id=account_id,
             game_id=GameID(),
-            client_fingerprint="test_device_123",
+            client_fingerprint="b" * 64,  # Valid SHA256 hash
             platform="test",
             status=DeviceStatus.ACTIVE,
             first_seen_at=now,
@@ -377,7 +377,7 @@ class TestClientAuthContext:
             id=device_id,
             account_id=account_id,
             game_id=GameID(),
-            client_fingerprint="test_device_123",
+            client_fingerprint="c" * 64,  # Valid SHA256 hash
             platform="test",
             status=DeviceStatus.ACTIVE,
             first_seen_at=now,

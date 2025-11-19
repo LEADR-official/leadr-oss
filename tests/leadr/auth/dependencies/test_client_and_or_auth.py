@@ -148,7 +148,7 @@ class TestClientOnlyAuth:
             id=DeviceID(),
             account_id=AccountID(),
             game_id=GameID(),
-            client_fingerprint="test_device",
+            client_fingerprint="a" * 64,  # Valid SHA256 hash
             platform="test",
             status=DeviceStatus.ACTIVE,
             first_seen_at=now,
@@ -191,7 +191,7 @@ class TestClientOnlyAuth:
             id=DeviceID(),
             account_id=AccountID(),
             game_id=GameID(),
-            client_fingerprint="test_device",
+            client_fingerprint="a" * 64,  # Valid SHA256 hash
             platform="test",
             status=DeviceStatus.ACTIVE,
             first_seen_at=now,
@@ -239,7 +239,7 @@ class TestClientOnlyAuth:
             id=DeviceID(),
             account_id=AccountID(),
             game_id=GameID(),
-            client_fingerprint="test_device",
+            client_fingerprint="a" * 64,  # Valid SHA256 hash
             platform="test",
             status=DeviceStatus.ACTIVE,
             first_seen_at=now,
@@ -287,7 +287,7 @@ class TestClientOnlyAuth:
             id=DeviceID(),
             account_id=AccountID(),
             game_id=GameID(),
-            client_fingerprint="test_device",
+            client_fingerprint="a" * 64,  # Valid SHA256 hash
             platform="test",
             status=DeviceStatus.ACTIVE,
             first_seen_at=now,
@@ -335,7 +335,7 @@ class TestClientOnlyAuth:
             id=DeviceID(),
             account_id=AccountID(),
             game_id=GameID(),
-            client_fingerprint="test_device",
+            client_fingerprint="a" * 64,  # Valid SHA256 hash
             platform="test",
             status=DeviceStatus.ACTIVE,
             first_seen_at=now,
@@ -384,7 +384,7 @@ class TestClientOnlyAuth:
             id=DeviceID(),
             account_id=account_id,
             game_id=GameID(),
-            client_fingerprint="test_device",
+            client_fingerprint="d" * 64,  # Valid SHA256 hash
             platform="test",
             status=DeviceStatus.ACTIVE,
             first_seen_at=now,
@@ -434,7 +434,7 @@ class TestClientOnlyAuth:
             id=DeviceID(),
             account_id=account_id,
             game_id=GameID(),
-            client_fingerprint="test_device",
+            client_fingerprint="e" * 64,  # Valid SHA256 hash
             platform="test",
             status=DeviceStatus.ACTIVE,
             first_seen_at=now,
@@ -478,7 +478,7 @@ class TestClientOnlyAuth:
             id=DeviceID(),
             account_id=AccountID(),
             game_id=GameID(),
-            client_fingerprint="test_device",
+            client_fingerprint="a" * 64,  # Valid SHA256 hash
             platform="test",
             status=DeviceStatus.ACTIVE,
             first_seen_at=now,
@@ -555,7 +555,7 @@ class TestORLogicAuth:
             id=DeviceID(),
             account_id=account_id,
             game_id=GameID(),
-            client_fingerprint="test_device",
+            client_fingerprint="f" * 64,  # Valid SHA256 hash
             platform="test",
             status=DeviceStatus.ACTIVE,
             first_seen_at=now,
