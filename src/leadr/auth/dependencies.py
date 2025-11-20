@@ -1,10 +1,12 @@
 """Authentication dependencies for FastAPI."""
 
+import json
 import logging
 from dataclasses import dataclass
 from typing import Annotated, Literal
+from uuid import UUID
 
-from fastapi import Body, Depends, Header, HTTPException, Query, Request
+from fastapi import Depends, Header, HTTPException, Query, Request
 
 from leadr.accounts.domain.user import User
 from leadr.accounts.services.dependencies import UserServiceDep
@@ -240,7 +242,6 @@ class AuthContextDependency:
         user_service: UserServiceDep,
         device_service: DeviceServiceDep,
         nonce_service: NonceServiceDep,
-        body_account_id: Annotated[AccountID | None, Body(alias="account_id")] = None,
         query_account_id: Annotated[AccountID | None, Query(alias="account_id")] = None,
         api_key: Annotated[str | None, Header(alias="leadr-api-key")] = None,
         authorization: Annotated[str | None, Header()] = None,
@@ -258,6 +259,7 @@ class AuthContextDependency:
             user_service: User service dependency.
             device_service: Device service dependency.
             nonce_service: Nonce service dependency.
+            query_account_id: Optional account_id from query parameters.
             api_key: The API key from 'leadr-api-key' header.
             authorization: The Authorization header (Bearer token).
             leadr_client_nonce: The nonce from 'leadr-client-nonce' header.
@@ -271,6 +273,20 @@ class AuthContextDependency:
             HTTPException: 401 if auth is disabled, missing, or invalid.
             HTTPException: 500 if server is misconfigured.
         """
+        # Extract account_id from request body if present (for POST/PATCH/PUT requests)
+        # Uses Starlette's cached body - safe to call multiple times
+        body_account_id = None
+        if request.method in ("POST", "PUT", "PATCH"):
+            try:
+                body_bytes = await request.body()
+                if body_bytes:
+                    body_data = json.loads(body_bytes)
+                    if isinstance(body_data, dict) and "account_id" in body_data:
+                        body_account_id = AccountID(value=UUID(body_data["account_id"]))
+            except (json.JSONDecodeError, ValueError, KeyError):
+                # Ignore parsing errors - let Pydantic validate the body
+                pass
+
         # Admin-only authentication
         if self.require_admin and not self.require_client:
             if not settings.ENABLE_ADMIN_API:

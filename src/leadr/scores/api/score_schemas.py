@@ -67,9 +67,18 @@ class ScoreCreateRequest(ScoreCreateRequestBase):
     device_id: DeviceID = Field(
         description="ID of the device that submitted this score (required for admin API)",
     )
-    timezone: str | None = Field()
-    country: str | None = Field()
-    city: str | None = Field()
+    timezone: str | None = Field(
+        default=None,
+        description="Optional override of GeoIP metadata",
+    )
+    country: str | None = Field(
+        default=None,
+        description="Optional override of GeoIP metadata",
+    )
+    city: str | None = Field(
+        default=None,
+        description="Optional override of GeoIP metadata",
+    )
 
 
 class ScoreClientCreateRequest(ScoreCreateRequestBase):
