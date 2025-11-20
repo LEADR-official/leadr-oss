@@ -4,7 +4,6 @@ import json
 import logging
 from dataclasses import dataclass
 from typing import Annotated, Literal
-from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, Query, Request
 
@@ -286,7 +285,7 @@ class AuthContextDependency:
                 if body_bytes:
                     body_data = json.loads(body_bytes)
                     if isinstance(body_data, dict) and "account_id" in body_data:
-                        body_account_id = AccountID(value=UUID(body_data["account_id"]))
+                        body_account_id = AccountID(body_data["account_id"])
             except (json.JSONDecodeError, ValueError, KeyError):
                 # Ignore parsing errors - let Pydantic validate the body
                 pass
