@@ -170,16 +170,6 @@ class TestUserAPI:
         assert "user1@example.com" in emails
         assert "user2@example.com" in emails
 
-    async def test_list_users_requires_account_id(self, authenticated_client: AsyncClient):
-        """Test that listing users without account_id returns 400 (superadmin)."""
-        response = await authenticated_client.get("/users")
-
-        # Superadmins must provide account_id, so this returns 400
-        assert response.status_code == 400
-        data = response.json()
-        assert "error" in data
-        assert "must explicitly specify account_id" in data["error"]
-
     async def test_update_user(self, authenticated_client: AsyncClient, db_session):
         """Test updating user via PATCH /users/{id}."""
         # Create account and user

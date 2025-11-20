@@ -9,7 +9,6 @@ from leadr.auth.dependencies import (
     AdminAuthContextDep,
     AuthContext,
     ClientAuthContextDep,
-    validate_body_account_id,
 )
 from leadr.boards.api.board_schemas import (
     BoardCreateRequest,
@@ -50,8 +49,6 @@ async def create_board(
         404: Game or account not found.
         400: Game doesn't belong to the specified account.
     """
-    validate_body_account_id(auth, request.account_id)
-
     try:
         board = await service.create_board(
             account_id=request.account_id,

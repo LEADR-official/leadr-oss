@@ -217,6 +217,7 @@ class AuthContextDependency:
         require_admin: bool = False,
         require_client: bool = False,
         require_nonce: bool = False,
+        require_superadmin_account_id: bool = False,
     ):
         """Initialize authentication requirements.
 
@@ -224,6 +225,8 @@ class AuthContextDependency:
             require_admin: If True, admin API key authentication is required.
             require_client: If True, client device token authentication is required.
             require_nonce: If True, nonce validation is required for client auth (mutations).
+            require_superadmin_account_id: If True, superadmins must provide account_id
+                query parameter on GET requests. Used for list endpoints.
 
         Raises:
             ValueError: If neither require_admin nor require_client is True.
@@ -234,6 +237,7 @@ class AuthContextDependency:
         self.require_admin = require_admin
         self.require_client = require_client
         self.require_nonce = require_nonce
+        self.require_superadmin_account_id = require_superadmin_account_id
 
     async def __call__(
         self,
@@ -310,12 +314,25 @@ class AuthContextDependency:
                 user_service=user_service,
                 request=request,
             )
-            # Check access if an account_id was provided
+
+            # Superadmins must explicitly provide account_id for GET requests on list endpoints
             account_id_to_check = body_account_id or query_account_id
+            if (
+                self.require_superadmin_account_id
+                and auth_context.is_superadmin
+                and request.method == "GET"
+                and account_id_to_check is None
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Superadmin must explicitly specify account_id query parameter",
+                )
+
+            # Check access if an account_id was provided
             if account_id_to_check and not auth_context.has_access_to_account(account_id_to_check):
                 raise HTTPException(
-                    status_code=401,
-                    detail="Unauthorised access",
+                    status_code=403,
+                    detail="Access denied to the specified account",
                 )
             return auth_context
 
@@ -482,151 +499,18 @@ class AuthContextDependency:
 
 # Create dependency instances for common use cases
 require_admin_auth = AuthContextDependency(require_admin=True)
+require_admin_auth_with_account_id = AuthContextDependency(
+    require_admin=True, require_superadmin_account_id=True
+)
 require_client_auth = AuthContextDependency(require_client=True)
 require_client_auth_with_nonce = AuthContextDependency(require_client=True, require_nonce=True)
 
 # Type aliases for dependency injection with specific return types
 AdminAuthContextDep = Annotated[AdminAuthContext, Depends(require_admin_auth)]
+AdminAuthContextWithAccountIDDep = Annotated[
+    AdminAuthContext, Depends(require_admin_auth_with_account_id)
+]
 ClientAuthContextDep = Annotated[ClientAuthContext, Depends(require_client_auth)]
 ClientAuthContextWithNonceDep = Annotated[
     ClientAuthContext, Depends(require_client_auth_with_nonce)
 ]
-
-
-def resolve_query_account_id(
-    auth: AdminAuthContext,
-    account_id: AccountID | None,
-) -> AccountID:
-    """Resolve account_id from query parameter based on user type.
-
-    For superadmin users:
-        - account_id query parameter is REQUIRED for list endpoints
-        - Raises 400 if not provided
-        - Returns the provided account_id (can access any account)
-
-    For regular users:
-        - account_id query parameter is optional/ignored
-        - Returns auth.account_id (can only access their own account)
-        - Raises 403 if provided account_id doesn't match
-
-    Args:
-        auth: The authenticated admin context.
-        account_id: Optional account_id from query parameter.
-
-    Returns:
-        AccountID to use for the query.
-
-    Raises:
-        HTTPException: 400 if superadmin doesn't provide account_id.
-        HTTPException: 403 if regular user tries to access another account.
-    """
-    if auth.is_superadmin:
-        if account_id is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Superadmin must explicitly specify account_id query parameter",
-            )
-        return account_id
-    else:
-        if account_id is not None and account_id != auth.account_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied to the specified account",
-            )
-        return auth.account_id
-
-
-def resolve_and_validate_account_id(
-    auth: AuthContext,
-    account_id: AccountID | None,
-) -> AccountID:
-    """Resolve and validate account_id based on authentication context.
-
-    This function enforces that only superadmins can specify account_id in requests.
-    Regular admins and clients must use their auth context's account_id.
-
-    Rules:
-    - If account_id is None: Returns auth.account_id (works for all users)
-    - If account_id is provided AND user is superadmin: Returns the provided account_id
-    - If account_id is provided AND user is NOT superadmin: Raises 403 Forbidden
-
-    Args:
-        auth: The authenticated context.
-        account_id: The account_id from request body/query (None if not provided).
-
-    Returns:
-        The resolved account_id to use for the operation.
-
-    Raises:
-        HTTPException: 403 if non-superadmin provides account_id.
-
-    Example:
-        >>> @router.post("/games", status_code=201)
-        >>> async def create_game(
-        >>>     request: GameCreateRequest,
-        >>>     service: GameServiceDep,
-        >>>     auth: AdminAuthContextDep,
-        >>> ):
-        >>>     account_id = resolve_and_validate_account_id(auth, request.account_id)
-        >>>     game = await service.create_game(account_id=account_id, ...)
-        >>>     return GameResponse.from_domain(game)
-    """
-    # If no account_id provided, use auth context's account
-    if account_id is None:
-        return auth.account_id
-
-    # If account_id provided, only superadmins can specify it
-    if not auth.is_superadmin:
-        raise HTTPException(
-            status_code=403,
-            detail=(
-                "Only superadmins can specify account_id. "
-                "Regular users must use their authenticated account."
-            ),
-        )
-
-    # Superadmin can access any account
-    return account_id
-
-
-def validate_body_account_id(
-    auth: AuthContext,
-    account_id: AccountID,
-) -> None:
-    """Validate that an account_id from request body matches authorized account.
-
-    DEPRECATED: Use resolve_and_validate_account_id instead, which handles None values
-    and enforces superadmin-only account_id specification.
-
-    For superadmin users:
-        - Can access any account, so any account_id is accepted
-
-    For regular users and clients:
-        - Can only access their own account
-        - Raises 403 Forbidden if account_id doesn't match their auth account
-
-    Args:
-        auth: The authenticated context.
-        account_id: The account_id from the request body to validate.
-
-    Raises:
-        HTTPException: 403 Forbidden if trying to access unauthorized account.
-
-    Example:
-        >>> @router.post("/games", status_code=201)
-        >>> async def create_game(
-        >>>     request: GameCreateRequest,
-        >>>     service: GameServiceDep,
-        >>>     auth: AdminAuthContextDep,
-        >>> ):
-        >>>     validate_body_account_id(auth, request.account_id)
-        >>>     game = await service.create_game(...)
-        >>>     return GameResponse.from_domain(game)
-    """
-    if not auth.is_superadmin:
-        # Regular users/clients can only access their own account
-        if account_id != auth.account_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied to the specified account",
-            )

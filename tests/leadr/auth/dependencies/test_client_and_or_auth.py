@@ -2,14 +2,11 @@
 
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock, patch
-from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.accounts.domain.account import Account, AccountStatus
-from leadr.accounts.services.repositories import AccountRepository
 from leadr.accounts.services.user_service import UserService
 from leadr.auth.dependencies import AuthContextDependency
 from leadr.auth.domain.device import Device, DeviceStatus
