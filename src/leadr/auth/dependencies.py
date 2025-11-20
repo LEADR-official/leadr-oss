@@ -503,12 +503,21 @@ require_admin_auth = AuthContextDependency(require_admin=True)
 require_client_auth = AuthContextDependency(require_client=True)
 require_client_auth_with_nonce = AuthContextDependency(require_client=True, require_nonce=True)
 require_admin_or_client_auth = AuthContextDependency(require_admin=True, require_client=True)
+require_admin_or_client_auth_with_nonce = AuthContextDependency(
+    require_admin=True, require_client=True, require_nonce=True
+)
 
 # Type aliases for dependency injection with specific return types
 AdminAuthContextDep = Annotated[AdminAuthContext, Depends(require_admin_auth)]
 ClientAuthContextDep = Annotated[ClientAuthContext, Depends(require_client_auth)]
 ClientAuthContextWithNonceDep = Annotated[
     ClientAuthContext, Depends(require_client_auth_with_nonce)
+]
+AdminOrClientAuthContextDep = Annotated[
+    AdminAuthContext | ClientAuthContext, Depends(require_admin_or_client_auth)
+]
+AdminOrClientAuthContextWithNonceDep = Annotated[
+    AdminAuthContext | ClientAuthContext, Depends(require_admin_or_client_auth_with_nonce)
 ]
 
 

@@ -50,6 +50,7 @@ async def http_exception_handler(
     Returns:
         JSONResponse with HTTP status code and error detail
     """
+    logger.exception(exc)
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": exc.detail},

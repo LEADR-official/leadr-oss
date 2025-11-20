@@ -18,10 +18,13 @@ class ScoreCreateRequest(BaseModel):
     IP address via GeoIP middleware. These fields are not accepted in the request.
     """
 
-    account_id: AccountID = Field(description="ID of the account this score belongs to")
-    game_id: GameID = Field(description="ID of the game this score belongs to")
+    game_id: GameID | None = Field(
+        description="ID of the game this score belongs to. Only required for Admin API"
+    )
     board_id: BoardID = Field(description="ID of the board this score belongs to")
-    device_id: DeviceID = Field(description="ID of the device that submitted this score")
+    device_id: DeviceID | None = Field(
+        description="ID of the device that submitted this score. Only required for Admin API"
+    )
     player_name: str = Field(description="Display name of the player")
     value: float = Field(description="Numeric value of the score for sorting/comparison")
     value_display: str | None = Field(
@@ -115,6 +118,50 @@ class ScoreResponse(BaseModel):
             game_id=score.game_id,
             board_id=score.board_id,
             device_id=score.device_id,
+            player_name=score.player_name,
+            value=score.value,
+            value_display=score.value_display,
+            timezone=score.timezone,
+            country=score.country,
+            city=score.city,
+            metadata=score.metadata,
+            created_at=score.created_at,
+            updated_at=score.updated_at,
+        )
+
+
+class ScoreClientResponse(BaseModel):
+    """Response model for a score (client API - excludes device_id)."""
+
+    id: ScoreID = Field(description="Unique identifier for the score")
+    account_id: AccountID = Field(description="ID of the account this score belongs to")
+    game_id: GameID = Field(description="ID of the game this score belongs to")
+    board_id: BoardID = Field(description="ID of the board this score belongs to")
+    player_name: str = Field(description="Display name of the player")
+    value: float = Field(description="Numeric value of the score")
+    value_display: str | None = Field(default=None, description="Formatted display string, or null")
+    timezone: str | None = Field(default=None, description="Timezone for categorization, or null")
+    country: str | None = Field(default=None, description="Country for categorization, or null")
+    city: str | None = Field(default=None, description="City for categorization, or null")
+    metadata: Any | None = Field(default=None, description="Game-specific metadata, or null")
+    created_at: datetime = Field(description="Timestamp when the score was created (UTC)")
+    updated_at: datetime = Field(description="Timestamp of last update (UTC)")
+
+    @classmethod
+    def from_domain(cls, score: Score) -> "ScoreClientResponse":
+        """Convert domain entity to client response model (without device_id).
+
+        Args:
+            score: The domain Score entity to convert.
+
+        Returns:
+            ScoreClientResponse with all fields except device_id.
+        """
+        return cls(
+            id=score.id,
+            account_id=score.account_id,
+            game_id=score.game_id,
+            board_id=score.board_id,
             player_name=score.player_name,
             value=score.value,
             value_display=score.value_display,

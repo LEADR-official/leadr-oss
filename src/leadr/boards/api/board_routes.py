@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
     AdminAuthContextDep,
+    AdminOrClientAuthContextDep,
     validate_body_account_id,
 )
 from leadr.boards.api.board_schemas import (
@@ -109,7 +110,7 @@ async def get_board(
 @client_router.get("/boards", response_model=PaginatedResponse[BoardResponse])
 async def list_boards(
     service: BoardServiceDep,
-    auth: AdminAuthContextDep,
+    auth: AdminOrClientAuthContextDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: AccountID | None = None,
     code: str | None = None,

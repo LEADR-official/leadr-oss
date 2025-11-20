@@ -715,3 +715,236 @@ class TestScoreRoutes:
         assert "pagination" in data
         assert len(data["data"]) == 1
         assert data["data"][0]["player_name"] == "Score2"
+
+    async def test_create_score_admin_auth_includes_device_id(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that admin-authenticated score creation includes device_id in response."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        # Create score with admin auth
+        response = await client.post(
+            "/scores",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "board_id": str(board.id),
+                "device_id": str(device.id),
+                "player_name": "AdminPlayer",
+                "value": 100.0,
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        # Admin auth should include device_id in response
+        assert "device_id" in data
+        assert data["device_id"] == str(device.id)
+
+    async def test_create_score_client_auth_excludes_device_id(
+        self, client: AsyncClient, db_session
+    ):
+        """Test that client-authenticated score creation excludes device_id from response."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, access_token, _, nonce = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        # Create score with client auth
+        response = await client.post(
+            "/scores",
+            json={
+                "account_id": str(account.id),
+                "board_id": str(board.id),
+                "player_name": "ClientPlayer",
+                "value": 200.0,
+            },
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "leadr-client-nonce": nonce.nonce_value,
+            },
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        # Client auth should NOT include device_id in response
+        assert "device_id" not in data
+        assert data["player_name"] == "ClientPlayer"
+
+    async def test_list_scores_admin_auth_includes_device_id(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that admin-authenticated score listing includes device_id in responses."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        # Create a score
+        score_service = ScoreService(db_session)
+        await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="TestPlayer",
+            value=100.0,
+        )
+
+        # List scores with admin auth
+        response = await client.get(
+            f"/scores?account_id={account.id}",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        # Admin auth should include device_id in response
+        assert "device_id" in data["data"][0]
+        assert data["data"][0]["device_id"] == str(device.id)
+
+    async def test_list_scores_client_auth_excludes_device_id(
+        self, client: AsyncClient, db_session
+    ):
+        """Test that client-authenticated score listing excludes device_id from responses."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, access_token, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        # Create a score
+        score_service = ScoreService(db_session)
+        await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="TestPlayer",
+            value=100.0,
+        )
+
+        # List scores with client auth
+        response = await client.get(
+            f"/scores?account_id={account.id}",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        # Client auth should NOT include device_id in response
+        assert "device_id" not in data["data"][0]
+        assert data["data"][0]["player_name"] == "TestPlayer"

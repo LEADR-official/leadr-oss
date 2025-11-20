@@ -7,13 +7,19 @@ from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
     AdminAuthContextDep,
+    AdminOrClientAuthContextDep,
+    AdminOrClientAuthContextWithNonceDep,
     resolve_query_account_id,
-    validate_body_account_id,
 )
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
-from leadr.scores.api.score_schemas import ScoreCreateRequest, ScoreResponse, ScoreUpdateRequest
+from leadr.scores.api.score_schemas import (
+    ScoreClientResponse,
+    ScoreCreateRequest,
+    ScoreResponse,
+    ScoreUpdateRequest,
+)
 from leadr.scores.services.dependencies import ScoreServiceDep
 
 router = APIRouter()
@@ -27,8 +33,8 @@ async def create_score(
     request: Request,
     service: ScoreServiceDep,
     background_tasks: BackgroundTasks,
-    auth: AdminAuthContextDep,
-) -> ScoreResponse:
+    auth: AdminOrClientAuthContextWithNonceDep,
+) -> ScoreResponse | ScoreClientResponse:
     """Create a new score.
 
     Creates a new score submission for a board. Performs three-level validation:
@@ -54,19 +60,25 @@ async def create_score(
         400: Validation failed (board doesn't belong to account, or game doesn't
             match board's game).
     """
-    validate_body_account_id(auth, score_request.account_id)
 
     # Get geo data from request state (populated by GeoIP middleware)
     timezone = getattr(request.state, "geo_timezone", None)
     country = getattr(request.state, "geo_country", None)
     city = getattr(request.state, "geo_city", None)
 
+    if auth.device is not None:
+        game_id = auth.device.game_id
+        device_id = auth.device.id
+    else:
+        game_id = score_request.game_id
+        device_id = score_request.device_id
+
     try:
         score, anti_cheat_result = await service.create_score(
-            account_id=score_request.account_id,
-            game_id=score_request.game_id,
+            account_id=auth.account_id,
+            game_id=game_id,
             board_id=score_request.board_id,
-            device_id=score_request.device_id,
+            device_id=device_id,
             player_name=score_request.player_name,
             value=score_request.value,
             value_display=score_request.value_display,
@@ -93,7 +105,11 @@ async def create_score(
             anti_cheat_result,
         )
 
-    return ScoreResponse.from_domain(score)
+    # Return appropriate response based on auth type
+    if auth.auth_type == "admin":
+        return ScoreResponse.from_domain(score)
+    else:
+        return ScoreClientResponse.from_domain(score)
 
 
 @router.get("/scores/{score_id}", response_model=ScoreResponse)
@@ -128,17 +144,17 @@ async def get_score(
     return ScoreResponse.from_domain(score)
 
 
-@router.get("/scores", response_model=PaginatedResponse[ScoreResponse])
-@client_router.get("/scores", response_model=PaginatedResponse[ScoreResponse])
+@router.get("/scores")
+@client_router.get("/scores")
 async def list_scores(
-    auth: AdminAuthContextDep,
+    auth: AdminOrClientAuthContextDep,
     service: ScoreServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     board_id: BoardID | None = None,
     game_id: GameID | None = None,
     device_id: DeviceID | None = None,
-) -> PaginatedResponse[ScoreResponse]:
+) -> PaginatedResponse[ScoreResponse] | PaginatedResponse[ScoreClientResponse]:
     """List scores for an account with optional filters and pagination.
 
     Returns paginated scores for the specified account, with optional
@@ -198,12 +214,21 @@ async def list_scores(
     if device_id is not None:
         filters_dict["device_id"] = str(device_id)
 
-    return PaginatedResponse.from_paginated_result(
-        result=result,
-        pagination=pagination,
-        filters=filters_dict,
-        response_model=ScoreResponse,
-    )
+    # Return appropriate response based on auth type
+    if auth.auth_type == "admin":
+        return PaginatedResponse.from_paginated_result(
+            result=result,
+            pagination=pagination,
+            filters=filters_dict,
+            response_model=ScoreResponse,
+        )
+    else:
+        return PaginatedResponse.from_paginated_result(
+            result=result,
+            pagination=pagination,
+            filters=filters_dict,
+            response_model=ScoreClientResponse,
+        )
 
 
 @router.patch("/scores/{score_id}", response_model=ScoreResponse)
