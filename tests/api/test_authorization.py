@@ -444,9 +444,9 @@ class TestRegularUserAuthorization:
             headers={"leadr-api-key": plain_key},
         )
 
-        # Should be forbidden
-        assert response.status_code == 403
-        assert "access" in response.json()["error"].lower()
+        # Should be unauthorized (auth dependency validates account access)
+        assert response.status_code == 401
+        assert "unauthorised" in response.json()["error"].lower()
 
     async def test_regular_user_cannot_access_games_from_other_accounts(
         self, db_session: AsyncSession, client: AsyncClient
@@ -641,9 +641,9 @@ class TestAPIKeyAuthorization:
             headers={"leadr-api-key": plain_key},
         )
 
-        # Should be forbidden
-        assert response.status_code == 403
-        assert "access" in response.json()["error"].lower()
+        # Should be unauthorized (auth dependency validates account access)
+        assert response.status_code == 401
+        assert "unauthorised" in response.json()["error"].lower()
 
     async def test_superadmin_can_create_api_keys_for_any_account(
         self, authenticated_client: AsyncClient, db_session: AsyncSession
@@ -853,9 +853,9 @@ class TestAccountIDResolution:
             headers={"leadr-api-key": plain_key},
         )
 
-        # Should be forbidden
-        assert response.status_code == 403
-        assert "access denied" in response.json()["error"].lower()
+        # Should be unauthorized (auth dependency validates account access)
+        assert response.status_code == 401
+        assert "unauthorised" in response.json()["error"].lower()
 
     async def test_regular_user_create_with_wrong_account_id_returns_403(
         self, db_session: AsyncSession, client: AsyncClient

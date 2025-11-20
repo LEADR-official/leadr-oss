@@ -808,9 +808,17 @@ class TestScoreRoutes:
             keep_strategy=KeepStrategy.ALL,
         )
 
+        # Generate a fresh nonce for the mutation (nonces are single-use)
+        nonce_response = await client.get(
+            "/client/nonce",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        fresh_nonce = nonce_response.json()["nonce_value"]
+
         # Create score with client auth (no account_id, game_id, device_id needed)
+        # Client routes are now under /client prefix after refactor
         response = await client.post(
-            "/scores",
+            "/client/scores",
             json={
                 "board_id": str(board.id),
                 "player_name": "ClientPlayer",
@@ -818,7 +826,7 @@ class TestScoreRoutes:
             },
             headers={
                 "Authorization": f"Bearer {access_token}",
-                "leadr-client-nonce": str(nonce_value),
+                "leadr-client-nonce": fresh_nonce,
             },
         )
 
@@ -938,9 +946,10 @@ class TestScoreRoutes:
             value=100.0,
         )
 
-        # List scores with client auth
+        # List scores with client auth (use /client prefix after refactor)
+        # Client API doesn't accept account_id parameter - it's auto-derived from device token
         response = await client.get(
-            f"/scores?account_id={account.id}",
+            "/client/scores",
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
