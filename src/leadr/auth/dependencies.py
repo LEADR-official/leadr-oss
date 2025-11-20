@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
-from fastapi import Depends, Header, HTTPException, Request
+from fastapi import Body, Depends, Header, HTTPException, Query, Request
 
 from leadr.accounts.domain.user import User
 from leadr.accounts.services.dependencies import UserServiceDep
@@ -240,6 +240,8 @@ class AuthContextDependency:
         user_service: UserServiceDep,
         device_service: DeviceServiceDep,
         nonce_service: NonceServiceDep,
+        body_account_id: Annotated[AccountID | None, Body(alias="account_id")] = None,
+        query_account_id: Annotated[AccountID | None, Query(alias="account_id")] = None,
         api_key: Annotated[str | None, Header(alias="leadr-api-key")] = None,
         authorization: Annotated[str | None, Header()] = None,
         leadr_client_nonce: Annotated[str | None, Header(alias="leadr-client-nonce")] = None,
@@ -286,12 +288,20 @@ class AuthContextDependency:
                     status_code=401,
                     detail="API key required",
                 )
-            return await self._validate_admin_auth(
+            auth_context = await self._validate_admin_auth(
                 api_key=api_key,
                 api_key_service=api_key_service,
                 user_service=user_service,
                 request=request,
             )
+            # Check access if an account_id was provided
+            account_id_to_check = body_account_id or query_account_id
+            if account_id_to_check and not auth_context.has_access_to_account(account_id_to_check):
+                raise HTTPException(
+                    status_code=401,
+                    detail="Unauthorised access",
+                )
+            return auth_context
 
         # Client-only authentication
         if self.require_client and not self.require_admin:
@@ -345,15 +355,24 @@ class AuthContextDependency:
             # Try admin auth (either as primary or fallback)
             if api_key and settings.ENABLE_ADMIN_API:
                 logger.debug("Trying admin auth (API key provided)...")
-                try:
-                    return await self._validate_admin_auth(
-                        api_key=api_key,
-                        api_key_service=api_key_service,
-                        user_service=user_service,
-                        request=request,
+
+                auth_context = await self._validate_admin_auth(
+                    api_key=api_key,
+                    api_key_service=api_key_service,
+                    user_service=user_service,
+                    request=request,
+                )
+
+                # Check access if an account_id was provided
+                account_id_to_check = body_account_id or query_account_id
+                if account_id_to_check and not auth_context.has_access_to_account(
+                    account_id_to_check
+                ):
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Unauthorised access",
                     )
-                except HTTPException:
-                    logger.debug("Admin auth failed")
+                return auth_context
 
             # Neither auth type succeeded
             raise HTTPException(
@@ -564,11 +583,67 @@ def resolve_query_account_id(
         return auth.account_id
 
 
+def resolve_and_validate_account_id(
+    auth: AuthContext,
+    account_id: AccountID | None,
+) -> AccountID:
+    """Resolve and validate account_id based on authentication context.
+
+    This function enforces that only superadmins can specify account_id in requests.
+    Regular admins and clients must use their auth context's account_id.
+
+    Rules:
+    - If account_id is None: Returns auth.account_id (works for all users)
+    - If account_id is provided AND user is superadmin: Returns the provided account_id
+    - If account_id is provided AND user is NOT superadmin: Raises 403 Forbidden
+
+    Args:
+        auth: The authenticated context.
+        account_id: The account_id from request body/query (None if not provided).
+
+    Returns:
+        The resolved account_id to use for the operation.
+
+    Raises:
+        HTTPException: 403 if non-superadmin provides account_id.
+
+    Example:
+        >>> @router.post("/games", status_code=201)
+        >>> async def create_game(
+        >>>     request: GameCreateRequest,
+        >>>     service: GameServiceDep,
+        >>>     auth: AdminAuthContextDep,
+        >>> ):
+        >>>     account_id = resolve_and_validate_account_id(auth, request.account_id)
+        >>>     game = await service.create_game(account_id=account_id, ...)
+        >>>     return GameResponse.from_domain(game)
+    """
+    # If no account_id provided, use auth context's account
+    if account_id is None:
+        return auth.account_id
+
+    # If account_id provided, only superadmins can specify it
+    if not auth.is_superadmin:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Only superadmins can specify account_id. "
+                "Regular users must use their authenticated account."
+            ),
+        )
+
+    # Superadmin can access any account
+    return account_id
+
+
 def validate_body_account_id(
     auth: AuthContext,
     account_id: AccountID,
 ) -> None:
     """Validate that an account_id from request body matches authorized account.
+
+    DEPRECATED: Use resolve_and_validate_account_id instead, which handles None values
+    and enforces superadmin-only account_id specification.
 
     For superadmin users:
         - Can access any account, so any account_id is accepted

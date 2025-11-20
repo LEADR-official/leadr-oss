@@ -13,12 +13,12 @@ from leadr.auth.dependencies import ClientAuthContextDep
 from leadr.auth.services.dependencies import DeviceServiceDep, NonceServiceDep
 from leadr.common.domain.exceptions import EntityNotFoundError
 
-public_router = APIRouter()
+public_router = APIRouter(prefix="/client")
 protected_router = APIRouter()
 
 
 @public_router.post(
-    "/client/sessions",
+    "/sessions",
     response_model=StartSessionResponse,
     status_code=status.HTTP_201_CREATED,
 )
@@ -62,7 +62,7 @@ async def start_session(
 
 
 @protected_router.post(
-    "/client/sessions/refresh",
+    "/sessions/refresh",
     response_model=RefreshTokenResponse,
     status_code=status.HTTP_200_OK,
 )
@@ -108,7 +108,7 @@ async def refresh_session(
 
 
 @protected_router.get(
-    "/client/nonce",
+    "/nonce",
     response_model=NonceResponse,
     status_code=status.HTTP_200_OK,
 )

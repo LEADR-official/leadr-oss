@@ -790,7 +790,7 @@ class TestScoreRoutes:
         )
 
         device_service = DeviceService(db_session)
-        device, access_token, _, nonce = await device_service.start_session(
+        device, access_token, _, nonce_value = await device_service.start_session(
             game_id=game.id,
             client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
@@ -808,18 +808,17 @@ class TestScoreRoutes:
             keep_strategy=KeepStrategy.ALL,
         )
 
-        # Create score with client auth
+        # Create score with client auth (no account_id, game_id, device_id needed)
         response = await client.post(
             "/scores",
             json={
-                "account_id": str(account.id),
                 "board_id": str(board.id),
                 "player_name": "ClientPlayer",
                 "value": 200.0,
             },
             headers={
                 "Authorization": f"Bearer {access_token}",
-                "leadr-client-nonce": nonce.nonce_value,
+                "leadr-client-nonce": str(nonce_value),
             },
         )
 
@@ -829,10 +828,10 @@ class TestScoreRoutes:
         assert "device_id" not in data
         assert data["player_name"] == "ClientPlayer"
 
-    async def test_list_scores_admin_auth_includes_device_id(
+    async def test_list_scores_admin_auth_includes_device_id_and_geo_fields(
         self, client: AsyncClient, db_session, test_api_key
     ):
-        """Test that admin-authenticated score listing includes device_id in responses."""
+        """Test that admin-authenticated score listing includes device_id and geo fields."""
         # Create supporting entities
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -885,14 +884,17 @@ class TestScoreRoutes:
         assert response.status_code == 200
         data = response.json()
         assert len(data["data"]) == 1
-        # Admin auth should include device_id in response
+        # Admin auth should include device_id and geo fields in response
         assert "device_id" in data["data"][0]
         assert data["data"][0]["device_id"] == str(device.id)
+        assert "timezone" in data["data"][0]
+        assert "country" in data["data"][0]
+        assert "city" in data["data"][0]
 
-    async def test_list_scores_client_auth_excludes_device_id(
+    async def test_list_scores_client_auth_excludes_device_id_and_geo_fields(
         self, client: AsyncClient, db_session
     ):
-        """Test that client-authenticated score listing excludes device_id from responses."""
+        """Test that client-authenticated score listing excludes device_id and geo fields."""
         # Create supporting entities
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -945,6 +947,9 @@ class TestScoreRoutes:
         assert response.status_code == 200
         data = response.json()
         assert len(data["data"]) == 1
-        # Client auth should NOT include device_id in response
+        # Client auth should NOT include device_id or geo fields in response
         assert "device_id" not in data["data"][0]
+        assert "timezone" not in data["data"][0]
+        assert "country" not in data["data"][0]
+        assert "city" not in data["data"][0]
         assert data["data"][0]["player_name"] == "TestPlayer"
