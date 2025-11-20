@@ -327,59 +327,6 @@ class AuthContextDependency:
                 leadr_client_nonce=leadr_client_nonce,
             )
 
-        # OR logic: both admin and client auth are available
-        if self.require_admin and self.require_client:
-            # Check at least one API is enabled
-            if not settings.ENABLE_ADMIN_API and not settings.ENABLE_CLIENT_API:
-                logger.exception(
-                    "Server misconfigured: endpoint requires auth but both APIs are disabled"
-                )
-                raise HTTPException(
-                    status_code=500,
-                    detail="Neither Admin nor Client API is enabled",
-                )
-
-            # Try client auth first (user's preference)
-            if authorization and settings.ENABLE_CLIENT_API:
-                logger.debug("Trying client auth first (bearer token provided)...")
-                try:
-                    return await self._validate_client_auth(
-                        authorization=authorization,
-                        device_service=device_service,
-                        nonce_service=nonce_service,
-                        leadr_client_nonce=leadr_client_nonce,
-                    )
-                except HTTPException:
-                    logger.debug("Client auth failed, trying admin auth...")
-
-            # Try admin auth (either as primary or fallback)
-            if api_key and settings.ENABLE_ADMIN_API:
-                logger.debug("Trying admin auth (API key provided)...")
-
-                auth_context = await self._validate_admin_auth(
-                    api_key=api_key,
-                    api_key_service=api_key_service,
-                    user_service=user_service,
-                    request=request,
-                )
-
-                # Check access if an account_id was provided
-                account_id_to_check = body_account_id or query_account_id
-                if account_id_to_check and not auth_context.has_access_to_account(
-                    account_id_to_check
-                ):
-                    raise HTTPException(
-                        status_code=401,
-                        detail="Unauthorised access",
-                    )
-                return auth_context
-
-            # Neither auth type succeeded
-            raise HTTPException(
-                status_code=401,
-                detail="Valid authentication required (admin API key or client bearer token)",
-            )
-
         # Should never reach here due to __init__ validation
         raise ValueError("At least one of require_admin or require_client must be True")
 
@@ -521,22 +468,12 @@ class AuthContextDependency:
 require_admin_auth = AuthContextDependency(require_admin=True)
 require_client_auth = AuthContextDependency(require_client=True)
 require_client_auth_with_nonce = AuthContextDependency(require_client=True, require_nonce=True)
-require_admin_or_client_auth = AuthContextDependency(require_admin=True, require_client=True)
-require_admin_or_client_auth_with_nonce = AuthContextDependency(
-    require_admin=True, require_client=True, require_nonce=True
-)
 
 # Type aliases for dependency injection with specific return types
 AdminAuthContextDep = Annotated[AdminAuthContext, Depends(require_admin_auth)]
 ClientAuthContextDep = Annotated[ClientAuthContext, Depends(require_client_auth)]
 ClientAuthContextWithNonceDep = Annotated[
     ClientAuthContext, Depends(require_client_auth_with_nonce)
-]
-AdminOrClientAuthContextDep = Annotated[
-    AdminAuthContext | ClientAuthContext, Depends(require_admin_or_client_auth)
-]
-AdminOrClientAuthContextWithNonceDep = Annotated[
-    AdminAuthContext | ClientAuthContext, Depends(require_admin_or_client_auth_with_nonce)
 ]
 
 
