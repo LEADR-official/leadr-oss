@@ -286,8 +286,10 @@ class TestBoardPagination:
                 },
             )
 
-        # Get boards filtered by code
-        response = await authenticated_client.get(f"/boards?code={test_code}")
+        # Get boards filtered by code (must include account_id after refactor)
+        response = await authenticated_client.get(
+            f"/boards?code={test_code}&account_id={test_account.id}"
+        )
         assert response.status_code == 200
         data = response.json()
 

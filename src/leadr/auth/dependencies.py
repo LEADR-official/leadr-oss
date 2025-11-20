@@ -1,10 +1,11 @@
 """Authentication dependencies for FastAPI."""
 
+import json
 import logging
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
-from fastapi import Depends, Header, HTTPException, Request
+from fastapi import Depends, Header, HTTPException, Query, Request
 
 from leadr.accounts.domain.user import User
 from leadr.accounts.services.dependencies import UserServiceDep
@@ -215,6 +216,7 @@ class AuthContextDependency:
         require_admin: bool = False,
         require_client: bool = False,
         require_nonce: bool = False,
+        require_superadmin_account_id: bool = False,
     ):
         """Initialize authentication requirements.
 
@@ -222,6 +224,8 @@ class AuthContextDependency:
             require_admin: If True, admin API key authentication is required.
             require_client: If True, client device token authentication is required.
             require_nonce: If True, nonce validation is required for client auth (mutations).
+            require_superadmin_account_id: If True, superadmins must provide account_id
+                query parameter on GET requests. Used for list endpoints.
 
         Raises:
             ValueError: If neither require_admin nor require_client is True.
@@ -232,6 +236,7 @@ class AuthContextDependency:
         self.require_admin = require_admin
         self.require_client = require_client
         self.require_nonce = require_nonce
+        self.require_superadmin_account_id = require_superadmin_account_id
 
     async def __call__(
         self,
@@ -240,6 +245,7 @@ class AuthContextDependency:
         user_service: UserServiceDep,
         device_service: DeviceServiceDep,
         nonce_service: NonceServiceDep,
+        query_account_id: Annotated[AccountID | None, Query(alias="account_id")] = None,
         api_key: Annotated[str | None, Header(alias="leadr-api-key")] = None,
         authorization: Annotated[str | None, Header()] = None,
         leadr_client_nonce: Annotated[str | None, Header(alias="leadr-client-nonce")] = None,
@@ -256,6 +262,7 @@ class AuthContextDependency:
             user_service: User service dependency.
             device_service: Device service dependency.
             nonce_service: Nonce service dependency.
+            query_account_id: Optional account_id from query parameters.
             api_key: The API key from 'leadr-api-key' header.
             authorization: The Authorization header (Bearer token).
             leadr_client_nonce: The nonce from 'leadr-client-nonce' header.
@@ -269,6 +276,20 @@ class AuthContextDependency:
             HTTPException: 401 if auth is disabled, missing, or invalid.
             HTTPException: 500 if server is misconfigured.
         """
+        # Extract account_id from request body if present (for POST/PATCH/PUT requests)
+        # Uses Starlette's cached body - safe to call multiple times
+        body_account_id = None
+        if request.method in ("POST", "PUT", "PATCH"):
+            try:
+                body_bytes = await request.body()
+                if body_bytes:
+                    body_data = json.loads(body_bytes)
+                    if isinstance(body_data, dict) and "account_id" in body_data:
+                        body_account_id = AccountID(body_data["account_id"])
+            except (json.JSONDecodeError, ValueError, KeyError):
+                # Ignore parsing errors - let Pydantic validate the body
+                pass
+
         # Admin-only authentication
         if self.require_admin and not self.require_client:
             if not settings.ENABLE_ADMIN_API:
@@ -286,12 +307,33 @@ class AuthContextDependency:
                     status_code=401,
                     detail="API key required",
                 )
-            return await self._validate_admin_auth(
+            auth_context = await self._validate_admin_auth(
                 api_key=api_key,
                 api_key_service=api_key_service,
                 user_service=user_service,
                 request=request,
             )
+
+            # Superadmins must explicitly provide account_id for GET requests on list endpoints
+            account_id_to_check = body_account_id or query_account_id
+            if (
+                self.require_superadmin_account_id
+                and auth_context.is_superadmin
+                and request.method == "GET"
+                and account_id_to_check is None
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Superadmin must explicitly specify account_id query parameter",
+                )
+
+            # Check access if an account_id was provided
+            if account_id_to_check and not auth_context.has_access_to_account(account_id_to_check):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Access denied to the specified account",
+                )
+            return auth_context
 
         # Client-only authentication
         if self.require_client and not self.require_admin:
@@ -315,50 +357,6 @@ class AuthContextDependency:
                 device_service=device_service,
                 nonce_service=nonce_service,
                 leadr_client_nonce=leadr_client_nonce,
-            )
-
-        # OR logic: both admin and client auth are available
-        if self.require_admin and self.require_client:
-            # Check at least one API is enabled
-            if not settings.ENABLE_ADMIN_API and not settings.ENABLE_CLIENT_API:
-                logger.exception(
-                    "Server misconfigured: endpoint requires auth but both APIs are disabled"
-                )
-                raise HTTPException(
-                    status_code=500,
-                    detail="Neither Admin nor Client API is enabled",
-                )
-
-            # Try client auth first (user's preference)
-            if authorization and settings.ENABLE_CLIENT_API:
-                logger.debug("Trying client auth first (bearer token provided)...")
-                try:
-                    return await self._validate_client_auth(
-                        authorization=authorization,
-                        device_service=device_service,
-                        nonce_service=nonce_service,
-                        leadr_client_nonce=leadr_client_nonce,
-                    )
-                except HTTPException:
-                    logger.debug("Client auth failed, trying admin auth...")
-
-            # Try admin auth (either as primary or fallback)
-            if api_key and settings.ENABLE_ADMIN_API:
-                logger.debug("Trying admin auth (API key provided)...")
-                try:
-                    return await self._validate_admin_auth(
-                        api_key=api_key,
-                        api_key_service=api_key_service,
-                        user_service=user_service,
-                        request=request,
-                    )
-                except HTTPException:
-                    logger.debug("Admin auth failed")
-
-            # Neither auth type succeeded
-            raise HTTPException(
-                status_code=401,
-                detail="Valid authentication required (admin API key or client bearer token)",
             )
 
         # Should never reach here due to __init__ validation
@@ -500,96 +498,18 @@ class AuthContextDependency:
 
 # Create dependency instances for common use cases
 require_admin_auth = AuthContextDependency(require_admin=True)
+require_admin_auth_with_account_id = AuthContextDependency(
+    require_admin=True, require_superadmin_account_id=True
+)
 require_client_auth = AuthContextDependency(require_client=True)
 require_client_auth_with_nonce = AuthContextDependency(require_client=True, require_nonce=True)
-require_admin_or_client_auth = AuthContextDependency(require_admin=True, require_client=True)
 
 # Type aliases for dependency injection with specific return types
 AdminAuthContextDep = Annotated[AdminAuthContext, Depends(require_admin_auth)]
+AdminAuthContextWithAccountIDDep = Annotated[
+    AdminAuthContext, Depends(require_admin_auth_with_account_id)
+]
 ClientAuthContextDep = Annotated[ClientAuthContext, Depends(require_client_auth)]
 ClientAuthContextWithNonceDep = Annotated[
     ClientAuthContext, Depends(require_client_auth_with_nonce)
 ]
-
-
-def resolve_query_account_id(
-    auth: AdminAuthContext,
-    account_id: AccountID | None,
-) -> AccountID:
-    """Resolve account_id from query parameter based on user type.
-
-    For superadmin users:
-        - account_id query parameter is REQUIRED for list endpoints
-        - Raises 400 if not provided
-        - Returns the provided account_id (can access any account)
-
-    For regular users:
-        - account_id query parameter is optional/ignored
-        - Returns auth.account_id (can only access their own account)
-        - Raises 403 if provided account_id doesn't match
-
-    Args:
-        auth: The authenticated admin context.
-        account_id: Optional account_id from query parameter.
-
-    Returns:
-        AccountID to use for the query.
-
-    Raises:
-        HTTPException: 400 if superadmin doesn't provide account_id.
-        HTTPException: 403 if regular user tries to access another account.
-    """
-    if auth.is_superadmin:
-        if account_id is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Superadmin must explicitly specify account_id query parameter",
-            )
-        return account_id
-    else:
-        if account_id is not None and account_id != auth.account_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied to the specified account",
-            )
-        return auth.account_id
-
-
-def validate_body_account_id(
-    auth: AuthContext,
-    account_id: AccountID,
-) -> None:
-    """Validate that an account_id from request body matches authorized account.
-
-    For superadmin users:
-        - Can access any account, so any account_id is accepted
-
-    For regular users and clients:
-        - Can only access their own account
-        - Raises 403 Forbidden if account_id doesn't match their auth account
-
-    Args:
-        auth: The authenticated context.
-        account_id: The account_id from the request body to validate.
-
-    Raises:
-        HTTPException: 403 Forbidden if trying to access unauthorized account.
-
-    Example:
-        >>> @router.post("/games", status_code=201)
-        >>> async def create_game(
-        >>>     request: GameCreateRequest,
-        >>>     service: GameServiceDep,
-        >>>     auth: AdminAuthContextDep,
-        >>> ):
-        >>>     validate_body_account_id(auth, request.account_id)
-        >>>     game = await service.create_game(...)
-        >>>     return GameResponse.from_domain(game)
-    """
-    if not auth.is_superadmin:
-        # Regular users/clients can only access their own account
-        if account_id != auth.account_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied to the specified account",
-            )

@@ -2,12 +2,13 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
     AdminAuthContextDep,
-    validate_body_account_id,
+    AuthContext,
+    ClientAuthContextDep,
 )
 from leadr.boards.api.board_schemas import (
     BoardCreateRequest,
@@ -48,8 +49,6 @@ async def create_board(
         404: Game or account not found.
         400: Game doesn't belong to the specified account.
     """
-    validate_body_account_id(auth, request.account_id)
-
     try:
         board = await service.create_board(
             account_id=request.account_id,
@@ -105,37 +104,18 @@ async def get_board(
     return BoardResponse.from_domain(board)
 
 
-@router.get("/boards", response_model=PaginatedResponse[BoardResponse])
-@client_router.get("/boards", response_model=PaginatedResponse[BoardResponse])
-async def list_boards(
+async def handle_list_boards(
+    auth: AuthContext,
     service: BoardServiceDep,
-    auth: AdminAuthContextDep,
-    pagination: Annotated[PaginationParams, Depends()],
-    account_id: AccountID | None = None,
-    code: str | None = None,
+    pagination: PaginationParams,
+    account_id: AccountID,
+    code: str | None,
 ) -> PaginatedResponse[BoardResponse]:
-    """List boards filtered by account_id and/or short code with pagination.
-
-    For regular users:
-    - If account_id not provided, defaults to their API key's account
-    - If account_id provided, must match their API key's account (403 otherwise)
-
-    For superadmins:
-    - Can provide any account_id or search by code only
-    - At least one of account_id or code is required
-
-    Pagination:
-    - Default: 20 items per page, sorted by created_at:desc,id:asc
-    - Custom sort: Use ?sort=name:asc,created_at:desc
-    - Valid sort fields: id, name, short_code, created_at, updated_at
-    - Navigation: Use next_cursor/prev_cursor from response
-
-    Example:
-        GET /v1/boards?account_id=acc_123&limit=50&sort=name:asc
+    """Shared handler for listing boards.
 
     Args:
-        service: Injected board service dependency.
         auth: Authentication context with user info.
+        service: Injected board service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
         account_id: Optional account ID to filter boards by.
         code: Optional short code to filter boards by.
@@ -145,28 +125,7 @@ async def list_boards(
 
     Raises:
         400: Invalid cursor, sort field, or cursor state mismatch.
-        403: User does not have access to the specified account.
-        422: Neither account_id nor code parameter provided (superadmins only).
     """
-    # Handle account_id resolution based on user role
-    if not auth.is_superadmin:
-        # Regular users: auto-derive account_id if not provided
-        user_account_id = auth.account_id
-        if account_id is None:
-            account_id = user_account_id
-        elif account_id != user_account_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied to the specified account",
-            )
-    else:
-        # Superadmins: require at least one parameter
-        if account_id is None and code is None:
-            raise HTTPException(
-                status_code=422,
-                detail="At least one of account_id or code parameter is required",
-            )
-
     try:
         result = await service.list_boards(account_id=account_id, code=code, pagination=pagination)
     except (CursorValidationError, ValueError) as e:
@@ -179,28 +138,89 @@ async def list_boards(
     if code is not None:
         filters_dict["code"] = code
 
-    # If filtering by code only, check authorization on results
-    if account_id is None and code is not None:
-        from leadr.common.domain.pagination_result import PaginatedResult
-
-        filtered_boards = [
-            board for board in result.items if auth.has_access_to_account(board.account_id)
-        ]
-        # Create new result with filtered items
-        result = PaginatedResult(
-            items=filtered_boards,
-            has_next=result.has_next,
-            has_prev=result.has_prev,
-            next_position=result.next_position,
-            prev_position=result.prev_position,
-        )
-
     return PaginatedResponse.from_paginated_result(
         result=result,
         pagination=pagination,
         filters=filters_dict,
         response_model=BoardResponse,
     )
+
+
+@router.get("/boards", response_model=PaginatedResponse[BoardResponse])
+async def list_boards_admin(
+    auth: AdminAuthContextDep,
+    service: BoardServiceDep,
+    pagination: Annotated[PaginationParams, Depends()],
+    account_id: Annotated[AccountID | None, Query(description="Filter by account ID")] = None,
+    code: str | None = None,
+) -> PaginatedResponse[BoardResponse]:
+    """List boards (Admin API).
+
+    For regular users:
+    - If account_id not provided, defaults to their API key's account
+    - If account_id provided and they are superadmin, can access any account
+    - If account_id provided and NOT superadmin, must match their account (validated in AuthContext)
+
+    Pagination:
+    - Default: 20 items per page, sorted by created_at:desc,id:asc
+    - Custom sort: Use ?sort=name:asc,created_at:desc
+    - Valid sort fields: id, name, short_code, created_at, updated_at
+    - Navigation: Use next_cursor/prev_cursor from response
+
+    Example:
+        GET /v1/boards?account_id=acc_123&limit=50&sort=name:asc
+
+    Args:
+        auth: Admin authentication context with user info.
+        service: Injected board service dependency.
+        pagination: Pagination parameters (cursor, limit, sort).
+        account_id: Optional account ID to filter boards by.
+        code: Optional short code to filter boards by.
+
+    Returns:
+        PaginatedResponse with boards and pagination metadata.
+
+    Raises:
+        400: Invalid cursor, sort field, or cursor state mismatch.
+    """
+    return await handle_list_boards(auth, service, pagination, account_id or auth.account_id, code)
+
+
+@client_router.get("/boards", response_model=PaginatedResponse[BoardResponse])
+async def list_boards_client(
+    auth: ClientAuthContextDep,
+    service: BoardServiceDep,
+    pagination: Annotated[PaginationParams, Depends()],
+    code: str | None = None,
+) -> PaginatedResponse[BoardResponse]:
+    """List boards (Client API).
+
+    Account ID is automatically derived from the authenticated device's account.
+    Clients can optionally filter by short code to find specific boards.
+
+    Pagination:
+    - Default: 20 items per page, sorted by created_at:desc,id:asc
+    - Custom sort: Use ?sort=name:asc,created_at:desc
+    - Valid sort fields: id, name, short_code, created_at, updated_at
+    - Navigation: Use next_cursor/prev_cursor from response
+
+    Example:
+        GET /v1/client/boards?code=WEEKLY-CHALLENGE&limit=50
+
+    Args:
+        auth: Client authentication context with device info.
+        service: Injected board service dependency.
+        pagination: Pagination parameters (cursor, limit, sort).
+        code: Optional short code to filter boards by.
+
+    Returns:
+        PaginatedResponse with boards and pagination metadata.
+
+    Raises:
+        400: Invalid cursor, sort field, or cursor state mismatch.
+    """
+    # Account ID auto-derived from client auth, code search supported
+    return await handle_list_boards(auth, service, pagination, auth.account_id, code)
 
 
 @router.patch("/boards/{board_id}", response_model=BoardResponse)

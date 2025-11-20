@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from leadr.auth.dependencies import AdminAuthContextDep, resolve_query_account_id
+from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
 from leadr.common.domain.ids import AccountID, BoardID, GameID, ScoreFlagID
 from leadr.scores.api.score_flag_schemas import ScoreFlagResponse, ScoreFlagUpdateRequest
 from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
@@ -15,7 +15,7 @@ router = APIRouter()
 
 @router.get("/score-flags", response_model=list[ScoreFlagResponse])
 async def list_score_flags(
-    auth: AdminAuthContextDep,
+    auth: AdminAuthContextWithAccountIDDep,
     service: ScoreFlagServiceDep,
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     board_id: BoardID | None = None,
@@ -47,10 +47,8 @@ async def list_score_flags(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
-    resolved_account_id = resolve_query_account_id(auth, account_id)
-
     flags = await service.list_flags(
-        account_id=resolved_account_id,
+        account_id=account_id or auth.account_id,
         board_id=board_id,
         game_id=game_id,
         status=status,

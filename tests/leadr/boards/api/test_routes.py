@@ -253,8 +253,11 @@ class TestBoardRoutes:
         )
         board_id = create_response.json()["id"]
 
-        # Retrieve by short code using query parameter
-        response = await client.get("/boards?code=SR2025", headers={"leadr-api-key": test_api_key})
+        # Retrieve by short code using query parameter (must include account_id after refactor)
+        response = await client.get(
+            f"/boards?code=SR2025&account_id={account.id}",
+            headers={"leadr-api-key": test_api_key},
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -411,11 +414,14 @@ class TestBoardRoutes:
         assert "Board Two" in names
 
     async def test_list_boards_requires_account_id_or_code(self, client: AsyncClient, test_api_key):
-        """Test that listing boards requires either account_id or code parameter."""
+        """Test that listing boards defaults to authenticated user's account."""
         response = await client.get("/boards", headers={"leadr-api-key": test_api_key})
 
-        assert response.status_code == 422  # Validation error
-        assert "account_id" in response.json()["error"].lower()
+        # After refactor, account_id defaults to auth.account_id instead of requiring explicit param
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
 
     async def test_list_boards_filters_by_account(
         self, client: AsyncClient, db_session, test_api_key

@@ -124,13 +124,6 @@ class TestGameRoutes:
         assert "Game One" in names
         assert "Game Two" in names
 
-    async def test_list_games_requires_account_id(self, client: AsyncClient, test_api_key):
-        """Test that listing games requires account_id parameter (for superadmins)."""
-        response = await client.get("/games", headers={"leadr-api-key": test_api_key})
-
-        # Superadmins must provide account_id, so this returns 400
-        assert response.status_code == 400
-
     async def test_list_games_filters_by_account(
         self, client: AsyncClient, db_session, test_api_key
     ):

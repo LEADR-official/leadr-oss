@@ -11,17 +11,10 @@ from leadr.config import settings
 from leadr.scores.domain.score import Score
 
 
-class ScoreCreateRequest(BaseModel):
-    """Request model for creating a score.
+class ScoreCreateRequestBase(BaseModel):
+    """Base request model for score creation with common fields."""
 
-    Note: Timezone, country, and city are automatically populated from the client's
-    IP address via GeoIP middleware. These fields are not accepted in the request.
-    """
-
-    account_id: AccountID = Field(description="ID of the account this score belongs to")
-    game_id: GameID = Field(description="ID of the game this score belongs to")
     board_id: BoardID = Field(description="ID of the board this score belongs to")
-    device_id: DeviceID = Field(description="ID of the device that submitted this score")
     player_name: str = Field(description="Display name of the player")
     value: float = Field(description="Numeric value of the score for sorting/comparison")
     value_display: str | None = Field(
@@ -49,6 +42,56 @@ class ScoreCreateRequest(BaseModel):
             )
 
         return v
+
+
+class ScoreCreateRequest(ScoreCreateRequestBase):
+    """Request model for creating a score (Admin API).
+
+    Note: Timezone, country, and city are automatically populated from the client's
+    IP address via GeoIP middleware but can be overriden by admins in the request body.
+
+    For regular admins: account_id is derived from auth context, must provide game_id and
+    device_id. For superadmins: can provide account_id to create scores for any account,
+    must provide game_id and device_id.
+    """
+
+    account_id: AccountID | None = Field(
+        default=None,
+        description=(
+            "ID of the account (only for superadmins, regular admins use their auth account)"
+        ),
+    )
+    game_id: GameID = Field(
+        description="ID of the game this score belongs to (required for admin API)",
+    )
+    device_id: DeviceID = Field(
+        description="ID of the device that submitted this score (required for admin API)",
+    )
+    timezone: str | None = Field(
+        default=None,
+        description="Optional override of GeoIP metadata",
+    )
+    country: str | None = Field(
+        default=None,
+        description="Optional override of GeoIP metadata",
+    )
+    city: str | None = Field(
+        default=None,
+        description="Optional override of GeoIP metadata",
+    )
+
+
+class ScoreClientCreateRequest(ScoreCreateRequestBase):
+    """Request model for creating a score (Client API).
+
+    For client authentication, account_id, game_id, and device_id are automatically
+    derived from the authenticated device session. Only game-specific fields are required.
+
+    Note: Timezone, country, and city are automatically populated from the client's
+    IP address via GeoIP middleware.
+    """
+
+    # All fields inherited from ScoreCreateRequestBase
 
 
 class ScoreUpdateRequest(BaseModel):
@@ -121,6 +164,44 @@ class ScoreResponse(BaseModel):
             timezone=score.timezone,
             country=score.country,
             city=score.city,
+            metadata=score.metadata,
+            created_at=score.created_at,
+            updated_at=score.updated_at,
+        )
+
+
+class ScoreClientResponse(BaseModel):
+    """Response model for a score (client API - excludes device_id and geo fields)."""
+
+    id: ScoreID = Field(description="Unique identifier for the score")
+    account_id: AccountID = Field(description="ID of the account this score belongs to")
+    game_id: GameID = Field(description="ID of the game this score belongs to")
+    board_id: BoardID = Field(description="ID of the board this score belongs to")
+    player_name: str = Field(description="Display name of the player")
+    value: float = Field(description="Numeric value of the score")
+    value_display: str | None = Field(default=None, description="Formatted display string, or null")
+    metadata: Any | None = Field(default=None, description="Game-specific metadata, or null")
+    created_at: datetime = Field(description="Timestamp when the score was created (UTC)")
+    updated_at: datetime = Field(description="Timestamp of last update (UTC)")
+
+    @classmethod
+    def from_domain(cls, score: Score) -> "ScoreClientResponse":
+        """Convert domain entity to client response model (without device_id or geo fields).
+
+        Args:
+            score: The domain Score entity to convert.
+
+        Returns:
+            ScoreClientResponse with all fields except device_id, timezone, country, and city.
+        """
+        return cls(
+            id=score.id,
+            account_id=score.account_id,
+            game_id=score.game_id,
+            board_id=score.board_id,
+            player_name=score.player_name,
+            value=score.value,
+            value_display=score.value_display,
             metadata=score.metadata,
             created_at=score.created_at,
             updated_at=score.updated_at,

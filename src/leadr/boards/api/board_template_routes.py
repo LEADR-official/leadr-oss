@@ -5,11 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
-from leadr.auth.dependencies import (
-    AdminAuthContextDep,
-    resolve_query_account_id,
-    validate_body_account_id,
-)
+from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
 from leadr.boards.api.board_template_schemas import (
     BoardTemplateCreateRequest,
     BoardTemplateResponse,
@@ -52,8 +48,6 @@ async def create_board_template(
         404: Game or account not found.
         400: Game doesn't belong to the specified account.
     """
-    validate_body_account_id(auth, request.account_id)
-
     try:
         template = await service.create_board_template(
             account_id=request.account_id,
@@ -107,7 +101,7 @@ async def get_board_template(
 
 @router.get("/board-templates", response_model=PaginatedResponse[BoardTemplateResponse])
 async def list_board_templates(
-    auth: AdminAuthContextDep,
+    auth: AdminAuthContextWithAccountIDDep,
     service: BoardTemplateServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
@@ -142,16 +136,14 @@ async def list_board_templates(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
-    resolved_account_id = resolve_query_account_id(auth, account_id)
-
     try:
         if game_id is not None:
             result = await service.list_board_templates_by_game(
-                resolved_account_id, game_id, pagination=pagination
+                account_id or auth.account_id, game_id, pagination=pagination
             )
         else:
             result = await service.list_board_templates_by_account(
-                resolved_account_id, pagination=pagination
+                account_id or auth.account_id, pagination=pagination
             )
     except (CursorValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from None

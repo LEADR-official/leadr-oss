@@ -11,11 +11,7 @@ from leadr.accounts.api.user_schemas import (
     UserUpdateRequest,
 )
 from leadr.accounts.services.dependencies import UserServiceDep
-from leadr.auth.dependencies import (
-    AdminAuthContextDep,
-    resolve_query_account_id,
-    validate_body_account_id,
-)
+from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, UserID
@@ -48,8 +44,6 @@ async def create_user(
         403: User does not have access to the specified account.
         404: Account not found.
     """
-    validate_body_account_id(auth, request.account_id)
-
     try:
         user = await service.create_user(
             account_id=request.account_id,
@@ -100,7 +94,7 @@ async def get_user(
 
 @router.get("/users", response_model=PaginatedResponse[UserResponse])
 async def list_users(
-    auth: AdminAuthContextDep,
+    auth: AdminAuthContextWithAccountIDDep,
     service: UserServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
@@ -133,10 +127,10 @@ async def list_users(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
-    resolved_account_id = resolve_query_account_id(auth, account_id)
-
     try:
-        result = await service.list_users_by_account(resolved_account_id, pagination=pagination)
+        result = await service.list_users_by_account(
+            account_id or auth.account_id, pagination=pagination
+        )
     except (CursorValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 

@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from leadr.auth.dependencies import AdminAuthContextDep, resolve_query_account_id
+from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, ScoreSubmissionMetaID
 from leadr.scores.api.score_submission_meta_schemas import ScoreSubmissionMetaResponse
 from leadr.scores.services.dependencies import ScoreSubmissionMetaServiceDep
@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.get("/score-submission-metadata", response_model=list[ScoreSubmissionMetaResponse])
 async def list_submission_meta(
-    auth: AdminAuthContextDep,
+    auth: AdminAuthContextWithAccountIDDep,
     service: ScoreSubmissionMetaServiceDep,
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     board_id: BoardID | None = None,
@@ -42,10 +42,8 @@ async def list_submission_meta(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
-    resolved_account_id = resolve_query_account_id(auth, account_id)
-
     metas = await service.list_submission_meta(
-        account_id=resolved_account_id,
+        account_id=account_id or auth.account_id,
         board_id=board_id,
         device_id=device_id,
     )

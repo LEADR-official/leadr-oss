@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from leadr.auth.api.device_schemas import DeviceResponse, DeviceUpdateRequest
-from leadr.auth.dependencies import AdminAuthContextDep, resolve_query_account_id
+from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
 from leadr.auth.domain.device import DeviceStatus
 from leadr.auth.services.dependencies import DeviceServiceDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
@@ -17,7 +17,7 @@ router = APIRouter()
 
 @router.get("/devices", response_model=PaginatedResponse[DeviceResponse])
 async def list_devices(
-    auth: AdminAuthContextDep,
+    auth: AdminAuthContextWithAccountIDDep,
     service: DeviceServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
@@ -59,11 +59,9 @@ async def list_devices(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
-    resolved_account_id = resolve_query_account_id(auth, account_id)
-
     try:
         result = await service.list_devices(
-            account_id=resolved_account_id,
+            account_id=account_id or auth.account_id,
             game_id=game_id,
             status=device_status,
             pagination=pagination,

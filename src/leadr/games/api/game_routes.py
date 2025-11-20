@@ -5,11 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
-from leadr.auth.dependencies import (
-    AdminAuthContextDep,
-    resolve_query_account_id,
-    validate_body_account_id,
-)
+from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, GameID
@@ -47,8 +43,6 @@ async def create_game(
         403: User does not have access to the specified account.
         404: Account not found.
     """
-    validate_body_account_id(auth, request.account_id)
-
     try:
         game = await service.create_game(
             account_id=request.account_id,
@@ -95,7 +89,7 @@ async def get_game(
 
 @router.get("/games", response_model=PaginatedResponse[GameResponse])
 async def list_games(
-    auth: AdminAuthContextDep,
+    auth: AdminAuthContextWithAccountIDDep,
     service: GameServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
@@ -131,10 +125,8 @@ async def list_games(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
-    resolved_account_id = resolve_query_account_id(auth, account_id)
-
     try:
-        result = await service.list_games(resolved_account_id, pagination=pagination)
+        result = await service.list_games(account_id or auth.account_id, pagination=pagination)
     except (CursorValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 

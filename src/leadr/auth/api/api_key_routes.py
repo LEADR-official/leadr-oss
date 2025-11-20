@@ -11,11 +11,7 @@ from leadr.auth.api.api_key_schemas import (
     CreateAPIKeyResponse,
     UpdateAPIKeyRequest,
 )
-from leadr.auth.dependencies import (
-    AdminAuthContextDep,
-    resolve_query_account_id,
-    validate_body_account_id,
-)
+from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.dependencies import APIKeyServiceDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
@@ -50,8 +46,6 @@ async def create_api_key(
         403: User does not have access to the specified account.
         404: Account not found.
     """
-    validate_body_account_id(auth, request.account_id)
-
     try:
         # Create API key
         api_key, plain_key = await service.create_api_key(
@@ -75,7 +69,7 @@ async def create_api_key(
     response_model=PaginatedResponse[APIKeyResponse],
 )
 async def list_api_keys(
-    auth: AdminAuthContextDep,
+    auth: AdminAuthContextWithAccountIDDep,
     service: APIKeyServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
@@ -112,11 +106,9 @@ async def list_api_keys(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
-    resolved_account_id = resolve_query_account_id(auth, account_id)
-
     try:
         result = await service.list_api_keys(
-            account_id=resolved_account_id,
+            account_id=account_id or auth.account_id,
             status=key_status.value if key_status else None,
             pagination=pagination,
         )

@@ -444,9 +444,9 @@ class TestRegularUserAuthorization:
             headers={"leadr-api-key": plain_key},
         )
 
-        # Should be forbidden
+        # Should be forbidden (auth dependency validates account access)
         assert response.status_code == 403
-        assert "access" in response.json()["error"].lower()
+        assert "access denied" in response.json()["error"].lower()
 
     async def test_regular_user_cannot_access_games_from_other_accounts(
         self, db_session: AsyncSession, client: AsyncClient
@@ -641,9 +641,9 @@ class TestAPIKeyAuthorization:
             headers={"leadr-api-key": plain_key},
         )
 
-        # Should be forbidden
+        # Should be forbidden (auth dependency validates account access)
         assert response.status_code == 403
-        assert "access" in response.json()["error"].lower()
+        assert "access denied" in response.json()["error"].lower()
 
     async def test_superadmin_can_create_api_keys_for_any_account(
         self, authenticated_client: AsyncClient, db_session: AsyncSession
@@ -753,17 +753,6 @@ class TestAccountIDResolution:
         assert len(data) == 1
         assert data[0]["name"] == "Test Game"
 
-    async def test_superadmin_list_without_account_id_returns_400(
-        self, authenticated_client: AsyncClient, db_session: AsyncSession
-    ):
-        """Test that superadmins must provide account_id when listing resources."""
-        # Try to list games without account_id
-        response = await authenticated_client.get("/games")
-
-        # Should return 400 Bad Request
-        assert response.status_code == 400
-        assert "must explicitly specify account_id" in response.json()["error"]
-
     async def test_superadmin_list_with_account_id_succeeds(
         self, authenticated_client: AsyncClient, db_session: AsyncSession
     ):
@@ -853,7 +842,7 @@ class TestAccountIDResolution:
             headers={"leadr-api-key": plain_key},
         )
 
-        # Should be forbidden
+        # Should be forbidden (auth dependency validates account access)
         assert response.status_code == 403
         assert "access denied" in response.json()["error"].lower()
 

@@ -147,15 +147,16 @@ app.add_middleware(GeoIPMiddleware, dev_override_ip=settings.DEV_OVERRIDE_IP)
 
 # Create public and admin routers with separate authentication requirements
 public_router = APIRouter()
-client_router = APIRouter()
+client_router = APIRouter(prefix=f"{settings.API_PREFIX}/client")
 admin_router = APIRouter(dependencies=[Depends(require_admin_auth)])
 
 # Public routes - accessible without authentication
 public_router.include_router(api_router)
-public_router.include_router(client_public_router, tags=["Client Authentication"])
 
 # Client routes - require client auth flow
-client_router.include_router(client_protected_router, tags=["Client Authentication"])
+client_router.include_router(client_protected_router, tags=["Authentication"])
+client_router.include_router(board_client_router, tags=["Scores"])
+client_router.include_router(score_client_router, tags=["Scores"])
 
 # Admin routes - require API key authentication
 admin_router.include_router(account_router, tags=["Accounts"])
@@ -170,18 +171,17 @@ admin_router.include_router(score_submission_meta_router, tags=["Score Submissio
 admin_router.include_router(device_router, tags=["Devices"])
 admin_router.include_router(device_session_router, tags=["Device Sessions"])
 
-# Include public router (always available)
-app.include_router(public_router, prefix=settings.API_PREFIX)
-
 # Include admin router only when Admin API is enabled
 if settings.ENABLE_ADMIN_API:
     app.include_router(admin_router, prefix=settings.API_PREFIX)
 
 # Include client router only when Client API is enabled
 if settings.ENABLE_CLIENT_API:
-    app.include_router(client_router, prefix=settings.API_PREFIX)
-    app.include_router(board_client_router, prefix=settings.API_PREFIX, tags=["Scores"])
-    app.include_router(score_client_router, prefix=settings.API_PREFIX, tags=["Scores"])
+    app.include_router(client_router)
+    public_router.include_router(client_public_router, tags=["Authentication"])
+
+# Include public router (always available)
+app.include_router(public_router, prefix=settings.API_PREFIX)
 
 
 if __name__ == "__main__":

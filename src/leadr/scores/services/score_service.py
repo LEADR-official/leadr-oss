@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 from typing import Any, overload
 
+from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.boards.domain.board import KeepStrategy, SortDirection
@@ -93,6 +94,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         city: str | None = None,
         metadata: Any | None = None,
         trust_tier: TrustTier = TrustTier.B,
+        background_tasks: BackgroundTasks | None = None,
     ) -> tuple[Score, AntiCheatResult | None]:
         """Create a new score.
 
@@ -216,6 +218,16 @@ class ScoreService(BaseService[Score, ScoreRepository]):
 
         # Save score to database
         saved_score = await self.repository.create(score)
+
+        # Schedule metadata update as background task (non-blocking)
+        if background_tasks is not None:
+            background_tasks.add_task(
+                self.update_submission_metadata,
+                saved_score,
+                device_id,
+                board_id,
+                anti_cheat_result,
+            )
 
         return saved_score, anti_cheat_result
 
