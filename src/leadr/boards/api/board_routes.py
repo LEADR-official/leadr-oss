@@ -130,16 +130,14 @@ async def handle_list_boards(
         400: Invalid cursor, sort field, or cursor state mismatch.
     """
     try:
-        result = await service.list_boards(
-            account_id=resolved_account_id, code=code, pagination=pagination
-        )
+        result = await service.list_boards(account_id=account_id, code=code, pagination=pagination)
     except (CursorValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
     # Build filter dict for cursors
     filters_dict = {}
-    if resolved_account_id is not None:
-        filters_dict["account_id"] = str(resolved_account_id)
+    if account_id is not None:
+        filters_dict["account_id"] = str(account_id)
     if code is not None:
         filters_dict["code"] = code
 
