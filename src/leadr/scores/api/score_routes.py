@@ -305,7 +305,7 @@ async def list_scores_admin(
         403: User does not have access to the specified account.
     """
     return await handle_list_scores(  # type: ignore[return-value]
-        auth, service, pagination, account_id, board_id, game_id, device_id
+        auth, service, pagination, account_id or auth.account_id, board_id, game_id, device_id
     )
 
 
