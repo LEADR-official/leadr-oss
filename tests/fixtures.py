@@ -82,6 +82,7 @@ async def game_orm(db_session: AsyncSession, account_orm: AccountORM) -> GameORM
     game = GameORM(
         account_id=account_orm.id,  # Raw UUID
         name="Test Game",
+        slug="test-game",
         steam_app_id=None,
         default_board_id=None,
         anti_cheat_enabled=False,
@@ -139,6 +140,7 @@ async def board_orm(
         account_id=account_orm.id,  # Raw UUID
         game_id=game_orm.id,  # Raw UUID
         name="Test Board",
+        slug="test-board",
         icon="trophy",
         short_code="TEST01",
         unit="points",

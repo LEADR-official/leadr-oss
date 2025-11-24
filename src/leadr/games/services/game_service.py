@@ -8,6 +8,7 @@ from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, GameID
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
+from leadr.common.utils.slug import generate_unique_slug_with_retry
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
 
@@ -31,6 +32,7 @@ class GameService(BaseService[Game, GameRepository]):
         self,
         account_id: AccountID,
         name: str,
+        slug: str | None = None,
         steam_app_id: str | None = None,
         default_board_id: BoardID | None = None,
         anti_cheat_enabled: bool = True,
@@ -40,12 +42,16 @@ class GameService(BaseService[Game, GameRepository]):
         Args:
             account_id: The ID of the account that owns this game.
             name: The game name.
+            slug: Optional URL-friendly slug. If not provided, auto-generated from name.
             steam_app_id: Optional Steam application ID.
             default_board_id: Optional default leaderboard ID.
             anti_cheat_enabled: Whether anti-cheat is enabled (defaults to True).
 
         Returns:
             The created Game domain entity.
+
+        Raises:
+            ValueError: If slug is invalid or already exists globally.
 
         Example:
             >>> game = await service.create_game(
@@ -54,9 +60,30 @@ class GameService(BaseService[Game, GameRepository]):
             ...     steam_app_id="123456",
             ... )
         """
+        # Generate or validate slug
+        if slug is None:
+            # Auto-generate unique slug from name with collision handling
+            async def check_slug_exists(slug_to_check: str) -> bool:
+                """Check if slug exists globally."""
+                existing = await self.repository.get_by_slug(slug_to_check)
+                return existing is not None
+
+            slug = await generate_unique_slug_with_retry(
+                base_text=name,
+                check_exists=check_slug_exists,
+                max_retries=10,
+            )
+        else:
+            # Use provided slug - validation will happen in Game domain model
+            # Check for global uniqueness constraint violation
+            existing = await self.repository.get_by_slug(slug)
+            if existing is not None:
+                raise ValueError(f"A game with slug '{slug}' already exists")
+
         game = Game(
             account_id=account_id,
             name=name,
+            slug=slug,
             steam_app_id=steam_app_id,
             default_board_id=default_board_id,
             anti_cheat_enabled=anti_cheat_enabled,
@@ -74,6 +101,17 @@ class GameService(BaseService[Game, GameRepository]):
             The Game domain entity if found, None otherwise.
         """
         return await self.get_by_id(game_id)
+
+    async def get_game_by_slug(self, slug: str) -> Game | None:
+        """Get a game by its slug (globally unique).
+
+        Args:
+            slug: The game slug to search for.
+
+        Returns:
+            The Game domain entity if found, None otherwise.
+        """
+        return await self.repository.get_by_slug(slug)
 
     @overload
     async def list_games(

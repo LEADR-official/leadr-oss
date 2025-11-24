@@ -995,7 +995,7 @@ class TestBoardService:
         assert board.ends_at == next_run + timedelta(days=7)
         assert board.tags == ["weekly", "challenge"]
         assert board.short_code is not None  # Should be auto-generated
-        assert len(board.short_code) == 8  # Default short code length
+        assert len(board.short_code) == 5  # Default short code length
 
     async def test_create_board_from_template_with_defaults(self, db_session: AsyncSession):
         """Test creating a board from a template with default config values."""

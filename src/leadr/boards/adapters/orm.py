@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import ARRAY, Boolean, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import ARRAY, Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,12 +20,24 @@ class BoardORM(Base):
     """Board ORM model.
 
     Represents a leaderboard/board that belongs to a game in the database.
-    Maps to the boards table with foreign keys to accounts and games, and a
-    unique constraint on short_code (globally unique for direct sharing).
+    Maps to the boards table with foreign keys to accounts and games, a
+    unique constraint on short_code (globally unique for direct sharing),
+    and a partial unique constraint on (account_id, game_id, slug) for
+    active boards only.
     """
 
     __tablename__ = "boards"
-    __table_args__ = (UniqueConstraint("short_code", name="uq_board_short_code"),)
+    __table_args__ = (
+        UniqueConstraint("short_code", name="uq_board_short_code"),
+        Index(
+            "ix_board_slug_unique_when_active",
+            "account_id",
+            "game_id",
+            "slug",
+            unique=True,
+            postgresql_where="is_active = true",
+        ),
+    )
 
     account_id: Mapped[UUID] = mapped_column(
         ForeignKey("accounts.id", ondelete="CASCADE"),
@@ -38,8 +50,9 @@ class BoardORM(Base):
         index=True,
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
+    slug: Mapped[str] = mapped_column(String, nullable=False, index=True)
     icon: Mapped[str] = mapped_column(String, nullable=False)
-    short_code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    short_code: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     unit: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
     sort_direction: Mapped[str] = mapped_column(String, nullable=False)

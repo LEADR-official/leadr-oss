@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from leadr.accounts.api.account_schemas import (
     AccountCreateRequest,
@@ -47,10 +47,13 @@ async def create_account(
             detail="Only superadmins can create accounts",
         )
 
-    account = await service.create_account(
-        name=request.name,
-        slug=request.slug,
-    )
+    try:
+        account = await service.create_account(
+            name=request.name,
+            slug=request.slug,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
     return AccountResponse.from_domain(account)
 
@@ -91,10 +94,14 @@ async def list_accounts(
     service: AccountServiceDep,
     auth: AdminAuthContextDep,
     pagination: Annotated[PaginationParams, Depends()],
+    slug: Annotated[str | None, Query(description="Filter by account slug")] = None,
 ) -> PaginatedResponse[AccountResponse]:
-    """List accounts with pagination.
+    """List accounts with pagination and optional filtering.
 
     Superadmins see all accounts (paginated). Regular users see only their own account.
+
+    Filtering:
+    - Use ?slug={slug} to find a specific account by its slug
 
     Pagination:
     - Default: 20 items per page, sorted by created_at:desc,id:asc
@@ -103,19 +110,46 @@ async def list_accounts(
     - Navigation: Use next_cursor/prev_cursor from response
 
     Example:
+        GET /v1/accounts?slug=acme-corp
         GET /v1/accounts?limit=50&sort=name:asc
 
     Args:
         service: Injected account service dependency.
         auth: Authentication context with user info.
         pagination: Pagination parameters (cursor, limit, sort).
+        slug: Optional slug filter to find a specific account.
 
     Returns:
         PaginatedResponse with accounts and pagination metadata.
 
     Raises:
         400: Invalid cursor, sort field, or cursor state mismatch.
+        404: Account not found when filtering by slug.
     """
+    # If slug filter is provided, return that specific account
+    if slug is not None:
+        account = await service.get_account_by_slug(slug)
+        if account is None:
+            raise HTTPException(status_code=404, detail=f"Account with slug '{slug}' not found")
+
+        # Check authorization
+        if not auth.is_superadmin and not auth.has_access_to_account(account.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have access to this account",
+            )
+
+        return PaginatedResponse(
+            data=[AccountResponse.from_domain(account)],
+            pagination=PaginationMeta(
+                next_cursor=None,
+                prev_cursor=None,
+                has_next=False,
+                has_prev=False,
+                count=1,
+            ),
+        )
+
     if auth.is_superadmin:
         # Superadmins can see all accounts (paginated)
         try:

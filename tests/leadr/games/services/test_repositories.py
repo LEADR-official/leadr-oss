@@ -43,6 +43,7 @@ class TestGameRepository:
             id=game_id,
             account_id=account_id,
             name="Super Awesome Game",
+            slug="super-awesome-game",
             steam_app_id="123456",
             created_at=now,
             updated_at=now,
@@ -81,6 +82,7 @@ class TestGameRepository:
             id=game_id,
             account_id=account_id,
             name="Super Awesome Game",
+            slug="super-awesome-game",
             created_at=now,
             updated_at=now,
         )
@@ -127,6 +129,7 @@ class TestGameRepository:
             id=game_id,
             account_id=account_id,
             name="Super Awesome Game",
+            slug="super-awesome-game",
             created_at=now,
             updated_at=now,
         )
@@ -168,6 +171,7 @@ class TestGameRepository:
             id=game_id,
             account_id=account_id,
             name="Super Awesome Game",
+            slug="super-awesome-game",
             created_at=now,
             updated_at=now,
         )
@@ -204,6 +208,7 @@ class TestGameRepository:
             id=GameID(uuid4()),
             account_id=account_id,
             name="Game One",
+            slug="game-one",
             created_at=now,
             updated_at=now,
         )
@@ -211,6 +216,7 @@ class TestGameRepository:
             id=GameID(uuid4()),
             account_id=account_id,
             name="Game Two",
+            slug="game-two",
             created_at=now,
             updated_at=now,
         )
@@ -260,6 +266,7 @@ class TestGameRepository:
             id=GameID(uuid4()),
             account_id=AccountID(account1_id),
             name="Account 1 Game",
+            slug="account-1-game",
             created_at=now,
             updated_at=now,
         )
@@ -267,6 +274,7 @@ class TestGameRepository:
             id=GameID(uuid4()),
             account_id=AccountID(account2_id),
             name="Account 2 Game",
+            slug="account-2-game",
             created_at=now,
             updated_at=now,
         )
@@ -306,6 +314,7 @@ class TestGameRepository:
             id=game_id,
             account_id=account_id,
             name="Super Awesome Game",
+            slug="super-awesome-game",
             created_at=now,
             updated_at=now,
         )
@@ -342,6 +351,7 @@ class TestGameRepository:
             id=GameID(uuid4()),
             account_id=account_id,
             name="Game One",
+            slug="game-one",
             created_at=now,
             updated_at=now,
         )
@@ -349,6 +359,7 @@ class TestGameRepository:
             id=GameID(uuid4()),
             account_id=account_id,
             name="Game Two",
+            slug="game-two",
             created_at=now,
             updated_at=now,
         )
@@ -389,6 +400,7 @@ class TestGameRepository:
             id=GameID(uuid4()),
             account_id=account_id,
             name="Duplicate Name Game",
+            slug="duplicate-name-game",
             created_at=now,
             updated_at=now,
         )
@@ -399,6 +411,7 @@ class TestGameRepository:
             id=GameID(uuid4()),
             account_id=account_id,
             name="Duplicate Name Game",
+            slug="duplicate-name-game-2",
             created_at=now,
             updated_at=now,
         )
@@ -440,6 +453,7 @@ class TestGameRepository:
             id=GameID(uuid4()),
             account_id=AccountID(account1_id),
             name="Popular Game",
+            slug="popular-game",
             created_at=now,
             updated_at=now,
         )
@@ -447,6 +461,7 @@ class TestGameRepository:
             id=GameID(uuid4()),
             account_id=AccountID(account2_id),
             name="Popular Game",
+            slug="popular-game-2",
             created_at=now,
             updated_at=now,
         )
@@ -458,3 +473,74 @@ class TestGameRepository:
         assert created1.name == "Popular Game"
         assert created2.name == "Popular Game"
         assert created1.account_id != created2.account_id
+
+    async def test_get_game_by_slug(self, db_session: AsyncSession, test_account: Account):
+        """Test getting a game by slug."""
+        game_repo = GameRepository(db_session)
+        game_id = GameID(uuid4())
+        now = datetime.now(UTC)
+
+        game = Game(
+            id=game_id,
+            account_id=test_account.id,
+            name="My Awesome Game",
+            slug="my-awesome-game",
+            created_at=now,
+            updated_at=now,
+        )
+        created_game = await game_repo.create(game)
+
+        # Get by slug
+        found_game = await game_repo.get_by_slug("my-awesome-game")
+
+        assert found_game is not None
+        assert found_game.id == created_game.id
+        assert found_game.slug == "my-awesome-game"
+        assert found_game.name == "My Awesome Game"
+
+    async def test_get_game_by_slug_not_found(self, db_session: AsyncSession):
+        """Test getting a nonexistent game by slug returns None."""
+        game_repo = GameRepository(db_session)
+
+        found_game = await game_repo.get_by_slug("nonexistent-game")
+
+        assert found_game is None
+
+    async def test_slug_in_sortable_fields(self, db_session: AsyncSession):
+        """Test that slug is in the SORTABLE_FIELDS set."""
+        game_repo = GameRepository(db_session)
+
+        assert "slug" in game_repo.SORTABLE_FIELDS
+
+    async def test_slug_globally_unique(self, db_session: AsyncSession, test_account: Account):
+        """Test that slugs must be globally unique across all accounts."""
+        from sqlalchemy.exc import IntegrityError
+
+        game_repo = GameRepository(db_session)
+        account2_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        # Create first game with slug
+        game1 = Game(
+            id=GameID(uuid4()),
+            account_id=test_account.id,
+            name="Popular Game 1",
+            slug="popular-game-1",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game1)
+
+        # Try to create second game with same slug in different account
+        game2 = Game(
+            id=GameID(uuid4()),
+            account_id=account2_id,
+            name="Popular Game 2",
+            slug="popular-game",  # Same slug as game1
+            created_at=now,
+            updated_at=now,
+        )
+
+        # Should raise IntegrityError due to unique constraint
+        with pytest.raises(IntegrityError):
+            await game_repo.create(game2)

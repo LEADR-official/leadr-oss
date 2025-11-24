@@ -481,6 +481,7 @@ class TestRegularUserAuthorization:
             id=GameID(),
             account_id=account2.id,
             name="Account 2 Game",
+            slug="account-2-game",
             created_at=now,
             updated_at=now,
         )
@@ -537,6 +538,7 @@ class TestRegularUserAuthorization:
             id=GameID(),
             account_id=account.id,
             name="My Game",
+            slug="my-game",
             created_at=now,
             updated_at=now,
         )
@@ -717,6 +719,7 @@ class TestAccountIDResolution:
             id=GameID(uuid4()),
             account_id=account.id,
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
@@ -776,6 +779,7 @@ class TestAccountIDResolution:
             id=GameID(uuid4()),
             account_id=account.id,
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )

@@ -85,10 +85,12 @@ class TestDeviceORM:
         game1 = GameORM(
             account_id=account_orm.id,
             name="Game 1",
+            slug="game-1",
         )
         game2 = GameORM(
             account_id=account_orm.id,
             name="Game 2",
+            slug="game-2",
         )
         db_session.add(game1)
         db_session.add(game2)
@@ -156,6 +158,7 @@ class TestDeviceORM:
         game = GameORM(
             account_id=account.id,
             name="Test Game",
+            slug="test-game",
         )
         db_session.add(game)
         await db_session.commit()

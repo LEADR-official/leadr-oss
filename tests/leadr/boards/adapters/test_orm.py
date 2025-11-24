@@ -30,6 +30,7 @@ class TestBoardORM:
             account_id=account_orm.id,
             game_id=game_orm.id,
             name="Speed Run Board",
+            slug="speed-run-board",
             icon="trophy",
             short_code="SR2025",
             unit="seconds",
@@ -74,6 +75,7 @@ class TestBoardORM:
             account_id=account_orm.id,
             game_id=game_orm.id,
             name="Simple Board",
+            slug="simple-board",
             icon="star",
             short_code="SB001",
             unit="points",
@@ -104,8 +106,8 @@ class TestBoardORM:
         await db_session.commit()
 
         # Create games for different accounts
-        game1 = GameORM(account_id=account1.id, name="Game 1")
-        game2 = GameORM(account_id=account2.id, name="Game 2")
+        game1 = GameORM(account_id=account1.id, name="Game 1", slug="game-1")
+        game2 = GameORM(account_id=account2.id, name="Game 2", slug="game-2")
         db_session.add_all([game1, game2])
         await db_session.commit()
 
@@ -114,6 +116,7 @@ class TestBoardORM:
             account_id=account1.id,
             game_id=game1.id,
             name="Board 1",
+            slug="board-1",
             icon="star",
             short_code="GLOBAL01",
             unit="points",
@@ -129,6 +132,7 @@ class TestBoardORM:
             account_id=account2.id,
             game_id=game2.id,
             name="Board 2",
+            slug="board-2",
             icon="trophy",
             short_code="GLOBAL01",  # Duplicate short_code
             unit="seconds",
@@ -150,6 +154,7 @@ class TestBoardORM:
             account_id=uuid4(),  # Non-existent account
             game_id=game_id,
             name="Board Without Account",
+            slug="board-without-account",
             icon="star",
             short_code="BWA01",
             unit="points",
@@ -171,6 +176,7 @@ class TestBoardORM:
             account_id=account_orm.id,
             game_id=uuid4(),  # Non-existent game
             name="Board Without Game",
+            slug="board-without-game",
             icon="star",
             short_code="BWG01",
             unit="points",
@@ -226,6 +232,7 @@ class TestBoardORM:
             account_id=account_orm.id,
             game_id=game_orm.id,
             name="Test Board",
+            slug="test-board",
             icon="star",
             short_code="TB003",
             unit="points",
@@ -257,6 +264,7 @@ class TestBoardORM:
             account_id=account_orm.id,
             game_id=game_orm.id,
             name="Test Board",
+            slug="test-board",
             icon="star",
             short_code="TB005",
             unit="points",
@@ -294,6 +302,7 @@ class TestBoardORM:
             account_id=account_orm.id,
             game_id=game_orm.id,
             name="Test Board",
+            slug="test-board",
             icon="star",
             short_code="TB007",
             unit="points",

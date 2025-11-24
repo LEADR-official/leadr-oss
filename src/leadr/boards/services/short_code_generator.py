@@ -14,7 +14,7 @@ from leadr.boards.services.repositories import BoardRepository
 # Excludes: 0 (zero), O (letter O), 1 (one), I (letter I), l (lowercase L)
 # This leaves us with 32 characters for better readability
 CHARSET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
-CODE_LENGTH = 8
+CODE_LENGTH = 5
 
 
 def generate_short_code() -> str:
@@ -24,12 +24,12 @@ def generate_short_code() -> str:
     Excludes ambiguous characters (0/O, 1/I/l) for better readability.
 
     Returns:
-        8-character uppercase alphanumeric code (e.g., 'A7B3X9K2').
+        5-character uppercase alphanumeric code (e.g., 'A7B3X').
 
     Example:
         >>> code = generate_short_code()
         >>> len(code)
-        8
+        5
         >>> code.isupper()
         True
     """
@@ -42,15 +42,12 @@ async def generate_unique_short_code(session: AsyncSession, max_retries: int = 1
     Generates random codes and checks database for uniqueness. If a collision
     is detected, retries up to max_retries times before raising an error.
 
-    With 32^8 = 1.1 trillion possible codes, collisions are extremely rare
-    until we have millions of boards.
-
     Args:
         session: Database session for uniqueness checking.
         max_retries: Maximum number of generation attempts (default 10).
 
     Returns:
-        Unique 8-character short code guaranteed not to exist in database.
+        Unique 5-character short code guaranteed not to exist in database.
 
     Raises:
         RuntimeError: If unable to generate unique code within max_retries attempts.

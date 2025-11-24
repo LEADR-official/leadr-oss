@@ -13,6 +13,13 @@ class GameCreateRequest(BaseModel):
 
     account_id: AccountID = Field(description="ID of the account this game belongs to")
     name: str = Field(description="Name of the game")
+    slug: str | None = Field(
+        default=None,
+        description=(
+            "Optional URL-friendly slug (globally unique). "
+            "If not provided, will be auto-generated from name"
+        ),
+    )
     steam_app_id: str | None = Field(
         default=None, description="Optional Steam App ID for Steam integration"
     )
@@ -44,6 +51,7 @@ class GameResponse(BaseModel):
     id: GameID = Field(description="Unique identifier for the game")
     account_id: AccountID = Field(description="ID of the account this game belongs to")
     name: str = Field(description="Name of the game")
+    slug: str = Field(description="URL-friendly slug for the game (globally unique, immutable)")
     steam_app_id: str | None = Field(
         default=None, description="Steam App ID if Steam integration is configured"
     )
@@ -68,6 +76,7 @@ class GameResponse(BaseModel):
             id=game.id,
             account_id=game.account_id,
             name=game.name,
+            slug=game.slug,
             steam_app_id=game.steam_app_id,
             default_board_id=game.default_board_id,
             anti_cheat_enabled=game.anti_cheat_enabled,

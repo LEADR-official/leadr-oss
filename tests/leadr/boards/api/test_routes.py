@@ -668,3 +668,180 @@ class TestBoardRoutes:
         assert "pagination" in data
         assert len(data["data"]) == 1
         assert data["data"][0]["name"] == "Board Two"
+
+    async def test_create_board_with_custom_slug(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating a board with a custom slug."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board with custom slug
+        response = await client.post(
+            "/boards",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "Speed Run Board",
+                "slug": "custom-speedrun-slug",
+                "icon": "trophy",
+                "short_code": "SR2025",
+                "unit": "seconds",
+                "is_active": True,
+                "sort_direction": "ASCENDING",
+                "keep_strategy": "BEST_ONLY",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["slug"] == "custom-speedrun-slug"
+        assert data["name"] == "Speed Run Board"
+
+    async def test_create_board_auto_generates_slug_when_not_provided(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that slug is auto-generated from name when not provided."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board without slug
+        response = await client.post(
+            "/boards",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "My Awesome Board",
+                "icon": "trophy",
+                "short_code": "MAB2025",
+                "unit": "points",
+                "is_active": True,
+                "sort_direction": "DESCENDING",
+                "keep_strategy": "ALL",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        # Should be auto-generated from "My Awesome Board" -> "my-awesome-board"
+        assert data["slug"] == "my-awesome-board"
+        assert data["name"] == "My Awesome Board"
+
+    async def test_create_board_with_invalid_slug_format(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating a board with invalid slug format returns 400."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Try to create board with invalid slug (uppercase, special chars)
+        response = await client.post(
+            "/boards",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "Invalid Slug Board",
+                "slug": "Invalid_Slug!",
+                "icon": "trophy",
+                "short_code": "ISB2025",
+                "unit": "points",
+                "is_active": True,
+                "sort_direction": "DESCENDING",
+                "keep_strategy": "ALL",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 400
+        error_msg = response.json()["error"].lower()
+        assert "slug" in error_msg
+
+    async def test_create_board_with_duplicate_slug_fails(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating boards with duplicate slug in same account+game fails."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create first board with slug
+        response1 = await client.post(
+            "/boards",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "First Board",
+                "slug": "my-unique-slug",
+                "icon": "trophy",
+                "short_code": "FIRST",
+                "unit": "points",
+                "is_active": True,
+                "sort_direction": "DESCENDING",
+                "keep_strategy": "ALL",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response1.status_code == 201
+
+        # Try to create second board with same slug (should fail)
+        response2 = await client.post(
+            "/boards",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "Second Board",
+                "slug": "my-unique-slug",
+                "icon": "star",
+                "short_code": "SECOND",
+                "unit": "points",
+                "is_active": True,
+                "sort_direction": "DESCENDING",
+                "keep_strategy": "ALL",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        # Should fail due to unique constraint
+        assert response2.status_code == 400

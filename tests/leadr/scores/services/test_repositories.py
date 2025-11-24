@@ -1,7 +1,6 @@
 """Tests for Score repository services."""
 
 from datetime import UTC, datetime
-from uuid import uuid4
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +26,7 @@ class TestScoreRepository:
         """Test creating a score via repository."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = AccountID(uuid4())
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -42,12 +41,13 @@ class TestScoreRepository:
 
         # Create game
         game_repo = GameRepository(db_session)
-        game_id = GameID(uuid4())
+        game_id = GameID()
 
         game = Game(
             id=game_id,
             account_id=account_id,
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
@@ -55,7 +55,7 @@ class TestScoreRepository:
 
         # Create device
         device_repo = DeviceRepository(db_session)
-        device_id = DeviceID(uuid4())  # This is the device's primary key (UUID)
+        device_id = DeviceID()
 
         device = Device(
             id=device_id,
@@ -72,13 +72,14 @@ class TestScoreRepository:
 
         # Create board
         board_repo = BoardRepository(db_session)
-        board_id = BoardID(uuid4())
+        board_id = BoardID()
 
         board = Board(
             id=board_id,
             account_id=account_id,
             game_id=game_id,
             name="Test Board",
+            slug="test-board",
             icon="trophy",
             short_code="TB2025",
             unit="points",
@@ -92,7 +93,7 @@ class TestScoreRepository:
 
         # Create score
         score_repo = ScoreRepository(db_session)
-        score_id = ScoreID(uuid4())
+        score_id = ScoreID()
 
         score = Score(
             id=score_id,
@@ -128,7 +129,7 @@ class TestScoreRepository:
         """Test retrieving a score by ID."""
         # Create supporting entities
         account_repo = AccountRepository(db_session)
-        account_id = AccountID(uuid4())
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -142,19 +143,20 @@ class TestScoreRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = GameID(uuid4())
+        game_id = GameID()
 
         game = Game(
             id=game_id,
             account_id=account_id,
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
         await game_repo.create(game)
 
         device_repo = DeviceRepository(db_session)
-        device_id = DeviceID(uuid4())
+        device_id = DeviceID()
 
         device = Device(
             id=device_id,
@@ -169,13 +171,14 @@ class TestScoreRepository:
         await device_repo.create(device)
 
         board_repo = BoardRepository(db_session)
-        board_id = BoardID(uuid4())
+        board_id = BoardID()
 
         board = Board(
             id=board_id,
             account_id=account_id,
             game_id=game_id,
             name="Test Board",
+            slug="test-board",
             icon="trophy",
             short_code="TB2025",
             unit="points",
@@ -189,7 +192,7 @@ class TestScoreRepository:
 
         # Create score
         score_repo = ScoreRepository(db_session)
-        score_id = ScoreID(uuid4())
+        score_id = ScoreID()
 
         score = Score(
             id=score_id,
@@ -215,7 +218,7 @@ class TestScoreRepository:
     async def test_get_score_by_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent score returns None."""
         score_repo = ScoreRepository(db_session)
-        non_existent_id = ScoreID(uuid4())
+        non_existent_id = ScoreID()
 
         result = await score_repo.get_by_id(non_existent_id)
 
@@ -225,7 +228,7 @@ class TestScoreRepository:
         """Test updating a score."""
         # Create supporting entities
         account_repo = AccountRepository(db_session)
-        account_id = AccountID(uuid4())
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -239,19 +242,20 @@ class TestScoreRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = GameID(uuid4())
+        game_id = GameID()
 
         game = Game(
             id=game_id,
             account_id=account_id,
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
         await game_repo.create(game)
 
         device_repo = DeviceRepository(db_session)
-        device_id = DeviceID(uuid4())
+        device_id = DeviceID()
 
         device = Device(
             id=device_id,
@@ -266,13 +270,14 @@ class TestScoreRepository:
         await device_repo.create(device)
 
         board_repo = BoardRepository(db_session)
-        board_id = BoardID(uuid4())
+        board_id = BoardID()
 
         board = Board(
             id=board_id,
             account_id=account_id,
             game_id=game_id,
             name="Test Board",
+            slug="test-board",
             icon="trophy",
             short_code="TB2025",
             unit="points",
@@ -286,7 +291,7 @@ class TestScoreRepository:
 
         # Create score
         score_repo = ScoreRepository(db_session)
-        score_id = ScoreID(uuid4())
+        score_id = ScoreID()
 
         score = Score(
             id=score_id,
@@ -315,7 +320,7 @@ class TestScoreRepository:
         account_repo = AccountRepository(db_session)
         now = datetime.now(UTC)
 
-        account1_id = AccountID(uuid4())
+        account1_id = AccountID()
         account1 = Account(
             id=account1_id,
             name="Account 1",
@@ -326,7 +331,7 @@ class TestScoreRepository:
         )
         await account_repo.create(account1)
 
-        account2_id = AccountID(uuid4())
+        account2_id = AccountID()
         account2 = Account(
             id=account2_id,
             name="Account 2",
@@ -340,21 +345,23 @@ class TestScoreRepository:
         # Create games for each account
         game_repo = GameRepository(db_session)
 
-        game1_id = GameID(uuid4())
+        game1_id = GameID()
         game1 = Game(
             id=game1_id,
             account_id=account1_id,
             name="Game 1",
+            slug="game-1",
             created_at=now,
             updated_at=now,
         )
         await game_repo.create(game1)
 
-        game2_id = GameID(uuid4())
+        game2_id = GameID()
         game2 = Game(
             id=game2_id,
             account_id=account2_id,
             name="Game 2",
+            slug="game-2",
             created_at=now,
             updated_at=now,
         )
@@ -363,7 +370,7 @@ class TestScoreRepository:
         # Create devices for each account
         device_repo = DeviceRepository(db_session)
 
-        device1_id = DeviceID(uuid4())
+        device1_id = DeviceID()
         device1 = Device(
             id=device1_id,
             account_id=account1_id,
@@ -376,7 +383,7 @@ class TestScoreRepository:
         )
         await device_repo.create(device1)
 
-        device2_id = DeviceID(uuid4())
+        device2_id = DeviceID()
         device2 = Device(
             id=device2_id,
             account_id=account2_id,
@@ -392,12 +399,13 @@ class TestScoreRepository:
         # Create boards for each game
         board_repo = BoardRepository(db_session)
 
-        board1_id = BoardID(uuid4())
+        board1_id = BoardID()
         board1 = Board(
             id=board1_id,
             account_id=account1_id,
             game_id=game1_id,
             name="Board 1",
+            slug="board-1",
             icon="trophy",
             short_code="B1",
             unit="points",
@@ -409,12 +417,13 @@ class TestScoreRepository:
         )
         await board_repo.create(board1)
 
-        board2_id = BoardID(uuid4())
+        board2_id = BoardID()
         board2 = Board(
             id=board2_id,
             account_id=account2_id,
             game_id=game2_id,
             name="Board 2",
+            slug="board-2",
             icon="star",
             short_code="B2",
             unit="seconds",
@@ -430,7 +439,7 @@ class TestScoreRepository:
         score_repo = ScoreRepository(db_session)
 
         score1 = Score(
-            id=ScoreID(uuid4()),
+            id=ScoreID(),
             account_id=account1_id,
             game_id=game1_id,
             board_id=board1_id,
@@ -443,7 +452,7 @@ class TestScoreRepository:
         await score_repo.create(score1)
 
         score2 = Score(
-            id=ScoreID(uuid4()),
+            id=ScoreID(),
             account_id=account2_id,
             game_id=game2_id,
             board_id=board2_id,
@@ -466,7 +475,7 @@ class TestScoreRepository:
         """Test filtering scores with optional board_id, game_id, device_id."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = AccountID(uuid4())
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -481,12 +490,13 @@ class TestScoreRepository:
 
         # Create game
         game_repo = GameRepository(db_session)
-        game_id = GameID(uuid4())
+        game_id = GameID()
 
         game = Game(
             id=game_id,
             account_id=account_id,
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
@@ -495,7 +505,7 @@ class TestScoreRepository:
         # Create two devices
         device_repo = DeviceRepository(db_session)
 
-        device1_id = DeviceID(uuid4())
+        device1_id = DeviceID()
         device1 = Device(
             id=device1_id,
             account_id=account_id,
@@ -508,7 +518,7 @@ class TestScoreRepository:
         )
         await device_repo.create(device1)
 
-        device2_id = DeviceID(uuid4())
+        device2_id = DeviceID()
         device2 = Device(
             id=device2_id,
             account_id=account_id,
@@ -524,12 +534,13 @@ class TestScoreRepository:
         # Create two boards
         board_repo = BoardRepository(db_session)
 
-        board1_id = BoardID(uuid4())
+        board1_id = BoardID()
         board1 = Board(
             id=board1_id,
             account_id=account_id,
             game_id=game_id,
             name="Board 1",
+            slug="board-1",
             icon="trophy",
             short_code="B1",
             unit="points",
@@ -541,12 +552,13 @@ class TestScoreRepository:
         )
         await board_repo.create(board1)
 
-        board2_id = BoardID(uuid4())
+        board2_id = BoardID()
         board2 = Board(
             id=board2_id,
             account_id=account_id,
             game_id=game_id,
             name="Board 2",
+            slug="board-2",
             icon="star",
             short_code="B2",
             unit="seconds",
@@ -562,7 +574,7 @@ class TestScoreRepository:
         score_repo = ScoreRepository(db_session)
 
         score1 = Score(
-            id=ScoreID(uuid4()),
+            id=ScoreID(),
             account_id=account_id,
             game_id=game_id,
             board_id=board1_id,
@@ -575,7 +587,7 @@ class TestScoreRepository:
         await score_repo.create(score1)
 
         score2 = Score(
-            id=ScoreID(uuid4()),
+            id=ScoreID(),
             account_id=account_id,
             game_id=game_id,
             board_id=board1_id,
@@ -588,7 +600,7 @@ class TestScoreRepository:
         await score_repo.create(score2)
 
         score3 = Score(
-            id=ScoreID(uuid4()),
+            id=ScoreID(),
             account_id=account_id,
             game_id=game_id,
             board_id=board2_id,
@@ -625,7 +637,7 @@ class TestScoreRepository:
         """Test that filter excludes soft-deleted scores."""
         # Create supporting entities
         account_repo = AccountRepository(db_session)
-        account_id = AccountID(uuid4())
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -639,19 +651,20 @@ class TestScoreRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = GameID(uuid4())
+        game_id = GameID()
 
         game = Game(
             id=game_id,
             account_id=account_id,
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
         await game_repo.create(game)
 
         device_repo = DeviceRepository(db_session)
-        device_id = DeviceID(uuid4())
+        device_id = DeviceID()
 
         device = Device(
             id=device_id,
@@ -666,13 +679,14 @@ class TestScoreRepository:
         await device_repo.create(device)
 
         board_repo = BoardRepository(db_session)
-        board_id = BoardID(uuid4())
+        board_id = BoardID()
 
         board = Board(
             id=board_id,
             account_id=account_id,
             game_id=game_id,
             name="Test Board",
+            slug="test-board",
             icon="trophy",
             short_code="TB2025",
             unit="points",
@@ -688,7 +702,7 @@ class TestScoreRepository:
         score_repo = ScoreRepository(db_session)
 
         score1 = Score(
-            id=ScoreID(uuid4()),
+            id=ScoreID(),
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
@@ -701,7 +715,7 @@ class TestScoreRepository:
         await score_repo.create(score1)
 
         score2 = Score(
-            id=ScoreID(uuid4()),
+            id=ScoreID(),
             account_id=account_id,
             game_id=game_id,
             board_id=board_id,
@@ -727,7 +741,7 @@ class TestScoreRepository:
         """Test that get_by_id excludes soft-deleted scores."""
         # Create supporting entities
         account_repo = AccountRepository(db_session)
-        account_id = AccountID(uuid4())
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -741,19 +755,20 @@ class TestScoreRepository:
         await account_repo.create(account)
 
         game_repo = GameRepository(db_session)
-        game_id = GameID(uuid4())
+        game_id = GameID()
 
         game = Game(
             id=game_id,
             account_id=account_id,
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
         await game_repo.create(game)
 
         device_repo = DeviceRepository(db_session)
-        device_id = DeviceID(uuid4())
+        device_id = DeviceID()
 
         device = Device(
             id=device_id,
@@ -768,13 +783,14 @@ class TestScoreRepository:
         await device_repo.create(device)
 
         board_repo = BoardRepository(db_session)
-        board_id = BoardID(uuid4())
+        board_id = BoardID()
 
         board = Board(
             id=board_id,
             account_id=account_id,
             game_id=game_id,
             name="Test Board",
+            slug="test-board",
             icon="trophy",
             short_code="TB2025",
             unit="points",
@@ -788,7 +804,7 @@ class TestScoreRepository:
 
         # Create score
         score_repo = ScoreRepository(db_session)
-        score_id = ScoreID(uuid4())
+        score_id = ScoreID()
 
         score = Score(
             id=score_id,
@@ -815,7 +831,7 @@ class TestScoreRepository:
         """Test creating a score with metadata via repository."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = AccountID(uuid4())
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -830,12 +846,13 @@ class TestScoreRepository:
 
         # Create game
         game_repo = GameRepository(db_session)
-        game_id = GameID(uuid4())
+        game_id = GameID()
 
         game = Game(
             id=game_id,
             account_id=account_id,
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
@@ -843,7 +860,7 @@ class TestScoreRepository:
 
         # Create device
         device_repo = DeviceRepository(db_session)
-        device_id = DeviceID(uuid4())
+        device_id = DeviceID()
 
         device = Device(
             id=device_id,
@@ -859,13 +876,14 @@ class TestScoreRepository:
 
         # Create board
         board_repo = BoardRepository(db_session)
-        board_id = BoardID(uuid4())
+        board_id = BoardID()
 
         board = Board(
             id=board_id,
             account_id=account_id,
             game_id=game_id,
             name="Test Board",
+            slug="test-board",
             icon="trophy",
             short_code="TB2025",
             unit="points",
@@ -879,7 +897,7 @@ class TestScoreRepository:
 
         # Create score with metadata
         score_repo = ScoreRepository(db_session)
-        score_id = ScoreID(uuid4())
+        score_id = ScoreID()
         metadata = {"level": 5, "character": "Warrior", "loadout": ["sword", "shield"]}
 
         score = Score(
@@ -911,7 +929,7 @@ class TestScoreRepository:
         """Test updating score metadata via repository."""
         # Create account
         account_repo = AccountRepository(db_session)
-        account_id = AccountID(uuid4())
+        account_id = AccountID()
         now = datetime.now(UTC)
 
         account = Account(
@@ -926,12 +944,13 @@ class TestScoreRepository:
 
         # Create game
         game_repo = GameRepository(db_session)
-        game_id = GameID(uuid4())
+        game_id = GameID()
 
         game = Game(
             id=game_id,
             account_id=account_id,
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
@@ -939,7 +958,7 @@ class TestScoreRepository:
 
         # Create device
         device_repo = DeviceRepository(db_session)
-        device_id = DeviceID(uuid4())
+        device_id = DeviceID()
 
         device = Device(
             id=device_id,
@@ -955,13 +974,14 @@ class TestScoreRepository:
 
         # Create board
         board_repo = BoardRepository(db_session)
-        board_id = BoardID(uuid4())
+        board_id = BoardID()
 
         board = Board(
             id=board_id,
             account_id=account_id,
             game_id=game_id,
             name="Test Board",
+            slug="test-board",
             icon="trophy",
             short_code="TB2025",
             unit="points",
@@ -975,7 +995,7 @@ class TestScoreRepository:
 
         # Create score with initial metadata
         score_repo = ScoreRepository(db_session)
-        score_id = ScoreID(uuid4())
+        score_id = ScoreID()
         initial_metadata = {"level": 1, "character": "Mage"}
 
         score = Score(

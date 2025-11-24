@@ -13,6 +13,7 @@ from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
+from leadr.common.utils.slug import generate_unique_slug_with_retry
 from leadr.games.services.game_service import GameService
 
 if TYPE_CHECKING:
@@ -45,6 +46,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         is_active: bool,
         sort_direction: SortDirection,
         keep_strategy: KeepStrategy,
+        slug: str | None = None,
         short_code: str | None = None,
         created_from_template_id: BoardTemplateID | None = None,
         template_name: str | None = None,
@@ -63,6 +65,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             is_active: Whether the board is currently active.
             sort_direction: Direction to sort scores.
             keep_strategy: Strategy for keeping multiple scores from same user.
+            slug: Optional URL-friendly slug. If not provided, auto-generated from name.
             short_code: Globally unique short code for direct sharing.
             created_from_template_id: Optional template ID this board was created from.
             template_name: Optional template name.
@@ -75,7 +78,7 @@ class BoardService(BaseService[Board, BoardRepository]):
 
         Raises:
             EntityNotFoundError: If the game doesn't exist.
-            ValueError: If the game doesn't belong to the specified account.
+            ValueError: If the game doesn't belong to the specified account or slug is invalid.
 
         Example:
             >>> board = await service.create_board(
@@ -100,10 +103,41 @@ class BoardService(BaseService[Board, BoardRepository]):
         if short_code is None:
             short_code = await generate_unique_short_code(self.repository.session)
 
+        # Generate or validate slug
+        if slug is None:
+            # Auto-generate unique slug from name with collision handling
+            async def check_slug_exists(slug_to_check: str) -> bool:
+                """Check if slug exists for this account/game combination."""
+                existing = await self.repository.get_by_slug(
+                    account_id=account_id,
+                    game_id=game_id,
+                    slug=slug_to_check,
+                    is_active=True,
+                )
+                return existing is not None
+
+            slug = await generate_unique_slug_with_retry(
+                base_text=name,
+                check_exists=check_slug_exists,
+                max_retries=10,
+            )
+        else:
+            # Use provided slug - validation will happen in Board domain model
+            # Check for uniqueness constraint violation (active board with same slug)
+            existing = await self.repository.get_by_slug(
+                account_id=account_id,
+                game_id=game_id,
+                slug=slug,
+                is_active=True,
+            )
+            if existing is not None:
+                raise ValueError(f"An active board with slug '{slug}' already exists for this game")
+
         board = Board(
             account_id=account_id,
             game_id=game_id,
             name=name,
+            slug=slug,
             icon=icon,
             short_code=short_code,
             unit=unit,
