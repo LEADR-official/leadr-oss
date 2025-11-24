@@ -279,6 +279,113 @@ class TestBoardTemplate:
 
         assert template.name == "Padded Template Name"
 
+    def test_board_template_slug_cannot_be_empty(self):
+        """Test that template slug cannot be empty."""
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        now = datetime.now(UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            BoardTemplate(
+                id=BoardTemplateID(template_id),
+                account_id=AccountID(account_id),
+                game_id=GameID(game_id),
+                name="Test Template",
+                slug="",
+                repeat_interval="7 days",
+                next_run_at=now + timedelta(days=7),
+                is_active=True,
+                created_at=now,
+                updated_at=now,
+            )
+
+        assert "slug cannot be empty" in str(exc_info.value).lower()
+
+    def test_board_template_slug_must_be_at_least_2_characters(self):
+        """Test that template slug must be at least 2 characters."""
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        now = datetime.now(UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            BoardTemplate(
+                id=BoardTemplateID(template_id),
+                account_id=AccountID(account_id),
+                game_id=GameID(game_id),
+                name="Test Template",
+                slug="a",
+                repeat_interval="7 days",
+                next_run_at=now + timedelta(days=7),
+                is_active=True,
+                created_at=now,
+                updated_at=now,
+            )
+
+        assert "at least 2 characters" in str(exc_info.value).lower()
+
+    def test_board_template_slug_cannot_exceed_50_characters(self):
+        """Test that template slug cannot exceed 50 characters."""
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        now = datetime.now(UTC)
+
+        with pytest.raises(ValidationError) as exc_info:
+            BoardTemplate(
+                id=BoardTemplateID(template_id),
+                account_id=AccountID(account_id),
+                game_id=GameID(game_id),
+                name="Test Template",
+                slug="a" * 51,  # 51 characters
+                repeat_interval="7 days",
+                next_run_at=now + timedelta(days=7),
+                is_active=True,
+                created_at=now,
+                updated_at=now,
+            )
+
+        assert "must not exceed 50 characters" in str(exc_info.value).lower()
+
+    def test_board_template_slug_must_be_valid_format(self):
+        """Test that template slug must be lowercase alphanumeric with hyphens."""
+        template_id = BoardTemplateID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        now = datetime.now(UTC)
+
+        invalid_slugs = [
+            "Invalid-Slug",  # uppercase
+            "invalid_slug",  # underscore
+            "invalid slug",  # space
+            "invalid.slug",  # period
+            "-invalid-slug",  # starts with hyphen
+            "invalid-slug-",  # ends with hyphen
+            "invalid--slug",  # double hyphen
+            "invalid@slug",  # special character
+        ]
+
+        for invalid_slug in invalid_slugs:
+            with pytest.raises(ValidationError) as exc_info:
+                BoardTemplate(
+                    id=BoardTemplateID(template_id),
+                    account_id=AccountID(account_id),
+                    game_id=GameID(game_id),
+                    name="Test Template",
+                    slug=invalid_slug,
+                    repeat_interval="7 days",
+                    next_run_at=now + timedelta(days=7),
+                    is_active=True,
+                    created_at=now,
+                    updated_at=now,
+                )
+
+            assert (
+                "lowercase alphanumeric" in str(exc_info.value).lower()
+                or "cannot start or end with a hyphen" in str(exc_info.value).lower()
+            )
+
     def test_board_template_repeat_interval_validates_postgres_syntax(self):
         """Test that repeat_interval validates PostgreSQL interval syntax."""
         template_id = BoardTemplateID(uuid4())
