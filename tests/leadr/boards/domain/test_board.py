@@ -131,6 +131,44 @@ class TestBoard:
         assert board.created_at == now
         assert board.updated_at == now
 
+    def test_create_board_with_defaults(self):
+        """Test creating a board using default values for optional fields."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        # Create board with only truly required fields (defaults for icon, unit, etc.)
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Minimal Board",
+            slug="minimal-board",
+            short_code="MIN001",
+        )
+
+        # Verify required fields
+        assert board.id == board_id
+        assert board.account_id == account_id
+        assert board.game_id == game_id
+        assert board.name == "Minimal Board"
+        assert board.slug == "minimal-board"
+        assert board.short_code == "MIN001"
+
+        # Verify defaults are applied
+        assert board.icon == "fa-crown"  # Default icon
+        assert board.unit is None  # Default unit
+        assert board.is_active is True  # Default active state
+        assert board.sort_direction == SortDirection.DESCENDING  # Default sort
+        assert board.keep_strategy == KeepStrategy.ALL  # Default strategy
+
+        # Verify optional fields
+        assert board.created_from_template_id is None
+        assert board.template_name is None
+        assert board.starts_at is None
+        assert board.ends_at is None
+        assert board.tags == []
+
     def test_board_name_required(self):
         """Test that board name is required."""
         board_id = BoardID(uuid4())

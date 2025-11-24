@@ -97,6 +97,47 @@ class TestBoardRoutes:
         assert data["tags"] == ["speedrun", "no-damage"]
         assert data["template_name"] == "Speed Run Template"
 
+    async def test_create_board_with_minimal_fields(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating a board with minimal required fields using defaults."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board with only required fields (name, short_code)
+        # Other fields should use defaults from the schema
+        response = await client.post(
+            "/boards",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "Minimal Board",
+                "short_code": "MIN001",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "Minimal Board"
+        assert data["short_code"] == "MIN001"
+        # Verify defaults were applied
+        assert data["icon"] == "fa-crown"  # Default icon
+        assert data["unit"] is None  # Default unit (None)
+        assert data["is_active"] is True  # Default active state
+        assert data["sort_direction"] == "DESCENDING"  # Default sort direction
+        assert data["keep_strategy"] == "ALL"  # Default keep strategy
+
     async def test_create_board_with_game_not_found(
         self, client: AsyncClient, db_session, test_api_key
     ):
