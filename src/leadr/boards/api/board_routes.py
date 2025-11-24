@@ -54,6 +54,7 @@ async def create_board(
             account_id=request.account_id,
             game_id=request.game_id,
             name=request.name,
+            slug=request.slug,
             icon=request.icon,
             short_code=request.short_code,
             unit=request.unit,

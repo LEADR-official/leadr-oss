@@ -14,6 +14,10 @@ class BoardCreateRequest(BaseModel):
     account_id: AccountID = Field(description="ID of the account this board belongs to")
     game_id: GameID = Field(description="ID of the game this board belongs to")
     name: str = Field(description="Name of the board")
+    slug: str | None = Field(
+        default=None,
+        description="Optional URL-friendly slug. If not provided, will be auto-generated from name",
+    )
     icon: str = Field(description="Icon identifier for the board")
     short_code: str = Field(description="Globally unique short code for direct sharing")
     unit: str = Field(description="Unit of measurement for scores (e.g., 'seconds', 'points')")
