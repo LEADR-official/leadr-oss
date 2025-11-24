@@ -36,6 +36,12 @@ from leadr.common.domain.ids import (
 from leadr.common.orm import Base
 from leadr.config import settings
 from leadr.games.adapters.orm import GameORM  # noqa: F401
+from leadr.infra.email.adapters.orm import EmailORM  # noqa: F401
+from leadr.registration.adapters.orm import (  # noqa: F401
+    JamCodeORM,
+    JamCodeRedemptionORM,
+    VerificationCodeORM,
+)
 from leadr.scores.adapters.orm import ScoreFlagORM, ScoreORM, ScoreSubmissionMetaORM  # noqa: F401
 
 # Import all ORM fixtures from fixtures module
