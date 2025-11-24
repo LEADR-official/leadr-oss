@@ -13,6 +13,7 @@ from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
+from leadr.common.utils.slug import generate_unique_slug_with_retry
 from leadr.games.services.game_service import GameService
 
 if TYPE_CHECKING:
@@ -100,10 +101,28 @@ class BoardService(BaseService[Board, BoardRepository]):
         if short_code is None:
             short_code = await generate_unique_short_code(self.repository.session)
 
+        # Generate unique slug from name with collision handling
+        async def check_slug_exists(slug: str) -> bool:
+            """Check if slug exists for this account/game combination."""
+            existing = await self.repository.get_by_slug(
+                account_id=account_id,
+                game_id=game_id,
+                slug=slug,
+                is_active=True,
+            )
+            return existing is not None
+
+        slug = await generate_unique_slug_with_retry(
+            base_text=name,
+            check_exists=check_slug_exists,
+            max_retries=10,
+        )
+
         board = Board(
             account_id=account_id,
             game_id=game_id,
             name=name,
+            slug=slug,
             icon=icon,
             short_code=short_code,
             unit=unit,

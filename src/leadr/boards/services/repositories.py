@@ -21,6 +21,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
     SORTABLE_FIELDS = {
         "id",
         "name",
+        "slug",
         "short_code",
         "created_at",
         "updated_at",
@@ -33,6 +34,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             account_id=AccountID(orm.account_id),
             game_id=GameID(orm.game_id),
             name=orm.name,
+            slug=orm.slug,
             icon=orm.icon,
             short_code=orm.short_code,
             unit=orm.unit,
@@ -58,6 +60,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             account_id=entity.account_id.uuid,
             game_id=entity.game_id.uuid,
             name=entity.name,
+            slug=entity.slug,
             icon=entity.icon,
             short_code=entity.short_code,
             unit=entity.unit,
@@ -121,6 +124,42 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             Board entity if found, None otherwise
         """
         return await self._get_by_field("short_code", short_code)
+
+    async def get_by_slug(
+        self,
+        account_id: UUID4 | AccountID,
+        game_id: UUID4 | GameID,
+        slug: str,
+        is_active: bool = True,
+    ) -> Board | None:
+        """Get board by slug within account and game scope.
+
+        Lookups are scoped to account_id and game_id to respect the partial
+        unique constraint (account_id, game_id, slug) WHERE is_active=true.
+
+        Args:
+            account_id: The account ID to filter by
+            game_id: The game ID to filter by
+            slug: The slug to search for
+            is_active: Whether to filter for active boards only (default: True)
+
+        Returns:
+            Board entity if found, None otherwise
+        """
+        account_uuid = self._extract_uuid(account_id)
+        game_uuid = self._extract_uuid(game_id)
+
+        query = select(BoardORM).where(
+            BoardORM.account_id == account_uuid,
+            BoardORM.game_id == game_uuid,
+            BoardORM.slug == slug,
+            BoardORM.is_active == is_active,
+            BoardORM.deleted_at.is_(None),
+        )
+
+        result = await self.session.execute(query)
+        orm = result.scalar_one_or_none()
+        return self._to_domain(orm) if orm else None
 
     @overload
     async def list_boards(

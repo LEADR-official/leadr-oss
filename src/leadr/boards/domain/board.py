@@ -1,5 +1,6 @@
 """Board domain model."""
 
+import re
 from datetime import datetime
 from enum import Enum
 
@@ -49,6 +50,7 @@ class Board(Entity):
         frozen=True, description="ID of the game this board belongs to (immutable)"
     )
     name: str = Field(description="Name of the board")
+    slug: str = Field(description="URL-friendly slug for the board (unique per game when active)")
     icon: str = Field(description="Icon identifier for the board")
     short_code: str = Field(description="Globally unique short code for direct board sharing")
     unit: str = Field(description="Unit of measurement for scores (e.g., 'seconds', 'points')")
@@ -93,6 +95,33 @@ class Board(Entity):
             raise ValueError("Board name cannot be empty")
         return value.strip()
 
+    @field_validator("slug")
+    @classmethod
+    def validate_slug(cls, value: str) -> str:
+        """Validate slug format (lowercase alphanumeric with hyphens).
+
+        Args:
+            value: The slug to validate.
+
+        Returns:
+            The validated slug.
+
+        Raises:
+            ValueError: If slug is invalid.
+        """
+        if not value:
+            raise ValueError("Board slug cannot be empty")
+        if len(value) < 2:
+            raise ValueError("Board slug must be at least 2 characters")
+        if len(value) > 50:
+            raise ValueError("Board slug must not exceed 50 characters")
+        if not re.match(r"^[a-z0-9]+(?:-[a-z0-9]+)*$", value):
+            raise ValueError(
+                "Board slug must be lowercase alphanumeric with hyphens, "
+                "and cannot start or end with a hyphen"
+            )
+        return value
+
     @field_validator("short_code")
     @classmethod
     def validate_short_code(cls, value: str) -> str:
@@ -109,4 +138,4 @@ class Board(Entity):
         """
         if not value or not value.strip():
             raise ValueError("Board short_code cannot be empty")
-        return value.strip()
+        return value.strip().upper()

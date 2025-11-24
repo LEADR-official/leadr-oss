@@ -66,6 +66,7 @@ class BoardResponse(BaseModel):
     account_id: AccountID = Field(description="ID of the account this board belongs to")
     game_id: GameID = Field(description="ID of the game this board belongs to")
     name: str = Field(description="Name of the board")
+    slug: str = Field(description="URL-friendly slug for the board (auto-generated, read-only)")
     icon: str = Field(description="Icon identifier for the board")
     short_code: str = Field(description="Globally unique short code for direct sharing")
     unit: str = Field(description="Unit of measurement for scores")
@@ -103,6 +104,7 @@ class BoardResponse(BaseModel):
             account_id=board.account_id,
             game_id=board.game_id,
             name=board.name,
+            slug=board.slug,
             icon=board.icon,
             short_code=board.short_code,
             unit=board.unit,
