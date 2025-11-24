@@ -201,6 +201,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             account_id=template.account_id,
             game_id=template.game_id,
             name=board_name,
+            slug=template.slug,  # Use template slug if set, otherwise auto-generate
             icon=template.icon,
             unit=template.unit,
             is_active=True,  # New boards from templates are always active

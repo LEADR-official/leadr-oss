@@ -76,7 +76,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         account_id: AccountID,
         game_id: GameID,
         name: str,
-        slug: str,
+        slug: str | None,
         repeat_interval: str,
         next_run_at: datetime,
         is_active: bool,

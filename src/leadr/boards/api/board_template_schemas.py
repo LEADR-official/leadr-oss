@@ -16,7 +16,9 @@ class BoardTemplateCreateRequest(BaseModel):
     account_id: AccountID = Field(description="ID of the account this template belongs to")
     game_id: GameID = Field(description="ID of the game this template belongs to")
     name: str = Field(description="Name of the template")
-    slug: str = Field(description="URL-friendly slug for boards created from this template")
+    slug: str | None = Field(
+        default=None, description="URL-friendly slug for boards created from this template"
+    )
     repeat_interval: str = Field(
         description="PostgreSQL interval syntax for repeat frequency (e.g., '7 days', '1 month')"
     )
@@ -97,7 +99,9 @@ class BoardTemplateResponse(BaseModel):
     account_id: AccountID = Field(description="ID of the account this template belongs to")
     game_id: GameID = Field(description="ID of the game this template belongs to")
     name: str = Field(description="Name of the template")
-    slug: str = Field(description="URL-friendly slug for boards created from this template")
+    slug: str | None = Field(
+        description="URL-friendly slug for boards created from this template, or null"
+    )
     name_template: str | None = Field(
         default=None, description="Template string for generating board names, or null"
     )

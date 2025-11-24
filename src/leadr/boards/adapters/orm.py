@@ -95,7 +95,7 @@ class BoardTemplateORM(Base):
         index=True,
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
-    slug: Mapped[str] = mapped_column(String, nullable=False)
+    slug: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     name_template: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     series: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     icon: Mapped[str | None] = mapped_column(String, nullable=True)

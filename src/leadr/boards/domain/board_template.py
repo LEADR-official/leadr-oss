@@ -35,7 +35,9 @@ class BoardTemplate(Entity):
         frozen=True, description="ID of the game this template belongs to (immutable)"
     )
     name: str = Field(description="Name of the template")
-    slug: str = Field(description="URL-friendly slug for boards created from this template")
+    slug: str | None = Field(
+        default=None, description="URL-friendly slug for boards created from this template"
+    )
     name_template: str | None = Field(
         default=None, description="Optional template string for generating board names"
     )
@@ -103,19 +105,21 @@ class BoardTemplate(Entity):
 
     @field_validator("slug")
     @classmethod
-    def validate_slug(cls, value: str) -> str:
+    def validate_slug(cls, value: str | None) -> str | None:
         """Validate slug format (lowercase alphanumeric with hyphens).
 
         Args:
-            value: The slug to validate.
+            value: The slug to validate, or None.
 
         Returns:
-            The validated slug.
+            The validated slug, or None if not provided.
 
         Raises:
             ValueError: If slug is invalid.
         """
-        if not value:
+        if value is None:
+            return None
+        if not value or not value.strip():
             raise ValueError("Template slug cannot be empty")
         if len(value) < 2:
             raise ValueError("Template slug must be at least 2 characters")
