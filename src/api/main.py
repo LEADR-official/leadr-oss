@@ -40,6 +40,8 @@ from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.geoip import GeoIPService
 from leadr.config import settings
 from leadr.games.api.game_routes import router as game_router
+from leadr.registration.api.routes import public_router as registration_public_router
+from leadr.registration.api.routes import router as jam_code_router
 from leadr.scores.api.score_flag_routes import router as score_flag_router
 from leadr.scores.api.score_routes import client_router as score_client_router
 from leadr.scores.api.score_routes import router as score_router
@@ -152,6 +154,7 @@ admin_router = APIRouter(dependencies=[Depends(require_admin_auth)])
 
 # Public routes - accessible without authentication
 public_router.include_router(api_router)
+public_router.include_router(registration_public_router, tags=["Registration"])
 
 # Client routes - require client auth flow
 client_router.include_router(client_protected_router, tags=["Authentication"])
@@ -170,6 +173,7 @@ admin_router.include_router(score_flag_router, tags=["Score Flags"])
 admin_router.include_router(score_submission_meta_router, tags=["Score Submission Metadata"])
 admin_router.include_router(device_router, tags=["Devices"])
 admin_router.include_router(device_session_router, tags=["Device Sessions"])
+admin_router.include_router(jam_code_router, tags=["Registration"])
 
 # Include admin router only when Admin API is enabled
 if settings.ENABLE_ADMIN_API:

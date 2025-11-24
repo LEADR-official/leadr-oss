@@ -205,3 +205,9 @@ class ScoreFlagID(PrefixedID):
     """Score flag entity identifier."""
 
     prefix = "flg"
+
+
+class EmailID(PrefixedID):
+    """Email entity identifier."""
+
+    prefix = "eml"

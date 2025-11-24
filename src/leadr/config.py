@@ -192,6 +192,20 @@ class CommonSettings(BaseSettings):
         description="Mailgun domain for email sending",
     )
 
+    # Registration Configuration
+    VERIFICATION_CODE_EXPIRY_SECONDS: int = Field(
+        default=600,
+        description="Expiry time for email verification codes in seconds (default: 10 minutes)",
+    )
+    VERIFICATION_TOKEN_EXPIRY_SECONDS: int = Field(
+        default=600,
+        description="Expiry time for verification JWT tokens in seconds (default: 10 minutes)",
+    )
+    REGISTRATION_RATE_LIMIT_PER_HOUR: int = Field(
+        default=3,
+        description="Maximum verification code requests per email per hour (default: 3)",
+    )
+
     # Background Task Configuration
     BACKGROUND_TASK_TEMPLATE_INTERVAL: int = Field(
         default=60,
