@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
-from leadr.common.api.pagination import PaginatedResponse, PaginationParams
+from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, GameID
 from leadr.games.api.game_schemas import (
@@ -128,8 +128,9 @@ async def list_games(
     service: GameServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
+    slug: Annotated[str | None, Query(description="Filter by game slug")] = None,
 ) -> PaginatedResponse[GameResponse]:
-    """List all games for an account with pagination.
+    """List all games for an account with pagination and optional filtering.
 
     Returns paginated games for the specified account. Supports cursor-based
     pagination with bidirectional navigation and custom sorting.
@@ -137,13 +138,17 @@ async def list_games(
     For regular users, account_id is automatically derived from their API key.
     For superadmins, account_id must be explicitly provided as a query parameter.
 
+    Filtering:
+    - Use ?slug={slug} to find a specific game by its globally unique slug
+
     Pagination:
     - Default: 20 items per page, sorted by created_at:desc,id:asc
     - Custom sort: Use ?sort=name:asc,created_at:desc
-    - Valid sort fields: id, name, created_at, updated_at
+    - Valid sort fields: id, name, slug, created_at, updated_at
     - Navigation: Use next_cursor/prev_cursor from response
 
     Example:
+        GET /v1/games?slug=my-game
         GET /v1/games?account_id=acc_123&limit=50&sort=name:asc
 
     Args:
@@ -151,6 +156,7 @@ async def list_games(
         service: Injected game service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
         account_id: Optional account_id query parameter (required for superadmins).
+        slug: Optional slug filter to find a specific game.
 
     Returns:
         PaginatedResponse with games and pagination metadata.
@@ -159,7 +165,32 @@ async def list_games(
         400: Invalid cursor, sort field, or cursor state mismatch.
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
+        404: Game not found when filtering by slug.
     """
+    # If slug filter is provided, return that specific game
+    if slug is not None:
+        game = await service.get_game_by_slug(slug)
+        if game is None:
+            raise HTTPException(status_code=404, detail=f"Game with slug '{slug}' not found")
+
+        # Check authorization
+        if not auth.has_access_to_account(game.account_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have access to this game's account",
+            )
+
+        return PaginatedResponse(
+            data=[GameResponse.from_domain(game)],
+            pagination=PaginationMeta(
+                next_cursor=None,
+                prev_cursor=None,
+                has_next=False,
+                has_prev=False,
+                count=1,
+            ),
+        )
+
     try:
         result = await service.list_games(account_id or auth.account_id, pagination=pagination)
     except (CursorValidationError, ValueError) as e:

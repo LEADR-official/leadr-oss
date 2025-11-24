@@ -52,7 +52,7 @@ class TestAccountAPI:
         assert response.status_code == 422
 
     async def test_create_account_missing_slug(self, authenticated_client: AsyncClient):
-        """Test creating account without slug returns 422."""
+        """Test creating account without slug auto-generates one from name."""
         response = await authenticated_client.post(
             "/accounts",
             json={
@@ -60,7 +60,10 @@ class TestAccountAPI:
             },
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "Acme Corporation"
+        assert data["slug"] == "acme-corporation"  # Auto-generated from name
 
     async def test_get_account_by_id(self, authenticated_client: AsyncClient, db_session):
         """Test getting account by ID via GET /accounts/{id}."""
