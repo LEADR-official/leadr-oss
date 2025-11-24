@@ -142,10 +142,10 @@ class TestScoreRepository:
         )
         await account_repo.create(account)
 
-        GameRepository(db_session)
+        game_repo = GameRepository(db_session)
         game_id = GameID()
 
-        Game(
+        game = Game(
             id=game_id,
             account_id=account_id,
             name="Test Game",
@@ -153,6 +153,7 @@ class TestScoreRepository:
             created_at=now,
             updated_at=now,
         )
+        await game_repo.create(game)
 
         device_repo = DeviceRepository(db_session)
         device_id = DeviceID()
@@ -240,10 +241,10 @@ class TestScoreRepository:
         )
         await account_repo.create(account)
 
-        GameRepository(db_session)
+        game_repo = GameRepository(db_session)
         game_id = GameID()
 
-        Game(
+        game = Game(
             id=game_id,
             account_id=account_id,
             name="Test Game",
@@ -251,6 +252,7 @@ class TestScoreRepository:
             created_at=now,
             updated_at=now,
         )
+        await game_repo.create(game)
 
         device_repo = DeviceRepository(db_session)
         device_id = DeviceID()
@@ -341,10 +343,10 @@ class TestScoreRepository:
         await account_repo.create(account2)
 
         # Create games for each account
-        GameRepository(db_session)
+        game_repo = GameRepository(db_session)
 
         game1_id = GameID()
-        Game(
+        game1 = Game(
             id=game1_id,
             account_id=account1_id,
             name="Game 1",
@@ -352,9 +354,10 @@ class TestScoreRepository:
             created_at=now,
             updated_at=now,
         )
+        await game_repo.create(game1)
 
         game2_id = GameID()
-        Game(
+        game2 = Game(
             id=game2_id,
             account_id=account2_id,
             name="Game 2",
@@ -362,6 +365,7 @@ class TestScoreRepository:
             created_at=now,
             updated_at=now,
         )
+        await game_repo.create(game2)
 
         # Create devices for each account
         device_repo = DeviceRepository(db_session)
@@ -485,10 +489,10 @@ class TestScoreRepository:
         await account_repo.create(account)
 
         # Create game
-        GameRepository(db_session)
+        game_repo = GameRepository(db_session)
         game_id = GameID()
 
-        Game(
+        game = Game(
             id=game_id,
             account_id=account_id,
             name="Test Game",
@@ -496,6 +500,7 @@ class TestScoreRepository:
             created_at=now,
             updated_at=now,
         )
+        await game_repo.create(game)
 
         # Create two devices
         device_repo = DeviceRepository(db_session)
@@ -645,10 +650,10 @@ class TestScoreRepository:
         )
         await account_repo.create(account)
 
-        GameRepository(db_session)
+        game_repo = GameRepository(db_session)
         game_id = GameID()
 
-        Game(
+        game = Game(
             id=game_id,
             account_id=account_id,
             name="Test Game",
@@ -656,6 +661,7 @@ class TestScoreRepository:
             created_at=now,
             updated_at=now,
         )
+        await game_repo.create(game)
 
         device_repo = DeviceRepository(db_session)
         device_id = DeviceID()
@@ -748,10 +754,10 @@ class TestScoreRepository:
         )
         await account_repo.create(account)
 
-        GameRepository(db_session)
+        game_repo = GameRepository(db_session)
         game_id = GameID()
 
-        Game(
+        game = Game(
             id=game_id,
             account_id=account_id,
             name="Test Game",
@@ -759,6 +765,7 @@ class TestScoreRepository:
             created_at=now,
             updated_at=now,
         )
+        await game_repo.create(game)
 
         device_repo = DeviceRepository(db_session)
         device_id = DeviceID()

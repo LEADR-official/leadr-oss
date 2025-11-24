@@ -82,6 +82,7 @@ async def game_orm(db_session: AsyncSession, account_orm: AccountORM) -> GameORM
     game = GameORM(
         account_id=account_orm.id,  # Raw UUID
         name="Test Game",
+        slug="test-game",
         steam_app_id=None,
         default_board_id=None,
         anti_cheat_enabled=False,

@@ -106,8 +106,8 @@ class TestBoardORM:
         await db_session.commit()
 
         # Create games for different accounts
-        game1 = GameORM(account_id=account1.id, name="Game 1")
-        game2 = GameORM(account_id=account2.id, name="Game 2")
+        game1 = GameORM(account_id=account1.id, name="Game 1", slug="game-1")
+        game2 = GameORM(account_id=account2.id, name="Game 2", slug="game-2")
         db_session.add_all([game1, game2])
         await db_session.commit()
 

@@ -130,11 +130,13 @@ class TestDeviceRepository:
             id=uuid4(),
             account_id=account1.id,
             name="Game 1",
+            slug="game-1",
         )
         game2 = GameORM(
             id=uuid4(),
             account_id=account2.id,
             name="Game 2",
+            slug="game-2",
         )
         db_session.add(game1)
         db_session.add(game2)
