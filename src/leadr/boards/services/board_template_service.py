@@ -6,6 +6,7 @@ from typing import Any, overload
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.boards.domain.interval_parser import parse_interval_to_timedelta
 from leadr.boards.services.repositories import BoardTemplateRepository
@@ -75,13 +76,20 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         account_id: AccountID,
         game_id: GameID,
         name: str,
+        slug: str,
         repeat_interval: str,
         next_run_at: datetime,
         is_active: bool,
         name_template: str | None = None,
         series: str | None = None,
+        icon: str | None = "fa-crown",
+        unit: str | None = None,
+        sort_direction: SortDirection = SortDirection.DESCENDING,
+        keep_strategy: KeepStrategy = KeepStrategy.ALL,
+        starts_at: datetime | None = None,
+        ends_at: datetime | None = None,
+        tags: list[str] | None = None,
         config: dict[str, Any] | None = None,
-        config_template: dict[str, Any] | None = None,
     ) -> BoardTemplate:
         """Create a new board template.
 
@@ -131,11 +139,18 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             account_id=account_id,
             game_id=game_id,
             name=name,
+            slug=slug,
             name_template=name_template,
             series=series,
+            icon=icon,
+            unit=unit,
+            sort_direction=sort_direction,
+            keep_strategy=keep_strategy,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            tags=tags or [],
             repeat_interval=repeat_interval,
             config=config or {},
-            config_template=config_template or {},
             next_run_at=next_run_at,
             is_active=is_active,
         )
@@ -221,11 +236,18 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         self,
         template_id: BoardTemplateID,
         name: str | None = None,
+        slug: str | None = None,
         name_template: str | None = None,
         series: str | None = None,
+        icon: str | None = None,
+        unit: str | None = None,
+        sort_direction: SortDirection | None = None,
+        keep_strategy: KeepStrategy | None = None,
+        starts_at: datetime | None = None,
+        ends_at: datetime | None = None,
+        tags: list[str] | None = None,
         repeat_interval: str | None = None,
         config: dict[str, Any] | None = None,
-        config_template: dict[str, Any] | None = None,
         next_run_at: datetime | None = None,
         is_active: bool | None = None,
     ) -> BoardTemplate:
@@ -257,16 +279,30 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
 
         if name is not None:
             template.name = name
+        if slug is not None:
+            template.slug = slug
         if name_template is not None:
             template.name_template = name_template
         if series is not None:
             template.series = series
+        if icon is not None:
+            template.icon = icon
+        if unit is not None:
+            template.unit = unit
+        if sort_direction is not None:
+            template.sort_direction = sort_direction
+        if keep_strategy is not None:
+            template.keep_strategy = keep_strategy
+        if starts_at is not None:
+            template.starts_at = starts_at
+        if ends_at is not None:
+            template.ends_at = ends_at
+        if tags is not None:
+            template.tags = tags
         if repeat_interval is not None:
             template.repeat_interval = repeat_interval
         if config is not None:
             template.config = config
-        if config_template is not None:
-            template.config_template = config_template
         if next_run_at is not None:
             template.next_run_at = next_run_at
         if is_active is not None:

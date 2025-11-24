@@ -45,6 +45,7 @@ class TestBoardTemplateService:
             repeat_interval="7 days",
             next_run_at=next_run_at,
             is_active=True,
+            slug="weekly-speed-run-template",
         )
 
         assert template.id is not None
@@ -82,14 +83,13 @@ class TestBoardTemplateService:
             name_template="Week {week} Competition",
             repeat_interval="7 days",
             config={"unit": "seconds", "sort_direction": "ASCENDING"},
-            config_template={"tags": ["weekly", "speedrun"]},
             next_run_at=next_run_at,
             is_active=True,
+            slug="weekly-template",
         )
 
         assert template.name_template == "Week {week} Competition"
         assert template.config == {"unit": "seconds", "sort_direction": "ASCENDING"}
-        assert template.config_template == {"tags": ["weekly", "speedrun"]}
 
     async def test_create_board_template_validates_game_belongs_to_account(
         self, db_session: AsyncSession
@@ -123,6 +123,7 @@ class TestBoardTemplateService:
                 game_id=game.id,
                 name="Invalid Template",
                 repeat_interval="7 days",
+                slug="invalid-template",
                 next_run_at=now + timedelta(days=7),
                 is_active=True,
             )
@@ -150,6 +151,7 @@ class TestBoardTemplateService:
                 account_id=account.id,
                 game_id=GameID(non_existent_game_id),
                 name="Invalid Template",
+                slug="invalid-template",
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
                 is_active=True,
@@ -179,6 +181,7 @@ class TestBoardTemplateService:
             game_id=game.id,
             name="Test Template",
             repeat_interval="1 day",
+            slug="test-template",
             next_run_at=now + timedelta(days=1),
             is_active=True,
         )
@@ -233,6 +236,7 @@ class TestBoardTemplateService:
             game_id=game1.id,
             name="Template 1",
             repeat_interval="7 days",
+            slug="template-1",
             next_run_at=now + timedelta(days=7),
             is_active=True,
         )
@@ -240,6 +244,7 @@ class TestBoardTemplateService:
             account_id=account1.id,
             game_id=game1.id,
             name="Template 2",
+            slug="template-2",
             repeat_interval="1 month",
             next_run_at=now + timedelta(days=30),
             is_active=True,
@@ -251,6 +256,7 @@ class TestBoardTemplateService:
             game_id=game2.id,
             name="Template 3",
             repeat_interval="1 day",
+            slug="template-3",
             next_run_at=now + timedelta(days=1),
             is_active=True,
         )
@@ -296,6 +302,7 @@ class TestBoardTemplateService:
             game_id=game1.id,
             name="Game 1 Template 1",
             repeat_interval="7 days",
+            slug="game-1-template-1",
             next_run_at=now + timedelta(days=7),
             is_active=True,
         )
@@ -303,6 +310,7 @@ class TestBoardTemplateService:
             account_id=account.id,
             game_id=game1.id,
             name="Game 1 Template 2",
+            slug="game-1-template-2",
             repeat_interval="1 month",
             next_run_at=now + timedelta(days=30),
             is_active=True,
@@ -312,6 +320,7 @@ class TestBoardTemplateService:
             game_id=game2.id,
             name="Game 2 Template",
             repeat_interval="1 day",
+            slug="game-2-template",
             next_run_at=now + timedelta(days=1),
             is_active=True,
         )
@@ -356,6 +365,7 @@ class TestBoardTemplateService:
             game_id=game.id,
             name="Original Template",
             repeat_interval="7 days",
+            slug="original-template",
             next_run_at=now + timedelta(days=7),
             is_active=True,
         )
@@ -399,6 +409,7 @@ class TestBoardTemplateService:
             game_id=game.id,
             name="Original Template",
             repeat_interval="7 days",
+            slug="original-template",
             next_run_at=now + timedelta(days=7),
             is_active=True,
         )
@@ -448,6 +459,7 @@ class TestBoardTemplateService:
             game_id=game.id,
             name="Template to Delete",
             repeat_interval="7 days",
+            slug="template-to-delete",
             next_run_at=now + timedelta(days=7),
             is_active=True,
         )
@@ -494,6 +506,7 @@ class TestBoardTemplateService:
             repeat_interval="7 days",
             next_run_at=original_next_run,
             is_active=True,
+            slug="weekly-template",
         )
 
         # Advance schedule
@@ -531,6 +544,7 @@ class TestBoardTemplateService:
             repeat_interval="1 hour",
             next_run_at=now,
             is_active=True,
+            slug="hourly-template",
         )
 
         advanced_hourly = await template_service.advance_template_schedule(hourly_template.id)
@@ -544,6 +558,7 @@ class TestBoardTemplateService:
             repeat_interval="2 weeks",
             next_run_at=now,
             is_active=True,
+            slug="weekly-template",
         )
 
         advanced_weekly = await template_service.advance_template_schedule(weekly_template.id)

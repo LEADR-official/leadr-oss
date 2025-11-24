@@ -79,7 +79,7 @@ class BoardTemplateORM(Base):
 
     Represents a template for automatically generating boards at regular intervals.
     Maps to the board_templates table with foreign keys to accounts and games.
-    Uses JSONB columns for config and config_template to support flexible configuration.
+    Uses JSONB column for config to support flexible procedural generation configuration.
     """
 
     __tablename__ = "board_templates"
@@ -95,13 +95,24 @@ class BoardTemplateORM(Base):
         index=True,
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
+    slug: Mapped[str] = mapped_column(String, nullable=False)
     name_template: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     series: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    icon: Mapped[str | None] = mapped_column(String, nullable=True)
+    unit: Mapped[str | None] = mapped_column(String, nullable=True)
+    sort_direction: Mapped[str] = mapped_column(String, nullable=False)
+    keep_strategy: Mapped[str] = mapped_column(String, nullable=False)
+    starts_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    ends_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(String), nullable=False, default=list, server_default="{}"
+    )
     repeat_interval: Mapped[str] = mapped_column(String, nullable=False)
     config: Mapped[dict[str, Any]] = mapped_column(
-        JSONB, nullable=False, default=dict, server_default="{}"
-    )
-    config_template: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"
     )
     next_run_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -117,6 +128,7 @@ class BoardTemplateORM(Base):
         Returns:
             BoardTemplate domain entity with all fields populated from ORM model.
         """
+        from leadr.boards.domain.board import KeepStrategy, SortDirection
         from leadr.boards.domain.board_template import BoardTemplate
         from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 
@@ -125,11 +137,18 @@ class BoardTemplateORM(Base):
             account_id=AccountID(self.account_id),
             game_id=GameID(self.game_id),
             name=self.name,
+            slug=self.slug,
             name_template=self.name_template,
             series=self.series,
+            icon=self.icon,
+            unit=self.unit,
+            sort_direction=SortDirection(self.sort_direction),
+            keep_strategy=KeepStrategy(self.keep_strategy),
+            starts_at=self.starts_at,
+            ends_at=self.ends_at,
+            tags=self.tags,
             repeat_interval=self.repeat_interval,
             config=self.config,
-            config_template=self.config_template,
             next_run_at=self.next_run_at,
             is_active=self.is_active,
             created_at=self.created_at,
@@ -153,11 +172,18 @@ class BoardTemplateORM(Base):
             account_id=entity.account_id.uuid,
             game_id=entity.game_id.uuid,
             name=entity.name,
+            slug=entity.slug,
             name_template=entity.name_template,
             series=entity.series,
+            icon=entity.icon,
+            unit=entity.unit,
+            sort_direction=entity.sort_direction.value,
+            keep_strategy=entity.keep_strategy.value,
+            starts_at=entity.starts_at,
+            ends_at=entity.ends_at,
+            tags=entity.tags,
             repeat_interval=entity.repeat_interval,
             config=entity.config,
-            config_template=entity.config_template,
             next_run_at=entity.next_run_at,
             is_active=entity.is_active,
             created_at=entity.created_at,

@@ -36,6 +36,7 @@ class TestBoardTemplateRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game.id),
                 "name": "Weekly Speed Run Template",
+                "slug": "weekly-speed-run-template",
                 "repeat_interval": "7 days",
                 "next_run_at": next_run_at,
                 "is_active": True,
@@ -76,10 +77,10 @@ class TestBoardTemplateRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game.id),
                 "name": "Weekly Template",
+                "slug": "weekly-template",
                 "name_template": "Week {week} Competition",
                 "repeat_interval": "7 days",
                 "config": {"unit": "seconds", "sort_direction": "ASCENDING"},
-                "config_template": {"tags": ["weekly", "speedrun"]},
                 "next_run_at": next_run_at,
                 "is_active": True,
             },
@@ -90,7 +91,6 @@ class TestBoardTemplateRoutes:
         data = response.json()
         assert data["name_template"] == "Week {week} Competition"
         assert data["config"] == {"unit": "seconds", "sort_direction": "ASCENDING"}
-        assert data["config_template"] == {"tags": ["weekly", "speedrun"]}
 
     async def test_create_board_template_with_game_not_found(
         self, client: AsyncClient, db_session, test_api_key
@@ -109,6 +109,7 @@ class TestBoardTemplateRoutes:
                 "account_id": str(account.id),
                 "game_id": "gam_00000000-0000-0000-0000-000000000000",
                 "name": "Invalid Template",
+                "slug": "invalid-template",
                 "repeat_interval": "7 days",
                 "next_run_at": next_run_at,
                 "is_active": True,
@@ -140,6 +141,7 @@ class TestBoardTemplateRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game.id),
                 "name": "Test Template",
+                "slug": "test-template",
                 "repeat_interval": "7 days",
                 "next_run_at": next_run_at,
                 "is_active": True,
@@ -194,6 +196,7 @@ class TestBoardTemplateRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game.id),
                 "name": "Template 1",
+                "slug": "template-1",
                 "repeat_interval": "7 days",
                 "next_run_at": next_run_at,
                 "is_active": True,
@@ -206,6 +209,7 @@ class TestBoardTemplateRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game.id),
                 "name": "Template 2",
+                "slug": "template-2",
                 "repeat_interval": "1 month",
                 "next_run_at": next_run_at,
                 "is_active": True,
@@ -253,6 +257,7 @@ class TestBoardTemplateRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game1.id),
                 "name": "Game 1 Template",
+                "slug": "game-1-template",
                 "repeat_interval": "7 days",
                 "next_run_at": next_run_at,
                 "is_active": True,
@@ -265,6 +270,7 @@ class TestBoardTemplateRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game2.id),
                 "name": "Game 2 Template",
+                "slug": "game-2-template",
                 "repeat_interval": "1 month",
                 "next_run_at": next_run_at,
                 "is_active": True,
@@ -307,6 +313,7 @@ class TestBoardTemplateRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game.id),
                 "name": "Original Template",
+                "slug": "original-template",
                 "repeat_interval": "7 days",
                 "next_run_at": next_run_at,
                 "is_active": True,
@@ -320,6 +327,7 @@ class TestBoardTemplateRoutes:
             f"/board-templates/{template_id}",
             json={
                 "name": "Updated Template",
+                "slug": "updated-template",
                 "is_active": False,
             },
             headers={"leadr-api-key": test_api_key},
@@ -352,6 +360,7 @@ class TestBoardTemplateRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game.id),
                 "name": "Template to Delete",
+                "slug": "template-to-delete",
                 "repeat_interval": "7 days",
                 "next_run_at": next_run_at,
                 "is_active": True,

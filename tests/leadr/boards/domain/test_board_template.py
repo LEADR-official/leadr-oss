@@ -26,10 +26,10 @@ class TestBoardTemplate:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Weekly Speed Run Template",
+            slug="weekly-speedrun",
             name_template="Speed Run Week {week}",
             repeat_interval="7 days",
             config={"unit": "seconds", "sort_direction": "ASCENDING"},
-            config_template={"tags": ["speedrun", "weekly"]},
             next_run_at=next_run_at,
             is_active=True,
             created_at=now,
@@ -43,7 +43,6 @@ class TestBoardTemplate:
         assert template.name_template == "Speed Run Week {week}"
         assert template.repeat_interval == "7 days"
         assert template.config == {"unit": "seconds", "sort_direction": "ASCENDING"}
-        assert template.config_template == {"tags": ["speedrun", "weekly"]}
         assert template.next_run_at == next_run_at
         assert template.is_active is True
         assert template.created_at == now
@@ -62,6 +61,7 @@ class TestBoardTemplate:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Simple Template",
+            slug="simple-template",
             repeat_interval="1 day",
             next_run_at=next_run_at,
             is_active=True,
@@ -76,7 +76,6 @@ class TestBoardTemplate:
         assert template.name_template is None
         assert template.repeat_interval == "1 day"
         assert template.config == {}
-        assert template.config_template == {}
         assert template.next_run_at == next_run_at
         assert template.is_active is True
         assert template.created_at == now
@@ -94,6 +93,7 @@ class TestBoardTemplate:
                 id=BoardTemplateID(template_id),
                 account_id=AccountID(account_id),
                 game_id=GameID(game_id),
+                slug="test-slug",
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
                 is_active=True,
@@ -114,6 +114,7 @@ class TestBoardTemplate:
                 id=BoardTemplateID(template_id),
                 game_id=GameID(game_id),
                 name="Template Without Account",
+                slug="test-slug",
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
                 is_active=True,
@@ -134,6 +135,7 @@ class TestBoardTemplate:
                 id=BoardTemplateID(template_id),
                 account_id=AccountID(account_id),
                 name="Template Without Game",
+                slug="test-slug",
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
                 is_active=True,
@@ -156,6 +158,7 @@ class TestBoardTemplate:
                 account_id=AccountID(account_id),
                 game_id=GameID(game_id),
                 name="Template Without Interval",
+                slug="test-slug",
                 next_run_at=now + timedelta(days=7),
                 is_active=True,
                 created_at=now,
@@ -177,6 +180,7 @@ class TestBoardTemplate:
                 account_id=AccountID(account_id),
                 game_id=GameID(game_id),
                 name="Template Without Next Run",
+                slug="test-slug",
                 repeat_interval="7 days",
                 is_active=True,
                 created_at=now,
@@ -198,6 +202,7 @@ class TestBoardTemplate:
                 account_id=AccountID(account_id),
                 game_id=GameID(game_id),
                 name="Template Without Active Status",
+                slug="test-slug",
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
                 created_at=now,
@@ -219,6 +224,7 @@ class TestBoardTemplate:
                 account_id=AccountID(account_id),
                 game_id=GameID(game_id),
                 name="",
+                slug="test-slug",
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
                 is_active=True,
@@ -241,6 +247,7 @@ class TestBoardTemplate:
                 account_id=AccountID(account_id),
                 game_id=GameID(game_id),
                 name="   ",
+                slug="test-slug",
                 repeat_interval="7 days",
                 next_run_at=now + timedelta(days=7),
                 is_active=True,
@@ -262,6 +269,7 @@ class TestBoardTemplate:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="  Padded Template Name  ",
+            slug="padded-template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -298,6 +306,7 @@ class TestBoardTemplate:
                 account_id=AccountID(account_id),
                 game_id=GameID(game_id),
                 name="Test Template",
+                slug="test-template",
                 repeat_interval=interval,
                 next_run_at=now + timedelta(days=1),
                 is_active=True,
@@ -329,6 +338,7 @@ class TestBoardTemplate:
                     account_id=AccountID(account_id),
                     game_id=GameID(game_id),
                     name="Test Template",
+                    slug="test-template",
                     repeat_interval=interval,
                     next_run_at=now + timedelta(days=1),
                     is_active=True,
@@ -350,6 +360,7 @@ class TestBoardTemplate:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Test Template",
+            slug="test-template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -359,28 +370,6 @@ class TestBoardTemplate:
 
         assert template.config == {}
         assert isinstance(template.config, dict)
-
-    def test_board_template_config_template_defaults_to_empty_dict(self):
-        """Test that config_template defaults to empty dict when not provided."""
-        template_id = BoardTemplateID(uuid4())
-        account_id = AccountID(uuid4())
-        game_id = GameID(uuid4())
-        now = datetime.now(UTC)
-
-        template = BoardTemplate(
-            id=BoardTemplateID(template_id),
-            account_id=AccountID(account_id),
-            game_id=GameID(game_id),
-            name="Test Template",
-            repeat_interval="7 days",
-            next_run_at=now + timedelta(days=7),
-            is_active=True,
-            created_at=now,
-            updated_at=now,
-        )
-
-        assert template.config_template == {}
-        assert isinstance(template.config_template, dict)
 
     def test_board_template_equality_based_on_id(self):
         """Test that template equality is based on ID."""
@@ -394,6 +383,7 @@ class TestBoardTemplate:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template One",
+            slug="template-one",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -406,6 +396,7 @@ class TestBoardTemplate:
             account_id=AccountID(uuid4()),
             game_id=GameID(uuid4()),
             name="Template Two",
+            slug="template-two",
             repeat_interval="1 month",
             next_run_at=now + timedelta(days=30),
             is_active=False,
@@ -426,6 +417,7 @@ class TestBoardTemplate:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template One",
+            slug="template-one",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -438,6 +430,7 @@ class TestBoardTemplate:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template One",
+            slug="template-one-2",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -459,6 +452,7 @@ class TestBoardTemplate:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Hashable Template",
+            slug="hashable-template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -486,6 +480,7 @@ class TestBoardTemplate:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Immutable ID Template",
+            slug="immutable-id",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -510,6 +505,7 @@ class TestBoardTemplate:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Immutable Account Template",
+            slug="immutable-account",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -534,6 +530,7 @@ class TestBoardTemplate:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Immutable Game Template",
+            slug="immutable-game",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -558,6 +555,7 @@ class TestBoardTemplate:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Deletable Template",
+            slug="deletable-template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -585,6 +583,7 @@ class TestBoardTemplate:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Restorable Template",
+            slug="restorable-template",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
             is_active=True,
@@ -615,6 +614,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Fallback Name",
+            slug="fallback-name",
             name_template=None,
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -638,6 +638,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
+            slug="template-name",
             name_template="Championship {year}",
             repeat_interval="1 year",
             next_run_at=now + timedelta(days=365),
@@ -662,6 +663,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
+            slug="template-name",
             name_template="High Scores - {month}",
             repeat_interval="1 month",
             next_run_at=now + timedelta(days=30),
@@ -686,6 +688,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
+            slug="template-name",
             name_template="Leaderboard {month_short} {year}",
             repeat_interval="1 month",
             next_run_at=now + timedelta(days=30),
@@ -710,6 +713,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
+            slug="template-name",
             name_template="Week {week} Challenge",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -735,6 +739,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
+            slug="template-name",
             name_template="{quarter} {year} Rankings",
             repeat_interval="3 months",
             next_run_at=now + timedelta(days=90),
@@ -770,6 +775,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
+            slug="template-name",
             name_template="Daily Challenge {date}",
             repeat_interval="1 day",
             next_run_at=now + timedelta(days=1),
@@ -794,6 +800,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
+            slug="template-name",
             name_template="Weekly Challenge {series}",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -817,6 +824,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
+            slug="template-name",
             name_template="{month} {year} - Week {series}",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -841,6 +849,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
+            slug="template-name",
             name_template="Challenge {invalid_placeholder}",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -867,6 +876,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
+            slug="template-name",
             name_template="Weekly Challenge {series}",
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),
@@ -892,6 +902,7 @@ class TestBoardTemplateGenerateName:
             account_id=AccountID(account_id),
             game_id=GameID(game_id),
             name="Template Name",
+            slug="template-name",
             name_template=("{year}/{month}/{month_short}/{week}/{quarter}/{date}/#{series}"),
             repeat_interval="7 days",
             next_run_at=now + timedelta(days=7),

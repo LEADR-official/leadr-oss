@@ -190,50 +190,27 @@ class BoardService(BaseService[Board, BoardRepository]):
         board_name = template.generate_name(timestamp=now, series_value=series_value)
 
         # Parse interval to calculate time boundaries
+        # Use template boundaries if set, otherwise derive from interval
         duration = parse_interval_to_timedelta(template.repeat_interval)
-        starts_at = template.next_run_at
-        ends_at = starts_at + duration
+        starts_at = template.starts_at if template.starts_at else template.next_run_at
+        ends_at = template.ends_at if template.ends_at else (starts_at + duration)
 
-        # Extract board configuration from template with defaults
-        icon = template.config.get("icon", "trophy")
-        unit = template.config.get("unit", "points")
-        is_active = template.config.get("is_active", True)
-        sort_direction_str = template.config.get("sort_direction", "desc")
-        keep_strategy_str = template.config.get("keep_strategy", "best")
-        tags = template.config.get("tags", [])
-
-        # Ensure tags is a list
-        if not isinstance(tags, list):
-            tags = []
-
-        # Convert string enums to domain types (handle both lowercase and uppercase)
-        if sort_direction_str.lower() == "asc" or sort_direction_str.upper() == "ASCENDING":
-            sort_direction = SortDirection.ASCENDING
-        else:  # Default to descending
-            sort_direction = SortDirection.DESCENDING
-
-        if keep_strategy_str.lower() == "latest" or keep_strategy_str.upper() == "LATEST_ONLY":
-            keep_strategy = KeepStrategy.LATEST_ONLY
-        elif keep_strategy_str.lower() == "all" or keep_strategy_str.upper() == "ALL":
-            keep_strategy = KeepStrategy.ALL
-        else:  # Default to best only
-            keep_strategy = KeepStrategy.BEST_ONLY
-
+        # Use first-class fields from template
         # Create board using standard creation method (short_code generated automatically)
         return await self.create_board(
             account_id=template.account_id,
             game_id=template.game_id,
             name=board_name,
-            icon=icon,
-            unit=unit,
-            is_active=is_active,
-            sort_direction=sort_direction,
-            keep_strategy=keep_strategy,
+            icon=template.icon,
+            unit=template.unit,
+            is_active=True,  # New boards from templates are always active
+            sort_direction=template.sort_direction,
+            keep_strategy=template.keep_strategy,
             created_from_template_id=template.id,
             template_name=template.name,
             starts_at=starts_at,
             ends_at=ends_at,
-            tags=tags,
+            tags=template.tags,
         )
 
     async def get_board(self, board_id: BoardID) -> Board | None:

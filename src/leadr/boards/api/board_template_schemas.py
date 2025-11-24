@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 
@@ -15,6 +16,7 @@ class BoardTemplateCreateRequest(BaseModel):
     account_id: AccountID = Field(description="ID of the account this template belongs to")
     game_id: GameID = Field(description="ID of the game this template belongs to")
     name: str = Field(description="Name of the template")
+    slug: str = Field(description="URL-friendly slug for boards created from this template")
     repeat_interval: str = Field(
         description="PostgreSQL interval syntax for repeat frequency (e.g., '7 days', '1 month')"
     )
@@ -28,11 +30,37 @@ class BoardTemplateCreateRequest(BaseModel):
     series: str | None = Field(
         default=None, description="Optional series identifier for sequential board naming"
     )
-    config: dict[str, Any] | None = Field(
-        default=None, description="Optional configuration for boards created from this template"
+    icon: str | None = Field(
+        default="fa-crown",
+        description="Icon identifier for boards created from this template",
     )
-    config_template: dict[str, Any] | None = Field(
-        default=None, description="Optional template configuration for random generation"
+    unit: str | None = Field(
+        default=None,
+        description="Unit of measurement for scores (e.g., 'seconds', 'points')",
+    )
+    sort_direction: SortDirection = Field(
+        default=SortDirection.DESCENDING,
+        description="Direction to sort scores (ascending/descending)",
+    )
+    keep_strategy: KeepStrategy = Field(
+        default=KeepStrategy.ALL,
+        description="Strategy for keeping multiple scores from the same user",
+    )
+    starts_at: datetime | None = Field(
+        default=None, description="Optional start time for time-bounded boards"
+    )
+    ends_at: datetime | None = Field(
+        default=None, description="Optional end time for time-bounded boards"
+    )
+    tags: list[str] | None = Field(
+        default=None,
+        description="List of tags for categorizing boards created from this template",
+    )
+    config: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Reserved for future procedural generation (bounds, variables, randomization rules)"
+        ),
     )
 
 
@@ -40,12 +68,20 @@ class BoardTemplateUpdateRequest(BaseModel):
     """Request model for updating a board template."""
 
     name: str | None = Field(default=None, description="Updated template name")
+    slug: str | None = Field(default=None, description="Updated slug")
     name_template: str | None = Field(default=None, description="Updated name template")
     series: str | None = Field(default=None, description="Updated series identifier")
+    icon: str | None = Field(default=None, description="Updated icon identifier")
+    unit: str | None = Field(default=None, description="Updated unit of measurement")
+    sort_direction: SortDirection | None = Field(default=None, description="Updated sort direction")
+    keep_strategy: KeepStrategy | None = Field(default=None, description="Updated keep strategy")
+    starts_at: datetime | None = Field(default=None, description="Updated start time")
+    ends_at: datetime | None = Field(default=None, description="Updated end time")
+    tags: list[str] | None = Field(default=None, description="Updated tags list")
     repeat_interval: str | None = Field(default=None, description="Updated repeat interval")
-    config: dict[str, Any] | None = Field(default=None, description="Updated config")
-    config_template: dict[str, Any] | None = Field(
-        default=None, description="Updated config template"
+    config: dict[str, Any] | None = Field(
+        default=None,
+        description="Updated config (reserved for procedural generation)",
     )
     next_run_at: datetime | None = Field(default=None, description="Updated next run time")
     is_active: bool | None = Field(default=None, description="Updated active status")
@@ -61,18 +97,34 @@ class BoardTemplateResponse(BaseModel):
     account_id: AccountID = Field(description="ID of the account this template belongs to")
     game_id: GameID = Field(description="ID of the game this template belongs to")
     name: str = Field(description="Name of the template")
+    slug: str = Field(description="URL-friendly slug for boards created from this template")
     name_template: str | None = Field(
         default=None, description="Template string for generating board names, or null"
     )
     series: str | None = Field(
         default=None, description="Series identifier for sequential board naming, or null"
     )
+    icon: str | None = Field(description="Icon identifier for boards created from this template")
+    unit: str | None = Field(
+        description="Unit of measurement for scores (e.g., 'seconds', 'points')"
+    )
+    sort_direction: SortDirection = Field(
+        description="Direction to sort scores (ascending/descending)"
+    )
+    keep_strategy: KeepStrategy = Field(
+        description="Strategy for keeping multiple scores from the same user"
+    )
+    starts_at: datetime | None = Field(description="Optional start time for time-bounded boards")
+    ends_at: datetime | None = Field(description="Optional end time for time-bounded boards")
+    tags: list[str] = Field(
+        description="List of tags for categorizing boards created from this template"
+    )
     repeat_interval: str = Field(description="Repeat frequency in PostgreSQL interval syntax")
     config: dict[str, Any] = Field(
-        default_factory=dict, description="Configuration for boards created from this template"
-    )
-    config_template: dict[str, Any] = Field(
-        default_factory=dict, description="Template configuration for random generation"
+        default_factory=dict,
+        description=(
+            "Reserved for future procedural generation (bounds, variables, randomization rules)"
+        ),
     )
     next_run_at: datetime = Field(description="Next scheduled run time (UTC)")
     is_active: bool = Field(description="Whether the template is currently active")
@@ -94,11 +146,18 @@ class BoardTemplateResponse(BaseModel):
             account_id=template.account_id,
             game_id=template.game_id,
             name=template.name,
+            slug=template.slug,
             name_template=template.name_template,
             series=template.series,
+            icon=template.icon,
+            unit=template.unit,
+            sort_direction=template.sort_direction,
+            keep_strategy=template.keep_strategy,
+            starts_at=template.starts_at,
+            ends_at=template.ends_at,
+            tags=template.tags,
             repeat_interval=template.repeat_interval,
             config=template.config,
-            config_template=template.config_template,
             next_run_at=template.next_run_at,
             is_active=template.is_active,
             created_at=template.created_at,
