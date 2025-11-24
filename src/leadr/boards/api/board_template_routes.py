@@ -53,13 +53,21 @@ async def create_board_template(
             account_id=request.account_id,
             game_id=request.game_id,
             name=request.name,
+            slug=request.slug,
             repeat_interval=request.repeat_interval,
             next_run_at=request.next_run_at,
             is_active=request.is_active,
+            is_published=request.is_published,
             name_template=request.name_template,
             series=request.series,
+            icon=request.icon,
+            unit=request.unit,
+            sort_direction=request.sort_direction,
+            keep_strategy=request.keep_strategy,
+            starts_at=request.starts_at,
+            ends_at=request.ends_at,
+            tags=request.tags,
             config=request.config,
-            config_template=request.config_template,
         )
     except IntegrityError:
         raise HTTPException(status_code=404, detail="Game or account not found") from None
@@ -204,13 +212,21 @@ async def update_board_template(
     template = await service.update_board_template(
         template_id=template_id,
         name=request.name,
+        slug=request.slug,
         name_template=request.name_template,
         series=request.series,
+        icon=request.icon,
+        unit=request.unit,
+        sort_direction=request.sort_direction,
+        keep_strategy=request.keep_strategy,
+        starts_at=request.starts_at,
+        ends_at=request.ends_at,
+        tags=request.tags,
         repeat_interval=request.repeat_interval,
         config=request.config,
-        config_template=request.config_template,
         next_run_at=request.next_run_at,
         is_active=request.is_active,
+        is_published=request.is_published,
     )
 
     return BoardTemplateResponse.from_domain(template)

@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from leadr.boards.adapters.orm import BoardTemplateORM
+from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 
@@ -24,12 +25,20 @@ class TestBoardTemplateORM:
             account_id=account_id,
             game_id=game_id,
             name="Weekly Speed Run Template",
+            slug="weekly-speedrun",
             name_template="Speed Run Week {week}",
+            icon="fa-trophy",
+            unit="seconds",
+            sort_direction="ASCENDING",
+            keep_strategy="BEST_ONLY",
+            starts_at=now,
+            ends_at=now + timedelta(days=30),
+            tags=["speedrun", "weekly"],
             repeat_interval="7 days",
-            config={"unit": "seconds", "sort_direction": "ASCENDING"},
-            config_template={"tags": ["speedrun", "weekly"]},
+            config={"custom": "value"},
             next_run_at=next_run_at,
             is_active=True,
+            is_published=True,
             created_at=now,
             updated_at=now,
             deleted_at=None,
@@ -42,12 +51,20 @@ class TestBoardTemplateORM:
         assert domain.account_id == account_id
         assert domain.game_id == game_id
         assert domain.name == "Weekly Speed Run Template"
+        assert domain.slug == "weekly-speedrun"
         assert domain.name_template == "Speed Run Week {week}"
+        assert domain.icon == "fa-trophy"
+        assert domain.unit == "seconds"
+        assert domain.sort_direction == SortDirection.ASCENDING
+        assert domain.keep_strategy == KeepStrategy.BEST_ONLY
+        assert domain.starts_at == now
+        assert domain.ends_at == now + timedelta(days=30)
+        assert domain.tags == ["speedrun", "weekly"]
         assert domain.repeat_interval == "7 days"
-        assert domain.config == {"unit": "seconds", "sort_direction": "ASCENDING"}
-        assert domain.config_template == {"tags": ["speedrun", "weekly"]}
+        assert domain.config == {"custom": "value"}
         assert domain.next_run_at == next_run_at
         assert domain.is_active is True
+        assert domain.is_published is True
         assert domain.created_at == now
         assert domain.updated_at == now
         assert domain.deleted_at is None
@@ -65,12 +82,20 @@ class TestBoardTemplateORM:
             account_id=account_id,
             game_id=game_id,
             name="Simple Template",
+            slug="simple-template",
             name_template=None,
+            icon="fa-crown",
+            unit=None,
+            sort_direction="DESCENDING",
+            keep_strategy="ALL",
+            starts_at=None,
+            ends_at=None,
+            tags=[],
             repeat_interval="1 day",
             config={},
-            config_template={},
             next_run_at=next_run_at,
             is_active=True,
+            is_published=True,
             created_at=now,
             updated_at=now,
             deleted_at=None,
@@ -79,9 +104,17 @@ class TestBoardTemplateORM:
         domain = orm.to_domain()
 
         assert isinstance(domain, BoardTemplate)
+        assert domain.slug == "simple-template"
         assert domain.name_template is None
+        assert domain.icon == "fa-crown"
+        assert domain.unit is None
+        assert domain.sort_direction == SortDirection.DESCENDING
+        assert domain.keep_strategy == KeepStrategy.ALL
+        assert domain.starts_at is None
+        assert domain.ends_at is None
+        assert domain.tags == []
         assert domain.config == {}
-        assert domain.config_template == {}
+        assert domain.is_published is True
 
     def test_board_template_domain_to_orm_with_all_fields(self):
         """Test converting domain entity to ORM model with all fields."""
@@ -96,10 +129,17 @@ class TestBoardTemplateORM:
             account_id=account_id,
             game_id=game_id,
             name="Weekly Speed Run Template",
+            slug="weekly-speedrun",
             name_template="Speed Run Week {week}",
+            icon="fa-trophy",
+            unit="seconds",
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+            starts_at=now,
+            ends_at=now + timedelta(days=30),
+            tags=["speedrun", "weekly"],
             repeat_interval="7 days",
-            config={"unit": "seconds", "sort_direction": "ASCENDING"},
-            config_template={"tags": ["speedrun", "weekly"]},
+            config={"custom": "value"},
             next_run_at=next_run_at,
             is_active=True,
             created_at=now,
@@ -113,10 +153,17 @@ class TestBoardTemplateORM:
         assert orm.account_id == account_id
         assert orm.game_id == game_id
         assert orm.name == "Weekly Speed Run Template"
+        assert orm.slug == "weekly-speedrun"
         assert orm.name_template == "Speed Run Week {week}"
+        assert orm.icon == "fa-trophy"
+        assert orm.unit == "seconds"
+        assert orm.sort_direction == "ASCENDING"
+        assert orm.keep_strategy == "BEST_ONLY"
+        assert orm.starts_at == now
+        assert orm.ends_at == now + timedelta(days=30)
+        assert orm.tags == ["speedrun", "weekly"]
         assert orm.repeat_interval == "7 days"
-        assert orm.config == {"unit": "seconds", "sort_direction": "ASCENDING"}
-        assert orm.config_template == {"tags": ["speedrun", "weekly"]}
+        assert orm.config == {"custom": "value"}
         assert orm.next_run_at == next_run_at
         assert orm.is_active is True
         assert orm.created_at == now
@@ -136,6 +183,7 @@ class TestBoardTemplateORM:
             account_id=account_id,
             game_id=game_id,
             name="Simple Template",
+            slug="simple-template",
             repeat_interval="1 day",
             next_run_at=next_run_at,
             is_active=False,
@@ -146,9 +194,9 @@ class TestBoardTemplateORM:
         orm = BoardTemplateORM.from_domain(domain)
 
         assert isinstance(orm, BoardTemplateORM)
+        assert orm.slug == "simple-template"
         assert orm.name_template is None
         assert orm.config == {}
-        assert orm.config_template == {}
         assert orm.is_active is False
 
     def test_board_template_orm_roundtrip_conversion(self):
@@ -164,16 +212,24 @@ class TestBoardTemplateORM:
             account_id=account_id,
             game_id=game_id,
             name="Monthly Competition Template",
+            slug="monthly-competition",
             name_template="Monthly Competition {month}",
+            icon="fa-crown",
+            unit=None,
+            sort_direction="DESCENDING",
+            keep_strategy="ALL",
+            starts_at=None,
+            ends_at=None,
+            tags=["monthly", "competition"],
             repeat_interval="1 month",
             config={
                 "unit": "points",
                 "sort_direction": "DESCENDING",
                 "keep_strategy": "BEST_ONLY",
             },
-            config_template={"tags": ["monthly", "competition"], "icon": "trophy"},
             next_run_at=next_run_at,
             is_active=True,
+            is_published=True,
             created_at=now,
             updated_at=now,
             deleted_at=None,
@@ -191,7 +247,6 @@ class TestBoardTemplateORM:
         assert new_orm.name_template == original_orm.name_template
         assert new_orm.repeat_interval == original_orm.repeat_interval
         assert new_orm.config == original_orm.config
-        assert new_orm.config_template == original_orm.config_template
         assert new_orm.next_run_at == original_orm.next_run_at
         assert new_orm.is_active == original_orm.is_active
         assert new_orm.created_at == original_orm.created_at
@@ -212,10 +267,10 @@ class TestBoardTemplateORM:
             account_id=account_id,
             game_id=game_id,
             name="Deleted Template",
+            slug="deleted-template",
             name_template="Template {date}",
             repeat_interval="7 days",
             config={"test": "value"},
-            config_template={"test": "template"},
             next_run_at=next_run_at,
             is_active=False,
             created_at=now,
@@ -235,7 +290,6 @@ class TestBoardTemplateORM:
         assert new_domain.name_template == original_domain.name_template
         assert new_domain.repeat_interval == original_domain.repeat_interval
         assert new_domain.config == original_domain.config
-        assert new_domain.config_template == original_domain.config_template
         assert new_domain.next_run_at == original_domain.next_run_at
         assert new_domain.is_active == original_domain.is_active
         assert new_domain.created_at == original_domain.created_at
@@ -261,6 +315,7 @@ class TestBoardTemplateORM:
             account_id=account_id,
             game_id=game_id,
             name="Template",
+            slug="test-template",
             repeat_interval="1 day",
             config=config,
             next_run_at=now + timedelta(days=1),
@@ -275,36 +330,3 @@ class TestBoardTemplateORM:
         # Verify roundtrip
         domain_back = orm.to_domain()
         assert domain_back.config == config
-
-    def test_board_template_config_template_jsonb_serialization(self):
-        """Test that config_template dict properly serializes to JSONB."""
-        template_id = BoardTemplateID(uuid4())
-        account_id = AccountID(uuid4())
-        game_id = GameID(uuid4())
-        now = datetime.now(UTC)
-
-        # Complex nested config_template
-        config_template = {
-            "tags": ["tag1", "tag2"],
-            "random_config": {"min": 1, "max": 100, "choices": ["a", "b", "c"]},
-        }
-
-        domain = BoardTemplate(
-            id=template_id,
-            account_id=account_id,
-            game_id=game_id,
-            name="Template",
-            repeat_interval="1 day",
-            config_template=config_template,
-            next_run_at=now + timedelta(days=1),
-            is_active=True,
-            created_at=now,
-            updated_at=now,
-        )
-
-        orm = BoardTemplateORM.from_domain(domain)
-        assert orm.config_template == config_template
-
-        # Verify roundtrip
-        domain_back = orm.to_domain()
-        assert domain_back.config_template == config_template

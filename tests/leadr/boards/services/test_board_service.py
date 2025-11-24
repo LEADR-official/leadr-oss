@@ -962,17 +962,16 @@ class TestBoardService:
             account_id=account.id,
             game_id=game.id,
             name="Weekly Challenge",
+            slug="weekly-challenge",
             repeat_interval="7 days",
             next_run_at=next_run,
             is_active=True,
-            config={
-                "icon": "star",
-                "unit": "points",
-                "is_active": True,
-                "sort_direction": "desc",
-                "keep_strategy": "best",
-                "tags": ["weekly", "challenge"],
-            },
+            icon="star",
+            unit="points",
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+            tags=["weekly", "challenge"],
+            config={},
         )
 
         # Create board from template
@@ -1023,22 +1022,23 @@ class TestBoardService:
             account_id=account.id,
             game_id=game.id,
             name="Hourly Event",
+            slug="hourly-event",
             repeat_interval="1 hour",
             next_run_at=next_run,
             is_active=True,
-            config={},  # Empty config - should use defaults
+            config={},
         )
 
         # Create board from template
         board_service = BoardService(db_session)
         board = await board_service.create_board_from_template(template)
 
-        # Assertions - check defaults are applied
-        assert board.icon == "trophy"  # Default
-        assert board.unit == "points"  # Default
-        assert board.is_active is True  # Default
-        assert board.sort_direction == SortDirection.DESCENDING  # Default "desc"
-        assert board.keep_strategy == KeepStrategy.BEST_ONLY  # Default "best"
-        assert board.tags == []  # Default empty list
+        # Assertions - check template defaults are applied
+        assert board.icon == "fa-crown"  # Template default
+        assert board.unit is None  # Template default
+        assert board.is_active is True  # Always true for new boards
+        assert board.sort_direction == SortDirection.DESCENDING  # Template default
+        assert board.keep_strategy == KeepStrategy.ALL  # Template default
+        assert board.tags == []  # Template default
         assert board.starts_at == next_run
         assert board.ends_at == next_run + timedelta(hours=1)

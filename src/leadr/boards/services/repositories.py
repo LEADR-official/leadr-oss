@@ -39,6 +39,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             short_code=orm.short_code,
             unit=orm.unit,
             is_active=orm.is_active,
+            is_published=orm.is_published,
             sort_direction=SortDirection(orm.sort_direction),
             keep_strategy=KeepStrategy(orm.keep_strategy),
             created_from_template_id=BoardTemplateID(orm.created_from_template_id)
@@ -65,6 +66,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             short_code=entity.short_code,
             unit=entity.unit,
             is_active=entity.is_active,
+            is_published=entity.is_published,
             sort_direction=entity.sort_direction.value,
             keep_strategy=entity.keep_strategy.value,
             created_from_template_id=entity.created_from_template_id.uuid
@@ -166,6 +168,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         self,
         account_id: UUID4 | AccountID | None = None,
         code: str | None = None,
+        is_published: bool | None = None,
         pagination: None = None,
     ) -> list[Board]: ...
 
@@ -174,6 +177,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         self,
         account_id: UUID4 | AccountID | None = None,
         code: str | None = None,
+        is_published: bool | None = None,
         pagination: PaginationParams = ...,
     ) -> PaginatedResult[Board]: ...
 
@@ -181,6 +185,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         self,
         account_id: UUID4 | AccountID | None = None,
         code: str | None = None,
+        is_published: bool | None = None,
         pagination: PaginationParams | None = None,
     ) -> list[Board] | PaginatedResult[Board]:
         """List boards with optional filtering by account_id and/or code.
@@ -190,6 +195,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         Args:
             account_id: Optional account ID to filter by
             code: Optional short code to filter by
+            is_published: Optional filter for published status
             pagination: Optional pagination parameters
 
         Returns:
@@ -212,6 +218,10 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         if code is not None:
             query = query.where(BoardORM.short_code == code)
             filters_dict["code"] = code
+
+        if is_published is not None:
+            query = query.where(BoardORM.is_published == is_published)
+            filters_dict["is_published"] = str(is_published)
 
         # If no pagination, return list (backward compatibility)
         if pagination is None:

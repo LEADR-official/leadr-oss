@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import Field, field_validator
 
+from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 from leadr.common.domain.models import Entity
 
@@ -34,6 +35,9 @@ class BoardTemplate(Entity):
         frozen=True, description="ID of the game this template belongs to (immutable)"
     )
     name: str = Field(description="Name of the template")
+    slug: str | None = Field(
+        default=None, description="URL-friendly slug for boards created from this template"
+    )
     name_template: str | None = Field(
         default=None, description="Optional template string for generating board names"
     )
@@ -43,21 +47,46 @@ class BoardTemplate(Entity):
             "Optional series identifier for sequential board naming (e.g., 'weekly', 'seasonal')"
         ),
     )
+    icon: str | None = Field(
+        description="Icon identifier for boards created from this template", default="fa-crown"
+    )
+    unit: str | None = Field(
+        description="Unit of measurement for scores (e.g., 'seconds', 'points')", default=None
+    )
+    sort_direction: SortDirection = Field(
+        description="Direction to sort scores (ascending/descending)",
+        default=SortDirection.DESCENDING,
+    )
+    keep_strategy: KeepStrategy = Field(
+        description="Strategy for keeping multiple scores from the same user",
+        default=KeepStrategy.ALL,
+    )
+    starts_at: datetime | None = Field(
+        default=None, description="Optional start time for time-bounded boards"
+    )
+    ends_at: datetime | None = Field(
+        default=None, description="Optional end time for time-bounded boards"
+    )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="List of tags for categorizing boards created from this template",
+    )
     repeat_interval: str = Field(
         description="PostgreSQL interval syntax for repeat frequency (e.g., '7 days', '1 month')"
     )
     config: dict[str, Any] = Field(
         default_factory=dict,
-        description="Configuration object for boards created from this template",
-    )
-    config_template: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Template configuration for random generation or variable substitution",
+        description=(
+            "Reserved for future procedural generation (bounds, variables, randomization rules)"
+        ),
     )
     next_run_at: datetime = Field(
         description="Next scheduled time to create a board from this template"
     )
     is_active: bool = Field(description="Whether the template is currently active")
+    is_published: bool = Field(
+        description="Whether boards created from this template should be published", default=True
+    )
 
     @field_validator("name")
     @classmethod
@@ -76,6 +105,35 @@ class BoardTemplate(Entity):
         if not value or not value.strip():
             raise ValueError("Template name cannot be empty")
         return value.strip()
+
+    @field_validator("slug")
+    @classmethod
+    def validate_slug(cls, value: str | None) -> str | None:
+        """Validate slug format (lowercase alphanumeric with hyphens).
+
+        Args:
+            value: The slug to validate, or None.
+
+        Returns:
+            The validated slug, or None if not provided.
+
+        Raises:
+            ValueError: If slug is invalid.
+        """
+        if value is None:
+            return None
+        if not value or not value.strip():
+            raise ValueError("Template slug cannot be empty")
+        if len(value) < 2:
+            raise ValueError("Template slug must be at least 2 characters")
+        if len(value) > 50:
+            raise ValueError("Template slug must not exceed 50 characters")
+        if not re.match(r"^[a-z0-9]+(?:-[a-z0-9]+)*$", value):
+            raise ValueError(
+                "Template slug must be lowercase alphanumeric with hyphens, "
+                "and cannot start or end with a hyphen"
+            )
+        return value
 
     @field_validator("repeat_interval")
     @classmethod

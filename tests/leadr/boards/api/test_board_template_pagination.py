@@ -28,6 +28,7 @@ class TestBoardTemplatePagination:
                     "account_id": str(test_account.id),
                     "game_id": str(test_game.id),
                     "name": f"Test Template {i}",
+                    "slug": f"test-template-{i}",
                     "repeat_interval": "1 week",
                     "next_run_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
                     "is_active": True,
@@ -75,6 +76,7 @@ class TestBoardTemplatePagination:
                     "account_id": str(test_account.id),
                     "game_id": str(test_game.id),
                     "name": f"Template {i:03d}",
+                    "slug": f"template-{i:03d}",
                     "repeat_interval": "1 week",
                     "next_run_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
                     "is_active": True,
@@ -121,6 +123,7 @@ class TestBoardTemplatePagination:
                     "account_id": str(test_account.id),
                     "game_id": str(test_game.id),
                     "name": f"Template {i:03d}",
+                    "slug": f"template-{i:03d}",
                     "repeat_interval": "1 week",
                     "next_run_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
                     "is_active": True,
@@ -165,13 +168,15 @@ class TestBoardTemplatePagination:
         """Test pagination with custom sort (name ascending)."""
         # Create templates with different names
         names = ["Zombie Weekly", "Arena Monthly", "Card Daily", "Dragon Seasonal"]
-        for name in names:
+        slugs = ["zombie-weekly", "arena-monthly", "card-daily", "dragon-seasonal"]
+        for name, slug in zip(names, slugs, strict=True):
             await authenticated_client.post(
                 "/board-templates",
                 json={
                     "account_id": str(test_account.id),
                     "game_id": str(test_game.id),
                     "name": name,
+                    "slug": slug,
                     "repeat_interval": "1 week",
                     "next_run_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
                     "is_active": True,
@@ -218,6 +223,7 @@ class TestBoardTemplatePagination:
                     "account_id": str(test_account.id),
                     "game_id": str(test_game.id),
                     "name": f"Template {i}",
+                    "slug": f"template-{i}",
                     "repeat_interval": "1 week",
                     "next_run_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
                     "is_active": True,
@@ -252,6 +258,7 @@ class TestBoardTemplatePagination:
             json={
                 "account_id": str(test_account.id),
                 "name": "Second Game",
+                "slug": "second-game",
             },
         )
         second_game_id = response.json()["id"]
@@ -264,6 +271,7 @@ class TestBoardTemplatePagination:
                     "account_id": str(test_account.id),
                     "game_id": str(test_game.id),
                     "name": f"Game1 Template {i}",
+                    "slug": f"game1-template-{i}",
                     "repeat_interval": "1 week",
                     "next_run_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
                     "is_active": True,
@@ -279,6 +287,7 @@ class TestBoardTemplatePagination:
                     "account_id": str(test_account.id),
                     "game_id": second_game_id,
                     "name": f"Game2 Template {i}",
+                    "slug": f"game2-template-{i}",
                     "repeat_interval": "1 week",
                     "next_run_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
                     "is_active": True,
