@@ -12,8 +12,12 @@ class AccountCreateRequest(BaseModel):
     """Request model for creating an account."""
 
     name: str = Field(description="Account name (2-100 characters)")
-    slug: str = Field(
-        description="URL-friendly identifier for the account (lowercase, alphanumeric, hyphens)"
+    slug: str | None = Field(
+        default=None,
+        description=(
+            "Optional URL-friendly slug (globally unique). "
+            "If not provided, will be auto-generated from name"
+        ),
     )
 
 

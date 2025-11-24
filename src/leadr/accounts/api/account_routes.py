@@ -47,10 +47,13 @@ async def create_account(
             detail="Only superadmins can create accounts",
         )
 
-    account = await service.create_account(
-        name=request.name,
-        slug=request.slug,
-    )
+    try:
+        account = await service.create_account(
+            name=request.name,
+            slug=request.slug,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
     return AccountResponse.from_domain(account)
 

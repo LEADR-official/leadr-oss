@@ -10,6 +10,7 @@ from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
+from leadr.common.utils.slug import generate_unique_slug_with_retry
 
 
 class AccountService(BaseService[Account, AccountRepository]):
@@ -31,23 +32,52 @@ class AccountService(BaseService[Account, AccountRepository]):
     async def create_account(
         self,
         name: str,
-        slug: str,
+        slug: str | None = None,
     ) -> Account:
-        """Create a new account.
+        """Create a new account with optional slug override.
+
+        If slug is not provided, it will be auto-generated from the name
+        with automatic collision handling to ensure global uniqueness.
 
         Args:
             name: The account name.
-            slug: The URL-friendly slug for the account.
+            slug: Optional URL-friendly slug. If not provided, auto-generated from name.
 
         Returns:
             The created Account domain entity.
 
+        Raises:
+            ValueError: If provided slug already exists.
+
         Example:
+            >>> # Auto-generate slug from name
+            >>> account = await service.create_account(name="Acme Corporation")
+            >>> # Override with custom slug
             >>> account = await service.create_account(
             ...     name="Acme Corporation",
             ...     slug="acme-corp",
             ... )
         """
+        # Generate or validate slug
+        if slug is None:
+            # Auto-generate unique slug from name with collision handling
+            async def check_slug_exists(slug_to_check: str) -> bool:
+                """Check if slug exists globally."""
+                existing = await self.repository.get_by_slug(slug_to_check)
+                return existing is not None
+
+            slug = await generate_unique_slug_with_retry(
+                base_text=name,
+                check_exists=check_slug_exists,
+                max_retries=10,
+            )
+        else:
+            # Use provided slug - validation will happen in Account domain model
+            # Check for global uniqueness constraint violation
+            existing = await self.repository.get_by_slug(slug)
+            if existing is not None:
+                raise ValueError(f"An account with slug '{slug}' already exists")
+
         account = Account(
             name=name,
             slug=slug,
