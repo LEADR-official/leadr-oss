@@ -51,15 +51,19 @@ class Board(Entity):
     )
     name: str = Field(description="Name of the board")
     slug: str = Field(description="URL-friendly slug for the board (unique per game when active)")
-    icon: str = Field(description="Icon identifier for the board")
     short_code: str = Field(description="Globally unique short code for direct board sharing")
-    unit: str = Field(description="Unit of measurement for scores (e.g., 'seconds', 'points')")
-    is_active: bool = Field(description="Whether the board is currently active")
+    icon: str | None = Field(description="Icon identifier for the board", default="fa-crown")
+    unit: str | None = Field(
+        description="Unit of measurement for scores (e.g., 'seconds', 'points')", default=None
+    )
+    is_active: bool = Field(description="Whether the board is currently active", default=True)
     sort_direction: SortDirection = Field(
-        description="Direction to sort scores (ascending/descending)"
+        description="Direction to sort scores (ascending/descending)",
+        default=SortDirection.DESCENDING,
     )
     keep_strategy: KeepStrategy = Field(
-        description="Strategy for keeping multiple scores from the same user"
+        description="Strategy for keeping multiple scores from the same user",
+        default=KeepStrategy.ALL,
     )
     created_from_template_id: BoardTemplateID | None = Field(
         default=None, description="Optional template ID this board was created from"

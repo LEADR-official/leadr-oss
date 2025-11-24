@@ -18,13 +18,21 @@ class BoardCreateRequest(BaseModel):
         default=None,
         description="Optional URL-friendly slug. If not provided, will be auto-generated from name",
     )
-    icon: str = Field(description="Icon identifier for the board")
+    icon: str | None = Field(
+        default="fa-crown", description="Icon identifier for the board. Defaults to 'fa-crown'"
+    )
     short_code: str = Field(description="Globally unique short code for direct sharing")
-    unit: str = Field(description="Unit of measurement for scores (e.g., 'seconds', 'points')")
-    is_active: bool = Field(description="Whether the board is currently active")
-    sort_direction: SortDirection = Field(description="Direction to sort scores")
+    unit: str | None = Field(
+        default=None,
+        description="Unit of measurement for scores (e.g., 'seconds', 'points'). Optional",
+    )
+    is_active: bool = Field(default=True, description="Whether the board is currently active")
+    sort_direction: SortDirection = Field(
+        default=SortDirection.DESCENDING, description="Direction to sort scores"
+    )
     keep_strategy: KeepStrategy = Field(
-        description="Strategy for keeping multiple scores from the same user"
+        default=KeepStrategy.ALL,
+        description="Strategy for keeping multiple scores from the same user",
     )
     created_from_template_id: BoardTemplateID | None = Field(
         default=None, description="Optional template ID this board was created from"
@@ -71,9 +79,9 @@ class BoardResponse(BaseModel):
     game_id: GameID = Field(description="ID of the game this board belongs to")
     name: str = Field(description="Name of the board")
     slug: str = Field(description="URL-friendly slug for the board (auto-generated, read-only)")
-    icon: str = Field(description="Icon identifier for the board")
+    icon: str | None = Field(description="Icon identifier for the board, or null")
     short_code: str = Field(description="Globally unique short code for direct sharing")
-    unit: str = Field(description="Unit of measurement for scores")
+    unit: str | None = Field(description="Unit of measurement for scores, or null")
     is_active: bool = Field(description="Whether the board is currently active")
     sort_direction: SortDirection = Field(description="Direction to sort scores")
     keep_strategy: KeepStrategy = Field(description="Strategy for keeping scores from same user")

@@ -41,11 +41,11 @@ class BoardService(BaseService[Board, BoardRepository]):
         account_id: AccountID,
         game_id: GameID,
         name: str,
-        icon: str,
-        unit: str,
-        is_active: bool,
-        sort_direction: SortDirection,
-        keep_strategy: KeepStrategy,
+        icon: str | None = "fa-crown",
+        unit: str | None = None,
+        is_active: bool = True,
+        sort_direction: SortDirection = SortDirection.DESCENDING,
+        keep_strategy: KeepStrategy = KeepStrategy.ALL,
         slug: str | None = None,
         short_code: str | None = None,
         created_from_template_id: BoardTemplateID | None = None,
@@ -60,11 +60,11 @@ class BoardService(BaseService[Board, BoardRepository]):
             account_id: The ID of the account that owns this board.
             game_id: The ID of the game this board belongs to.
             name: The board name.
-            icon: Icon identifier for the board.
-            unit: Unit of measurement for scores.
-            is_active: Whether the board is currently active.
-            sort_direction: Direction to sort scores.
-            keep_strategy: Strategy for keeping multiple scores from same user.
+            icon: Icon identifier for the board. Defaults to "fa-crown".
+            unit: Unit of measurement for scores. Defaults to None.
+            is_active: Whether the board is currently active. Defaults to True.
+            sort_direction: Direction to sort scores. Defaults to DESCENDING.
+            keep_strategy: Strategy for keeping multiple scores from same user. Defaults to ALL.
             slug: Optional URL-friendly slug. If not provided, auto-generated from name.
             short_code: Globally unique short code for direct sharing.
             created_from_template_id: Optional template ID this board was created from.
