@@ -20,6 +20,7 @@ class GameRepository(BaseRepository[Game, GameORM]):
     SORTABLE_FIELDS = {
         "id",
         "name",
+        "slug",
         "created_at",
         "updated_at",
     }
@@ -30,6 +31,7 @@ class GameRepository(BaseRepository[Game, GameORM]):
             id=GameID(orm.id),
             account_id=AccountID(orm.account_id),
             name=orm.name,
+            slug=orm.slug,
             steam_app_id=orm.steam_app_id,
             default_board_id=BoardID(orm.default_board_id) if orm.default_board_id else None,
             anti_cheat_enabled=orm.anti_cheat_enabled,
@@ -44,6 +46,7 @@ class GameRepository(BaseRepository[Game, GameORM]):
             id=entity.id.uuid,
             account_id=entity.account_id.uuid,
             name=entity.name,
+            slug=entity.slug,
             steam_app_id=entity.steam_app_id,
             default_board_id=entity.default_board_id.uuid if entity.default_board_id else None,
             anti_cheat_enabled=entity.anti_cheat_enabled,
@@ -55,6 +58,24 @@ class GameRepository(BaseRepository[Game, GameORM]):
     def _get_orm_class(self) -> type[GameORM]:
         """Get the ORM model class."""
         return GameORM
+
+    async def get_by_slug(self, slug: str) -> Game | None:
+        """Get game by slug (globally unique lookup).
+
+        Args:
+            slug: The game slug to search for.
+
+        Returns:
+            Game domain entity if found, None otherwise.
+        """
+        query = select(GameORM).where(
+            GameORM.slug == slug,
+            GameORM.deleted_at.is_(None),
+        )
+
+        result = await self.session.execute(query)
+        orm = result.scalar_one_or_none()
+        return self._to_domain(orm) if orm else None
 
     @overload
     async def filter(

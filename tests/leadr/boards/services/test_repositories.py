@@ -45,6 +45,7 @@ class TestBoardRepository:
             id=GameID(game_id),
             account_id=AccountID(account_id),
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
@@ -105,6 +106,7 @@ class TestBoardRepository:
             id=GameID(game_id),
             account_id=AccountID(account_id),
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
@@ -172,6 +174,7 @@ class TestBoardRepository:
             id=GameID(game_id),
             account_id=AccountID(account_id),
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
@@ -237,6 +240,7 @@ class TestBoardRepository:
             id=GameID(game_id),
             account_id=AccountID(account_id),
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
@@ -301,6 +305,7 @@ class TestBoardRepository:
             id=GameID(game_id),
             account_id=AccountID(account_id),
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
@@ -359,6 +364,7 @@ class TestBoardRepository:
             id=GameID(game_id),
             account_id=AccountID(account_id),
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
@@ -445,6 +451,7 @@ class TestBoardRepository:
             id=GameID(game1_id),
             account_id=AccountID(account1_id),
             name="Game 1",
+            slug="game-1",
             created_at=now,
             updated_at=now,
         )
@@ -452,6 +459,7 @@ class TestBoardRepository:
             id=GameID(game2_id),
             account_id=AccountID(account2_id),
             name="Game 2",
+            slug="game-2",
             created_at=now,
             updated_at=now,
         )
@@ -526,6 +534,7 @@ class TestBoardRepository:
             id=GameID(game_id),
             account_id=AccountID(account_id),
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
@@ -583,6 +592,7 @@ class TestBoardRepository:
             id=GameID(game_id),
             account_id=AccountID(account_id),
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )
@@ -669,6 +679,7 @@ class TestBoardRepository:
             id=GameID(game1_id),
             account_id=AccountID(account1_id),
             name="Game 1",
+            slug="game-1",
             created_at=now,
             updated_at=now,
         )
@@ -676,6 +687,7 @@ class TestBoardRepository:
             id=GameID(game2_id),
             account_id=AccountID(account2_id),
             name="Game 2",
+            slug="game-2",
             created_at=now,
             updated_at=now,
         )
@@ -756,6 +768,7 @@ class TestBoardRepository:
             id=GameID(game_id),
             account_id=AccountID(account_id),
             name="Test Game",
+            slug="test-game",
             created_at=now,
             updated_at=now,
         )

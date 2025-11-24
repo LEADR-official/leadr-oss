@@ -47,12 +47,15 @@ async def create_game(
         game = await service.create_game(
             account_id=request.account_id,
             name=request.name,
+            slug=request.slug,
             steam_app_id=request.steam_app_id,
             default_board_id=request.default_board_id,
             anti_cheat_enabled=request.anti_cheat_enabled,
         )
     except IntegrityError:
         raise HTTPException(status_code=404, detail="Account not found") from None
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
     return GameResponse.from_domain(game)
 
@@ -76,6 +79,38 @@ async def get_game(
         404: Game not found.
     """
     game = await service.get_by_id_or_raise(game_id)
+
+    # Check authorization
+    if not auth.has_access_to_account(game.account_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this game's account",
+        )
+
+    return GameResponse.from_domain(game)
+
+
+@router.get("/games/by-slug/{slug}", response_model=GameResponse)
+async def get_game_by_slug(
+    slug: str, service: GameServiceDep, auth: AdminAuthContextDep
+) -> GameResponse:
+    """Get a game by its slug (globally unique).
+
+    Args:
+        slug: The URL-friendly slug of the game.
+        service: Injected game service dependency.
+        auth: Authentication context with user info.
+
+    Returns:
+        GameResponse with full game details.
+
+    Raises:
+        403: User does not have access to this game's account.
+        404: Game not found.
+    """
+    game = await service.get_game_by_slug(slug)
+    if game is None:
+        raise HTTPException(status_code=404, detail=f"Game with slug '{slug}' not found")
 
     # Check authorization
     if not auth.has_access_to_account(game.account_id):

@@ -1,5 +1,7 @@
 """Game domain model."""
 
+import re
+
 from pydantic import Field, field_validator
 
 from leadr.common.domain.ids import AccountID, BoardID, GameID
@@ -26,6 +28,7 @@ class Game(Entity):
         frozen=True, description="ID of the account this game belongs to (immutable)"
     )
     name: str = Field(description="Name of the game")
+    slug: str = Field(description="URL-friendly slug for the game (globally unique)")
     steam_app_id: str | None = Field(
         default=None, description="Optional Steam App ID for platform integration"
     )
@@ -54,3 +57,30 @@ class Game(Entity):
         if not value or not value.strip():
             raise ValueError("Game name cannot be empty")
         return value.strip()
+
+    @field_validator("slug")
+    @classmethod
+    def validate_slug(cls, value: str) -> str:
+        """Validate slug format (lowercase alphanumeric with hyphens).
+
+        Args:
+            value: The slug to validate.
+
+        Returns:
+            The validated slug.
+
+        Raises:
+            ValueError: If slug format is invalid.
+        """
+        if not value:
+            raise ValueError("Game slug cannot be empty")
+        if len(value) < 2:
+            raise ValueError("Game slug must be at least 2 characters")
+        if len(value) > 50:
+            raise ValueError("Game slug must not exceed 50 characters")
+        if not re.match(r"^[a-z0-9]+(?:-[a-z0-9]+)*$", value):
+            raise ValueError(
+                "Game slug must be lowercase alphanumeric with hyphens, "
+                "and cannot start or end with a hyphen"
+            )
+        return value
