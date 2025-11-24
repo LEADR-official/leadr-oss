@@ -323,6 +323,7 @@ async def test_board(db_session: AsyncSession, test_account: Account, test_game)
         account_id=test_account.id,
         game_id=test_game.id,
         name="Test Board",
+        slug="test-board",
         icon="trophy",
         short_code=f"TEST{str(board_id.uuid)[:6]}".upper(),
         unit="points",

@@ -15,16 +15,16 @@ from leadr.boards.services.short_code_generator import (
 class TestGenerateShortCode:
     """Tests for generate_short_code function."""
 
-    def test_generates_8_character_code(self):
-        """Test that generated code is exactly 8 characters long."""
+    def test_generates_5_character_code(self):
+        """Test that generated code is exactly 5 characters long."""
         code = generate_short_code()
-        assert len(code) == 8
+        assert len(code) == 5
 
     def test_generates_alphanumeric_code(self):
         """Test that generated code contains only uppercase letters and digits."""
         code = generate_short_code()
         # Should only contain uppercase letters and digits (no special chars)
-        assert re.match(r"^[A-Z0-9]{8}$", code)
+        assert re.match(r"^[A-Z0-9]{5}$", code)
 
     def test_generates_url_safe_code(self):
         """Test that generated code is URL-safe (no special characters)."""
@@ -36,7 +36,6 @@ class TestGenerateShortCode:
     def test_generates_different_codes(self):
         """Test that multiple calls generate different codes."""
         codes = {generate_short_code() for _ in range(100)}
-        # With 32^8 possible codes, we should never see duplicates in 100 tries
         assert len(codes) == 100
 
     def test_no_ambiguous_characters(self):
@@ -47,7 +46,7 @@ class TestGenerateShortCode:
         for code in codes:
             # If we decide to exclude ambiguous chars, they shouldn't appear
             # For now, we'll test that the code is readable
-            assert len(code) == 8
+            assert len(code) == 5
 
 
 class TestGenerateUniqueShortCode:

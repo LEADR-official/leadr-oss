@@ -139,6 +139,7 @@ async def board_orm(
         account_id=account_orm.id,  # Raw UUID
         game_id=game_orm.id,  # Raw UUID
         name="Test Board",
+        slug="test-board",
         icon="trophy",
         short_code="TEST01",
         unit="points",

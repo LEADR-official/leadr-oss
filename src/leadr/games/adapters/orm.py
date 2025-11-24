@@ -29,7 +29,8 @@ class GameORM(Base):
         nullable=False,
         index=True,
     )
-    name: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    # slug: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     steam_app_id: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     default_board_id: Mapped[UUID | None] = mapped_column(nullable=True, default=None)
     anti_cheat_enabled: Mapped[bool] = mapped_column(nullable=False, default=True)
