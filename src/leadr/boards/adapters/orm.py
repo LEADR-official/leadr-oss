@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+import sqlalchemy as sa
 from sqlalchemy import ARRAY, Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -55,6 +56,9 @@ class BoardORM(Base):
     short_code: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     unit: Mapped[str | None] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_published: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=sa.text("true")
+    )
     sort_direction: Mapped[str] = mapped_column(String, nullable=False)
     keep_strategy: Mapped[str] = mapped_column(String, nullable=False)
     created_from_template_id: Mapped[UUID | None] = mapped_column(nullable=True, default=None)
@@ -117,6 +121,9 @@ class BoardTemplateORM(Base):
     )
     next_run_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_published: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=sa.text("true")
+    )
 
     # Relationships
     account: Mapped["AccountORM"] = relationship("AccountORM")  # type: ignore[name-defined]
@@ -151,6 +158,7 @@ class BoardTemplateORM(Base):
             config=self.config,
             next_run_at=self.next_run_at,
             is_active=self.is_active,
+            is_published=self.is_published,
             created_at=self.created_at,
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
@@ -186,6 +194,7 @@ class BoardTemplateORM(Base):
             config=entity.config,
             next_run_at=entity.next_run_at,
             is_active=entity.is_active,
+            is_published=entity.is_published,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,

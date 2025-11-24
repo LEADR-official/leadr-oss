@@ -84,6 +84,9 @@ class BoardTemplate(Entity):
         description="Next scheduled time to create a board from this template"
     )
     is_active: bool = Field(description="Whether the template is currently active")
+    is_published: bool = Field(
+        description="Whether boards created from this template should be published", default=True
+    )
 
     @field_validator("name")
     @classmethod

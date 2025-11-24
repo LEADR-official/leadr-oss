@@ -38,6 +38,7 @@ class TestBoardTemplateORM:
             config={"custom": "value"},
             next_run_at=next_run_at,
             is_active=True,
+            is_published=True,
             created_at=now,
             updated_at=now,
             deleted_at=None,
@@ -63,6 +64,7 @@ class TestBoardTemplateORM:
         assert domain.config == {"custom": "value"}
         assert domain.next_run_at == next_run_at
         assert domain.is_active is True
+        assert domain.is_published is True
         assert domain.created_at == now
         assert domain.updated_at == now
         assert domain.deleted_at is None
@@ -93,6 +95,7 @@ class TestBoardTemplateORM:
             config={},
             next_run_at=next_run_at,
             is_active=True,
+            is_published=True,
             created_at=now,
             updated_at=now,
             deleted_at=None,
@@ -111,6 +114,7 @@ class TestBoardTemplateORM:
         assert domain.ends_at is None
         assert domain.tags == []
         assert domain.config == {}
+        assert domain.is_published is True
 
     def test_board_template_domain_to_orm_with_all_fields(self):
         """Test converting domain entity to ORM model with all fields."""
@@ -225,6 +229,7 @@ class TestBoardTemplateORM:
             },
             next_run_at=next_run_at,
             is_active=True,
+            is_published=True,
             created_at=now,
             updated_at=now,
             deleted_at=None,

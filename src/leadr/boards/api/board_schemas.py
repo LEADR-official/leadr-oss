@@ -27,6 +27,9 @@ class BoardCreateRequest(BaseModel):
         description="Unit of measurement for scores (e.g., 'seconds', 'points'). Optional",
     )
     is_active: bool = Field(default=True, description="Whether the board is currently active")
+    is_published: bool = Field(
+        default=True, description="Whether the board is published and visible on public web views"
+    )
     sort_direction: SortDirection = Field(
         default=SortDirection.DESCENDING, description="Direction to sort scores"
     )
@@ -59,6 +62,7 @@ class BoardUpdateRequest(BaseModel):
     short_code: str | None = Field(default=None, description="Updated short code")
     unit: str | None = Field(default=None, description="Updated unit of measurement")
     is_active: bool | None = Field(default=None, description="Updated active status")
+    is_published: bool | None = Field(default=None, description="Updated published status")
     sort_direction: SortDirection | None = Field(default=None, description="Updated sort direction")
     keep_strategy: KeepStrategy | None = Field(default=None, description="Updated keep strategy")
     created_from_template_id: BoardTemplateID | None = Field(
@@ -83,6 +87,9 @@ class BoardResponse(BaseModel):
     short_code: str = Field(description="Globally unique short code for direct sharing")
     unit: str | None = Field(description="Unit of measurement for scores, or null")
     is_active: bool = Field(description="Whether the board is currently active")
+    is_published: bool = Field(
+        description="Whether the board is published and visible on public web views"
+    )
     sort_direction: SortDirection = Field(description="Direction to sort scores")
     keep_strategy: KeepStrategy = Field(description="Strategy for keeping scores from same user")
     created_from_template_id: BoardTemplateID | None = Field(
@@ -121,6 +128,7 @@ class BoardResponse(BaseModel):
             short_code=board.short_code,
             unit=board.unit,
             is_active=board.is_active,
+            is_published=board.is_published,
             sort_direction=board.sort_direction,
             keep_strategy=board.keep_strategy,
             created_from_template_id=board.created_from_template_id,

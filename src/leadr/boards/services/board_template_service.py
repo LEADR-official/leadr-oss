@@ -80,6 +80,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         repeat_interval: str,
         next_run_at: datetime,
         is_active: bool,
+        is_published: bool = True,
         name_template: str | None = None,
         series: str | None = None,
         icon: str | None = "fa-crown",
@@ -153,6 +154,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             config=config or {},
             next_run_at=next_run_at,
             is_active=is_active,
+            is_published=is_published,
         )
 
         return await self.repository.create(template)
@@ -250,6 +252,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         config: dict[str, Any] | None = None,
         next_run_at: datetime | None = None,
         is_active: bool | None = None,
+        is_published: bool | None = None,
     ) -> BoardTemplate:
         """Update board template fields.
 
@@ -307,6 +310,8 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             template.next_run_at = next_run_at
         if is_active is not None:
             template.is_active = is_active
+        if is_published is not None:
+            template.is_published = is_published
 
         return await self.repository.update(template)
 

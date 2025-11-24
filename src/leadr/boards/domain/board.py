@@ -57,6 +57,9 @@ class Board(Entity):
         description="Unit of measurement for scores (e.g., 'seconds', 'points')", default=None
     )
     is_active: bool = Field(description="Whether the board is currently active", default=True)
+    is_published: bool = Field(
+        description="Whether the board is published and visible on public web views", default=True
+    )
     sort_direction: SortDirection = Field(
         description="Direction to sort scores (ascending/descending)",
         default=SortDirection.DESCENDING,

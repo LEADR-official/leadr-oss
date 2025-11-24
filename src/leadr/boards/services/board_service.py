@@ -44,6 +44,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         icon: str | None = "fa-crown",
         unit: str | None = None,
         is_active: bool = True,
+        is_published: bool = True,
         sort_direction: SortDirection = SortDirection.DESCENDING,
         keep_strategy: KeepStrategy = KeepStrategy.ALL,
         slug: str | None = None,
@@ -63,6 +64,8 @@ class BoardService(BaseService[Board, BoardRepository]):
             icon: Icon identifier for the board. Defaults to "fa-crown".
             unit: Unit of measurement for scores. Defaults to None.
             is_active: Whether the board is currently active. Defaults to True.
+            is_published: Whether the board is published and visible on public web views.
+                Defaults to True.
             sort_direction: Direction to sort scores. Defaults to DESCENDING.
             keep_strategy: Strategy for keeping multiple scores from same user. Defaults to ALL.
             slug: Optional URL-friendly slug. If not provided, auto-generated from name.
@@ -142,6 +145,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             short_code=short_code,
             unit=unit,
             is_active=is_active,
+            is_published=is_published,
             sort_direction=sort_direction,
             keep_strategy=keep_strategy,
             created_from_template_id=created_from_template_id,
@@ -205,6 +209,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             icon=template.icon,
             unit=template.unit,
             is_active=True,  # New boards from templates are always active
+            is_published=template.is_published,
             sort_direction=template.sort_direction,
             keep_strategy=template.keep_strategy,
             created_from_template_id=template.id,
@@ -252,6 +257,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         self,
         account_id: AccountID | None = None,
         code: str | None = None,
+        is_published: bool | None = None,
         pagination: None = None,
     ) -> list[Board]: ...
 
@@ -260,6 +266,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         self,
         account_id: AccountID | None = None,
         code: str | None = None,
+        is_published: bool | None = None,
         pagination: PaginationParams = ...,
     ) -> PaginatedResult[Board]: ...
 
@@ -267,6 +274,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         self,
         account_id: AccountID | None = None,
         code: str | None = None,
+        is_published: bool | None = None,
         pagination: PaginationParams | None = None,
     ) -> list[Board] | PaginatedResult[Board]:
         """List boards with optional filtering by account_id and/or code.
@@ -274,13 +282,14 @@ class BoardService(BaseService[Board, BoardRepository]):
         Args:
             account_id: Optional account ID to filter by
             code: Optional short code to filter by
+            is_published: Optional filter for published status
             pagination: Optional pagination parameters
 
         Returns:
             List of Board entities if no pagination, PaginatedResult if pagination provided.
         """
         return await self.repository.list_boards(
-            account_id=account_id, code=code, pagination=pagination
+            account_id=account_id, code=code, is_published=is_published, pagination=pagination
         )
 
     async def update_board(
@@ -291,6 +300,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         short_code: str | None = None,
         unit: str | None = None,
         is_active: bool | None = None,
+        is_published: bool | None = None,
         sort_direction: SortDirection | None = None,
         keep_strategy: KeepStrategy | None = None,
         created_from_template_id: BoardTemplateID | None = None,
@@ -308,6 +318,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             short_code: New short_code, if provided
             unit: New unit, if provided
             is_active: New is_active status, if provided
+            is_published: New is_published status, if provided
             sort_direction: New sort_direction, if provided
             keep_strategy: New keep_strategy, if provided
             created_from_template_id: New created_from_template_id, if provided
@@ -334,6 +345,8 @@ class BoardService(BaseService[Board, BoardRepository]):
             board.unit = unit
         if is_active is not None:
             board.is_active = is_active
+        if is_published is not None:
+            board.is_published = is_published
         if sort_direction is not None:
             board.sort_direction = sort_direction
         if keep_strategy is not None:

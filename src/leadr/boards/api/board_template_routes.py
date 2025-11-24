@@ -57,6 +57,7 @@ async def create_board_template(
             repeat_interval=request.repeat_interval,
             next_run_at=request.next_run_at,
             is_active=request.is_active,
+            is_published=request.is_published,
             name_template=request.name_template,
             series=request.series,
             icon=request.icon,
@@ -225,6 +226,7 @@ async def update_board_template(
         config=request.config,
         next_run_at=request.next_run_at,
         is_active=request.is_active,
+        is_published=request.is_published,
     )
 
     return BoardTemplateResponse.from_domain(template)
