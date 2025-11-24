@@ -140,7 +140,7 @@ class JamCodeService:
         Returns:
             List of all jam codes.
         """
-        return await self.jam_code_repository.list()
+        return await self.jam_code_repository.filter()
 
     async def update_jam_code(
         self,

@@ -42,7 +42,7 @@ async def get_verification_service(
     Returns:
         VerificationService instance.
     """
-    return VerificationService(db, settings, email_service)
+    return VerificationService(db, settings, email_service)  # type: ignore[arg-type]
 
 
 VerificationServiceDep = Annotated[VerificationService, Depends(get_verification_service)]
@@ -88,7 +88,7 @@ async def get_registration_service(
     """
     return RegistrationService(
         db,
-        settings,
+        settings,  # type: ignore[arg-type]
         account_service,
         user_service,
         api_key_service,

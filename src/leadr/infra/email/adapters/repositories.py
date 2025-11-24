@@ -1,5 +1,8 @@
 """Email repository for database operations."""
 
+from typing import Any
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.common.repositories import BaseRepository
@@ -29,16 +32,16 @@ class EmailRepository(BaseRepository[Email, EmailORM]):
         """
         return orm.to_domain()
 
-    def _to_orm(self, domain: Email) -> EmailORM:
+    def _to_orm(self, entity: Email) -> EmailORM:
         """Convert domain entity to ORM model.
 
         Args:
-            domain: Domain entity.
+            entity: Domain entity.
 
         Returns:
             ORM model instance.
         """
-        return EmailORM.from_domain(domain)
+        return EmailORM.from_domain(entity)
 
     def _get_orm_class(self) -> type[EmailORM]:
         """Get the ORM class for this repository.
@@ -47,3 +50,25 @@ class EmailRepository(BaseRepository[Email, EmailORM]):
             ORM class.
         """
         return EmailORM
+
+    async def filter(self, account_id: Any | None = None, **kwargs: Any) -> list[Email]:
+        """Filter emails by criteria.
+
+        Args:
+            account_id: Not used for emails (top-level entity).
+            **kwargs: Filter parameters (to, status, etc.)
+
+        Returns:
+            List of matching Email entities.
+        """
+        query = select(EmailORM)
+
+        # Apply filters based on kwargs
+        if "to" in kwargs:
+            query = query.where(EmailORM.to == kwargs["to"])
+        if "status" in kwargs:
+            query = query.where(EmailORM.status == kwargs["status"])
+
+        result = await self.session.execute(query)
+        orm_models = result.scalars().all()
+        return [self._to_domain(orm) for orm in orm_models]

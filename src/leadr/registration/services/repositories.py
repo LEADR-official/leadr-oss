@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -34,6 +35,27 @@ class VerificationCodeRepository(BaseRepository[VerificationCode, VerificationCo
         """Get the ORM model class."""
         return VerificationCodeORM
 
+    async def filter(self, account_id: Any | None = None, **kwargs: Any) -> list[VerificationCode]:
+        """Filter verification codes by criteria.
+
+        Args:
+            account_id: Not used for verification codes (top-level entity).
+            **kwargs: Filter parameters (email, status, etc.)
+
+        Returns:
+            List of matching VerificationCode entities.
+        """
+        query = select(VerificationCodeORM)
+
+        if "email" in kwargs:
+            query = query.where(VerificationCodeORM.email == kwargs["email"])
+        if "status" in kwargs:
+            query = query.where(VerificationCodeORM.status == kwargs["status"])
+
+        result = await self.session.execute(query)
+        orm_models = result.scalars().all()
+        return [self._to_domain(orm) for orm in orm_models]
+
     async def find_valid_code_by_email(self, email: str, code: str) -> VerificationCode | None:
         """Find a valid (pending) verification code by email and code value.
 
@@ -49,7 +71,7 @@ class VerificationCodeRepository(BaseRepository[VerificationCode, VerificationCo
             VerificationCodeORM.code == code.upper(),
             VerificationCodeORM.status == VerificationCodeStatusEnum.PENDING,
         )
-        result = await self.db.execute(query)
+        result = await self.session.execute(query)
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
@@ -69,13 +91,13 @@ class VerificationCodeRepository(BaseRepository[VerificationCode, VerificationCo
             )
             .with_for_update()
         )
-        result = await self.db.execute(query)
+        result = await self.session.execute(query)
         codes = result.scalars().all()
 
         for code_orm in codes:
             code_orm.status = VerificationCodeStatusEnum.EXPIRED
 
-        await self.db.flush()
+        await self.session.flush()
 
 
 class JamCodeRepository(BaseRepository[JamCode, JamCodeORM]):
@@ -93,6 +115,25 @@ class JamCodeRepository(BaseRepository[JamCode, JamCodeORM]):
         """Get the ORM model class."""
         return JamCodeORM
 
+    async def filter(self, account_id: Any | None = None, **kwargs: Any) -> list[JamCode]:
+        """Filter jam codes by criteria.
+
+        Args:
+            account_id: Not used for jam codes (top-level entity).
+            **kwargs: Filter parameters (code, etc.)
+
+        Returns:
+            List of matching JamCode entities.
+        """
+        query = select(JamCodeORM)
+
+        if "code" in kwargs:
+            query = query.where(JamCodeORM.code == kwargs["code"].upper())
+
+        result = await self.session.execute(query)
+        orm_models = result.scalars().all()
+        return [self._to_domain(orm) for orm in orm_models]
+
     async def find_by_code(self, code: str) -> JamCode | None:
         """Find a jam code by its code value.
 
@@ -103,7 +144,7 @@ class JamCodeRepository(BaseRepository[JamCode, JamCodeORM]):
             The jam code if found, None otherwise.
         """
         query = select(JamCodeORM).where(JamCodeORM.code == code.upper())
-        result = await self.db.execute(query)
+        result = await self.session.execute(query)
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
@@ -123,6 +164,25 @@ class JamCodeRedemptionRepository(BaseRepository[JamCodeRedemption, JamCodeRedem
         """Get the ORM model class."""
         return JamCodeRedemptionORM
 
+    async def filter(self, account_id: Any | None = None, **kwargs: Any) -> list[JamCodeRedemption]:
+        """Filter jam code redemptions by criteria.
+
+        Args:
+            account_id: Optional account ID to filter by.
+            **kwargs: Additional filter parameters.
+
+        Returns:
+            List of matching JamCodeRedemption entities.
+        """
+        query = select(JamCodeRedemptionORM)
+
+        if account_id:
+            query = query.where(JamCodeRedemptionORM.account_id == account_id)
+
+        result = await self.session.execute(query)
+        orm_models = result.scalars().all()
+        return [self._to_domain(orm) for orm in orm_models]
+
     async def find_by_account(self, account_id: AccountID) -> list[JamCodeRedemption]:
         """Find all jam code redemptions for an account.
 
@@ -135,7 +195,7 @@ class JamCodeRedemptionRepository(BaseRepository[JamCodeRedemption, JamCodeRedem
         query = select(JamCodeRedemptionORM).where(
             JamCodeRedemptionORM.account_id == account_id.uuid
         )
-        result = await self.db.execute(query)
+        result = await self.session.execute(query)
         orms = result.scalars().all()
         return [self._to_domain(orm) for orm in orms]
 
@@ -153,5 +213,5 @@ class JamCodeRedemptionRepository(BaseRepository[JamCodeRedemption, JamCodeRedem
             JamCodeRedemptionORM.account_id == account_id.uuid,
             JamCodeRedemptionORM.jam_code_id == jam_code_id,
         )
-        result = await self.db.execute(query)
+        result = await self.session.execute(query)
         return result.scalar_one_or_none() is not None

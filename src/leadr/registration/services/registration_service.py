@@ -100,7 +100,7 @@ class RegistrationService:
         )
 
         # Create API key
-        plain_api_key, api_key = await self.api_key_service.create_api_key(
+        api_key, plain_api_key = await self.api_key_service.create_api_key(
             account_id=account.id,
             user_id=user.id,
             name="CLI API Key",
