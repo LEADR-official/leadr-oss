@@ -203,7 +203,7 @@ class TestCompleteRegistration:
 
         assert response.status_code == 201
         data = response.json()
-        assert data["account_id"] == str(mock_account.id.uuid)
+        assert data["account_id"] == str(mock_account.id)
         assert data["account_slug"] == "test-account"
         assert data["api_key"] == "ldr_test_key_123"
 
