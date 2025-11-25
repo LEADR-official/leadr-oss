@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 import jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.config import Settings
+from leadr.config import settings
 from leadr.infra.email import EmailService
 from leadr.registration.domain.verification_code import VerificationCode
 from leadr.registration.services.repositories import VerificationCodeRepository
@@ -15,16 +15,14 @@ from leadr.registration.services.repositories import VerificationCodeRepository
 class VerificationService:
     """Service for managing email verification codes."""
 
-    def __init__(self, db: AsyncSession, settings: Settings, email_service: EmailService):
+    def __init__(self, db: AsyncSession, email_service: EmailService):
         """Initialize the verification service.
 
         Args:
             db: Database session.
-            settings: Application settings.
             email_service: Email service for sending verification codes.
         """
         self.db = db
-        self.settings = settings
         self.email_service = email_service
         self.repository = VerificationCodeRepository(db)
 
@@ -42,7 +40,7 @@ class VerificationService:
         # Generate new verification code
         code = self._generate_code()
         expires_at = datetime.now(UTC) + timedelta(
-            seconds=self.settings.VERIFICATION_CODE_EXPIRY_SECONDS
+            seconds=settings.VERIFICATION_CODE_EXPIRY_SECONDS
         )
 
         # Create verification code entity
@@ -110,7 +108,7 @@ class VerificationService:
         try:
             payload = jwt.decode(
                 token,
-                self.settings.API_KEY_SECRET,
+                settings.API_KEY_SECRET,
                 algorithms=["HS256"],
             )
 
@@ -148,7 +146,7 @@ class VerificationService:
             A JWT token valid for the configured duration.
         """
         now = datetime.now(UTC)
-        expires_at = now + timedelta(seconds=self.settings.VERIFICATION_TOKEN_EXPIRY_SECONDS)
+        expires_at = now + timedelta(seconds=settings.VERIFICATION_TOKEN_EXPIRY_SECONDS)
 
         payload = {
             "email": email,
@@ -157,5 +155,5 @@ class VerificationService:
             "exp": expires_at.timestamp(),
         }
 
-        token = jwt.encode(payload, self.settings.API_KEY_SECRET, algorithm="HS256")
+        token = jwt.encode(payload, settings.API_KEY_SECRET, algorithm="HS256")
         return token

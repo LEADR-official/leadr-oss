@@ -8,7 +8,6 @@ from leadr.accounts.services.account_service import AccountService
 from leadr.accounts.services.user_service import UserService
 from leadr.auth.services.api_key_service import APIKeyService
 from leadr.common.utils.slug import generate_slug
-from leadr.config import Settings
 from leadr.infra.email import EmailService
 from leadr.registration.services.jam_code_service import JamCodeService
 from leadr.registration.services.verification_service import VerificationService
@@ -20,7 +19,6 @@ class RegistrationService:
     def __init__(
         self,
         db: AsyncSession,
-        settings: Settings,
         account_service: AccountService,
         user_service: UserService,
         api_key_service: APIKeyService,
@@ -32,7 +30,6 @@ class RegistrationService:
 
         Args:
             db: Database session.
-            settings: Application settings.
             account_service: Service for account operations.
             user_service: Service for user operations.
             api_key_service: Service for API key operations.
@@ -41,7 +38,6 @@ class RegistrationService:
             email_service: Service for sending emails.
         """
         self.db = db
-        self.settings = settings
         self.account_service = account_service
         self.user_service = user_service
         self.api_key_service = api_key_service

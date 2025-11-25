@@ -2,7 +2,9 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.config import settings
 from leadr.infra.email.adapters.mailgun import MailgunEmailProvider
+from leadr.infra.email.adapters.smtp import SMTPEmailProvider
 from leadr.infra.email.domain.exceptions import (
     EmailError,
     EmailSendError,
@@ -20,27 +22,31 @@ def create_email_service(
     """Create an email service with the specified or default provider.
 
     Args:
-        provider: Email provider instance. If None, uses MailgunEmailProvider.
+        provider: Email provider instance. If None, uses MailgunEmailProvider
+                 in production or SMTPEmailProvider in TEST environment.
         db: Optional database session for persisting email records.
 
     Returns:
         EmailService instance ready for use.
 
     Example:
-        # Use default Mailgun provider without database persistence
+        # Use default provider (Mailgun in prod, SMTP in test)
         email_service = create_email_service()
 
         # With database persistence
         email_service = create_email_service(db=session)
 
-        # Use custom provider (for testing)
+        # Use custom provider
         custom_provider = MyCustomEmailProvider()
         email_service = create_email_service(provider=custom_provider)
     """
     if provider is None:
-        provider = MailgunEmailProvider()
+        if settings.ENV == "TEST":
+            provider = SMTPEmailProvider()
+        else:
+            provider = MailgunEmailProvider()
 
-    return EmailService(provider=provider, db=db, validate_on_init=True)
+    return EmailService(provider=provider, db=db, validate_on_init=False)
 
 
 # Export main classes and functions for easy import
@@ -54,5 +60,6 @@ __all__ = [
     "EmailSendError",
     "EmailService",
     "MailgunEmailProvider",
+    "SMTPEmailProvider",
     "create_email_service",
 ]

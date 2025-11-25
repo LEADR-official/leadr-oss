@@ -103,11 +103,6 @@ class EmailService:
 
         logger.info("Sending email: %s\tTo: %s\nFrom: %s", subject, to, from_email)
 
-        # Short circuit so we never send from TEST
-        if settings.ENV == "TEST":
-            logger.warning("Not sending email from TEST env :)")
-            return {"status": "skipped", "reason": "test_environment"}
-
         try:
             response = self.provider.send(email)
             logger.debug(response)
@@ -153,10 +148,9 @@ class EmailService:
         from_email: str | None = None,
     ) -> dict[str, Any]:
         """Send a welcome email after successful LEADR registration."""
-        dashboard_url = f"https://leadr.gg/{account_slug}"
         subject = f"Welcome to LEADR, {account_name}!"
         template = self._load_template("welcome")
-        body = template.format(account_name=account_name, dashboard_url=dashboard_url)
+        body = template.format(account_name=account_name)
 
         return await self.send_email(
             to=to,

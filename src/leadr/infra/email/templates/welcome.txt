@@ -8,9 +8,9 @@ Next Steps:
 - Set up leaderboards
 - Start submitting scores!
 
-Dashboard: {dashboard_url}
-
-Need help? Check out our documentation at https://docs.leadr.gg
+Need help?
+- Check out our documentation: https://docs.leadr.gg
+- Join the Discord: https://discord.gg/RMUukcAxSZ
 
 ---
 LEADR - Cross-platform leaderboard backend for indie game developers

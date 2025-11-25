@@ -212,6 +212,51 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides.clear()
 
 
+@pytest_asyncio.fixture(scope="session")
+async def smtp_server():
+    """
+    Start an SMTP debugging server for testing email sending.
+
+    The server runs on localhost:1025 and captures all emails sent to it.
+    Emails are stored in memory and can be accessed via the `messages` attribute.
+
+    Yields:
+        A tuple of (server_controller, messages_list) where:
+        - server_controller: The aiosmtpd Controller instance
+        - messages_list: A list that collects all sent emails as (envelope, content) tuples
+    """
+    import asyncio
+
+    from aiosmtpd.controller import Controller
+
+    messages = []
+
+    class TestHandler:
+        """Handler that captures emails in memory."""
+
+        async def handle_DATA(self, server, session, envelope):  # noqa: N802
+            """Handle email data - store in messages list."""
+            messages.append(
+                {
+                    "envelope": envelope,
+                    "from": envelope.mail_from,
+                    "to": envelope.rcpt_tos,
+                    "data": envelope.content.decode("utf-8", errors="replace"),
+                }
+            )
+            return "250 Message accepted for delivery"
+
+    controller = Controller(TestHandler(), hostname="localhost", port=1025)
+    controller.start()
+
+    # Give server time to start
+    await asyncio.sleep(0.1)
+
+    yield controller, messages
+
+    controller.stop()
+
+
 @pytest_asyncio.fixture
 async def test_account(db_session: AsyncSession) -> Account:
     """Create a test account for use in tests.

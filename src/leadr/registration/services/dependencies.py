@@ -7,7 +7,6 @@ from fastapi import Depends
 from leadr.accounts.services.dependencies import AccountServiceDep, UserServiceDep
 from leadr.auth.services.dependencies import APIKeyServiceDep
 from leadr.common.dependencies import DatabaseSession
-from leadr.config import settings
 from leadr.infra.email import EmailService, create_email_service
 from leadr.registration.services.jam_code_service import JamCodeService
 from leadr.registration.services.registration_service import RegistrationService
@@ -42,7 +41,7 @@ async def get_verification_service(
     Returns:
         VerificationService instance.
     """
-    return VerificationService(db, settings, email_service)  # type: ignore[arg-type]
+    return VerificationService(db, email_service)
 
 
 VerificationServiceDep = Annotated[VerificationService, Depends(get_verification_service)]
@@ -88,7 +87,6 @@ async def get_registration_service(
     """
     return RegistrationService(
         db,
-        settings,  # type: ignore[arg-type]
         account_service,
         user_service,
         api_key_service,

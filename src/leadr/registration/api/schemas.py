@@ -52,7 +52,6 @@ class CompleteRegistrationResponse(BaseModel):
     account_id: UUID = Field(description="ID of the created account")
     account_slug: str = Field(description="URL slug of the account")
     api_key: str = Field(description="API key for authentication")
-    dashboard_url: str = Field(description="URL to the account dashboard")
 
 
 # Admin Jam Code Management Schemas

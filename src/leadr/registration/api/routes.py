@@ -105,13 +105,10 @@ async def complete_registration(
             detail=str(e),
         ) from None
 
-    dashboard_url = f"https://leadr.gg/{account.slug}"
-
     return CompleteRegistrationResponse(
         account_id=account.id.uuid,
         account_slug=account.slug,
         api_key=api_key,
-        dashboard_url=dashboard_url,
     )
 
 
