@@ -98,6 +98,7 @@ async def complete_registration(
             account_name=request.account_name,
             account_slug=request.account_slug,
             jam_code=request.jam_code,
+            display_name=request.display_name,
         )
     except ValueError as e:
         raise HTTPException(
@@ -105,11 +106,7 @@ async def complete_registration(
             detail=str(e),
         ) from None
 
-    return CompleteRegistrationResponse(
-        account_id=account.id.uuid,
-        account_slug=account.slug,
-        api_key=api_key,
-    )
+    return CompleteRegistrationResponse.from_domain(account, user, api_key)
 
 
 @public_router.post("/resend-code", status_code=status.HTTP_200_OK)

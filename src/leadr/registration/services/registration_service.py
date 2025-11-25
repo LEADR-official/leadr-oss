@@ -51,6 +51,7 @@ class RegistrationService:
         account_name: str,
         account_slug: str | None = None,
         jam_code: str | None = None,
+        display_name: str | None = None,
     ) -> tuple[Account, User, str]:
         """Complete the registration process and create account, user, and API key.
 
@@ -59,6 +60,7 @@ class RegistrationService:
             account_name: Name for the new account.
             account_slug: Optional slug (will be auto-generated if not provided).
             jam_code: Optional jam code for promotional features.
+            display_name: Optional display name (will use email prefix if not provided).
 
         Returns:
             Tuple of (Account, User, plain_api_key).
@@ -88,11 +90,17 @@ class RegistrationService:
             slug=account_slug,
         )
 
+        # Determine display name: use provided or fall back to email prefix
+        # Treat None, empty string, or whitespace-only as "not provided"
+        user_display_name = (
+            display_name if display_name and display_name.strip() else email.split("@")[0]
+        )
+
         # Create user
         user = await self.user_service.create_user(
             account_id=account.id,
             email=email,
-            display_name=email.split("@")[0],  # Use email prefix as display name
+            display_name=user_display_name,
         )
 
         # Create API key

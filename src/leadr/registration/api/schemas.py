@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 # Public Registration Schemas
 
@@ -44,6 +44,18 @@ class CompleteRegistrationRequest(BaseModel):
         default=None, description="Optional URL slug (auto-generated if not provided)"
     )
     jam_code: str | None = Field(default=None, description="Optional jam/promo code")
+    display_name: str | None = Field(
+        default=None,
+        description="Optional display name for user (auto-generated from email if not provided)",
+    )
+
+    @field_validator("display_name")
+    @classmethod
+    def normalize_display_name(cls, value: str | None) -> str | None:
+        """Convert empty/whitespace strings to None."""
+        if value is not None and not value.strip():
+            return None
+        return value
 
 
 class CompleteRegistrationResponse(BaseModel):
@@ -52,6 +64,26 @@ class CompleteRegistrationResponse(BaseModel):
     account_id: UUID = Field(description="ID of the created account")
     account_slug: str = Field(description="URL slug of the account")
     api_key: str = Field(description="API key for authentication")
+    display_name: str = Field(description="Display name of the created user")
+
+    @classmethod
+    def from_domain(cls, account, user, api_key: str) -> "CompleteRegistrationResponse":
+        """Create response from domain entities.
+
+        Args:
+            account: Account domain entity.
+            user: User domain entity.
+            api_key: API key string.
+
+        Returns:
+            CompleteRegistrationResponse instance.
+        """
+        return cls(
+            account_id=account.id.uuid,
+            account_slug=account.slug,
+            api_key=api_key,
+            display_name=user.display_name,
+        )
 
 
 # Admin Jam Code Management Schemas

@@ -350,7 +350,7 @@ class TestRegistrationServiceCompleteRegistration:
     async def test_complete_registration_uses_email_prefix_as_display_name(
         self, db_session: AsyncSession
     ):
-        """Test that display name is set from email prefix."""
+        """Test that display name is set from email prefix when not provided."""
         mock_account_service = AsyncMock()
         mock_user_service = AsyncMock()
         mock_api_key_service = AsyncMock()
@@ -391,11 +391,163 @@ class TestRegistrationServiceCompleteRegistration:
             verification_token="valid_token",
             account_name="Test Account",
             account_slug="test-account",
+            display_name=None,  # Explicitly not provided
         )
 
         # Verify display name was set from email prefix
         create_user_call = mock_user_service.create_user.call_args
         assert create_user_call.kwargs["display_name"] == "john.doe"
+
+    async def test_complete_registration_with_custom_display_name(self, db_session: AsyncSession):
+        """Test that custom display name is used when provided."""
+        mock_account_service = AsyncMock()
+        mock_user_service = AsyncMock()
+        mock_api_key_service = AsyncMock()
+        mock_verification_service = Mock()
+        mock_jam_code_service = AsyncMock()
+        mock_email_service = AsyncMock()
+
+        mock_verification_service.validate_verification_token.return_value = "john.doe@example.com"
+
+        mock_account = Account(
+            id=AccountID(),
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_account_service.create_account.return_value = mock_account
+
+        mock_user = User(
+            id=UserID(),
+            account_id=mock_account.id,
+            email="john.doe@example.com",
+            display_name="Custom Name",
+        )
+        mock_user_service.create_user.return_value = mock_user
+        mock_api_key_service.create_api_key.return_value = (Mock(), "ldr_key")
+
+        service = RegistrationService(
+            db=db_session,
+            account_service=mock_account_service,
+            user_service=mock_user_service,
+            api_key_service=mock_api_key_service,
+            verification_service=mock_verification_service,
+            jam_code_service=mock_jam_code_service,
+            email_service=mock_email_service,
+        )
+
+        await service.complete_registration(
+            verification_token="valid_token",
+            account_name="Test Account",
+            account_slug="test-account",
+            display_name="Custom Name",
+        )
+
+        # Verify custom display name was used
+        create_user_call = mock_user_service.create_user.call_args
+        assert create_user_call.kwargs["display_name"] == "Custom Name"
+
+    async def test_complete_registration_with_empty_display_name_uses_email_prefix(
+        self, db_session: AsyncSession
+    ):
+        """Test that empty string display name falls back to email prefix."""
+        mock_account_service = AsyncMock()
+        mock_user_service = AsyncMock()
+        mock_api_key_service = AsyncMock()
+        mock_verification_service = Mock()
+        mock_jam_code_service = AsyncMock()
+        mock_email_service = AsyncMock()
+
+        mock_verification_service.validate_verification_token.return_value = "test@example.com"
+
+        mock_account = Account(
+            id=AccountID(),
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_account_service.create_account.return_value = mock_account
+
+        mock_user = User(
+            id=UserID(),
+            account_id=mock_account.id,
+            email="test@example.com",
+            display_name="test",
+        )
+        mock_user_service.create_user.return_value = mock_user
+        mock_api_key_service.create_api_key.return_value = (Mock(), "ldr_key")
+
+        service = RegistrationService(
+            db=db_session,
+            account_service=mock_account_service,
+            user_service=mock_user_service,
+            api_key_service=mock_api_key_service,
+            verification_service=mock_verification_service,
+            jam_code_service=mock_jam_code_service,
+            email_service=mock_email_service,
+        )
+
+        await service.complete_registration(
+            verification_token="valid_token",
+            account_name="Test Account",
+            account_slug="test-account",
+            display_name="",  # Empty string
+        )
+
+        # Verify display name was set from email prefix
+        create_user_call = mock_user_service.create_user.call_args
+        assert create_user_call.kwargs["display_name"] == "test"
+
+    async def test_complete_registration_with_whitespace_display_name_uses_email_prefix(
+        self, db_session: AsyncSession
+    ):
+        """Test that whitespace-only display name falls back to email prefix."""
+        mock_account_service = AsyncMock()
+        mock_user_service = AsyncMock()
+        mock_api_key_service = AsyncMock()
+        mock_verification_service = Mock()
+        mock_jam_code_service = AsyncMock()
+        mock_email_service = AsyncMock()
+
+        mock_verification_service.validate_verification_token.return_value = "test@example.com"
+
+        mock_account = Account(
+            id=AccountID(),
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_account_service.create_account.return_value = mock_account
+
+        mock_user = User(
+            id=UserID(),
+            account_id=mock_account.id,
+            email="test@example.com",
+            display_name="test",
+        )
+        mock_user_service.create_user.return_value = mock_user
+        mock_api_key_service.create_api_key.return_value = (Mock(), "ldr_key")
+
+        service = RegistrationService(
+            db=db_session,
+            account_service=mock_account_service,
+            user_service=mock_user_service,
+            api_key_service=mock_api_key_service,
+            verification_service=mock_verification_service,
+            jam_code_service=mock_jam_code_service,
+            email_service=mock_email_service,
+        )
+
+        await service.complete_registration(
+            verification_token="valid_token",
+            account_name="Test Account",
+            account_slug="test-account",
+            display_name="   ",  # Whitespace only
+        )
+
+        # Verify display name was set from email prefix
+        create_user_call = mock_user_service.create_user.call_args
+        assert create_user_call.kwargs["display_name"] == "test"
 
 
 @pytest.mark.asyncio

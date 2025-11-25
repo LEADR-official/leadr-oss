@@ -273,6 +273,133 @@ class TestCompleteRegistration:
 
         app.dependency_overrides.clear()
 
+    async def test_complete_registration_response_includes_display_name(self, client: AsyncClient):
+        """Test that registration response includes user display_name."""
+        mock_service = AsyncMock()
+        mock_account = Account(
+            id=AccountID(),
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_user = User(
+            id=UserID(),
+            account_id=mock_account.id,
+            email="john.doe@example.com",
+            display_name="john.doe",
+        )
+        mock_service.complete_registration.return_value = (
+            mock_account,
+            mock_user,
+            "ldr_key",
+        )
+
+        async def override_service():
+            return mock_service
+
+        app.dependency_overrides[get_registration_service] = override_service
+
+        response = await client.post(
+            "/register/complete",
+            json={
+                "verification_token": "valid_token",
+                "account_name": "Test Account",
+            },
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert "display_name" in data
+        assert data["display_name"] == "john.doe"
+
+        app.dependency_overrides.clear()
+
+    async def test_complete_registration_with_custom_display_name(self, client: AsyncClient):
+        """Test registration with custom display_name."""
+        mock_service = AsyncMock()
+        mock_account = Account(
+            id=AccountID(),
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_user = User(
+            id=UserID(),
+            account_id=mock_account.id,
+            email="test@example.com",
+            display_name="My Custom Name",
+        )
+        mock_service.complete_registration.return_value = (
+            mock_account,
+            mock_user,
+            "ldr_key",
+        )
+
+        async def override_service():
+            return mock_service
+
+        app.dependency_overrides[get_registration_service] = override_service
+
+        response = await client.post(
+            "/register/complete",
+            json={
+                "verification_token": "valid_token",
+                "account_name": "Test Account",
+                "display_name": "My Custom Name",
+            },
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["display_name"] == "My Custom Name"
+
+        # Verify service was called with display_name
+        mock_service.complete_registration.assert_called_once()
+        call_kwargs = mock_service.complete_registration.call_args.kwargs
+        assert call_kwargs["display_name"] == "My Custom Name"
+
+        app.dependency_overrides.clear()
+
+    async def test_complete_registration_without_display_name(self, client: AsyncClient):
+        """Test registration without display_name uses default."""
+        mock_service = AsyncMock()
+        mock_account = Account(
+            id=AccountID(),
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_user = User(
+            id=UserID(),
+            account_id=mock_account.id,
+            email="jane@example.com",
+            display_name="jane",  # Auto-generated from email
+        )
+        mock_service.complete_registration.return_value = (
+            mock_account,
+            mock_user,
+            "ldr_key",
+        )
+
+        async def override_service():
+            return mock_service
+
+        app.dependency_overrides[get_registration_service] = override_service
+
+        response = await client.post(
+            "/register/complete",
+            json={
+                "verification_token": "valid_token",
+                "account_name": "Test Account",
+            },
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["display_name"] == "jane"
+
+        app.dependency_overrides.clear()
+
 
 @pytest.mark.asyncio
 class TestResendVerificationCode:
