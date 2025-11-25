@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.main import app
@@ -397,6 +398,34 @@ class TestCompleteRegistration:
         assert response.status_code == 201
         data = response.json()
         assert data["display_name"] == "jane"
+
+        app.dependency_overrides.clear()
+
+    async def test_complete_registration_duplicate_email(self, client: AsyncClient):
+        """Test registration with already-registered email returns 409."""
+        mock_service = AsyncMock()
+        mock_service.complete_registration.side_effect = IntegrityError(
+            statement="INSERT INTO users",
+            params={},
+            orig=Exception("duplicate key value violates unique constraint"),
+        )
+
+        async def override_service():
+            return mock_service
+
+        app.dependency_overrides[get_registration_service] = override_service
+
+        response = await client.post(
+            "/register/complete",
+            json={
+                "verification_token": "valid_token",
+                "account_name": "Test Account",
+            },
+        )
+
+        assert response.status_code == 409
+        data = response.json()
+        assert data["error"] == "Email already registered"
 
         app.dependency_overrides.clear()
 

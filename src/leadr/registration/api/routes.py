@@ -3,6 +3,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.config import settings
@@ -104,6 +105,11 @@ async def complete_registration(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
+        ) from None
+    except IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered",
         ) from None
 
     return CompleteRegistrationResponse.from_domain(account, user, api_key)

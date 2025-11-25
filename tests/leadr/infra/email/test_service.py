@@ -316,10 +316,12 @@ class TestEmailServiceConvenienceMethods:
 
         service = EmailService(provider=mock_provider, db=db_session)
 
-        service._load_template = Mock(return_value="Welcome {account_name}!")
+        service._load_template = Mock(return_value="Welcome {display_name}!")
+        service._footer = ""
 
         response = await service.send_welcome_email(
             to="user@example.com",
+            user_name="Test User",
             account_name="TestCo",
             account_slug="testco",
         )
@@ -330,7 +332,7 @@ class TestEmailServiceConvenienceMethods:
         emails = await repository.filter()
         assert len(emails) == 1
         assert "Welcome to LEADR, TestCo!" in emails[0].subject
-        assert "TestCo" in emails[0].body
+        assert "Test User" in emails[0].body
         assert emails[0].priority == EmailPriority.NORMAL
 
     @patch("leadr.infra.email.service.settings")

@@ -1,10 +1,8 @@
 """Main FastAPI application."""
 
-import logging.config
+import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
-import yaml
 from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 
@@ -47,20 +45,7 @@ from leadr.scores.api.score_routes import client_router as score_client_router
 from leadr.scores.api.score_routes import router as score_router
 from leadr.scores.api.score_submission_meta_routes import router as score_submission_meta_router
 
-log_config_path = Path(__file__).parent / "logging.yaml"
-with log_config_path.open() as f:
-    log_config = yaml.safe_load(f)
-
-# Substitute app and env values into the format strings
-for formatter in log_config["formatters"].values():
-    if "fmt" in formatter:
-        formatter["fmt"] = formatter["fmt"].format(app=settings.APP, env=settings.ENV)
-
-logging.config.dictConfig(log_config)
 logger = logging.getLogger(__name__)
-if settings.DEBUG:
-    logger.setLevel(logging.DEBUG)
-logger.warning("Logging level is %s", logging.getLevelName(logger.level))
 
 
 @asynccontextmanager
@@ -92,21 +77,24 @@ async def lifespan(app: FastAPI):
 
     # Register and start background tasks
     scheduler = get_scheduler()
-    scheduler.add_task(
-        "process-due-templates",
-        process_due_templates,
-        interval_seconds=settings.BACKGROUND_TASK_TEMPLATE_INTERVAL,
-    )
-    scheduler.add_task(
-        "expire-boards",
-        expire_boards,
-        interval_seconds=settings.BACKGROUND_TASK_EXPIRE_INTERVAL,
-    )
-    scheduler.add_task(
-        "cleanup-expired-nonces",
-        cleanup_expired_nonces,
-        interval_seconds=settings.BACKGROUND_TASK_NONCE_CLEANUP_INTERVAL,
-    )
+
+    # Ensure we only run background tasks one API instance
+    if settings.ENABLE_ADMIN_API:
+        scheduler.add_task(
+            "process-due-templates",
+            process_due_templates,
+            interval_seconds=settings.BACKGROUND_TASK_TEMPLATE_INTERVAL,
+        )
+        scheduler.add_task(
+            "expire-boards",
+            expire_boards,
+            interval_seconds=settings.BACKGROUND_TASK_EXPIRE_INTERVAL,
+        )
+        scheduler.add_task(
+            "cleanup-expired-nonces",
+            cleanup_expired_nonces,
+            interval_seconds=settings.BACKGROUND_TASK_NONCE_CLEANUP_INTERVAL,
+        )
     await scheduler.start()
 
     yield

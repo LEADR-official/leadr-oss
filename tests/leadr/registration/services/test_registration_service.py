@@ -288,6 +288,7 @@ class TestRegistrationServiceCompleteRegistration:
         # Verify welcome email was sent
         mock_email_service.send_welcome_email.assert_called_once_with(
             to="test@example.com",
+            user_name="test",
             account_name="Test Account",
             account_slug="test-account",
         )

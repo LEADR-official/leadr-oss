@@ -40,6 +40,8 @@ class EmailService:
         if validate_on_init and not self.validate_provider_config():
             raise ValueError("Email provider configuration is invalid")
 
+        self._footer = self._load_template("footer")
+
     def _load_template(self, template_name: str) -> str:
         """Load email template from file with caching.
 
@@ -102,12 +104,17 @@ class EmailService:
             await self.db.commit()
 
         logger.info("Sending email: %s\tTo: %s\nFrom: %s", subject, to, from_email)
+        logger.debug("Email body:\n%s", body)
 
         try:
             response = self.provider.send(email)
             logger.debug(response)
+            provider_message_id = response.get("message_id", response.get("id"))
+            if provider_message_id is None:
+                raise EmailSendError("No message ID in provider response")
+
             email.mark_as_sent(
-                provider_message_id=response.get("message_id", response.get("id", "unknown")),
+                provider_message_id=provider_message_id,
                 provider_response=response,
             )
 
@@ -131,7 +138,7 @@ class EmailService:
         """Send a verification code email for LEADR registration."""
         subject = "Verify your LEADR account"
         template = self._load_template("verification_code")
-        body = template.format(code=code)
+        body = template.format(code=code, footer=self._footer)
 
         return await self.send_email(
             to=to,
@@ -143,6 +150,7 @@ class EmailService:
     async def send_welcome_email(
         self,
         to: str,
+        user_name: str,
         account_name: str,
         account_slug: str,
         from_email: str | None = None,
@@ -150,7 +158,9 @@ class EmailService:
         """Send a welcome email after successful LEADR registration."""
         subject = f"Welcome to LEADR, {account_name}!"
         template = self._load_template("welcome")
-        body = template.format(account_name=account_name)
+        body = template.format(
+            display_name=user_name, account_name=account_name, footer=self._footer
+        )
 
         return await self.send_email(
             to=to,
@@ -170,7 +180,7 @@ class EmailService:
     ) -> dict[str, Any]:
         """Send a notification email."""
         template = self._load_template("notification")
-        body = template.format(message=message)
+        body = template.format(message=message, footer=self._footer)
 
         return await self.send_email(
             to=to, subject=subject, body=body, from_email=from_email, priority=priority
