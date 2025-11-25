@@ -8,6 +8,4 @@ This code will expire in 10 minutes.
 
 If you didn't request this verification code, you can safely ignore this email.
 
----
-LEADR - Cross-platform leaderboard backend for indie game developers
-leadr.gg
+{footer}

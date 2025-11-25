@@ -1,9 +1,10 @@
 """API schemas for registration endpoints."""
 
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from leadr.common.domain.ids import AccountID, JamCodeID, JamCodeRedemptionID
 
 # Public Registration Schemas
 
@@ -61,7 +62,7 @@ class CompleteRegistrationRequest(BaseModel):
 class CompleteRegistrationResponse(BaseModel):
     """Response after completing registration."""
 
-    account_id: UUID = Field(description="ID of the created account")
+    account_id: AccountID = Field(description="ID of the created account")
     account_slug: str = Field(description="URL slug of the account")
     api_key: str = Field(description="API key for authentication")
     display_name: str = Field(description="Display name of the created user")
@@ -114,7 +115,7 @@ class UpdateJamCodeRequest(BaseModel):
 class JamCodeResponse(BaseModel):
     """Response representing a jam code."""
 
-    id: UUID
+    id: JamCodeID
     code: str
     description: str
     features: dict
@@ -152,9 +153,9 @@ class JamCodeResponse(BaseModel):
 class JamCodeRedemptionResponse(BaseModel):
     """Response representing a jam code redemption."""
 
-    id: UUID
-    jam_code_id: UUID
-    account_id: UUID
+    id: JamCodeRedemptionID
+    jam_code_id: JamCodeID
+    account_id: AccountID
     redeemed_at: datetime
     meta: dict
 

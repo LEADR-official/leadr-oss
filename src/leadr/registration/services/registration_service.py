@@ -122,6 +122,7 @@ class RegistrationService:
         try:
             await self.email_service.send_welcome_email(
                 to=email,
+                user_name=user.display_name,
                 account_name=account_name,
                 account_slug=account_slug,
             )

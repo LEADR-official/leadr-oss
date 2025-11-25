@@ -211,3 +211,15 @@ class EmailID(PrefixedID):
     """Email entity identifier."""
 
     prefix = "eml"
+
+
+class JamCodeID(PrefixedID):
+    """Jam Code entity identifier."""
+
+    prefix = "jam"
+
+
+class JamCodeRedemptionID(PrefixedID):
+    """Jam Code Redemption entity identifier."""
+
+    prefix = "red"

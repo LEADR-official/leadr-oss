@@ -1,6 +1,6 @@
-Welcome to LEADR, {account_name}!
+Welcome to LEADR, {user_name}!
 
-Your account has been successfully created. You're now ready to add leaderboards to your games!
+The {account_name} account has been successfully created. You're now ready to add leaderboards to your games!
 
 Next Steps:
 - Check your API key (stored securely in your CLI)
@@ -12,6 +12,4 @@ Need help?
 - Check out our documentation: https://docs.leadr.gg
 - Join the Discord: https://discord.gg/RMUukcAxSZ
 
----
-LEADR - Cross-platform leaderboard backend for indie game developers
-leadr.gg
+{footer}
