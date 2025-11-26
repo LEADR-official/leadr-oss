@@ -1,0 +1,24 @@
+services:
+  api:
+    restart: unless-stopped
+
+  db:
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
