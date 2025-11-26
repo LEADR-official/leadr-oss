@@ -1,0 +1,8 @@
+LEADR Notification
+
+{message}
+
+---
+This is an automated message from LEADR.
+
+{footer}

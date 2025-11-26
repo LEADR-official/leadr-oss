@@ -16,9 +16,12 @@ Example:
     '/v1'
 """
 
+import logging
+import logging.config
 import os
 from pathlib import Path
 
+import yaml
 from pydantic import Field, HttpUrl, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -192,6 +195,20 @@ class CommonSettings(BaseSettings):
         description="Mailgun domain for email sending",
     )
 
+    # Registration Configuration
+    VERIFICATION_CODE_EXPIRY_SECONDS: int = Field(
+        default=600,
+        description="Expiry time for email verification codes in seconds (default: 10 minutes)",
+    )
+    VERIFICATION_TOKEN_EXPIRY_SECONDS: int = Field(
+        default=600,
+        description="Expiry time for verification JWT tokens in seconds (default: 10 minutes)",
+    )
+    REGISTRATION_RATE_LIMIT_PER_HOUR: int = Field(
+        default=3,
+        description="Maximum verification code requests per email per hour (default: 3)",
+    )
+
     # Background Task Configuration
     BACKGROUND_TASK_TEMPLATE_INTERVAL: int = Field(
         default=60,
@@ -337,3 +354,31 @@ settings = (
     if os.environ.get("ENV") == "TEST"
     else Settings(_env_file=Path(PROJ_ROOT, ".env"))  # type: ignore[reportCallIssue]
 )
+
+
+def setup_logging() -> None:
+    """Configure application logging based on settings.
+
+    Loads logging configuration from logging.yaml and applies it.
+    When DEBUG mode is enabled, all loggers are set to DEBUG level.
+    """
+    log_config_path = Path(__file__).parent / "logging.yaml"
+    with log_config_path.open() as f:
+        log_config = yaml.safe_load(f)
+
+    # Substitute app and env values into format strings
+    for formatter in log_config["formatters"].values():
+        if "fmt" in formatter:
+            formatter["fmt"] = formatter["fmt"].format(app=settings.APP, env=settings.ENV)
+
+    # Set all loggers to DEBUG when DEBUG mode is enabled
+    if settings.DEBUG:
+        log_config["root"]["level"] = "DEBUG"
+        for logger_config in log_config.get("loggers", {}).values():
+            logger_config["level"] = "DEBUG"
+
+    logging.config.dictConfig(log_config)
+
+
+# Initialize logging on module import
+setup_logging()

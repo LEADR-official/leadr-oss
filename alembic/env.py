@@ -16,14 +16,20 @@ sys.path.append(str(Path(__file__).parent.parent / "src"))
 # Import all ORM models to ensure they're registered with SQLAlchemy
 # (Import your ORM model modules here as they're created)
 from leadr.accounts.adapters.orm import AccountORM, UserORM  # noqa: F401
-from leadr.auth.adapters.orm import APIKeyORM  # noqa: F401
-from leadr.boards.adapters.orm import BoardORM  # noqa: F401
-from leadr.games.adapters.orm import GameORM  # noqa: F401
-from leadr.scores.adapters.orm import ScoreORM  # noqa: F401
+from leadr.auth.adapters.orm import APIKeyORM, DeviceORM, DeviceSessionORM, NonceORM  # noqa: F401
+from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM  # noqa: F401
 
 # Import for database configuration
 from leadr.common.database import build_database_url
 from leadr.common.orm import Base
+from leadr.games.adapters.orm import GameORM  # noqa: F401
+from leadr.infra.email.adapters.orm import EmailORM  # noqa: F401
+from leadr.registration.adapters.orm import (  # noqa: F401
+    JamCodeORM,
+    JamCodeRedemptionORM,
+    VerificationCodeORM,
+)
+from leadr.scores.adapters.orm import ScoreFlagORM, ScoreORM, ScoreSubmissionMetaORM  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -1,0 +1,11 @@
+Verify your LEADR account
+
+Welcome to LEADR! Please use the following verification code to complete your registration:
+
+{code}
+
+This code will expire in 10 minutes.
+
+If you didn't request this verification code, you can safely ignore this email.
+
+{footer}

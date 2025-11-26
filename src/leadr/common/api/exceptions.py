@@ -29,7 +29,7 @@ async def catchall_exception_handler(
     """
     logger.exception(exc)
     if settings.DEBUG:
-        return JSONResponse(status_code=500, content={"error": exc})
+        return JSONResponse(status_code=500, content={"error": str(exc)})
     else:
         return JSONResponse(
             status_code=500,

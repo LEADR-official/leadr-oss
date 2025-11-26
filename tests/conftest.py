@@ -1,5 +1,6 @@
 """Test configuration and fixtures."""
 
+import asyncio
 import sys
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
@@ -7,8 +8,9 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from aiosmtpd.controller import Controller
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -19,11 +21,16 @@ from sqlalchemy.ext.asyncio import (
 # Import all ORM models to register them with SQLAlchemy metadata
 from leadr.accounts.adapters.orm import AccountORM, UserORM  # noqa: F401
 from leadr.accounts.domain.account import Account, AccountStatus
+from leadr.accounts.domain.user import User
 from leadr.accounts.services.dependencies import get_user_service
-from leadr.accounts.services.repositories import AccountRepository
+from leadr.accounts.services.repositories import AccountRepository, UserRepository
 from leadr.auth.adapters.orm import APIKeyORM  # noqa: F401
+from leadr.auth.domain.device import Device
 from leadr.auth.services.dependencies import get_api_key_service
+from leadr.auth.services.repositories import DeviceRepository
 from leadr.boards.adapters.orm import BoardORM  # noqa: F401
+from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.boards.services.repositories import BoardRepository
 from leadr.common.database import get_db
 from leadr.common.domain.ids import (
     AccountID,
@@ -36,7 +43,17 @@ from leadr.common.domain.ids import (
 from leadr.common.orm import Base
 from leadr.config import settings
 from leadr.games.adapters.orm import GameORM  # noqa: F401
+from leadr.games.domain.game import Game
+from leadr.games.services.repositories import GameRepository
+from leadr.infra.email.adapters.orm import EmailORM  # noqa: F401
+from leadr.registration.adapters.orm import (  # noqa: F401
+    JamCodeORM,
+    JamCodeRedemptionORM,
+    VerificationCodeORM,
+)
 from leadr.scores.adapters.orm import ScoreFlagORM, ScoreORM, ScoreSubmissionMetaORM  # noqa: F401
+from leadr.scores.domain.score import Score
+from leadr.scores.services.repositories import ScoreRepository
 
 # Import all ORM fixtures from fixtures module
 from tests.fixtures import *  # noqa: F403, F401
@@ -70,8 +87,6 @@ def pytest_sessionfinish(session, exitstatus):
     test_database_name = session.config.cache.get("test_database_name", None)
 
     if test_database_name:
-        from sqlalchemy import create_engine
-
         admin_url = f"postgresql+psycopg://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/postgres"
 
         try:
@@ -102,7 +117,6 @@ def test_database_name():
 def setup_test_database(test_database_name: str, request):
     """Create and destroy test database for the session (sync fixture)."""
     # Use sync psycopg for database creation/destruction to avoid event loop issues
-    from sqlalchemy import create_engine
 
     # Store database name in pytest config for cleanup hook
     request.config.cache.set("test_database_name", test_database_name)
@@ -206,6 +220,47 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides.clear()
 
 
+@pytest_asyncio.fixture(scope="session")
+async def smtp_server():
+    """
+    Start an SMTP debugging server for testing email sending.
+
+    The server runs on localhost:1025 and captures all emails sent to it.
+    Emails are stored in memory and can be accessed via the `messages` attribute.
+
+    Yields:
+        A tuple of (server_controller, messages_list) where:
+        - server_controller: The aiosmtpd Controller instance
+        - messages_list: A list that collects all sent emails as (envelope, content) tuples
+    """
+    messages = []
+
+    class TestHandler:
+        """Handler that captures emails in memory."""
+
+        async def handle_DATA(self, server, session, envelope):  # noqa: N802
+            """Handle email data - store in messages list."""
+            messages.append(
+                {
+                    "envelope": envelope,
+                    "from": envelope.mail_from,
+                    "to": envelope.rcpt_tos,
+                    "data": envelope.content.decode("utf-8", errors="replace"),
+                }
+            )
+            return "250 Message accepted for delivery"
+
+    controller = Controller(TestHandler(), hostname="localhost", port=1025)
+    controller.start()
+
+    # Give server time to start
+    await asyncio.sleep(0.1)
+
+    yield controller, messages
+
+    controller.stop()
+
+
 @pytest_asyncio.fixture
 async def test_account(db_session: AsyncSession) -> Account:
     """Create a test account for use in tests.
@@ -235,8 +290,6 @@ async def test_user(db_session: AsyncSession, test_account: Account):
     Returns:
         The created User domain entity.
     """
-    from leadr.accounts.domain.user import User
-    from leadr.accounts.services.repositories import UserRepository
 
     user_repo = UserRepository(db_session)
     user_id = UserID()
@@ -260,8 +313,6 @@ async def test_game(db_session: AsyncSession, test_account: Account):
     Returns:
         The created Game domain entity.
     """
-    from leadr.games.domain.game import Game
-    from leadr.games.services.repositories import GameRepository
 
     game_repo = GameRepository(db_session)
     game_id = GameID()
@@ -285,8 +336,6 @@ async def test_device(db_session: AsyncSession, test_account: Account, test_game
     Returns:
         The created Device domain entity.
     """
-    from leadr.auth.domain.device import Device
-    from leadr.auth.services.repositories import DeviceRepository
 
     device_repo = DeviceRepository(db_session)
     device_id = DeviceID()
@@ -312,8 +361,6 @@ async def test_board(db_session: AsyncSession, test_account: Account, test_game)
     Returns:
         The created Board domain entity.
     """
-    from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
-    from leadr.boards.services.repositories import BoardRepository
 
     board_repo = BoardRepository(db_session)
     board_id = BoardID()
@@ -346,8 +393,6 @@ async def test_score(
     Returns:
         The created Score domain entity.
     """
-    from leadr.scores.domain.score import Score
-    from leadr.scores.services.repositories import ScoreRepository
 
     score_repo = ScoreRepository(db_session)
     score_id = ScoreID()
