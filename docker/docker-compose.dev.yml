@@ -9,10 +9,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
-      # Application database credentials (passed to init script)
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
       # Postgres data directory
       PGDATA: /data/postgres
     volumes:
@@ -22,7 +18,7 @@ services:
       - "5332:5432"
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
+      test: [ "CMD-SHELL", "pg_isready -U $$DB_USER -d $$DB_NAME" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -35,6 +31,7 @@ services:
       DB_HOST: postgres
       ENABLE_ADMIN_API: "true"
       ENABLE_CLIENT_API: "false"
+      RUN_MIGRATIONS: "true"
     ports:
       - "8001:8000"
     volumes:
@@ -82,6 +79,7 @@ services:
       dockerfile: docker/api.Dockerfile
     depends_on:
       - postgres
+      - admin-api
     command: ./scripts/start.sh
     develop:
       # Create a `watch` configuration to update the app
