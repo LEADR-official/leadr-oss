@@ -7,4 +7,9 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
     alembic upgrade head
 fi
 
-uvicorn --app-dir src api.main:app --host 0.0.0.0 --port 8000
+# Enable live reload in development
+if [ "$ENV" = "DEV" ]; then
+    uvicorn --app-dir src api.main:app --host 0.0.0.0 --port ${PORT:-8000} --reload
+else
+    uvicorn --app-dir src api.main:app --host 0.0.0.0 --port ${PORT:-8000}
+fi

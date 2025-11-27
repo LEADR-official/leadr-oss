@@ -33,7 +33,7 @@ services:
       ENABLE_CLIENT_API: "false"
       RUN_MIGRATIONS: "true"
     ports:
-      - "8001:8000"
+      - "8001:${PORT:-8000}"
     volumes:
       - ..:/app
       - /app/.venv # Preserve the Docker/Linux venv & packages
@@ -44,19 +44,8 @@ services:
       - postgres
     command: ./scripts/start.sh
     develop:
-      # Create a `watch` configuration to update the app
-      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
       watch:
-        # Sync the working directory with the `/app` directory in the container
-        - action: sync
-          path: ..
-          target: /app
-          # Exclude the project virtual environment — it could be for a
-          # different platform in the container
-          ignore:
-            - .venv/
-
-        # Rebuild the image if dependencies change by checking uv.lock
+        # Rebuild the image if dependencies change
         - action: rebuild
           path: ../uv.lock
 
@@ -70,7 +59,7 @@ services:
       ENABLE_ADMIN_API: "false"
       ENABLE_CLIENT_API: "true"
     ports:
-      - "8000:8000"
+      - "8000:${PORT:-8000}"
     volumes:
       - ..:/app
       - /app/.venv # Preserve the Docker/Linux venv & packages
@@ -82,20 +71,10 @@ services:
       - admin-api
     command: ./scripts/start.sh
     develop:
-      # Create a `watch` configuration to update the app
-      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
       watch:
-        # Sync the working directory with the `/app` directory in the container
-        - action: sync
-          path: ..
-          target: /app
-          # Exclude the project virtual environment — it could be for a
-          # different platform in the container
-          ignore:
-            - .venv/
-
-        # Rebuild the image if dependencies change by checking uv.lock
+        # Rebuild the image if dependencies change
         - action: rebuild
           path: ../uv.lock
+
 volumes:
   db:
