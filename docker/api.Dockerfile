@@ -2,9 +2,6 @@
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS builder
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
-LABEL "Name"="leadr_api"
-LABEL "Version"="0.0.1"
-
 # Disable Python downloads, because we want to use the system interpreter
 # across both images. If using a managed Python version, it needs to be
 # copied from the build image into the final image; see `standalone.Dockerfile`
@@ -24,6 +21,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Then, use a final image without uv
 FROM python:3.11-slim-bookworm
+
+ARG VERSION=dev
+LABEL org.opencontainers.image.title="leadr-api"
+LABEL org.opencontainers.image.version="${VERSION}"
 
 # Install curl for healthchecks
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*

@@ -173,5 +173,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ steps.next_version.outputs.version }}
+          build-args: |
+            VERSION=${{ steps.next_version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
