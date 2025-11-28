@@ -2,7 +2,7 @@
 name = "leadr-oss"
 license = {text = "Apache-2.0"}
 version = "0.1.1"
-tescription = "LEADR is the cross-platform leadboard backend for indie game devs that turns any game into a social experience"
+description = "LEADR is the cross-platform leaderboard backend for indie game devs that turns any game into a social experience"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -22,7 +22,6 @@ dependencies = [
     "sqlalchemy>=2.0.43",
     "uvicorn>=0.35.0",
 ]
-packages = ["src"]
 
 [dependency-groups]
 dev = [
@@ -105,3 +104,10 @@ show_signature_return_annotation = true
 
 [tool.alembic]
 file_template = "%%(year)d%%(month).2d%%(day).2d%%(hour).2d%%(minute).2d%%(second).2d_%%(rev)s_%%(slug)s"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/api", "src/leadr"]
