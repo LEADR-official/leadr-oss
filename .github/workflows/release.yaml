@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Full history for version analysis
-          token: ${{ secrets.GITHUB_TOKEN }}  # Needed for pushing version bump
+          token: ${{ secrets.LEADR_OSS_PAT }}  # PAT needed to bypass branch protection
 
       - name: Get current version
         id: current_version
