@@ -176,6 +176,7 @@ jobs:
           context: .
           file: ./docker/api.Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/${{ steps.repo.outputs.name }}:latest
             ghcr.io/${{ steps.repo.outputs.name }}:${{ steps.next_version.outputs.version }}
