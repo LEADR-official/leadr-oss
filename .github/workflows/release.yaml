@@ -110,6 +110,9 @@ jobs:
           echo "" >> release_notes.md
           echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${CURRENT}...${NEW}" >> release_notes.md
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+
       - name: Update pyproject.toml version
         env:
           NEW_VERSION: ${{ steps.next_version.outputs.version }}
@@ -137,10 +140,13 @@ jobs:
               f.write(content)
           EOF
 
+          # Regenerate lockfile after version bump
+          uv lock
+
           # Commit and push version bump (only if there are changes)
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add pyproject.toml
+          git add pyproject.toml uv.lock
           if ! git diff --staged --quiet; then
             git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
             git push
