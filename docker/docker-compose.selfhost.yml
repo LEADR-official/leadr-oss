@@ -1,8 +1,21 @@
 services:
-  api:
+  admin-api:
+    extends:
+      file: docker-compose.base.yml
+      service: admin-api
+    image: ghcr.io/leadr-official/leadr-oss:${LEADR_IMAGE_TAG:-latest}
+    environment:
+      DB_HOST: ${DB_HOST:?DB_HOST must be set to your external PostgreSQL host}
+      RUN_MIGRATIONS: "true"
     restart: unless-stopped
 
-  db:
+  client-api:
+    extends:
+      file: docker-compose.base.yml
+      service: client-api
+    image: ghcr.io/leadr-official/leadr-oss:${LEADR_IMAGE_TAG:-latest}
+    environment:
+      DB_HOST: ${DB_HOST:?DB_HOST must be set to your external PostgreSQL host}
     restart: unless-stopped
 
   caddy:
@@ -16,8 +29,11 @@ services:
       - caddy_data:/data
     environment:
       - DOMAIN=${DOMAIN:-localhost}
+      - PORT=${PORT:-8000}
     depends_on:
-      api:
+      admin-api:
+        condition: service_healthy
+      client-api:
         condition: service_healthy
 
 volumes:

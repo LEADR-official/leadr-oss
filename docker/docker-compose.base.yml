@@ -1,21 +1,4 @@
 services:
-  api:
-    image: ghcr.io/leadr-official/leadr-oss:${LEADR_IMAGE_TAG:-latest}
-    env_file:
-      - ../.env
-    environment:
-      - DB_HOST=db
-      - RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}
-    depends_on:
-      db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
   db:
     image: postgres:16
     env_file:
@@ -33,6 +16,32 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  admin-api:
+    env_file:
+      - ../.env
+    environment:
+      ENABLE_ADMIN_API: "true"
+      ENABLE_CLIENT_API: "false"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8000}/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  client-api:
+    env_file:
+      - ../.env
+    environment:
+      ENABLE_ADMIN_API: "false"
+      ENABLE_CLIENT_API: "true"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8000}/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   db_data:
