@@ -1,103 +1,65 @@
 services:
-  postgres:
+  db:
+    extends:
+      file: docker-compose.base.yml
+      service: db
     container_name: postgres
-    image: postgres:16
-    env_file:
-      - ../.env
-    environment:
-      # Postgres superuser credentials
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
-      # Application database credentials (passed to init script)
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      # Postgres data directory
-      PGDATA: /data/postgres
-    volumes:
-      - db:/data/postgres
-      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
     ports:
       - "5332:5432"
     restart: unless-stopped
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+
   admin-api:
+    extends:
+      file: docker-compose.base.yml
+      service: admin-api
     container_name: leadr-admin-api
-    env_file:
-      - ../.env
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
+      DB_HOST: db
       ENV: DEV
-      DB_HOST: postgres
-      ENABLE_ADMIN_API: "true"
-      ENABLE_CLIENT_API: "false"
+      RUN_MIGRATIONS: "true"
     ports:
-      - "8001:8000"
+      - "8001:${PORT:-8000}"
     volumes:
       - ..:/app
-      - /app/.venv # Preserve the Docker/Linux venv & packages
+      - /app/.venv
     build:
       context: ..
       dockerfile: docker/api.Dockerfile
-    depends_on:
-      - postgres
     command: ./scripts/start.sh
     develop:
-      # Create a `watch` configuration to update the app
-      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
       watch:
-        # Sync the working directory with the `/app` directory in the container
-        - action: sync
-          path: ..
-          target: /app
-          # Exclude the project virtual environment — it could be for a
-          # different platform in the container
-          ignore:
-            - .venv/
-
-        # Rebuild the image if dependencies change by checking uv.lock
         - action: rebuild
           path: ../uv.lock
 
   client-api:
+    extends:
+      file: docker-compose.base.yml
+      service: client-api
     container_name: leadr-client-api
-    env_file:
-      - ../.env
+    depends_on:
+      db:
+        condition: service_healthy
+      admin-api:
+        condition: service_healthy
     environment:
+      DB_HOST: db
       ENV: DEV
-      DB_HOST: postgres
-      ENABLE_ADMIN_API: "false"
-      ENABLE_CLIENT_API: "true"
     ports:
-      - "8000:8000"
+      - "8000:${PORT:-8000}"
     volumes:
       - ..:/app
-      - /app/.venv # Preserve the Docker/Linux venv & packages
+      - /app/.venv
     build:
       context: ..
       dockerfile: docker/api.Dockerfile
-    depends_on:
-      - postgres
     command: ./scripts/start.sh
     develop:
-      # Create a `watch` configuration to update the app
-      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
       watch:
-        # Sync the working directory with the `/app` directory in the container
-        - action: sync
-          path: ..
-          target: /app
-          # Exclude the project virtual environment — it could be for a
-          # different platform in the container
-          ignore:
-            - .venv/
-
-        # Rebuild the image if dependencies change by checking uv.lock
         - action: rebuild
           path: ../uv.lock
+
 volumes:
-  db:
+  db_data:

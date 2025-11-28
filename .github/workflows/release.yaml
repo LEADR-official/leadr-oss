@@ -111,14 +111,16 @@ jobs:
           echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${CURRENT}...${NEW}" >> release_notes.md
 
       - name: Update pyproject.toml version
+        env:
+          NEW_VERSION: ${{ steps.next_version.outputs.version }}
         run: |
-          NEW_VERSION="${{ steps.next_version.outputs.version }}"
-          # Remove 'v' prefix for pyproject.toml
-          VERSION_CLEAN=${NEW_VERSION#v}
-
           # Use Python to update pyproject.toml (more reliable than sed)
-          python3 << EOF
+          python3 << 'EOF'
           import re
+          import os
+
+          new_version = os.environ['NEW_VERSION']
+          version_clean = new_version.lstrip('v')
 
           with open('pyproject.toml', 'r') as f:
               content = f.read()
@@ -126,7 +128,7 @@ jobs:
           # Update version line (handle both quoted and unquoted versions)
           content = re.sub(
               r'^version\s*=\s*["\']?[^"\'\n]+["\']?',
-              f'version = "{VERSION_CLEAN}"',
+              f'version = "{version_clean}"',
               content,
               flags=re.MULTILINE
           )
@@ -171,5 +173,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ steps.next_version.outputs.version }}
+          build-args: |
+            VERSION=${{ steps.next_version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

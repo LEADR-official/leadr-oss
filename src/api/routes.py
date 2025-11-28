@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from leadr.common.dependencies import DatabaseSession
+from leadr.config import settings
 
 router = APIRouter()
 
@@ -12,6 +13,7 @@ router = APIRouter()
 class HealthResponse(BaseModel):
     """Health check response model."""
 
+    service: str = Field(description="The name of the service")
     status: str = Field(description="Overall API health status (healthy, degraded, or unhealthy)")
     database: str = Field(description="Database connection status")
 
@@ -38,6 +40,7 @@ async def health_check(db: DatabaseSession) -> HealthResponse:
         db_status = f"unhealthy: {str(e)}"
 
     return HealthResponse(
+        service="Admin API" if settings.ENABLE_ADMIN_API else "Client API",
         status="healthy" if db_status == "healthy" else "degraded",
         database=db_status,
     )
