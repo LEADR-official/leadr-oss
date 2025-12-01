@@ -1,22 +1,4 @@
 services:
-  db:
-    image: postgres:16
-    env_file:
-      - ../.env
-    environment:
-      POSTGRES_USER: ${DB_USER:-leadr}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME:-leadr}
-      PGDATA: /data/postgres
-    volumes:
-      - db_data:/data/postgres
-      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-leadr} -d ${DB_NAME:-leadr}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   admin-api:
     env_file:
       - ../.env
@@ -42,6 +24,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-volumes:
-  db_data:
