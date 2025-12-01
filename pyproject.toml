@@ -1,7 +1,7 @@
 [project]
 name = "leadr-oss"
 license = {text = "Apache-2.0"}
-version = "0.1.1"
+version = "0.1.2"
 description = "LEADR is the cross-platform leaderboard backend for indie game devs that turns any game into a social experience"
 readme = "README.md"
 requires-python = ">=3.11"
