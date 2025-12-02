@@ -4,12 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       bump_type:
-        description: 'Version bump type (auto will analyze commits)'
+        description: 'Version bump type'
         required: true
-        default: 'auto'
+        default: 'patch'
         type: choice
         options:
-          - auto
           - patch
           - minor
           - major
@@ -26,124 +25,46 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for version analysis
+          fetch-depth: 0  # Full history for release notes
           token: ${{ secrets.LEADR_OSS_PAT }}  # PAT needed to bypass branch protection
 
-      - name: Get current version
-        id: current_version
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Bump version
+        id: version
         run: |
-          # Get the latest tag or default to v0.0.0
-          CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
+          CURRENT="v$(uv version --short)"
+          echo "current=${CURRENT}" >> $GITHUB_OUTPUT
 
-      - name: Determine next version
-        id: next_version
-        run: |
-          CURRENT="${{ steps.current_version.outputs.version }}"
-          BUMP_TYPE="${{ github.event.inputs.bump_type }}"
+          uv version --bump ${{ github.event.inputs.bump_type }}
 
-          # Remove 'v' prefix for processing
-          CURRENT_CLEAN=${CURRENT#v}
-
-          # Split version
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_CLEAN"
-
-          if [ "$BUMP_TYPE" = "auto" ]; then
-            # Analyze commits since last tag
-            if [ "$CURRENT" = "v0.0.0" ]; then
-              # First release
-              COMMITS=$(git log --pretty=format:"%s" --no-merges)
-            else
-              COMMITS=$(git log ${CURRENT}..HEAD --pretty=format:"%s" --no-merges)
-            fi
-
-            # Default to patch
-            BUMP_TYPE="patch"
-
-            # Check for breaking changes (major)
-            if echo "$COMMITS" | grep -qiE "^(breaking|major|BREAKING CHANGE:)"; then
-              BUMP_TYPE="major"
-            # Check for features (minor)
-            elif echo "$COMMITS" | grep -qiE "^(feat|feature|add):"; then
-              BUMP_TYPE="minor"
-            fi
-          fi
-
-          # Apply bump
-          case $BUMP_TYPE in
-            major)
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-              ;;
-            minor)
-              MINOR=$((MINOR + 1))
-              PATCH=0
-              ;;
-            patch)
-              PATCH=$((PATCH + 1))
-              ;;
-          esac
-
-          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
-          echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
-          echo "bump_type=${BUMP_TYPE}" >> $GITHUB_OUTPUT
+          NEW="v$(uv version --short)"
+          echo "new=${NEW}" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
-        id: release_notes
         run: |
-          CURRENT="${{ steps.current_version.outputs.version }}"
-          NEW="${{ steps.next_version.outputs.version }}"
+          CURRENT="${{ steps.version.outputs.current }}"
+          NEW="${{ steps.version.outputs.new }}"
 
           echo "# Release ${NEW}" > release_notes.md
           echo "" >> release_notes.md
           echo "## What's Changed" >> release_notes.md
           echo "" >> release_notes.md
 
-          if [ "$CURRENT" = "v0.0.0" ]; then
-            git log --pretty=format:"- %s (%h)" --no-merges >> release_notes.md
-          else
+          if git rev-parse "$CURRENT" >/dev/null 2>&1; then
             git log ${CURRENT}..HEAD --pretty=format:"- %s (%h)" --no-merges >> release_notes.md
+          else
+            git log --pretty=format:"- %s (%h)" --no-merges >> release_notes.md
           fi
 
           echo "" >> release_notes.md
           echo "" >> release_notes.md
           echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${CURRENT}...${NEW}" >> release_notes.md
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Update pyproject.toml version
-        env:
-          NEW_VERSION: ${{ steps.next_version.outputs.version }}
+      - name: Commit version bump
         run: |
-          # Use Python to update pyproject.toml (more reliable than sed)
-          python3 << 'EOF'
-          import re
-          import os
-
-          new_version = os.environ['NEW_VERSION']
-          version_clean = new_version.lstrip('v')
-
-          with open('pyproject.toml', 'r') as f:
-              content = f.read()
-
-          # Update version line (handle both quoted and unquoted versions)
-          content = re.sub(
-              r'^version\s*=\s*["\']?[^"\'\n]+["\']?',
-              f'version = "{version_clean}"',
-              content,
-              flags=re.MULTILINE
-          )
-
-          with open('pyproject.toml', 'w') as f:
-              f.write(content)
-          EOF
-
-          # Regenerate lockfile after version bump
-          uv lock
-
-          # Commit and push version bump (only if there are changes)
+          NEW_VERSION="${{ steps.version.outputs.new }}"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add pyproject.toml uv.lock
@@ -156,8 +77,8 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.next_version.outputs.version }}
-          name: ${{ steps.next_version.outputs.version }}
+          tag_name: ${{ steps.version.outputs.new }}
+          name: ${{ steps.version.outputs.new }}
           body_path: release_notes.md
           draft: false
           prerelease: false
@@ -185,8 +106,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/${{ steps.repo.outputs.name }}:latest
-            ghcr.io/${{ steps.repo.outputs.name }}:${{ steps.next_version.outputs.version }}
+            ghcr.io/${{ steps.repo.outputs.name }}:${{ steps.version.outputs.new }}
           build-args: |
-            VERSION=${{ steps.next_version.outputs.version }}
+            VERSION=${{ steps.version.outputs.new }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
