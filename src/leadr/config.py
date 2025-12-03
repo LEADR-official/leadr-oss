@@ -25,7 +25,9 @@ import yaml
 from pydantic import Field, HttpUrl, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-PROJ_ROOT = Path(__file__).resolve().parent.parent.parent
+# Use current working directory so .env is loaded from where the app is run
+# This allows leadr-cloud to wrap leadr-oss while using its own .env
+PROJ_ROOT = Path.cwd()
 
 
 class CommonSettings(BaseSettings):
