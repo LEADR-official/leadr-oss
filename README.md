@@ -123,7 +123,49 @@ docker run -p 3000:3000 \
 
 ### Database Management
 
-...
+LEADR uses PostgreSQL and supports both local development databases and managed PostgreSQL services like [Neon](https://neon.tech).
+
+#### Environment Variables
+
+| Variable         | Description                                             | Default                 |
+| ---------------- | ------------------------------------------------------- | ----------------------- |
+| `DB_HOST`        | PostgreSQL host                                         | `localhost`             |
+| `DB_PORT`        | PostgreSQL port                                         | `5432`                  |
+| `DB_NAME`        | Database name                                           | `leadr`                 |
+| `DB_USER`        | Database user                                           | `leadr`                 |
+| `DB_PASSWORD`    | Database password                                       | `leadr`                 |
+| `DB_HOST_DIRECT` | Direct host for migrations (bypasses connection pooler) | Falls back to `DB_HOST` |
+
+#### Using Neon (Recommended for Production)
+
+When using Neon's managed PostgreSQL, configure two endpoints:
+
+```bash
+# Pooled endpoint for application connections (uses PgBouncer)
+DB_HOST=ep-xxx-pooler.region.aws.neon.tech
+
+# Direct endpoint for migrations (bypasses PgBouncer)
+DB_HOST_DIRECT=ep-xxx.region.aws.neon.tech
+```
+
+**Connection behavior by environment:**
+
+| Environment  | SSL         | Client Pooling      | Notes                              |
+| ------------ | ----------- | ------------------- | ---------------------------------- |
+| `DEV`/`TEST` | Disabled    | Enabled (QueuePool) | Local development                  |
+| `PROD`       | verify-full | Disabled (NullPool) | Neon handles pooling via PgBouncer |
+
+Migrations always use `DB_HOST_DIRECT` (if set) with `NullPool` to avoid issues with PgBouncer during schema changes.
+
+#### Running Migrations
+
+```bash
+# Apply all pending migrations
+uv run alembic upgrade head
+
+# Check migration status
+uv run alembic current
+```
 
 ### Documentation Generation
 

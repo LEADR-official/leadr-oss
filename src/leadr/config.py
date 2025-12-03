@@ -92,6 +92,11 @@ class CommonSettings(BaseSettings):
         default="leadr",
         description="PostgreSQL database password",
     )
+    DB_HOST_DIRECT: str | None = Field(
+        default=None,
+        description="Direct PostgreSQL host for migrations (bypasses connection pooler). "
+        "If not set, falls back to DB_HOST. For Neon, use the non-pooler endpoint.",
+    )
 
     # Database Connection Pool Settings
     DB_POOL_SIZE: int = Field(

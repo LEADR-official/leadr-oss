@@ -13,14 +13,15 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 # Add src to path so we can import our models
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
+# Import database helpers (must come after sys.path modification)
 # Import all ORM models to ensure they're registered with SQLAlchemy
 # (Import your ORM model modules here as they're created)
 from leadr.accounts.adapters.orm import AccountORM, UserORM  # noqa: F401
 from leadr.auth.adapters.orm import APIKeyORM, DeviceORM, DeviceSessionORM, NonceORM  # noqa: F401
 from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM  # noqa: F401
+from leadr.common.database import _get_connect_args, build_direct_database_url  # noqa: E402
 
-# Import for database configuration
-from leadr.common.database import build_database_url
+# Import for database configuration (removed - using build_direct_database_url from above)
 from leadr.common.orm import Base
 from leadr.games.adapters.orm import GameORM  # noqa: F401
 from leadr.infra.email.adapters.orm import EmailORM  # noqa: F401
@@ -35,8 +36,8 @@ from leadr.scores.adapters.orm import ScoreFlagORM, ScoreORM, ScoreSubmissionMet
 # access to the values within the .ini file in use.
 config = context.config
 
-# Use application database configuration
-config.set_main_option("sqlalchemy.url", build_database_url())
+# Use direct database connection (bypasses connection pooler for migrations)
+config.set_main_option("sqlalchemy.url", build_direct_database_url())
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -90,12 +91,17 @@ async def run_async_migrations() -> None:
 
     In this scenario we need to create an async Engine
     and associate a connection with the context.
+
+    Migrations always use NullPool (no client-side pooling) and should
+    connect directly to the database, not through PgBouncer.
+    SSL is configured based on the environment (verify-full in production).
     """
     # Create async engine from config
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=_get_connect_args(),  # SSL config for production
     )
 
     async with connectable.connect() as connection:
