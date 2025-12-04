@@ -2,7 +2,7 @@
 name = "leadr-oss"
 license = {text = "Apache-2.0"}
 version = "0.1.3"
-description = "LEADR is the cross-platform leaderboard backend for indie game devs that turns any game into a social experience"
+description = "LEADR Open-Source Edition is the free cross-platform leaderboard backend for game devs"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
