@@ -1,5 +1,6 @@
 """Main FastAPI application."""
 
+import importlib.metadata
 import logging
 from contextlib import asynccontextmanager
 
@@ -122,7 +123,7 @@ def get_api_title() -> str:
 app = FastAPI(
     title=get_api_title(),
     description="LEADR is the cross-platform leaderboard backend for indie game devs",
-    version="0.1.0",
+    version=importlib.metadata.version("leadr-oss"),
     lifespan=lifespan,
 )
 
