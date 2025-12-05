@@ -8,6 +8,7 @@ on:
 
 env:
   ENV: TEST
+  PYTHONDONTWRITEBYTECODE: 1
 
 permissions:
   contents: read
