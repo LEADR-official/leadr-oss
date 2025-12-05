@@ -16,12 +16,9 @@ Example:
     '/v1'
 """
 
-import logging
-import logging.config
 import os
 from pathlib import Path
 
-import yaml
 from pydantic import Field, HttpUrl, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -322,6 +319,20 @@ class CommonSettings(BaseSettings):
         description="Maximum size in bytes for score metadata JSON (default: 1KB)",
     )
 
+    # Logging Configuration
+    LOG_TO_FILE: bool = Field(
+        default=False,
+        description="Enable file logging in addition to stdout",
+    )
+    LOG_DIR: Path = Field(
+        default=Path("/var/log/leadr"),
+        description="Directory for log files when LOG_TO_FILE is enabled",
+    )
+    LOG_JSON: bool = Field(
+        default=True,
+        description="Use JSON format for logs (disable for colored console in dev)",
+    )
+
     @model_validator(mode="after")
     def validate_api_enabled(self):
         """Ensure at least one API (Admin or Client) is enabled."""
@@ -361,31 +372,3 @@ settings = (
     if os.environ.get("ENV") == "TEST"
     else Settings(_env_file=Path(PROJ_ROOT, ".env"))  # type: ignore[reportCallIssue]
 )
-
-
-def setup_logging() -> None:
-    """Configure application logging based on settings.
-
-    Loads logging configuration from logging.yaml and applies it.
-    When DEBUG mode is enabled, all loggers are set to DEBUG level.
-    """
-    log_config_path = Path(__file__).parent / "logging.yaml"
-    with log_config_path.open() as f:
-        log_config = yaml.safe_load(f)
-
-    # Substitute app and env values into format strings
-    for formatter in log_config["formatters"].values():
-        if "fmt" in formatter:
-            formatter["fmt"] = formatter["fmt"].format(app=settings.APP, env=settings.ENV)
-
-    # Set all loggers to DEBUG when DEBUG mode is enabled
-    if settings.DEBUG:
-        log_config["root"]["level"] = "DEBUG"
-        for logger_config in log_config.get("loggers", {}).values():
-            logger_config["level"] = "DEBUG"
-
-    logging.config.dictConfig(log_config)
-
-
-# Initialize logging on module import
-setup_logging()

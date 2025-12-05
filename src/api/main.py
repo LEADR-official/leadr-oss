@@ -41,12 +41,23 @@ from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.geoip import GeoIPService
 from leadr.config import settings
 from leadr.games.api.game_routes import router as game_router
+from leadr.logging import setup_logging
 from leadr.registration.api.routes import public_router as registration_public_router
 from leadr.registration.api.routes import router as jam_code_router
 from leadr.scores.api.score_flag_routes import router as score_flag_router
 from leadr.scores.api.score_routes import client_router as score_client_router
 from leadr.scores.api.score_routes import router as score_router
 from leadr.scores.api.score_submission_meta_routes import router as score_submission_meta_router
+
+# Initialize structured logging before any loggers are used
+setup_logging(
+    log_level="DEBUG" if settings.DEBUG else "INFO",
+    json_format=settings.LOG_JSON,
+    log_to_file=settings.LOG_TO_FILE,
+    log_dir=settings.LOG_DIR,
+    app_name=settings.APP,
+    env=settings.ENV,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -218,5 +229,4 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    # Logging config already applied at module level
     uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
