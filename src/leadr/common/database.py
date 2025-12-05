@@ -45,15 +45,12 @@ def _get_ssl_context() -> ssl.SSLContext | None:
 def _get_connect_args() -> dict[str, Any]:
     """Get asyncpg connection arguments.
 
-    Configures SSL and channel binding for production connections to Neon.
-    Channel binding provides SCRAM-SHA-256-PLUS authentication, though asyncpg
-    ignores this parameter (included for documentation/future compatibility).
+    Configures SSL for production connections to Neon.
     """
     args: dict[str, Any] = {}
     ssl_ctx = _get_ssl_context()
     if ssl_ctx:
         args["ssl"] = ssl_ctx
-        args["channel_binding"] = "require"  # Best-effort, ignored by asyncpg
     return args
 
 
