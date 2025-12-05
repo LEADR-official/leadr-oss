@@ -15,6 +15,56 @@ from typing import Any
 
 import structlog
 
+# ANSI color codes for console output
+_COLORS = {
+    "debug": "\033[36m",  # Cyan
+    "info": "\033[32m",  # Green
+    "warning": "\033[33m",  # Yellow
+    "error": "\033[31m",  # Red
+    "critical": "\033[35m",  # Magenta
+}
+_RESET = "\033[0m"
+_DIM = "\033[2m"
+
+
+def _console_renderer(
+    logger: logging.Logger,
+    method_name: str,
+    event_dict: structlog.types.EventDict,
+) -> str:
+    """Custom console renderer matching the original LEADR log format.
+
+    Format: timestamp|app|env|server [LEVEL] logger:func:line - message key=value
+    """
+    # Extract standard fields
+    timestamp = event_dict.pop("timestamp", "")
+    level = event_dict.pop("level", "info").upper()
+    logger_name = event_dict.pop("logger", "")
+    func_name = event_dict.pop("func_name", "")
+    lineno = event_dict.pop("lineno", "")
+    app = event_dict.pop("app", "LEADR")
+    env = event_dict.pop("env", "")
+    event = event_dict.pop("event", "")
+
+    # Build location string
+    location = logger_name
+    if func_name:
+        location = f"{location}:{func_name}"
+    if lineno:
+        location = f"{location}:{lineno}"
+
+    # Format extra key=value pairs
+    extras = ""
+    if event_dict:
+        extras = " " + " ".join(f"{k}={v}" for k, v in event_dict.items())
+
+    # Apply colors
+    color = _COLORS.get(level.lower(), "")
+    level_str = f"{color}[{level}]{_RESET}"
+    dim_location = f"{_DIM}{location}{_RESET}"
+
+    return f"{timestamp}|{app}|{env}|server {level_str} {dim_location} - {event}{extras}"
+
 
 def _add_app_context(app_name: str, env: str) -> structlog.types.Processor:
     """Create a processor that adds app and env context to log entries."""
@@ -77,8 +127,8 @@ def setup_logging(
         # Production: JSON output
         renderer: structlog.types.Processor = structlog.processors.JSONRenderer()
     else:
-        # Development: colored console output
-        renderer = structlog.dev.ConsoleRenderer(colors=True)
+        # Development: colored console output matching original LEADR format
+        renderer = _console_renderer
 
     # Configure structlog
     structlog.configure(
