@@ -21,7 +21,10 @@ class BoardCreateRequest(BaseModel):
     icon: str | None = Field(
         default="fa-crown", description="Icon identifier for the board. Defaults to 'fa-crown'"
     )
-    short_code: str = Field(description="Globally unique short code for direct sharing")
+    short_code: str | None = Field(
+        default=None,
+        description="Globally unique short code for direct sharing. Auto-generated if not provided",
+    )
     unit: str | None = Field(
         default=None,
         description="Unit of measurement for scores (e.g., 'seconds', 'points'). Optional",

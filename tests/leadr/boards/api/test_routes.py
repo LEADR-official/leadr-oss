@@ -114,7 +114,7 @@ class TestBoardRoutes:
             name="Test Game",
         )
 
-        # Create board with only required fields (name, short_code)
+        # Create board with only required fields (name)
         # Other fields should use defaults from the schema
         response = await client.post(
             "/boards",
@@ -122,7 +122,6 @@ class TestBoardRoutes:
                 "account_id": str(account.id),
                 "game_id": str(game.id),
                 "name": "Minimal Board",
-                "short_code": "MIN001",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -130,7 +129,9 @@ class TestBoardRoutes:
         assert response.status_code == 201
         data = response.json()
         assert data["name"] == "Minimal Board"
-        assert data["short_code"] == "MIN001"
+        # short_code should be auto-generated (5 uppercase alphanumeric chars)
+        assert data["short_code"] is not None
+        assert len(data["short_code"]) == 5
         # Verify defaults were applied
         assert data["icon"] == "fa-crown"  # Default icon
         assert data["unit"] is None  # Default unit (None)
