@@ -573,3 +573,150 @@ class TestBoardTemplateService:
 
         with pytest.raises(EntityNotFoundError):
             await template_service.advance_template_schedule(BoardTemplateID(non_existent_id))
+
+    async def test_unique_series_per_game(self, db_session: AsyncSession):
+        """Test that series must be unique per game."""
+        from sqlalchemy.exc import IntegrityError
+
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        template_service = BoardTemplateService(db_session)
+        next_run = datetime.now(UTC) + timedelta(days=1)
+
+        # Create first template with series="weekly"
+        await template_service.create_board_template(
+            account_id=account.id,
+            game_id=game.id,
+            name="First Weekly",
+            slug="first-weekly",
+            repeat_interval="7 days",
+            next_run_at=next_run,
+            is_active=True,
+            series="weekly",
+            config={},
+        )
+
+        # Try to create second template with same series for same game
+        with pytest.raises(IntegrityError):
+            await template_service.create_board_template(
+                account_id=account.id,
+                game_id=game.id,
+                name="Second Weekly",
+                slug="second-weekly",
+                repeat_interval="7 days",
+                next_run_at=next_run,
+                is_active=True,
+                series="weekly",  # Same series - should fail
+                config={},
+            )
+
+    async def test_same_series_allowed_for_different_games(self, db_session: AsyncSession):
+        """Test that the same series can be used across different games."""
+        # Create account
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        # Create two games
+        game_service = GameService(db_session)
+        game1 = await game_service.create_game(
+            account_id=account.id,
+            name="Game One",
+        )
+        game2 = await game_service.create_game(
+            account_id=account.id,
+            name="Game Two",
+        )
+
+        template_service = BoardTemplateService(db_session)
+        next_run = datetime.now(UTC) + timedelta(days=1)
+
+        # Create template with series="weekly" for game1
+        template1 = await template_service.create_board_template(
+            account_id=account.id,
+            game_id=game1.id,
+            name="Game 1 Weekly",
+            slug="game1-weekly",
+            repeat_interval="7 days",
+            next_run_at=next_run,
+            is_active=True,
+            series="weekly",
+            config={},
+        )
+
+        # Create template with same series="weekly" for game2 - should succeed
+        template2 = await template_service.create_board_template(
+            account_id=account.id,
+            game_id=game2.id,
+            name="Game 2 Weekly",
+            slug="game2-weekly",
+            repeat_interval="7 days",
+            next_run_at=next_run,
+            is_active=True,
+            series="weekly",  # Same series but different game - should work
+            config={},
+        )
+
+        assert template1.series == "weekly"
+        assert template2.series == "weekly"
+        assert template1.game_id != template2.game_id
+
+    async def test_null_series_allowed_multiple_times(self, db_session: AsyncSession):
+        """Test that multiple templates can have series=None for the same game."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        template_service = BoardTemplateService(db_session)
+        next_run = datetime.now(UTC) + timedelta(days=1)
+
+        # Create first template with series=None
+        template1 = await template_service.create_board_template(
+            account_id=account.id,
+            game_id=game.id,
+            name="Template One",
+            slug="template-one",
+            repeat_interval="7 days",
+            next_run_at=next_run,
+            is_active=True,
+            # series is None by default
+            config={},
+        )
+
+        # Create second template with series=None - should succeed
+        template2 = await template_service.create_board_template(
+            account_id=account.id,
+            game_id=game.id,
+            name="Template Two",
+            slug="template-two",
+            repeat_interval="7 days",
+            next_run_at=next_run,
+            is_active=True,
+            # series is None by default
+            config={},
+        )
+
+        assert template1.series is None
+        assert template2.series is None

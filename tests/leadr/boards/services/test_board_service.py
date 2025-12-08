@@ -1042,3 +1042,52 @@ class TestBoardService:
         assert board.tags == []  # Template default
         assert board.starts_at == next_run
         assert board.ends_at == next_run + timedelta(hours=1)
+
+    async def test_create_board_from_template_with_series_placeholder(
+        self, db_session: AsyncSession
+    ):
+        """Test creating a board from a template with {series} placeholder in name_template.
+
+        Regression test: ensures series_value is calculated when name_template contains
+        {series} placeholder, regardless of whether template.series field is set.
+        """
+        from datetime import timedelta
+
+        from leadr.boards.services.board_template_service import BoardTemplateService
+
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create a board template with {series} in name_template but series=None
+        template_service = BoardTemplateService(db_session)
+        next_run = datetime.now(UTC) + timedelta(days=1)
+        template = await template_service.create_board_template(
+            account_id=account.id,
+            game_id=game.id,
+            name="Weekly Challenge",
+            slug="weekly-challenge",
+            repeat_interval="7 days",
+            next_run_at=next_run,
+            is_active=True,
+            name_template="Weekly {series}",  # Contains {series} placeholder
+            # series is not set (None by default)
+            config={},
+        )
+
+        # Create board from template - should succeed and use series_value=1
+        board_service = BoardService(db_session)
+        board = await board_service.create_board_from_template(template)
+
+        # Assertions - the key test is that the name uses series_value=1
+        assert board.name == "Weekly 1"  # First board should have series_value=1
+        assert board.created_from_template_id == template.id

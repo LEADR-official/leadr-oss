@@ -125,6 +125,17 @@ class BoardTemplateORM(Base):
         Boolean, nullable=False, default=True, server_default=sa.text("true")
     )
 
+    __table_args__ = (
+        # Unique series identifier per game (partial index - only when series is set)
+        Index(
+            "uq_board_template_game_series",
+            "game_id",
+            "series",
+            unique=True,
+            postgresql_where=sa.text("series IS NOT NULL"),
+        ),
+    )
+
     # Relationships
     account: Mapped["AccountORM"] = relationship("AccountORM")  # type: ignore[name-defined]
     game: Mapped["GameORM"] = relationship("GameORM")  # type: ignore[name-defined]

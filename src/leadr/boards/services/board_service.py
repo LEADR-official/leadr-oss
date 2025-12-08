@@ -183,9 +183,9 @@ class BoardService(BaseService[Board, BoardRepository]):
         # Get current timestamp for name generation
         now = datetime.now(UTC)
 
-        # Calculate series value if template uses series
+        # Calculate series value if name_template uses {series} placeholder
         series_value = None
-        if template.series is not None:
+        if template.name_template and "{series}" in template.name_template:
             # Count existing boards from this template and increment
             count = await self.repository.count_boards_by_template(template.id)
             series_value = count + 1
