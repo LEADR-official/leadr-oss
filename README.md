@@ -175,6 +175,8 @@ uv run alembic current
 
 This project uses automated semantic versioning:
 
+0. See what's changed: `git log <v tag>..HEAD && git diff <v tag> HEAD --stat`
+1. Decide whether the release is a patch, minor or major version
 1. Go to Actions → Release and Publish
 1. Click "Run workflow"
 1. The workflow will:
