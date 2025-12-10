@@ -384,3 +384,81 @@ class TestBoardTemplateRoutes:
             headers={"leadr-api-key": test_api_key},
         )
         assert get_response.status_code == 404
+
+    async def test_superadmin_list_board_templates_without_account_id_returns_all(
+        self, authenticated_client: AsyncClient, db_session
+    ):
+        """Test that superadmin can list board templates WITHOUT account_id and sees all."""
+        from datetime import UTC, datetime, timedelta
+
+        from leadr.accounts.domain.account import Account, AccountStatus
+        from leadr.accounts.services.repositories import AccountRepository
+        from leadr.boards.services.board_template_service import BoardTemplateService
+        from leadr.common.domain.ids import AccountID
+
+        # Create two accounts with board templates in each
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account1 = Account(
+            id=AccountID(),
+            name="Account One Templates",
+            slug="account-one-templates",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        account2 = Account(
+            id=AccountID(),
+            name="Account Two Templates",
+            slug="account-two-templates",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account1)
+        await account_repo.create(account2)
+
+        # Create games and board templates for each account
+        game_service = GameService(db_session)
+        game1 = await game_service.create_game(
+            account_id=account1.id,
+            name="Game Template 1",
+        )
+        game2 = await game_service.create_game(
+            account_id=account2.id,
+            name="Game Template 2",
+        )
+
+        template_service = BoardTemplateService(db_session)
+        await template_service.create_board_template(
+            account_id=account1.id,
+            game_id=game1.id,
+            name="Template from Account 1",
+            slug="template-from-account-1",
+            repeat_interval="7 days",
+            next_run_at=now + timedelta(days=7),
+            is_active=True,
+        )
+        await template_service.create_board_template(
+            account_id=account2.id,
+            game_id=game2.id,
+            name="Template from Account 2",
+            slug="template-from-account-2",
+            repeat_interval="7 days",
+            next_run_at=now + timedelta(days=7),
+            is_active=True,
+        )
+
+        # List board templates WITHOUT account_id - should return from ALL accounts
+        response = await authenticated_client.get("/board-templates")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
+
+        # Should contain templates from both accounts
+        template_names = {t["name"] for t in data["data"]}
+        assert "Template from Account 1" in template_names
+        assert "Template from Account 2" in template_names

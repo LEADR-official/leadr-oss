@@ -887,3 +887,79 @@ class TestBoardRoutes:
 
         # Should fail due to unique constraint
         assert response2.status_code == 400
+
+    async def test_superadmin_list_boards_without_account_id_returns_all(
+        self, authenticated_client: AsyncClient, db_session
+    ):
+        """Test that superadmin can list boards WITHOUT account_id and sees all accounts."""
+        from datetime import UTC, datetime
+
+        from leadr.accounts.domain.account import Account, AccountStatus
+        from leadr.accounts.services.repositories import AccountRepository
+        from leadr.boards.services.board_service import BoardService
+        from leadr.common.domain.ids import AccountID
+
+        # Create two accounts with boards in each
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account1 = Account(
+            id=AccountID(),
+            name="Account One Boards",
+            slug="account-one-boards",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        account2 = Account(
+            id=AccountID(),
+            name="Account Two Boards",
+            slug="account-two-boards",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account1)
+        await account_repo.create(account2)
+
+        # Create games and boards for each account
+        game_service = GameService(db_session)
+        game1 = await game_service.create_game(
+            account_id=account1.id,
+            name="Game Board 1",
+        )
+        game2 = await game_service.create_game(
+            account_id=account2.id,
+            name="Game Board 2",
+        )
+
+        board_service = BoardService(db_session)
+        await board_service.create_board(
+            account_id=account1.id,
+            game_id=game1.id,
+            name="Board from Account 1",
+            icon="trophy",
+            short_code="BRD1A1",
+            unit="points",
+        )
+        await board_service.create_board(
+            account_id=account2.id,
+            game_id=game2.id,
+            name="Board from Account 2",
+            icon="star",
+            short_code="BRD2A2",
+            unit="points",
+        )
+
+        # List boards WITHOUT account_id - should return boards from ALL accounts
+        response = await authenticated_client.get("/boards")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
+
+        # Should contain boards from both accounts
+        board_names = {b["name"] for b in data["data"]}
+        assert "Board from Account 1" in board_names
+        assert "Board from Account 2" in board_names
