@@ -114,7 +114,7 @@ async def handle_list_boards(
     service: BoardService,
     game_service: GameService,
     pagination: PaginationParams,
-    account_id: AccountID,
+    account_id: AccountID | None,
     code: str | None,
     game_slug: str | None,
     slug: str | None,
@@ -164,6 +164,9 @@ async def handle_list_boards(
             )
 
         # Use repository to get board by slug within game scope
+        # account_id is guaranteed to be set when game_slug is provided (line 156)
+        if account_id is None:
+            raise HTTPException(status_code=400, detail="account_id is required")
         board = await service.repository.get_by_slug(account_id, game_id, slug)
         if board is None:
             raise HTTPException(
@@ -286,12 +289,16 @@ async def list_boards_admin(
         400: Invalid cursor, sort field, cursor state mismatch, or slug without game_slug.
         404: Game or board not found when using slug filters.
     """
+    # Superadmin without account_id = None (all accounts)
+    # Superadmin with account_id = that specific account
+    # Regular user = always their account_id (ignores query param)
+    effective_account_id = account_id if auth.is_superadmin else auth.account_id
     return await handle_list_boards(
         auth,
         service,
         game_service,
         pagination,
-        account_id or auth.account_id,
+        effective_account_id,
         code,
         game_slug,
         slug,

@@ -91,22 +91,17 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         """Filter boards by account and optional criteria.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Optional account ID to filter by. If None, returns all boards
+                (superadmin use case). Regular users should always pass account_id.
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
             List of boards for the account matching the filter criteria
-
-        Raises:
-            ValueError: If account_id is None (required for multi-tenant safety)
         """
-        if account_id is None:
-            raise ValueError("account_id is required for filtering boards")
-        account_uuid = self._extract_uuid(account_id)
-        query = select(BoardORM).where(
-            BoardORM.account_id == account_uuid,
-            BoardORM.deleted_at.is_(None),
-        )
+        query = select(BoardORM).where(BoardORM.deleted_at.is_(None))
+        if account_id is not None:
+            account_uuid = self._extract_uuid(account_id)
+            query = query.where(BoardORM.account_id == account_uuid)
 
         # Future: Add additional filters here as needed
         # if "game_id" in kwargs:
@@ -322,7 +317,8 @@ class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
         """Filter board templates by account and optional game.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Optional account ID to filter by. If None, returns all templates
+                (superadmin use case). Regular users should always pass account_id.
             game_id: OPTIONAL - Game ID to filter by
             pagination: Optional pagination parameters
             **kwargs: Additional filter parameters (reserved for future use)
@@ -331,17 +327,13 @@ class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
             List of board templates if no pagination, PaginatedResult if pagination provided
 
         Raises:
-            ValueError: If account_id is None (required for multi-tenant safety)
             ValueError: If sort field is not in SORTABLE_FIELDS
             CursorValidationError: If cursor is invalid or state doesn't match
         """
-        if account_id is None:
-            raise ValueError("account_id is required for filtering board templates")
-        account_uuid = self._extract_uuid(account_id)
-        query = select(BoardTemplateORM).where(
-            BoardTemplateORM.account_id == account_uuid,
-            BoardTemplateORM.deleted_at.is_(None),
-        )
+        query = select(BoardTemplateORM).where(BoardTemplateORM.deleted_at.is_(None))
+        if account_id is not None:
+            account_uuid = self._extract_uuid(account_id)
+            query = query.where(BoardTemplateORM.account_id == account_uuid)
 
         # Build filters dict for cursor validation
         filters_dict = {}

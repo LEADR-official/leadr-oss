@@ -305,7 +305,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
     @overload
     async def list_scores(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         board_id: BoardID | None = None,
         game_id: GameID | None = None,
         device_id: DeviceID | None = None,
@@ -315,7 +315,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
     @overload
     async def list_scores(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         board_id: BoardID | None = None,
         game_id: GameID | None = None,
         device_id: DeviceID | None = None,
@@ -324,7 +324,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
 
     async def list_scores(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         board_id: BoardID | None = None,
         game_id: GameID | None = None,
         device_id: DeviceID | None = None,
@@ -333,7 +333,8 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         """List scores for an account with optional filters and pagination.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety).
+            account_id: Account ID to filter by. If None, returns all scores
+                (superadmin use case).
             board_id: Optional board ID to filter by.
             game_id: Optional game ID to filter by.
             device_id: Optional device ID to filter by.

@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from leadr.auth.api.device_schemas import DeviceResponse, DeviceUpdateRequest
-from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
+from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.auth.domain.device import DeviceStatus
 from leadr.auth.services.dependencies import DeviceServiceDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
@@ -17,7 +17,7 @@ router = APIRouter()
 
 @router.get("/devices", response_model=PaginatedResponse[DeviceResponse])
 async def list_devices(
-    auth: AdminAuthContextWithAccountIDDep,
+    auth: AdminAuthContextDep,
     service: DeviceServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
@@ -32,7 +32,7 @@ async def list_devices(
     filtering by game or status.
 
     For regular users, account_id is automatically derived from their API key.
-    For superadmins, account_id must be explicitly provided as a query parameter.
+    For superadmins, account_id is optional - if omitted, returns devices from all accounts.
 
     Pagination:
     - Default: 20 items per page, sorted by created_at:desc,id:asc
@@ -47,7 +47,7 @@ async def list_devices(
         auth: Authentication context with user info.
         service: Injected device service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
-        account_id: Optional account_id query parameter (required for superadmins).
+        account_id: Optional account_id query parameter (superadmins can omit to see all).
         game_id: Optional game ID to filter by.
         device_status: Optional status to filter by (active, banned, suspended).
 
@@ -56,12 +56,15 @@ async def list_devices(
 
     Raises:
         400: Invalid cursor, sort field, or cursor state mismatch.
-        400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    # Superadmin without account_id = None (all accounts)
+    # Superadmin with account_id = that specific account
+    # Regular user = always their account_id (ignores query param)
+    effective_account_id = account_id if auth.is_superadmin else auth.account_id
     try:
         result = await service.list_devices(
-            account_id=account_id or auth.account_id,
+            account_id=effective_account_id,
             game_id=game_id,
             status=device_status,
             pagination=pagination,

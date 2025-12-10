@@ -297,14 +297,71 @@ class TestDeviceRoutes:
         data = response.json()
         assert data["status"] == "active"
 
-    async def test_list_devices_requires_account_id(
-        self, client: AsyncClient, db_session, test_api_key
+    async def test_superadmin_list_devices_without_account_id_returns_all(
+        self, authenticated_client: AsyncClient, db_session
     ):
-        """Test that listing devices requires account_id parameter."""
-        response = await client.get(
-            "/devices",
-            headers={"leadr-api-key": test_api_key},
+        """Test that superadmin can list devices WITHOUT account_id and sees all accounts."""
+        from datetime import UTC, datetime
+
+        from leadr.accounts.domain.account import Account, AccountStatus
+        from leadr.accounts.services.repositories import AccountRepository
+        from leadr.common.domain.ids import AccountID
+
+        # Create two accounts with devices in each
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account1 = Account(
+            id=AccountID(),
+            name="Account One Devices",
+            slug="account-one-devices",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        account2 = Account(
+            id=AccountID(),
+            name="Account Two Devices",
+            slug="account-two-devices",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account1)
+        await account_repo.create(account2)
+
+        # Create games and devices for each account
+        game_service = GameService(db_session)
+        game1 = await game_service.create_game(
+            account_id=account1.id,
+            name="Game Account 1 Dev",
+        )
+        game2 = await game_service.create_game(
+            account_id=account2.id,
+            name="Game Account 2 Dev",
         )
 
-        assert response.status_code == 400
-        assert "account_id" in response.json()["error"].lower()
+        device_service = DeviceService(db_session)
+        hash1 = "ccc93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfc0"
+        hash2 = "ddd93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfd0"
+        await device_service.start_session(
+            game_id=game1.id,
+            client_fingerprint=hash1,
+        )
+        await device_service.start_session(
+            game_id=game2.id,
+            client_fingerprint=hash2,
+        )
+
+        # List devices WITHOUT account_id - should return devices from ALL accounts
+        response = await authenticated_client.get("/devices")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
+
+        # Should contain devices from both accounts
+        fingerprints = {d["client_fingerprint"] for d in data["data"]}
+        assert hash1 in fingerprints
+        assert hash2 in fingerprints

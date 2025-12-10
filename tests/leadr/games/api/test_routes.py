@@ -407,3 +407,61 @@ class TestGameRoutes:
         data = get_response.json()
         assert "anti_cheat_enabled" in data
         assert data["anti_cheat_enabled"] is False
+
+    async def test_superadmin_list_games_without_account_id_returns_all(
+        self, authenticated_client: AsyncClient, db_session
+    ):
+        """Test that superadmin can list games WITHOUT account_id and sees all accounts."""
+        from datetime import UTC, datetime
+
+        from leadr.accounts.domain.account import Account, AccountStatus
+        from leadr.accounts.services.repositories import AccountRepository
+        from leadr.common.domain.ids import AccountID
+        from leadr.games.services.game_service import GameService
+
+        # Create two accounts with games in each
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account1 = Account(
+            id=AccountID(),
+            name="Account One Games",
+            slug="account-one-games",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        account2 = Account(
+            id=AccountID(),
+            name="Account Two Games",
+            slug="account-two-games",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account1)
+        await account_repo.create(account2)
+
+        # Create games in each account
+        game_service = GameService(db_session)
+        await game_service.create_game(
+            account_id=account1.id,
+            name="Game from Account 1",
+        )
+        await game_service.create_game(
+            account_id=account2.id,
+            name="Game from Account 2",
+        )
+
+        # List games WITHOUT account_id - should return games from ALL accounts
+        response = await authenticated_client.get("/games")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
+
+        # Should contain games from both accounts
+        game_names = {g["name"] for g in data["data"]}
+        assert "Game from Account 1" in game_names
+        assert "Game from Account 2" in game_names

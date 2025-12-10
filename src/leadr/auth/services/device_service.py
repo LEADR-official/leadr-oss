@@ -270,7 +270,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
     @overload
     async def list_devices(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         game_id: GameID | None = None,
         status: str | None = None,
         pagination: None = None,
@@ -279,7 +279,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
     @overload
     async def list_devices(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         game_id: GameID | None = None,
         status: str | None = None,
         pagination: PaginationParams = ...,
@@ -287,7 +287,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
 
     async def list_devices(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         game_id: GameID | None = None,
         status: str | None = None,
         pagination: PaginationParams | None = None,
@@ -295,7 +295,8 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         """List devices for an account with optional filters and pagination.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Account ID to filter by. If None, returns all devices
+                (superadmin use case).
             game_id: Optional game ID to filter by
             status: Optional status to filter by (active, banned, suspended)
             pagination: Optional pagination parameters
@@ -390,7 +391,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
     @overload
     async def list_sessions(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         device_id: DeviceID | None = None,
         pagination: None = None,
     ) -> list[DeviceSession]: ...
@@ -398,21 +399,22 @@ class DeviceService(BaseService[Device, DeviceRepository]):
     @overload
     async def list_sessions(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         device_id: DeviceID | None = None,
         pagination: PaginationParams = ...,
     ) -> PaginatedResult[DeviceSession]: ...
 
     async def list_sessions(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         device_id: DeviceID | None = None,
         pagination: PaginationParams | None = None,
     ) -> list[DeviceSession] | PaginatedResult[DeviceSession]:
         """List device sessions for an account with optional filters and pagination.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Account ID to filter by. If None, returns all sessions
+                (superadmin use case).
             device_id: Optional device ID to filter by
             pagination: Optional pagination parameters
 

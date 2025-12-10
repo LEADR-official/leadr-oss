@@ -204,7 +204,7 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
     @overload
     async def list_api_keys(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         status: str | None = None,
         pagination: None = None,
     ) -> list[APIKey]: ...
@@ -212,21 +212,22 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
     @overload
     async def list_api_keys(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         status: str | None = None,
         pagination: PaginationParams = ...,
     ) -> PaginatedResult[APIKey]: ...
 
     async def list_api_keys(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         status: str | None = None,
         pagination: PaginationParams | None = None,
     ) -> list[APIKey] | PaginatedResult[APIKey]:
         """List API keys for an account with optional filters and pagination.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety).
+            account_id: Account ID to filter by. If None, returns all API keys
+                (superadmin use case).
             status: Optional status string to filter by.
             pagination: Optional pagination parameters.
 

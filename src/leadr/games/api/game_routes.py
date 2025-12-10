@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
-from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
+from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, GameID
@@ -92,7 +92,7 @@ async def get_game(
 
 @router.get("/games", response_model=PaginatedResponse[GameResponse])
 async def list_games(
-    auth: AdminAuthContextWithAccountIDDep,
+    auth: AdminAuthContextDep,
     service: GameServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
@@ -104,7 +104,7 @@ async def list_games(
     pagination with bidirectional navigation and custom sorting.
 
     For regular users, account_id is automatically derived from their API key.
-    For superadmins, account_id must be explicitly provided as a query parameter.
+    For superadmins, account_id is optional - if omitted, returns games from all accounts.
 
     Filtering:
     - Use ?slug={slug} to find a specific game by its globally unique slug
@@ -123,7 +123,7 @@ async def list_games(
         auth: Authentication context with user info.
         service: Injected game service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
-        account_id: Optional account_id query parameter (required for superadmins).
+        account_id: Optional account_id query parameter (superadmins can omit to see all).
         slug: Optional slug filter to find a specific game.
 
     Returns:
@@ -131,7 +131,6 @@ async def list_games(
 
     Raises:
         400: Invalid cursor, sort field, or cursor state mismatch.
-        400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
         404: Game not found when filtering by slug.
     """
@@ -159,8 +158,12 @@ async def list_games(
             ),
         )
 
+    # Superadmin without account_id = None (all accounts)
+    # Superadmin with account_id = that specific account
+    # Regular user = always their account_id (ignores query param)
+    effective_account_id = account_id if auth.is_superadmin else auth.account_id
     try:
-        result = await service.list_games(account_id or auth.account_id, pagination=pagination)
+        result = await service.list_games(effective_account_id, pagination=pagination)
     except (CursorValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 

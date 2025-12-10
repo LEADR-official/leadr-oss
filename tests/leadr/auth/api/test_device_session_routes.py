@@ -184,14 +184,69 @@ class TestDeviceSessionRoutes:
         data = response.json()
         assert data["revoked_at"] is not None
 
-    async def test_list_sessions_requires_account_id(
-        self, client: AsyncClient, db_session, test_api_key
+    async def test_superadmin_list_sessions_without_account_id_returns_all(
+        self, authenticated_client: AsyncClient, db_session
     ):
-        """Test that listing sessions requires account_id parameter."""
-        response = await client.get(
-            "/device-sessions",
-            headers={"leadr-api-key": test_api_key},
+        """Test that superadmin can list sessions WITHOUT account_id and sees all accounts."""
+        from datetime import UTC, datetime
+
+        from leadr.accounts.domain.account import Account, AccountStatus
+        from leadr.accounts.services.repositories import AccountRepository
+        from leadr.common.domain.ids import AccountID
+
+        # Create two accounts with devices/sessions in each
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account1 = Account(
+            id=AccountID(),
+            name="Account One Sessions",
+            slug="account-one-sessions",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        account2 = Account(
+            id=AccountID(),
+            name="Account Two Sessions",
+            slug="account-two-sessions",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account1)
+        await account_repo.create(account2)
+
+        # Create games and devices for each account
+        game_service = GameService(db_session)
+        game1 = await game_service.create_game(
+            account_id=account1.id,
+            name="Game Account 1",
+        )
+        game2 = await game_service.create_game(
+            account_id=account2.id,
+            name="Game Account 2",
         )
 
-        assert response.status_code == 400
-        assert "account_id" in response.json()["error"].lower()
+        device_service = DeviceService(db_session)
+        hash1 = "aaa93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfa0"
+        hash2 = "bbb93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+        await device_service.start_session(
+            game_id=game1.id,
+            client_fingerprint=hash1,
+        )
+        await device_service.start_session(
+            game_id=game2.id,
+            client_fingerprint=hash2,
+        )
+
+        # List sessions WITHOUT account_id - should return sessions from ALL accounts
+        response = await authenticated_client.get("/device-sessions")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
+
+        # Should contain sessions from both accounts (at least 2)
+        assert len(data["data"]) >= 2

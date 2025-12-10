@@ -28,7 +28,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
 
     async def list_flags(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         board_id: BoardID | None = None,
         game_id: GameID | None = None,
         status: str | None = None,
@@ -37,7 +37,8 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         """List score flags for an account with optional filters.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Account ID to filter by. If None, returns all flags
+                (superadmin use case).
             board_id: Optional board ID to filter by
             game_id: Optional game ID to filter by
             status: Optional status to filter by (PENDING, CONFIRMED_CHEAT, etc.)

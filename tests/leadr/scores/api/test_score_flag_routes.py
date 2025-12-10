@@ -751,14 +751,130 @@ class TestScoreFlagRoutes:
         assert len(data) == 1
         assert data[0]["flag_type"] == "DUPLICATE"
 
-    async def test_list_flags_requires_account_id(
-        self, client: AsyncClient, db_session, test_api_key
+    async def test_superadmin_list_score_flags_without_account_id_returns_all(
+        self, authenticated_client: AsyncClient, db_session
     ):
-        """Test that listing flags requires account_id parameter."""
-        response = await client.get(
-            "/score-flags",
-            headers={"leadr-api-key": test_api_key},
+        """Test that superadmin can list score flags WITHOUT account_id and sees all."""
+        from datetime import UTC, datetime
+
+        from leadr.accounts.domain.account import Account, AccountStatus
+        from leadr.accounts.services.repositories import AccountRepository
+        from leadr.common.domain.ids import AccountID
+
+        # Create two accounts with score flags in each
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account1 = Account(
+            id=AccountID(),
+            name="Account One Flags",
+            slug="account-one-flags",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        account2 = Account(
+            id=AccountID(),
+            name="Account Two Flags",
+            slug="account-two-flags",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account1)
+        await account_repo.create(account2)
+
+        # Create games, devices, boards, scores and flags for each account
+        game_service = GameService(db_session)
+        game1 = await game_service.create_game(
+            account_id=account1.id,
+            name="Game Flag 1",
+        )
+        game2 = await game_service.create_game(
+            account_id=account2.id,
+            name="Game Flag 2",
         )
 
-        assert response.status_code == 400
-        assert "account_id" in response.json()["error"].lower()
+        device_service = DeviceService(db_session)
+        hash1 = "111934981c5a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbf10"
+        hash2 = "222934981c5a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbf20"
+        device1, _, _, _ = await device_service.start_session(
+            game_id=game1.id,
+            client_fingerprint=hash1,
+        )
+        device2, _, _, _ = await device_service.start_session(
+            game_id=game2.id,
+            client_fingerprint=hash2,
+        )
+
+        board_service = BoardService(db_session)
+        board1 = await board_service.create_board(
+            account_id=account1.id,
+            game_id=game1.id,
+            name="Board Flag 1",
+            icon="trophy",
+            short_code="BFL1A1",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+        board2 = await board_service.create_board(
+            account_id=account2.id,
+            game_id=game2.id,
+            name="Board Flag 2",
+            icon="star",
+            short_code="BFL2A2",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        score_service = ScoreService(db_session)
+        score1, _ = await score_service.create_score(
+            account_id=account1.id,
+            game_id=game1.id,
+            board_id=board1.id,
+            device_id=device1.id,
+            player_name="Player Flag 1",
+            value=1000.0,
+        )
+        score2, _ = await score_service.create_score(
+            account_id=account2.id,
+            game_id=game2.id,
+            board_id=board2.id,
+            device_id=device2.id,
+            player_name="Player Flag 2",
+            value=2000.0,
+        )
+
+        # Create flags for each score
+        flag_repo = ScoreFlagRepository(db_session)
+        flag1 = ScoreFlag(
+            score_id=score1.id,
+            flag_type=FlagType.VELOCITY,
+            confidence=FlagConfidence.MEDIUM,
+            metadata={"source": "account1"},
+            status=ScoreFlagStatus.PENDING,
+        )
+        flag2 = ScoreFlag(
+            score_id=score2.id,
+            flag_type=FlagType.DUPLICATE,
+            confidence=FlagConfidence.HIGH,
+            metadata={"source": "account2"},
+            status=ScoreFlagStatus.PENDING,
+        )
+        await flag_repo.create(flag1)
+        await flag_repo.create(flag2)
+
+        # List score flags WITHOUT account_id - should return flags from ALL accounts
+        response = await authenticated_client.get("/score-flags")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should contain flags from both accounts
+        flag_types = {f["flag_type"] for f in data}
+        assert "VELOCITY" in flag_types
+        assert "DUPLICATE" in flag_types

@@ -332,14 +332,124 @@ class TestScoreSubmissionMetaRoutes:
 
         assert response.status_code == 404
 
-    async def test_list_submission_meta_requires_account_id(
-        self, client: AsyncClient, db_session, test_api_key
+    async def test_superadmin_list_submission_metadata_without_account_id_returns_all(
+        self, authenticated_client: AsyncClient, db_session
     ):
-        """Test that listing submission metadata requires account_id parameter."""
-        response = await client.get(
-            "/score-submission-metadata",
-            headers={"leadr-api-key": test_api_key},
+        """Test that superadmin can list submission metadata WITHOUT account_id and sees all."""
+        from datetime import UTC, datetime
+
+        from leadr.accounts.domain.account import Account, AccountStatus
+        from leadr.accounts.services.repositories import AccountRepository
+        from leadr.common.domain.ids import AccountID
+
+        # Create two accounts with submission metadata in each
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account1 = Account(
+            id=AccountID(),
+            name="Account One Meta",
+            slug="account-one-meta",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        account2 = Account(
+            id=AccountID(),
+            name="Account Two Meta",
+            slug="account-two-meta",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account1)
+        await account_repo.create(account2)
+
+        # Create games, devices, boards, and scores for each account
+        game_service = GameService(db_session)
+        game1 = await game_service.create_game(
+            account_id=account1.id,
+            name="Game Meta 1",
+        )
+        game2 = await game_service.create_game(
+            account_id=account2.id,
+            name="Game Meta 2",
         )
 
-        assert response.status_code == 400
-        assert "account_id" in response.json()["error"].lower()
+        board_service = BoardService(db_session)
+        board1 = await board_service.create_board(
+            account_id=account1.id,
+            game_id=game1.id,
+            name="Board Meta 1",
+            icon="trophy",
+            short_code="BMT1A1",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+        board2 = await board_service.create_board(
+            account_id=account2.id,
+            game_id=game2.id,
+            name="Board Meta 2",
+            icon="star",
+            short_code="BMT2A2",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        device_service = DeviceService(db_session)
+        hash1 = "333934981c5a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbf30"
+        hash2 = "444934981c5a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbf40"
+        device1, _, _, _ = await device_service.start_session(
+            game_id=game1.id,
+            client_fingerprint=hash1,
+        )
+        device2, _, _, _ = await device_service.start_session(
+            game_id=game2.id,
+            client_fingerprint=hash2,
+        )
+
+        # Create scores and update submission metadata for each account
+        score_service = ScoreService(db_session)
+        score1, result1 = await score_service.create_score(
+            account_id=account1.id,
+            game_id=game1.id,
+            board_id=board1.id,
+            device_id=device1.id,
+            player_name="Player Meta 1",
+            value=1000.0,
+        )
+        await score_service.update_submission_metadata(
+            saved_score=score1,
+            device_id=device1.id,
+            board_id=board1.id,
+            anti_cheat_result=result1,
+        )
+        score2, result2 = await score_service.create_score(
+            account_id=account2.id,
+            game_id=game2.id,
+            board_id=board2.id,
+            device_id=device2.id,
+            player_name="Player Meta 2",
+            value=2000.0,
+        )
+        await score_service.update_submission_metadata(
+            saved_score=score2,
+            device_id=device2.id,
+            board_id=board2.id,
+            anti_cheat_result=result2,
+        )
+
+        # List submission metadata WITHOUT account_id - should return from ALL accounts
+        response = await authenticated_client.get("/score-submission-metadata")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should contain metadata from both accounts (at least 2 entries)
+        device_ids = {m["device_id"] for m in data}
+        assert str(device1.id) in device_ids
+        assert str(device2.id) in device_ids

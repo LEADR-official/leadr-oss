@@ -962,3 +962,116 @@ class TestScoreRoutes:
         assert "country" not in data["data"][0]
         assert "city" not in data["data"][0]
         assert data["data"][0]["player_name"] == "TestPlayer"
+
+    async def test_superadmin_list_scores_without_account_id_returns_all(
+        self, authenticated_client: AsyncClient, db_session
+    ):
+        """Test that superadmin can list scores WITHOUT account_id and sees all accounts."""
+        from datetime import UTC, datetime
+
+        from leadr.accounts.domain.account import Account, AccountStatus
+        from leadr.accounts.services.repositories import AccountRepository
+        from leadr.boards.domain.board import KeepStrategy, SortDirection
+        from leadr.boards.services.board_service import BoardService
+        from leadr.common.domain.ids import AccountID
+
+        # Create two accounts with scores in each
+        account_repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        account1 = Account(
+            id=AccountID(),
+            name="Account One Scores",
+            slug="account-one-scores",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        account2 = Account(
+            id=AccountID(),
+            name="Account Two Scores",
+            slug="account-two-scores",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account1)
+        await account_repo.create(account2)
+
+        # Create games, devices, boards and scores for each account
+        game_service = GameService(db_session)
+        game1 = await game_service.create_game(
+            account_id=account1.id,
+            name="Game Score 1",
+        )
+        game2 = await game_service.create_game(
+            account_id=account2.id,
+            name="Game Score 2",
+        )
+
+        device_service = DeviceService(db_session)
+        hash1 = "eee93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfe0"
+        hash2 = "fff93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbff0"
+        device1, _, _, _ = await device_service.start_session(
+            game_id=game1.id,
+            client_fingerprint=hash1,
+        )
+        device2, _, _, _ = await device_service.start_session(
+            game_id=game2.id,
+            client_fingerprint=hash2,
+        )
+
+        board_service = BoardService(db_session)
+        board1 = await board_service.create_board(
+            account_id=account1.id,
+            game_id=game1.id,
+            name="Board Score 1",
+            icon="trophy",
+            short_code="BSC1A1",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+        board2 = await board_service.create_board(
+            account_id=account2.id,
+            game_id=game2.id,
+            name="Board Score 2",
+            icon="star",
+            short_code="BSC2A2",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        score_service = ScoreService(db_session)
+        await score_service.create_score(
+            account_id=account1.id,
+            game_id=game1.id,
+            board_id=board1.id,
+            device_id=device1.id,
+            player_name="Player From Account 1",
+            value=1000.0,
+        )
+        await score_service.create_score(
+            account_id=account2.id,
+            game_id=game2.id,
+            board_id=board2.id,
+            device_id=device2.id,
+            player_name="Player From Account 2",
+            value=2000.0,
+        )
+
+        # List scores WITHOUT account_id - should return scores from ALL accounts
+        response = await authenticated_client.get("/scores")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
+
+        # Should contain scores from both accounts
+        player_names = {s["player_name"] for s in data["data"]}
+        assert "Player From Account 1" in player_names
+        assert "Player From Account 2" in player_names

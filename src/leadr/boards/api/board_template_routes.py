@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
-from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
+from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.boards.api.board_template_schemas import (
     BoardTemplateCreateRequest,
     BoardTemplateResponse,
@@ -109,7 +109,7 @@ async def get_board_template(
 
 @router.get("/board-templates", response_model=PaginatedResponse[BoardTemplateResponse])
 async def list_board_templates(
-    auth: AdminAuthContextWithAccountIDDep,
+    auth: AdminAuthContextDep,
     service: BoardTemplateServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
@@ -118,7 +118,7 @@ async def list_board_templates(
     """List board templates for an account with pagination, optionally filtered by game.
 
     For regular users, account_id is automatically derived from their API key.
-    For superadmins, account_id must be explicitly provided as a query parameter.
+    For superadmins, account_id is optional - if omitted, returns templates from all accounts.
 
     Pagination:
     - Default: 20 items per page, sorted by created_at:desc,id:asc
@@ -133,7 +133,7 @@ async def list_board_templates(
         auth: Authentication context with user info.
         service: Injected board template service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
-        account_id: Optional account_id query parameter (required for superadmins).
+        account_id: Optional account_id query parameter (superadmins can omit to see all).
         game_id: Optional game ID to filter templates by.
 
     Returns:
@@ -141,17 +141,20 @@ async def list_board_templates(
 
     Raises:
         400: Invalid cursor, sort field, or cursor state mismatch.
-        400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    # Superadmin without account_id = None (all accounts)
+    # Superadmin with account_id = that specific account
+    # Regular user = always their account_id (ignores query param)
+    effective_account_id = account_id if auth.is_superadmin else auth.account_id
     try:
         if game_id is not None:
             result = await service.list_board_templates_by_game(
-                account_id or auth.account_id, game_id, pagination=pagination
+                effective_account_id, game_id, pagination=pagination
             )
         else:
             result = await service.list_board_templates_by_account(
-                account_id or auth.account_id, pagination=pagination
+                effective_account_id, pagination=pagination
             )
     except (CursorValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from None

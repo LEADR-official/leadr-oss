@@ -11,7 +11,7 @@ from leadr.auth.api.api_key_schemas import (
     CreateAPIKeyResponse,
     UpdateAPIKeyRequest,
 )
-from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
+from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.dependencies import APIKeyServiceDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
@@ -69,7 +69,7 @@ async def create_api_key(
     response_model=PaginatedResponse[APIKeyResponse],
 )
 async def list_api_keys(
-    auth: AdminAuthContextWithAccountIDDep,
+    auth: AdminAuthContextDep,
     service: APIKeyServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
@@ -80,7 +80,7 @@ async def list_api_keys(
     """List API keys for an account with optional filters and pagination.
 
     For regular users, account_id is automatically derived from their API key.
-    For superadmins, account_id must be explicitly provided as a query parameter.
+    For superadmins, account_id is optional - if omitted, returns API keys from all accounts.
 
     Pagination:
     - Default: 20 items per page, sorted by created_at:desc,id:asc
@@ -95,7 +95,7 @@ async def list_api_keys(
         auth: Authentication context with user info.
         service: Injected API key service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
-        account_id: Optional account_id query parameter (required for superadmins).
+        account_id: Optional account_id query parameter (superadmins can omit to see all).
         key_status: Optional status to filter results (active or revoked).
 
     Returns:
@@ -103,12 +103,15 @@ async def list_api_keys(
 
     Raises:
         400: Invalid cursor, sort field, or cursor state mismatch.
-        400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    # Superadmin without account_id = None (all accounts)
+    # Superadmin with account_id = that specific account
+    # Regular user = always their account_id (ignores query param)
+    effective_account_id = account_id if auth.is_superadmin else auth.account_id
     try:
         result = await service.list_api_keys(
-            account_id=account_id or auth.account_id,
+            account_id=effective_account_id,
             status=key_status.value if key_status else None,
             pagination=pagination,
         )

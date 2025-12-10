@@ -24,14 +24,15 @@ class ScoreSubmissionMetaService(BaseService[ScoreSubmissionMeta, ScoreSubmissio
 
     async def list_submission_meta(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         board_id: BoardID | None = None,
         device_id: DeviceID | None = None,
     ) -> list[ScoreSubmissionMeta]:
         """List score submission metadata for an account with optional filters.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Account ID to filter by. If None, returns all metadata
+                (superadmin use case).
             board_id: Optional board ID to filter by
             device_id: Optional device ID to filter by
 

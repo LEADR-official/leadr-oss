@@ -68,7 +68,8 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
         a direct account relation.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Optional account ID to filter by. If None, returns all metadata
+                (superadmin use case). Regular users should always pass account_id.
             board_id: Optional board ID to filter by
             device_id: Optional device ID to filter by
             **kwargs: Additional filter parameters (reserved for future use)
@@ -78,20 +79,15 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
         """
         from leadr.scores.adapters.orm import ScoreORM
 
-        if account_id is None:
-            msg = "account_id is required for filtering submission metadata"
-            raise ValueError(msg)
+        # Build base query
+        query = select(ScoreSubmissionMetaORM).where(ScoreSubmissionMetaORM.deleted_at.is_(None))
 
-        account_uuid = self._extract_uuid(account_id)
-        # Join with scores table to filter by account
-        query = (
-            select(ScoreSubmissionMetaORM)
-            .join(ScoreORM, ScoreSubmissionMetaORM.score_id == ScoreORM.id)
-            .where(
-                ScoreORM.account_id == account_uuid,
-                ScoreSubmissionMetaORM.deleted_at.is_(None),
+        if account_id is not None:
+            account_uuid = self._extract_uuid(account_id)
+            # Join with scores table to filter by account
+            query = query.join(ScoreORM, ScoreSubmissionMetaORM.score_id == ScoreORM.id).where(
+                ScoreORM.account_id == account_uuid
             )
-        )
 
         # Apply optional filters
         if board_id is not None:
@@ -195,7 +191,8 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
         a direct account relation.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Optional account ID to filter by. If None, returns all flags
+                (superadmin use case). Regular users should always pass account_id.
             board_id: Optional board ID to filter by
             game_id: Optional game ID to filter by
             status: Optional status to filter by (PENDING, CONFIRMED_CHEAT, etc.)
@@ -207,20 +204,15 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
         """
         from leadr.scores.adapters.orm import ScoreORM
 
-        if account_id is None:
-            msg = "account_id is required for filtering score flags"
-            raise ValueError(msg)
+        # Build base query
+        query = select(ScoreFlagORM).where(ScoreFlagORM.deleted_at.is_(None))
 
-        account_uuid = self._extract_uuid(account_id)
-        # Join with scores table to filter by account
-        query = (
-            select(ScoreFlagORM)
-            .join(ScoreORM, ScoreFlagORM.score_id == ScoreORM.id)
-            .where(
-                ScoreORM.account_id == account_uuid,
-                ScoreFlagORM.deleted_at.is_(None),
+        if account_id is not None:
+            account_uuid = self._extract_uuid(account_id)
+            # Join with scores table to filter by account
+            query = query.join(ScoreORM, ScoreFlagORM.score_id == ScoreORM.id).where(
+                ScoreORM.account_id == account_uuid
             )
-        )
 
         # Apply optional filters
         if board_id is not None:

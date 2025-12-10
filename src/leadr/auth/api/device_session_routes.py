@@ -8,7 +8,7 @@ from leadr.auth.api.device_session_schemas import (
     DeviceSessionResponse,
     DeviceSessionUpdateRequest,
 )
-from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
+from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.auth.services.dependencies import DeviceServiceDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
@@ -19,7 +19,7 @@ router = APIRouter()
 
 @router.get("/device-sessions", response_model=PaginatedResponse[DeviceSessionResponse])
 async def list_sessions(
-    auth: AdminAuthContextWithAccountIDDep,
+    auth: AdminAuthContextDep,
     service: DeviceServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
@@ -31,7 +31,7 @@ async def list_sessions(
     filtering by device.
 
     For regular users, account_id is automatically derived from their API key.
-    For superadmins, account_id must be explicitly provided as a query parameter.
+    For superadmins, account_id is optional - if omitted, returns sessions from all accounts.
 
     Pagination:
     - Default: 20 items per page, sorted by created_at:desc,id:asc
@@ -46,7 +46,7 @@ async def list_sessions(
         auth: Authentication context with user info.
         service: Injected device service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
-        account_id: Optional account_id query parameter (required for superadmins).
+        account_id: Optional account_id query parameter (superadmins can omit to see all).
         device_id: Optional device ID to filter by.
 
     Returns:
@@ -54,12 +54,15 @@ async def list_sessions(
 
     Raises:
         400: Invalid cursor, sort field, or cursor state mismatch.
-        400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    # Superadmin without account_id = None (all accounts)
+    # Superadmin with account_id = that specific account
+    # Regular user = always their account_id (ignores query param)
+    effective_account_id = account_id if auth.is_superadmin else auth.account_id
     try:
         result = await service.list_sessions(
-            account_id=account_id or auth.account_id,
+            account_id=effective_account_id,
             device_id=device_id,
             pagination=pagination,
         )

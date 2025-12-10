@@ -11,7 +11,7 @@ from leadr.accounts.api.user_schemas import (
     UserUpdateRequest,
 )
 from leadr.accounts.services.dependencies import UserServiceDep
-from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
+from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, UserID
@@ -94,7 +94,7 @@ async def get_user(
 
 @router.get("/users", response_model=PaginatedResponse[UserResponse])
 async def list_users(
-    auth: AdminAuthContextWithAccountIDDep,
+    auth: AdminAuthContextDep,
     service: UserServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
@@ -102,7 +102,7 @@ async def list_users(
     """List users for an account with pagination.
 
     For regular users, account_id is automatically derived from their API key.
-    For superadmins, account_id must be explicitly provided as a query parameter.
+    For superadmins, account_id is optional - if omitted, returns users from all accounts.
 
     Pagination:
     - Default: 20 items per page, sorted by created_at:desc,id:asc
@@ -117,20 +117,21 @@ async def list_users(
         auth: Authentication context with user info.
         service: Injected user service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
-        account_id: Optional account_id query parameter (required for superadmins).
+        account_id: Optional account_id query parameter (superadmins can omit to see all).
 
     Returns:
         PaginatedResponse with users and pagination metadata.
 
     Raises:
         400: Invalid cursor, sort field, or cursor state mismatch.
-        400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    # Superadmin without account_id = None (all accounts)
+    # Superadmin with account_id = that specific account
+    # Regular user = always their account_id (ignores query param)
+    effective_account_id = account_id if auth.is_superadmin else auth.account_id
     try:
-        result = await service.list_users_by_account(
-            account_id or auth.account_id, pagination=pagination
-        )
+        result = await service.list_users_by_account(effective_account_id, pagination=pagination)
     except (CursorValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
