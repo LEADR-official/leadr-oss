@@ -314,20 +314,8 @@ class AuthContextDependency:
                 request=request,
             )
 
-            # Superadmins must explicitly provide account_id for GET requests on list endpoints
-            account_id_to_check = body_account_id or query_account_id
-            if (
-                self.require_superadmin_account_id
-                and auth_context.is_superadmin
-                and request.method == "GET"
-                and account_id_to_check is None
-            ):
-                raise HTTPException(
-                    status_code=400,
-                    detail="Superadmin must explicitly specify account_id query parameter",
-                )
-
             # Check access if an account_id was provided
+            account_id_to_check = body_account_id or query_account_id
             if account_id_to_check and not auth_context.has_access_to_account(account_id_to_check):
                 raise HTTPException(
                     status_code=403,

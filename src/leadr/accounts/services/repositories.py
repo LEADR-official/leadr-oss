@@ -218,7 +218,8 @@ class UserRepository(BaseRepository[User, UserORM]):
         """Filter users by account and optional criteria with optional pagination.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Optional account ID to filter by. If None, returns all users
+                (superadmin use case). Regular users should always pass account_id.
             pagination: Optional pagination parameters
             **kwargs: Additional filter parameters (reserved for future use)
 
@@ -226,18 +227,13 @@ class UserRepository(BaseRepository[User, UserORM]):
             List of users if no pagination, PaginatedResult if pagination provided
 
         Raises:
-            ValueError: If account_id is None (required for multi-tenant safety)
             ValueError: If sort field is not in SORTABLE_FIELDS
             CursorValidationError: If cursor is invalid or state doesn't match
         """
-        if account_id is None:
-            raise ValueError("account_id is required for filtering users")
-
-        account_uuid = self._extract_uuid(account_id)
-        query = select(UserORM).where(
-            UserORM.account_id == account_uuid,
-            UserORM.deleted_at.is_(None),
-        )
+        query = select(UserORM).where(UserORM.deleted_at.is_(None))
+        if account_id is not None:
+            account_uuid = self._extract_uuid(account_id)
+            query = query.where(UserORM.account_id == account_uuid)
 
         # Build filters dict for cursor validation
         filters_dict = {}

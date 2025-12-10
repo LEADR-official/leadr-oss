@@ -114,7 +114,8 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         """Filter API keys by account and optional criteria.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Optional account ID to filter by. If None, returns all API keys
+                (superadmin use case). Regular users should always pass account_id.
             status: Optional APIKeyStatus to filter by
             active_only: If True, only return ACTIVE keys (bool)
             pagination: Optional pagination parameters
@@ -124,17 +125,13 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
             List of API keys if no pagination, PaginatedResult if pagination provided
 
         Raises:
-            ValueError: If account_id is None (required for multi-tenant safety)
             ValueError: If sort field is not in SORTABLE_FIELDS
             CursorValidationError: If cursor is invalid or state doesn't match
         """
-        if account_id is None:
-            raise ValueError("account_id is required for filtering API keys")
-        account_uuid = self._extract_uuid(account_id)
-        query = select(APIKeyORM).where(
-            APIKeyORM.account_id == account_uuid,
-            APIKeyORM.deleted_at.is_(None),
-        )
+        query = select(APIKeyORM).where(APIKeyORM.deleted_at.is_(None))
+        if account_id is not None:
+            account_uuid = self._extract_uuid(account_id)
+            query = query.where(APIKeyORM.account_id == account_uuid)
 
         # Build filters dict for cursor validation
         filters_dict = {}
@@ -271,7 +268,8 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
         """Filter devices by account and optional criteria.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Optional account ID to filter by. If None, returns all devices
+                (superadmin use case). Regular users should always pass account_id.
             game_id: Optional game ID to filter by
             status: Optional status string to filter by (active, banned, suspended)
             pagination: Optional pagination parameters
@@ -281,17 +279,13 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
             List of devices if no pagination, PaginatedResult if pagination provided
 
         Raises:
-            ValueError: If account_id is None (required for multi-tenant safety)
             ValueError: If sort field is not in SORTABLE_FIELDS
             CursorValidationError: If cursor is invalid or state doesn't match
         """
-        if account_id is None:
-            raise ValueError("account_id is required for filtering devices")
-        account_uuid = self._extract_uuid(account_id)
-        query = select(DeviceORM).where(
-            DeviceORM.account_id == account_uuid,
-            DeviceORM.deleted_at.is_(None),
-        )
+        query = select(DeviceORM).where(DeviceORM.deleted_at.is_(None))
+        if account_id is not None:
+            account_uuid = self._extract_uuid(account_id)
+            query = query.where(DeviceORM.account_id == account_uuid)
 
         # Build filters dict for cursor validation
         filters_dict = {}
@@ -421,7 +415,8 @@ class DeviceSessionRepository(BaseRepository[DeviceSession, DeviceSessionORM]):
         Note: account_id is used for multi-tenant safety via JOIN with devices table.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Optional account ID to filter by. If None, returns all sessions
+                (superadmin use case). Regular users should always pass account_id.
             device_id: Optional device ID to filter by
             pagination: Optional pagination parameters
             **kwargs: Additional filter parameters (reserved for future use)
@@ -430,22 +425,18 @@ class DeviceSessionRepository(BaseRepository[DeviceSession, DeviceSessionORM]):
             List of sessions if no pagination, PaginatedResult if pagination provided
 
         Raises:
-            ValueError: If account_id is None (required for multi-tenant safety)
             ValueError: If sort field is not in SORTABLE_FIELDS
             CursorValidationError: If cursor is invalid or state doesn't match
         """
-        if account_id is None:
-            raise ValueError("account_id is required for filtering device sessions")
-        account_uuid = self._extract_uuid(account_id)
-        # Join with devices table to filter by account_id
-        query = (
-            select(DeviceSessionORM)
-            .join(DeviceORM, DeviceSessionORM.device_id == DeviceORM.id)
-            .where(
-                DeviceORM.account_id == account_uuid,
-                DeviceSessionORM.deleted_at.is_(None),
+        # Base query without account filter
+        query = select(DeviceSessionORM).where(DeviceSessionORM.deleted_at.is_(None))
+
+        # Join with devices table to filter by account_id if provided
+        if account_id is not None:
+            account_uuid = self._extract_uuid(account_id)
+            query = query.join(DeviceORM, DeviceSessionORM.device_id == DeviceORM.id).where(
+                DeviceORM.account_id == account_uuid
             )
-        )
 
         # Build filters dict for cursor validation
         filters_dict = {}

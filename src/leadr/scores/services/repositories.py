@@ -106,7 +106,8 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         """Filter scores by account and optional criteria.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Optional account ID to filter by. If None, returns all scores
+                (superadmin use case). Regular users should always pass account_id.
             board_id: Optional board ID to filter by
             game_id: Optional game ID to filter by
             device_id: Optional device ID to filter by
@@ -117,19 +118,15 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             List of scores if no pagination, PaginatedResult if pagination provided
 
         Raises:
-            ValueError: If account_id is None (required for multi-tenant safety)
             ValueError: If sort field is not in SORTABLE_FIELDS
             CursorValidationError: If cursor is invalid or state doesn't match
         """
-        if account_id is None:
-            raise ValueError("account_id is required for filtering scores")
+        # Build base query
+        query = select(ScoreORM).where(ScoreORM.deleted_at.is_(None))
 
-        # Build base query with filters
-        account_uuid = self._extract_uuid(account_id)
-        query = select(ScoreORM).where(
-            ScoreORM.account_id == account_uuid,
-            ScoreORM.deleted_at.is_(None),
-        )
+        if account_id is not None:
+            account_uuid = self._extract_uuid(account_id)
+            query = query.where(ScoreORM.account_id == account_uuid)
 
         # Apply optional filters
         filters_dict = {}

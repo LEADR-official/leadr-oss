@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
+from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.common.domain.ids import AccountID, BoardID, GameID, ScoreFlagID
 from leadr.scores.api.score_flag_schemas import ScoreFlagResponse, ScoreFlagUpdateRequest
 from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
@@ -15,7 +15,7 @@ router = APIRouter()
 
 @router.get("/score-flags", response_model=list[ScoreFlagResponse])
 async def list_score_flags(
-    auth: AdminAuthContextWithAccountIDDep,
+    auth: AdminAuthContextDep,
     service: ScoreFlagServiceDep,
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     board_id: BoardID | None = None,
@@ -29,12 +29,12 @@ async def list_score_flags(
     filtering by board, game, status, or flag type.
 
     For regular users, account_id is automatically derived from their API key.
-    For superadmins, account_id must be explicitly provided as a query parameter.
+    For superadmins, account_id is optional - if omitted, returns flags from all accounts.
 
     Args:
         auth: Authentication context with user info.
         service: Injected score flag service dependency.
-        account_id: Optional account_id query parameter (required for superadmins).
+        account_id: Optional account_id query parameter (superadmins can omit to see all).
         board_id: Optional board ID to filter by.
         game_id: Optional game ID to filter by.
         status: Optional status to filter by (PENDING, CONFIRMED_CHEAT, etc.).
@@ -44,11 +44,14 @@ async def list_score_flags(
         List of ScoreFlagResponse objects matching the filter criteria.
 
     Raises:
-        400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    # Superadmin without account_id = None (all accounts)
+    # Superadmin with account_id = that specific account
+    # Regular user = always their account_id (ignores query param)
+    effective_account_id = account_id if auth.is_superadmin else auth.account_id
     flags = await service.list_flags(
-        account_id=account_id or auth.account_id,
+        account_id=effective_account_id,
         board_id=board_id,
         game_id=game_id,
         status=status,

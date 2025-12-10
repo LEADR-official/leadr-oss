@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from leadr.auth.dependencies import AdminAuthContextDep, AdminAuthContextWithAccountIDDep
+from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, ScoreSubmissionMetaID
 from leadr.scores.api.score_submission_meta_schemas import ScoreSubmissionMetaResponse
 from leadr.scores.services.dependencies import ScoreSubmissionMetaServiceDep
@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.get("/score-submission-metadata", response_model=list[ScoreSubmissionMetaResponse])
 async def list_submission_meta(
-    auth: AdminAuthContextWithAccountIDDep,
+    auth: AdminAuthContextDep,
     service: ScoreSubmissionMetaServiceDep,
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     board_id: BoardID | None = None,
@@ -26,12 +26,12 @@ async def list_submission_meta(
     filtering by board or device.
 
     For regular users, account_id is automatically derived from their API key.
-    For superadmins, account_id must be explicitly provided as a query parameter.
+    For superadmins, account_id is optional - if omitted, returns metadata from all accounts.
 
     Args:
         auth: Authentication context with user info.
         service: Injected submission metadata service dependency.
-        account_id: Optional account_id query parameter (required for superadmins).
+        account_id: Optional account_id query parameter (superadmins can omit to see all).
         board_id: Optional board ID to filter by.
         device_id: Optional device ID to filter by.
 
@@ -39,11 +39,14 @@ async def list_submission_meta(
         List of ScoreSubmissionMetaResponse objects matching the filter criteria.
 
     Raises:
-        400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    # Superadmin without account_id = None (all accounts)
+    # Superadmin with account_id = that specific account
+    # Regular user = always their account_id (ignores query param)
+    effective_account_id = account_id if auth.is_superadmin else auth.account_id
     metas = await service.list_submission_meta(
-        account_id=account_id or auth.account_id,
+        account_id=effective_account_id,
         board_id=board_id,
         device_id=device_id,
     )

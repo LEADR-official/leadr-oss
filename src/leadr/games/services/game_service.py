@@ -116,26 +116,27 @@ class GameService(BaseService[Game, GameRepository]):
     @overload
     async def list_games(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         pagination: None = None,
     ) -> list[Game]: ...
 
     @overload
     async def list_games(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         pagination: PaginationParams = ...,
     ) -> PaginatedResult[Game]: ...
 
     async def list_games(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         pagination: PaginationParams | None = None,
     ) -> list[Game] | PaginatedResult[Game]:
         """List all games for an account with optional pagination.
 
         Args:
-            account_id: The ID of the account to list games for.
+            account_id: The ID of the account to list games for. If None, returns all
+                games (superadmin use case).
             pagination: Optional pagination parameters.
 
         Returns:

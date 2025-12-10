@@ -102,7 +102,8 @@ class GameRepository(BaseRepository[Game, GameORM]):
         """Filter games by account and optional criteria.
 
         Args:
-            account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
+            account_id: Optional account ID to filter by. If None, returns all games
+                (superadmin use case). Regular users should always pass account_id.
             pagination: Optional pagination parameters
             **kwargs: Additional filter parameters (reserved for future use)
 
@@ -110,17 +111,13 @@ class GameRepository(BaseRepository[Game, GameORM]):
             List of games if no pagination, PaginatedResult if pagination provided
 
         Raises:
-            ValueError: If account_id is None (required for multi-tenant safety)
             ValueError: If sort field is not in SORTABLE_FIELDS
             CursorValidationError: If cursor is invalid or state doesn't match
         """
-        if account_id is None:
-            raise ValueError("account_id is required for filtering games")
-        account_uuid = self._extract_uuid(account_id)
-        query = select(GameORM).where(
-            GameORM.account_id == account_uuid,
-            GameORM.deleted_at.is_(None),
-        )
+        query = select(GameORM).where(GameORM.deleted_at.is_(None))
+        if account_id is not None:
+            account_uuid = self._extract_uuid(account_id)
+            query = query.where(GameORM.account_id == account_uuid)
 
         # Build filters dict for cursor validation
         filters_dict = {}

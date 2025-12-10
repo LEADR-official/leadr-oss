@@ -223,7 +223,7 @@ async def handle_list_scores(
     """
     try:
         result = await service.list_scores(
-            account_id=account_id or auth.account_id,
+            account_id=account_id,
             board_id=board_id,
             game_id=game_id,
             device_id=device_id,
@@ -304,8 +304,12 @@ async def list_scores_admin(
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
     """
+    # Superadmin without account_id = None (all accounts)
+    # Superadmin with account_id = that specific account
+    # Regular user = always their account_id (ignores query param)
+    effective_account_id = account_id if auth.is_superadmin else auth.account_id
     return await handle_list_scores(  # type: ignore[return-value]
-        auth, service, pagination, account_id or auth.account_id, board_id, game_id, device_id
+        auth, service, pagination, effective_account_id, board_id, game_id, device_id
     )
 
 

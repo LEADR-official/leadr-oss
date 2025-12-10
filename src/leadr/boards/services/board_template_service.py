@@ -173,26 +173,27 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
     @overload
     async def list_board_templates_by_account(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         pagination: None = None,
     ) -> list[BoardTemplate]: ...
 
     @overload
     async def list_board_templates_by_account(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         pagination: PaginationParams = ...,
     ) -> PaginatedResult[BoardTemplate]: ...
 
     async def list_board_templates_by_account(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         pagination: PaginationParams | None = None,
     ) -> list[BoardTemplate] | PaginatedResult[BoardTemplate]:
         """List all board templates for an account with optional pagination.
 
         Args:
-            account_id: The ID of the account to list templates for.
+            account_id: The ID of the account to list templates for. If None, returns all
+                templates (superadmin use case).
             pagination: Optional pagination parameters.
 
         Returns:
@@ -203,7 +204,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
     @overload
     async def list_board_templates_by_game(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         game_id: GameID,
         pagination: None = None,
     ) -> list[BoardTemplate]: ...
@@ -211,21 +212,22 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
     @overload
     async def list_board_templates_by_game(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         game_id: GameID,
         pagination: PaginationParams = ...,
     ) -> PaginatedResult[BoardTemplate]: ...
 
     async def list_board_templates_by_game(
         self,
-        account_id: AccountID,
+        account_id: AccountID | None,
         game_id: GameID,
         pagination: PaginationParams | None = None,
     ) -> list[BoardTemplate] | PaginatedResult[BoardTemplate]:
         """List all board templates for a specific game with optional pagination.
 
         Args:
-            account_id: The ID of the account (for multi-tenant safety).
+            account_id: The ID of the account. If None, returns templates from all accounts
+                (superadmin use case).
             game_id: The ID of the game to list templates for.
             pagination: Optional pagination parameters.
 

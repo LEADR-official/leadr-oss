@@ -85,21 +85,22 @@ class UserService(BaseService[User, UserRepository]):
 
     @overload
     async def list_users_by_account(
-        self, account_id: AccountID, pagination: None = None
+        self, account_id: AccountID | None, pagination: None = None
     ) -> list[User]: ...
 
     @overload
     async def list_users_by_account(
-        self, account_id: AccountID, pagination: PaginationParams = ...
+        self, account_id: AccountID | None, pagination: PaginationParams = ...
     ) -> PaginatedResult[User]: ...
 
     async def list_users_by_account(
-        self, account_id: AccountID, pagination: PaginationParams | None = None
+        self, account_id: AccountID | None, pagination: PaginationParams | None = None
     ) -> list[User] | PaginatedResult[User]:
         """List all users for an account with optional pagination.
 
         Args:
-            account_id: The account ID to list users for.
+            account_id: The account ID to list users for. If None, returns all users
+                (superadmin use case).
             pagination: Optional pagination parameters.
 
         Returns:
