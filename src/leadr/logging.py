@@ -45,6 +45,7 @@ def _console_renderer(
     app = event_dict.pop("app", "LEADR")
     env = event_dict.pop("env", "")
     event = event_dict.pop("event", "")
+    exception = event_dict.pop("exception", None)
 
     # Build location string
     location = logger_name
@@ -63,7 +64,11 @@ def _console_renderer(
     level_str = f"{color}[{level}]{_RESET}"
     dim_location = f"{_DIM}{location}{_RESET}"
 
-    return f"{timestamp}|{app}|{env}|server {level_str} {dim_location} - {event}{extras}"
+    log_line = f"{timestamp}|{app}|{env}|server {level_str} {dim_location} - {event}{extras}"
+
+    if exception:
+        return f"{log_line}\n{exception}"
+    return log_line
 
 
 def _add_app_context(app_name: str, env: str) -> structlog.types.Processor:
@@ -113,6 +118,7 @@ def setup_logging(
         structlog.stdlib.PositionalArgumentsFormatter(),
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.StackInfoRenderer(),
+        structlog.processors.ExceptionRenderer(),
         structlog.processors.UnicodeDecoder(),
         _add_app_context(app_name, env),
         structlog.processors.CallsiteParameterAdder(

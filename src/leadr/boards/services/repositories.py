@@ -1,5 +1,6 @@
 """Board repository services."""
 
+from datetime import datetime
 from typing import Any, overload
 
 from pydantic import UUID4
@@ -164,8 +165,14 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
     async def list_boards(
         self,
         account_id: UUID4 | AccountID | None = None,
+        game_id: UUID4 | GameID | None = None,
         code: str | None = None,
+        is_active: bool | None = None,
         is_published: bool | None = None,
+        starts_before: datetime | None = None,
+        starts_after: datetime | None = None,
+        ends_before: datetime | None = None,
+        ends_after: datetime | None = None,
         pagination: None = None,
     ) -> list[Board]: ...
 
@@ -173,26 +180,42 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
     async def list_boards(
         self,
         account_id: UUID4 | AccountID | None = None,
+        game_id: UUID4 | GameID | None = None,
         code: str | None = None,
+        is_active: bool | None = None,
         is_published: bool | None = None,
+        starts_before: datetime | None = None,
+        starts_after: datetime | None = None,
+        ends_before: datetime | None = None,
+        ends_after: datetime | None = None,
         pagination: PaginationParams = ...,
     ) -> PaginatedResult[Board]: ...
 
     async def list_boards(
         self,
         account_id: UUID4 | AccountID | None = None,
+        game_id: UUID4 | GameID | None = None,
         code: str | None = None,
+        is_active: bool | None = None,
         is_published: bool | None = None,
+        starts_before: datetime | None = None,
+        starts_after: datetime | None = None,
+        ends_before: datetime | None = None,
+        ends_after: datetime | None = None,
         pagination: PaginationParams | None = None,
     ) -> list[Board] | PaginatedResult[Board]:
-        """List boards with optional filtering by account_id and/or code.
-
-        This method supports special behavior for superadmins filtering by code only.
+        """List boards with optional filtering.
 
         Args:
             account_id: Optional account ID to filter by
+            game_id: Optional game ID to filter by
             code: Optional short code to filter by
+            is_active: Optional filter for active status
             is_published: Optional filter for published status
+            starts_before: Optional filter for boards starting before this time
+            starts_after: Optional filter for boards starting after this time
+            ends_before: Optional filter for boards ending before this time
+            ends_after: Optional filter for boards ending after this time
             pagination: Optional pagination parameters
 
         Returns:
@@ -205,20 +228,45 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         query = select(BoardORM).where(BoardORM.deleted_at.is_(None))
 
         # Build filters dict for cursor validation
-        filters_dict = {}
+        filters_dict: dict[str, str] = {}
 
         if account_id is not None:
             account_uuid = self._extract_uuid(account_id)
             query = query.where(BoardORM.account_id == account_uuid)
             filters_dict["account_id"] = str(account_id)
 
+        if game_id is not None:
+            game_uuid = self._extract_uuid(game_id)
+            query = query.where(BoardORM.game_id == game_uuid)
+            filters_dict["game_id"] = str(game_id)
+
         if code is not None:
             query = query.where(BoardORM.short_code == code)
             filters_dict["code"] = code
 
+        if is_active is not None:
+            query = query.where(BoardORM.is_active == is_active)
+            filters_dict["is_active"] = str(is_active)
+
         if is_published is not None:
             query = query.where(BoardORM.is_published == is_published)
             filters_dict["is_published"] = str(is_published)
+
+        if starts_before is not None:
+            query = query.where(BoardORM.starts_at <= starts_before)
+            filters_dict["starts_before"] = starts_before.isoformat()
+
+        if starts_after is not None:
+            query = query.where(BoardORM.starts_at >= starts_after)
+            filters_dict["starts_after"] = starts_after.isoformat()
+
+        if ends_before is not None:
+            query = query.where(BoardORM.ends_at <= ends_before)
+            filters_dict["ends_before"] = ends_before.isoformat()
+
+        if ends_after is not None:
+            query = query.where(BoardORM.ends_at >= ends_after)
+            filters_dict["ends_after"] = ends_after.isoformat()
 
         # If no pagination, return list (backward compatibility)
         if pagination is None:

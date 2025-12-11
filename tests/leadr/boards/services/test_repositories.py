@@ -843,3 +843,593 @@ class TestBoardRepository:
         # Count boards from the other template
         other_count = await board_repo.count_boards_by_template(BoardTemplateID(other_template_id))
         assert other_count == 1
+
+    async def test_list_boards_filter_by_game_id(self, db_session: AsyncSession):
+        """Test filtering boards by game_id."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create two games
+        game_repo = GameRepository(db_session)
+        game1_id = GameID(uuid4())
+        game2_id = GameID(uuid4())
+
+        game1 = Game(
+            id=game1_id,
+            account_id=account_id,
+            name="Game 1",
+            slug="game-1",
+            created_at=now,
+            updated_at=now,
+        )
+        game2 = Game(
+            id=game2_id,
+            account_id=account_id,
+            name="Game 2",
+            slug="game-2",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game1)
+        await game_repo.create(game2)
+
+        # Create boards for different games
+        board_repo = BoardRepository(db_session)
+
+        board1 = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game1_id,
+            name="Game 1 Board",
+            slug="game-1-board",
+            short_code="G1B1",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        board2 = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game2_id,
+            name="Game 2 Board",
+            slug="game-2-board",
+            short_code="G2B1",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(board1)
+        await board_repo.create(board2)
+
+        # Filter by game_id
+        boards = await board_repo.list_boards(game_id=game1_id)
+
+        assert len(boards) == 1
+        assert boards[0].name == "Game 1 Board"
+        assert boards[0].game_id == game1_id
+
+    async def test_list_boards_filter_by_is_active(self, db_session: AsyncSession):
+        """Test filtering boards by is_active status."""
+        # Create account and game
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID(uuid4())
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create active and inactive boards
+        board_repo = BoardRepository(db_session)
+
+        active_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Active Board",
+            slug="active-board",
+            short_code="ACTIVE",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        inactive_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Inactive Board",
+            slug="inactive-board",
+            short_code="INACTIVE",
+            is_active=False,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(active_board)
+        await board_repo.create(inactive_board)
+
+        # Filter active only
+        active_boards = await board_repo.list_boards(is_active=True)
+        assert len(active_boards) == 1
+        assert active_boards[0].name == "Active Board"
+
+        # Filter inactive only
+        inactive_boards = await board_repo.list_boards(is_active=False)
+        assert len(inactive_boards) == 1
+        assert inactive_boards[0].name == "Inactive Board"
+
+    async def test_list_boards_filter_by_starts_before(self, db_session: AsyncSession):
+        """Test filtering boards starting before a given date."""
+        from datetime import timedelta
+
+        # Create account and game
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID(uuid4())
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create boards with different start dates
+        board_repo = BoardRepository(db_session)
+
+        early_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Early Board",
+            slug="early-board",
+            short_code="EARLY",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            starts_at=now - timedelta(days=10),
+            created_at=now,
+            updated_at=now,
+        )
+        late_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Late Board",
+            slug="late-board",
+            short_code="LATE",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            starts_at=now + timedelta(days=10),
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(early_board)
+        await board_repo.create(late_board)
+
+        # Filter boards starting before now
+        boards = await board_repo.list_boards(starts_before=now)
+        assert len(boards) == 1
+        assert boards[0].name == "Early Board"
+
+    async def test_list_boards_filter_by_starts_after(self, db_session: AsyncSession):
+        """Test filtering boards starting after a given date."""
+        from datetime import timedelta
+
+        # Create account and game
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID(uuid4())
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create boards with different start dates
+        board_repo = BoardRepository(db_session)
+
+        early_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Early Board",
+            slug="early-board",
+            short_code="EARLY",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            starts_at=now - timedelta(days=10),
+            created_at=now,
+            updated_at=now,
+        )
+        late_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Late Board",
+            slug="late-board",
+            short_code="LATE",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            starts_at=now + timedelta(days=10),
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(early_board)
+        await board_repo.create(late_board)
+
+        # Filter boards starting after now
+        boards = await board_repo.list_boards(starts_after=now)
+        assert len(boards) == 1
+        assert boards[0].name == "Late Board"
+
+    async def test_list_boards_filter_by_ends_before(self, db_session: AsyncSession):
+        """Test filtering boards ending before a given date."""
+        from datetime import timedelta
+
+        # Create account and game
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID(uuid4())
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create boards with different end dates
+        board_repo = BoardRepository(db_session)
+
+        ended_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Ended Board",
+            slug="ended-board",
+            short_code="ENDED",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            ends_at=now - timedelta(days=5),
+            created_at=now,
+            updated_at=now,
+        )
+        ongoing_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Ongoing Board",
+            slug="ongoing-board",
+            short_code="ONGOING",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            ends_at=now + timedelta(days=5),
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(ended_board)
+        await board_repo.create(ongoing_board)
+
+        # Filter boards ending before now
+        boards = await board_repo.list_boards(ends_before=now)
+        assert len(boards) == 1
+        assert boards[0].name == "Ended Board"
+
+    async def test_list_boards_filter_by_ends_after(self, db_session: AsyncSession):
+        """Test filtering boards ending after a given date."""
+        from datetime import timedelta
+
+        # Create account and game
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID(uuid4())
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create boards with different end dates
+        board_repo = BoardRepository(db_session)
+
+        ended_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Ended Board",
+            slug="ended-board",
+            short_code="ENDED",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            ends_at=now - timedelta(days=5),
+            created_at=now,
+            updated_at=now,
+        )
+        ongoing_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Ongoing Board",
+            slug="ongoing-board",
+            short_code="ONGOING",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            ends_at=now + timedelta(days=5),
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(ended_board)
+        await board_repo.create(ongoing_board)
+
+        # Filter boards ending after now
+        boards = await board_repo.list_boards(ends_after=now)
+        assert len(boards) == 1
+        assert boards[0].name == "Ongoing Board"
+
+    async def test_list_boards_filter_by_multiple_criteria(self, db_session: AsyncSession):
+        """Test filtering boards by multiple criteria at once."""
+        from datetime import timedelta
+
+        # Create account and game
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID(uuid4())
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create various boards
+        board_repo = BoardRepository(db_session)
+
+        # Active board starting in the past
+        board1 = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Active Past Board",
+            slug="active-past",
+            short_code="AP1",
+            is_active=True,
+            is_published=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            starts_at=now - timedelta(days=5),
+            created_at=now,
+            updated_at=now,
+        )
+        # Inactive board starting in the past
+        board2 = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Inactive Past Board",
+            slug="inactive-past",
+            short_code="IP1",
+            is_active=False,
+            is_published=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            starts_at=now - timedelta(days=5),
+            created_at=now,
+            updated_at=now,
+        )
+        # Active board starting in the future
+        board3 = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Active Future Board",
+            slug="active-future",
+            short_code="AF1",
+            is_active=True,
+            is_published=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            starts_at=now + timedelta(days=5),
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(board1)
+        await board_repo.create(board2)
+        await board_repo.create(board3)
+
+        # Filter: active AND started before now
+        boards = await board_repo.list_boards(
+            game_id=game_id,
+            is_active=True,
+            starts_before=now,
+        )
+        assert len(boards) == 1
+        assert boards[0].name == "Active Past Board"
+
+    async def test_list_boards_with_game_id_supports_pagination(self, db_session: AsyncSession):
+        """Test that filtering by game_id works with pagination."""
+        from leadr.common.api.pagination import PaginationParams
+
+        # Create account and game
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID(uuid4())
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create multiple boards
+        board_repo = BoardRepository(db_session)
+        for i in range(5):
+            board = Board(
+                id=BoardID(uuid4()),
+                account_id=account_id,
+                game_id=game_id,
+                name=f"Board {i}",
+                slug=f"board-{i}",
+                short_code=f"B{i:03d}",
+                is_active=True,
+                sort_direction=SortDirection.DESCENDING,
+                keep_strategy=KeepStrategy.ALL,
+                created_at=now,
+                updated_at=now,
+            )
+            await board_repo.create(board)
+
+        # Paginate with game_id filter
+        pagination = PaginationParams(limit=2, sort=None, cursor=None)
+        result = await board_repo.list_boards(game_id=game_id, pagination=pagination)
+
+        assert len(result.items) == 2
+        assert result.has_next is True
+        assert result.next_position is not None

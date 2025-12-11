@@ -259,8 +259,14 @@ class BoardService(BaseService[Board, BoardRepository]):
     async def list_boards(
         self,
         account_id: AccountID | None = None,
+        game_id: GameID | None = None,
         code: str | None = None,
+        is_active: bool | None = None,
         is_published: bool | None = None,
+        starts_before: datetime | None = None,
+        starts_after: datetime | None = None,
+        ends_before: datetime | None = None,
+        ends_after: datetime | None = None,
         pagination: None = None,
     ) -> list[Board]: ...
 
@@ -268,31 +274,60 @@ class BoardService(BaseService[Board, BoardRepository]):
     async def list_boards(
         self,
         account_id: AccountID | None = None,
+        game_id: GameID | None = None,
         code: str | None = None,
+        is_active: bool | None = None,
         is_published: bool | None = None,
+        starts_before: datetime | None = None,
+        starts_after: datetime | None = None,
+        ends_before: datetime | None = None,
+        ends_after: datetime | None = None,
         pagination: PaginationParams = ...,
     ) -> PaginatedResult[Board]: ...
 
     async def list_boards(
         self,
         account_id: AccountID | None = None,
+        game_id: GameID | None = None,
         code: str | None = None,
+        is_active: bool | None = None,
         is_published: bool | None = None,
+        starts_before: datetime | None = None,
+        starts_after: datetime | None = None,
+        ends_before: datetime | None = None,
+        ends_after: datetime | None = None,
         pagination: PaginationParams | None = None,
     ) -> list[Board] | PaginatedResult[Board]:
-        """List boards with optional filtering by account_id and/or code.
+        """List boards with optional filtering.
 
         Args:
             account_id: Optional account ID to filter by
+            game_id: Optional game ID to filter by
             code: Optional short code to filter by
+            is_active: Optional filter for active status
             is_published: Optional filter for published status
+            starts_before: Optional filter for boards starting before this time
+            starts_after: Optional filter for boards starting after this time
+            ends_before: Optional filter for boards ending before this time
+            ends_after: Optional filter for boards ending after this time
             pagination: Optional pagination parameters
 
         Returns:
             List of Board entities if no pagination, PaginatedResult if pagination provided.
         """
-        return await self.repository.list_boards(
-            account_id=account_id, code=code, is_published=is_published, pagination=pagination
+        # pyright: ignore needed due to Python overload resolution limitations
+        # when passing PaginationParams | None to overloaded method
+        return await self.repository.list_boards(  # pyright: ignore[reportCallIssue]
+            account_id=account_id,
+            game_id=game_id,
+            code=code,
+            is_active=is_active,
+            is_published=is_published,
+            starts_before=starts_before,
+            starts_after=starts_after,
+            ends_before=ends_before,
+            ends_after=ends_after,
+            pagination=pagination,  # pyright: ignore[reportArgumentType]
         )
 
     async def update_board(
