@@ -465,3 +465,220 @@ class TestGameRoutes:
         game_names = {g["name"] for g in data["data"]}
         assert "Game from Account 1" in game_names
         assert "Game from Account 2" in game_names
+
+    async def test_create_game_with_tags_and_description(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating a game with tags and description via API."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        response = await client.post(
+            "/games",
+            json={
+                "account_id": str(account.id),
+                "name": "Adventure Game",
+                "description": "An epic journey awaits",
+                "tags": ["adventure", "rpg", "story"],
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "Adventure Game"
+        assert data["description"] == "An epic journey awaits"
+        assert data["tags"] == ["adventure", "rpg", "story"]
+
+    async def test_create_game_tags_defaults_to_empty_list(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that tags defaults to empty list when not provided via API."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        response = await client.post(
+            "/games",
+            json={
+                "account_id": str(account.id),
+                "name": "Simple Game",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["tags"] == []
+        assert data["description"] is None
+
+    async def test_update_game_tags(self, client: AsyncClient, db_session, test_api_key):
+        """Test updating a game's tags via API."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        create_response = await client.post(
+            "/games",
+            json={
+                "account_id": str(account.id),
+                "name": "Game to Update Tags",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+        game_id = create_response.json()["id"]
+
+        # Update tags
+        update_response = await client.patch(
+            f"/games/{game_id}",
+            json={"tags": ["action", "puzzle"]},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert update_response.status_code == 200
+        data = update_response.json()
+        assert data["tags"] == ["action", "puzzle"]
+
+    async def test_update_game_description(self, client: AsyncClient, db_session, test_api_key):
+        """Test updating a game's description via API."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        create_response = await client.post(
+            "/games",
+            json={
+                "account_id": str(account.id),
+                "name": "Game to Update Description",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+        game_id = create_response.json()["id"]
+
+        # Update description
+        update_response = await client.patch(
+            f"/games/{game_id}",
+            json={"description": "A brand new description"},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert update_response.status_code == 200
+        data = update_response.json()
+        assert data["description"] == "A brand new description"
+
+    async def test_get_game_returns_tags_and_description(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that retrieving a game includes tags and description."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        # Create game with tags and description
+        create_response = await client.post(
+            "/games",
+            json={
+                "account_id": str(account.id),
+                "name": "Full Game",
+                "description": "A complete game",
+                "tags": ["complete", "full"],
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+        game_id = create_response.json()["id"]
+
+        # Retrieve game
+        get_response = await client.get(
+            f"/games/{game_id}", headers={"leadr-api-key": test_api_key}
+        )
+
+        assert get_response.status_code == 200
+        data = get_response.json()
+        assert data["description"] == "A complete game"
+        assert data["tags"] == ["complete", "full"]
+
+    async def test_create_game_with_page_url(self, client: AsyncClient, db_session, test_api_key):
+        """Test creating a game with page_url via API."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        response = await client.post(
+            "/games",
+            json={
+                "account_id": str(account.id),
+                "name": "Game with Page",
+                "page_url": "https://example.com/game",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "Game with Page"
+        assert data["page_url"] == "https://example.com/game"
+
+    async def test_update_game_page_url(self, client: AsyncClient, db_session, test_api_key):
+        """Test updating a game's page_url via API."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        create_response = await client.post(
+            "/games",
+            json={
+                "account_id": str(account.id),
+                "name": "Game to Update URL",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+        game_id = create_response.json()["id"]
+
+        # Update page_url
+        update_response = await client.patch(
+            f"/games/{game_id}",
+            json={"page_url": "https://example.com/updated"},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert update_response.status_code == 200
+        data = update_response.json()
+        assert data["page_url"] == "https://example.com/updated"
+
+    async def test_game_page_url_defaults_to_none(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that page_url defaults to None when not provided via API."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        response = await client.post(
+            "/games",
+            json={
+                "account_id": str(account.id),
+                "name": "Simple Game",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["page_url"] is None

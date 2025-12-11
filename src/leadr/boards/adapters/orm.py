@@ -72,6 +72,7 @@ class BoardORM(Base):
     tags: Mapped[list[str]] = mapped_column(
         ARRAY(String), nullable=False, default=list, server_default="{}"
     )
+    description: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
 
     # Relationships
     account: Mapped["AccountORM"] = relationship("AccountORM")  # type: ignore[name-defined]

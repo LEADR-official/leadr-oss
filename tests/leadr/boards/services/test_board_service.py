@@ -1091,3 +1091,70 @@ class TestBoardService:
         # Assertions - the key test is that the name uses series_value=1
         assert board.name == "Weekly 1"  # First board should have series_value=1
         assert board.created_from_template_id == template.id
+
+    async def test_create_board_with_description(self, db_session: AsyncSession):
+        """Test creating a board with description via service."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speed Run Board",
+            icon="trophy",
+            short_code="SRDESC",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+            description="Complete the level as fast as possible",
+        )
+
+        assert board.id is not None
+        assert board.description == "Complete the level as fast as possible"
+
+    async def test_update_board_description(self, db_session: AsyncSession):
+        """Test updating board description."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        board_service = BoardService(db_session)
+        created_board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speed Run Board",
+            icon="trophy",
+            short_code="SRUPD",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        # Update description
+        updated_board = await board_service.update_board(
+            board_id=created_board.id,
+            description="Updated description for the board",
+        )
+
+        assert updated_board.description == "Updated description for the board"
+        assert updated_board.name == "Speed Run Board"  # Unchanged

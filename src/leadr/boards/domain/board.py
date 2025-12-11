@@ -83,6 +83,7 @@ class Board(Entity):
     tags: list[str] = Field(
         default_factory=list, description="List of tags for categorizing the board"
     )
+    description: str | None = Field(default=None, description="Short description of the board")
 
     @field_validator("name")
     @classmethod

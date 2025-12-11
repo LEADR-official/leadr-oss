@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, String, UniqueConstraint
+from sqlalchemy import ARRAY, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from leadr.common.orm import Base
@@ -37,6 +37,11 @@ class GameORM(Base):
     steam_app_id: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     default_board_id: Mapped[UUID | None] = mapped_column(nullable=True, default=None)
     anti_cheat_enabled: Mapped[bool] = mapped_column(nullable=False, default=True)
+    description: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(String), nullable=False, default=list, server_default="{}"
+    )
+    page_url: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
 
     # Relationships
     account: Mapped["AccountORM"] = relationship("AccountORM")  # type: ignore[name-defined]

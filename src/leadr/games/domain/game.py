@@ -39,6 +39,11 @@ class Game(Entity):
         default=True,
         description="Whether anti-cheat is enabled for this game (defaults to enabled)",
     )
+    description: str | None = Field(default=None, description="Short description of the game")
+    tags: list[str] = Field(
+        default_factory=list, description="List of tags for categorizing the game"
+    )
+    page_url: str | None = Field(default=None, description="URL to the game's page or website")
 
     @field_validator("name")
     @classmethod

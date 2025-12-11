@@ -51,6 +51,9 @@ async def create_game(
             steam_app_id=request.steam_app_id,
             default_board_id=request.default_board_id,
             anti_cheat_enabled=request.anti_cheat_enabled,
+            description=request.description,
+            tags=request.tags,
+            page_url=request.page_url,
         )
     except IntegrityError:
         raise HTTPException(status_code=404, detail="Account not found") from None
@@ -218,6 +221,9 @@ async def update_game(
         steam_app_id=request.steam_app_id,
         default_board_id=request.default_board_id,
         anti_cheat_enabled=request.anti_cheat_enabled,
+        description=request.description,
+        tags=request.tags,
+        page_url=request.page_url,
     )
 
     return GameResponse.from_domain(game)

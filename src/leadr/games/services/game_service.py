@@ -36,6 +36,9 @@ class GameService(BaseService[Game, GameRepository]):
         steam_app_id: str | None = None,
         default_board_id: BoardID | None = None,
         anti_cheat_enabled: bool = True,
+        description: str | None = None,
+        tags: list[str] | None = None,
+        page_url: str | None = None,
     ) -> Game:
         """Create a new game.
 
@@ -46,6 +49,9 @@ class GameService(BaseService[Game, GameRepository]):
             steam_app_id: Optional Steam application ID.
             default_board_id: Optional default leaderboard ID.
             anti_cheat_enabled: Whether anti-cheat is enabled (defaults to True).
+            description: Optional short description of the game.
+            tags: Optional list of tags for categorizing the game.
+            page_url: Optional URL to the game's page or website.
 
         Returns:
             The created Game domain entity.
@@ -87,6 +93,9 @@ class GameService(BaseService[Game, GameRepository]):
             steam_app_id=steam_app_id,
             default_board_id=default_board_id,
             anti_cheat_enabled=anti_cheat_enabled,
+            description=description,
+            tags=tags or [],
+            page_url=page_url,
         )
 
         return await self.repository.create(game)
@@ -151,6 +160,9 @@ class GameService(BaseService[Game, GameRepository]):
         steam_app_id: str | None = None,
         default_board_id: BoardID | None = None,
         anti_cheat_enabled: bool | None = None,
+        description: str | None = None,
+        tags: list[str] | None = None,
+        page_url: str | None = None,
     ) -> Game:
         """Update game fields.
 
@@ -160,6 +172,9 @@ class GameService(BaseService[Game, GameRepository]):
             steam_app_id: New Steam app ID, if provided
             default_board_id: New default board ID, if provided
             anti_cheat_enabled: Whether anti-cheat is enabled, if provided
+            description: New game description, if provided
+            tags: New list of tags, if provided
+            page_url: New page URL, if provided
 
         Returns:
             The updated Game domain entity
@@ -177,5 +192,11 @@ class GameService(BaseService[Game, GameRepository]):
             game.default_board_id = default_board_id
         if anti_cheat_enabled is not None:
             game.anti_cheat_enabled = anti_cheat_enabled
+        if description is not None:
+            game.description = description
+        if tags is not None:
+            game.tags = tags
+        if page_url is not None:
+            game.page_url = page_url
 
         return await self.repository.update(game)

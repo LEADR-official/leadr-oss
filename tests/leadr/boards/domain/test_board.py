@@ -651,3 +651,54 @@ class TestBoard:
         board.restore()
         assert board.is_deleted is False
         assert board.deleted_at is None
+
+    def test_create_board_with_description(self):
+        """Test creating a board with description."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        now = datetime.now(UTC)
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Speed Run Board",
+            slug="speed-run-board",
+            icon="trophy",
+            short_code="SR001",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST_ONLY,
+            description="Complete the level as fast as possible",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert board.description == "Complete the level as fast as possible"
+
+    def test_board_description_defaults_to_none(self):
+        """Test that description defaults to None when not provided."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        now = datetime.now(UTC)
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Simple Board",
+            slug="simple-board",
+            icon="star",
+            short_code="SB001",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert board.description is None

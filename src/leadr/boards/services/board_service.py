@@ -54,6 +54,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         starts_at: datetime | None = None,
         ends_at: datetime | None = None,
         tags: list[str] | None = None,
+        description: str | None = None,
     ) -> Board:
         """Create a new board.
 
@@ -75,6 +76,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             starts_at: Optional start time for time-bounded boards.
             ends_at: Optional end time for time-bounded boards.
             tags: Optional list of tags for categorization.
+            description: Optional short description of the board.
 
         Returns:
             The created Board domain entity.
@@ -153,6 +155,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             starts_at=starts_at,
             ends_at=ends_at,
             tags=tags or [],
+            description=description,
         )
 
         return await self.repository.create(board)
@@ -308,6 +311,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         starts_at: datetime | None = None,
         ends_at: datetime | None = None,
         tags: list[str] | None = None,
+        description: str | None = None,
     ) -> Board:
         """Update board fields.
 
@@ -326,6 +330,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             starts_at: New starts_at, if provided
             ends_at: New ends_at, if provided
             tags: New tags list, if provided
+            description: New description, if provided
 
         Returns:
             The updated Board domain entity
@@ -361,5 +366,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             board.ends_at = ends_at
         if tags is not None:
             board.tags = tags
+        if description is not None:
+            board.description = description
 
         return await self.repository.update(board)

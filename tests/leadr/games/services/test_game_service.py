@@ -282,3 +282,148 @@ class TestGameService:
             await game_service.soft_delete(non_existent_id)
 
         assert "Game not found" in str(exc_info.value)
+
+    async def test_create_game_with_tags_and_description(self, db_session: AsyncSession):
+        """Test creating a game with tags and description via service."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Adventure Game",
+            description="An epic adventure awaits",
+            tags=["adventure", "story", "rpg"],
+        )
+
+        assert game.id is not None
+        assert game.description == "An epic adventure awaits"
+        assert game.tags == ["adventure", "story", "rpg"]
+
+    async def test_game_tags_defaults_to_empty_list(self, db_session: AsyncSession):
+        """Test that tags defaults to empty list when not provided via service."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Simple Game",
+        )
+
+        assert game.tags == []
+        assert isinstance(game.tags, list)
+
+    async def test_update_game_tags(self, db_session: AsyncSession):
+        """Test updating game tags."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        created_game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Update tags
+        updated_game = await game_service.update_game(
+            game_id=created_game.id,
+            tags=["puzzle", "strategy"],
+        )
+
+        assert updated_game.tags == ["puzzle", "strategy"]
+        assert updated_game.name == "Test Game"  # Unchanged
+
+    async def test_update_game_description(self, db_session: AsyncSession):
+        """Test updating game description."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        created_game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Update description
+        updated_game = await game_service.update_game(
+            game_id=created_game.id,
+            description="A brand new description",
+        )
+
+        assert updated_game.description == "A brand new description"
+        assert updated_game.name == "Test Game"  # Unchanged
+
+    async def test_game_tags_persists_through_retrieval(self, db_session: AsyncSession):
+        """Test that tags are persisted and retrieved correctly."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        created_game = await game_service.create_game(
+            account_id=account.id,
+            name="Tagged Game",
+            tags=["tag1", "tag2", "tag3"],
+        )
+
+        # Retrieve the game
+        retrieved_game = await game_service.get_game(created_game.id)
+
+        assert retrieved_game is not None
+        assert retrieved_game.tags == ["tag1", "tag2", "tag3"]
+
+    async def test_create_game_with_page_url(self, db_session: AsyncSession):
+        """Test creating a game with page_url via service."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Game with Page",
+            page_url="https://example.com/game",
+        )
+
+        assert game.id is not None
+        assert game.page_url == "https://example.com/game"
+
+    async def test_update_game_page_url(self, db_session: AsyncSession):
+        """Test updating game page_url."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        created_game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Update page_url
+        updated_game = await game_service.update_game(
+            game_id=created_game.id,
+            page_url="https://example.com/updated-game",
+        )
+
+        assert updated_game.page_url == "https://example.com/updated-game"
+        assert updated_game.name == "Test Game"  # Unchanged

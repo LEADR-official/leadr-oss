@@ -70,6 +70,7 @@ async def create_board(
             starts_at=request.starts_at,
             ends_at=request.ends_at,
             tags=request.tags,
+            description=request.description,
         )
     except IntegrityError:
         raise HTTPException(status_code=404, detail="Game or account not found") from None
@@ -415,6 +416,7 @@ async def update_board(
         starts_at=request.starts_at,
         ends_at=request.ends_at,
         tags=request.tags,
+        description=request.description,
     )
 
     return BoardResponse.from_domain(board)

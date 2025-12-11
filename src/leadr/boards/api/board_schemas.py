@@ -55,6 +55,9 @@ class BoardCreateRequest(BaseModel):
     tags: list[str] | None = Field(
         default=None, description="Optional list of tags for categorization"
     )
+    description: str | None = Field(
+        default=None, description="Optional short description of the board"
+    )
 
 
 class BoardUpdateRequest(BaseModel):
@@ -75,6 +78,7 @@ class BoardUpdateRequest(BaseModel):
     starts_at: datetime | None = Field(default=None, description="Updated start time")
     ends_at: datetime | None = Field(default=None, description="Updated end time")
     tags: list[str] | None = Field(default=None, description="Updated tags list")
+    description: str | None = Field(default=None, description="Updated board description")
     deleted: bool | None = Field(default=None, description="Set to true to soft delete the board")
 
 
@@ -108,6 +112,7 @@ class BoardResponse(BaseModel):
         default=None, description="End time for time-bounded boards (UTC)"
     )
     tags: list[str] = Field(default_factory=list, description="List of tags for categorization")
+    description: str | None = Field(default=None, description="Short description of the board")
     created_at: datetime = Field(description="Timestamp when the board was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -139,6 +144,7 @@ class BoardResponse(BaseModel):
             starts_at=board.starts_at,
             ends_at=board.ends_at,
             tags=board.tags,
+            description=board.description,
             created_at=board.created_at,
             updated_at=board.updated_at,
         )

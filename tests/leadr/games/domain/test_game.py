@@ -468,3 +468,93 @@ class TestGame:
         )
 
         assert game.slug == "game-2024"
+
+    def test_create_game_with_tags_and_description(self):
+        """Test creating a game with tags and description."""
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="My Game",
+            slug="my-game",
+            description="An awesome adventure game",
+            tags=["action", "rpg", "adventure"],
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert game.description == "An awesome adventure game"
+        assert game.tags == ["action", "rpg", "adventure"]
+
+    def test_game_tags_defaults_to_empty_list(self):
+        """Test that tags defaults to empty list when not provided."""
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Simple Game",
+            slug="simple-game",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert game.tags == []
+        assert isinstance(game.tags, list)
+
+    def test_game_description_defaults_to_none(self):
+        """Test that description defaults to None when not provided."""
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Simple Game",
+            slug="simple-game",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert game.description is None
+
+    def test_create_game_with_page_url(self):
+        """Test creating a game with page_url."""
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="My Game",
+            slug="my-game",
+            page_url="https://example.com/my-game",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert game.page_url == "https://example.com/my-game"
+
+    def test_game_page_url_defaults_to_none(self):
+        """Test that page_url defaults to None when not provided."""
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Simple Game",
+            slug="simple-game",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert game.page_url is None

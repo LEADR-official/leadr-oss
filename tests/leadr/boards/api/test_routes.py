@@ -963,3 +963,110 @@ class TestBoardRoutes:
         board_names = {b["name"] for b in data["data"]}
         assert "Board from Account 1" in board_names
         assert "Board from Account 2" in board_names
+
+    async def test_create_board_with_description(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating a board with description via API."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        response = await client.post(
+            "/boards",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "Speed Run Board",
+                "icon": "trophy",
+                "short_code": "SRDAPI",
+                "unit": "seconds",
+                "description": "Complete the level as fast as possible",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "Speed Run Board"
+        assert data["description"] == "Complete the level as fast as possible"
+
+    async def test_update_board_description(self, client: AsyncClient, db_session, test_api_key):
+        """Test updating a board's description via API."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        create_response = await client.post(
+            "/boards",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "Board to Update",
+                "icon": "trophy",
+                "short_code": "UPDDSC",
+                "unit": "points",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+        board_id = create_response.json()["id"]
+
+        # Update description
+        update_response = await client.patch(
+            f"/boards/{board_id}",
+            json={"description": "A brand new description"},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert update_response.status_code == 200
+        data = update_response.json()
+        assert data["description"] == "A brand new description"
+
+    async def test_board_description_defaults_to_none(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that description defaults to None when not provided via API."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        response = await client.post(
+            "/boards",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "Simple Board",
+                "icon": "star",
+                "short_code": "SMPBRD",
+                "unit": "points",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["description"] is None
