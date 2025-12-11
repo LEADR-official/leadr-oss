@@ -76,7 +76,8 @@ async def create_board(
             tags=request.tags,
             description=request.description,
         )
-    except IntegrityError:
+    except IntegrityError as e:
+        logger.exception(e)
         raise HTTPException(status_code=404, detail="Game or account not found") from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None

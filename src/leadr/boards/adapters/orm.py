@@ -36,7 +36,7 @@ class BoardORM(Base):
             "game_id",
             "slug",
             unique=True,
-            postgresql_where="is_active = true",
+            postgresql_where="is_active = true AND deleted_at IS NULL",
         ),
     )
 
