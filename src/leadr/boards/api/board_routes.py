@@ -185,7 +185,7 @@ async def handle_list_boards(
         if account_id is None:
             raise HTTPException(status_code=400, detail="account_id is required")
 
-        board = await service.repository.get_by_slug(account_id, game_id, slug)
+        board = await service.repository.get_by_slug(account_id, game_id, slug, is_active=is_active)
         if board is None:
             raise HTTPException(
                 status_code=404,

@@ -130,7 +130,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         account_id: UUID4 | AccountID,
         game_id: UUID4 | GameID,
         slug: str,
-        is_active: bool = True,
+        is_active: bool | None = None,
     ) -> Board | None:
         """Get board by slug within account and game scope.
 
@@ -141,7 +141,8 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             account_id: The account ID to filter by
             game_id: The game ID to filter by
             slug: The slug to search for
-            is_active: Whether to filter for active boards only (default: True)
+            is_active: Optional filter for active status. If None, returns board
+                regardless of active status.
 
         Returns:
             Board entity if found, None otherwise
@@ -153,9 +154,11 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             BoardORM.account_id == account_uuid,
             BoardORM.game_id == game_uuid,
             BoardORM.slug == slug,
-            BoardORM.is_active == is_active,
             BoardORM.deleted_at.is_(None),
         )
+
+        if is_active is not None:
+            query = query.where(BoardORM.is_active == is_active)
 
         result = await self.session.execute(query)
         orm = result.scalar_one_or_none()
