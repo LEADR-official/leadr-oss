@@ -6,8 +6,11 @@ LEADR provides secure authentication for game clients without requiring players 
 
 In case your interested, this guide explains how the authentication system works and how you could integrate it directly into your game without an SDKs help.
 
-> [!TIP]
-> 99% of users do not need to understand this process. This information is provided for transparency and to aid in SDK development.
+!!! tip "TL;DR"
+
+```
+99% of users do not need to understand this process. This information is provided for transparency and to aid in SDK development.
+```
 
 ______________________________________________________________________
 
