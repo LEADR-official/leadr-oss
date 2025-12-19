@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
+import httpx
 import pytest
 
 from leadr.common.geoip import GeoInfo, GeoIPService
@@ -262,6 +263,83 @@ class TestGeoIPService:
             service = GeoIPService(**geoip_config)
 
             # Initialize should not raise exception
+            await service.initialize()
+
+            # Service should still be usable but return None for lookups
+            geo_info = service.get_geo_info("8.8.8.8")
+            assert geo_info is None
+
+    @pytest.mark.asyncio
+    async def test_initialize_handles_429_rate_limit(self, geoip_config):
+        """Test that initialize handles 429 rate limit errors gracefully."""
+        with (
+            patch("leadr.common.geoip.httpx.AsyncClient") as mock_client_class,
+            patch("leadr.common.geoip.maxminddb.open_database"),
+        ):
+            # Mock HTTP response with 429 status
+            mock_response = Mock()
+            mock_response.status_code = 429
+            mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+                "Rate limited",
+                request=Mock(),
+                response=mock_response,
+            )
+            mock_client = AsyncMock()
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+
+            service = GeoIPService(**geoip_config)
+
+            # Initialize should not raise exception even with 429
+            await service.initialize()
+
+            # Service should still be usable but return None for lookups
+            geo_info = service.get_geo_info("8.8.8.8")
+            assert geo_info is None
+
+    @pytest.mark.asyncio
+    async def test_initialize_handles_http_error(self, geoip_config):
+        """Test that initialize handles HTTP errors (500, etc) gracefully."""
+        with (
+            patch("leadr.common.geoip.httpx.AsyncClient") as mock_client_class,
+            patch("leadr.common.geoip.maxminddb.open_database"),
+        ):
+            # Mock HTTP response with 500 status
+            mock_response = Mock()
+            mock_response.status_code = 500
+            mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+                "Server error",
+                request=Mock(),
+                response=mock_response,
+            )
+            mock_client = AsyncMock()
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+
+            service = GeoIPService(**geoip_config)
+
+            # Initialize should not raise exception even with HTTP error
+            await service.initialize()
+
+            # Service should still be usable but return None for lookups
+            geo_info = service.get_geo_info("8.8.8.8")
+            assert geo_info is None
+
+    @pytest.mark.asyncio
+    async def test_initialize_handles_network_error(self, geoip_config):
+        """Test that initialize handles network errors gracefully."""
+        with (
+            patch("leadr.common.geoip.httpx.AsyncClient") as mock_client_class,
+            patch("leadr.common.geoip.maxminddb.open_database"),
+        ):
+            # Mock HTTP client to raise network error
+            mock_client = AsyncMock()
+            mock_client.get.side_effect = httpx.RequestError("Connection failed")
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+
+            service = GeoIPService(**geoip_config)
+
+            # Initialize should not raise exception even with network error
             await service.initialize()
 
             # Service should still be usable but return None for lookups

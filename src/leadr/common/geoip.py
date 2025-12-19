@@ -168,8 +168,30 @@ class GeoIPService:
             target_filename: Filename to save the extracted .mmdb as
         """
         # Download tar.gz file
-        response = await client.get(url)
-        response.raise_for_status()
+        try:
+            response = await client.get(url)
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                logger.warning(
+                    "Rate limited by MaxMind (429) when downloading %s. "
+                    "Continuing with GeoIP disabled. Retry after cooldown period.",
+                    target_filename,
+                )
+            else:
+                logger.warning(
+                    "HTTP error %d downloading %s. Continuing with GeoIP disabled.",
+                    e.response.status_code,
+                    target_filename,
+                )
+            return
+        except httpx.RequestError as e:
+            logger.warning(
+                "Network error downloading %s: %s. Continuing with GeoIP disabled.",
+                target_filename,
+                e,
+            )
+            return
 
         # Save to temporary tar.gz file
         tar_gz_path = self.database_path / f"{target_filename}.tar.gz"
