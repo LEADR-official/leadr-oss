@@ -12,6 +12,7 @@ from api.main import app
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
 from leadr.auth.dependencies import require_admin_auth
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, UserID
 from leadr.infra.email.service import EmailService
 from leadr.registration.services.dependencies import (
@@ -99,8 +100,9 @@ class TestVerifyCode:
         # Create verification code
         service = VerificationService(db_session, mock_email_service)
         await service.initiate_verification("test@example.com")
-        codes = await service.repository.filter(email="test@example.com")
-        code = codes[0].code
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.repository.filter(email="test@example.com", pagination=pagination)
+        code = result.items[0].code
 
         # Verify the code
         response = await client.post(
@@ -141,8 +143,9 @@ class TestVerifyCode:
         # Create and use code
         service = VerificationService(db_session, mock_email_service)
         await service.initiate_verification("test@example.com")
-        codes = await service.repository.filter(email="test@example.com")
-        code = codes[0].code
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.repository.filter(email="test@example.com", pagination=pagination)
+        code = result.items[0].code
         await service.verify_code("test@example.com", code)
 
         # Try to verify again

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID
 from leadr.registration.services.jam_code_service import JamCodeService
 
@@ -319,8 +320,9 @@ class TestJamCodeServiceList:
         """Test listing when no codes exist."""
         service = JamCodeService(db_session)
 
-        codes = await service.list_jam_codes()
-        assert codes == []
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.list_jam_codes(pagination=pagination)
+        assert result.items == []
 
     async def test_list_multiple_codes(self, db_session: AsyncSession):
         """Test listing multiple jam codes."""
@@ -330,8 +332,9 @@ class TestJamCodeServiceList:
         await service.create_jam_code(code="CODE2", description="Second")
         await service.create_jam_code(code="CODE3", description="Third")
 
-        codes = await service.list_jam_codes()
-        assert len(codes) == 3
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.list_jam_codes(pagination=pagination)
+        assert len(result.items) == 3
 
 
 @pytest.mark.asyncio

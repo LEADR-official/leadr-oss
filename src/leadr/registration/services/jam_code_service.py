@@ -5,7 +5,9 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.registration.domain.jam_code import JamCode
 from leadr.registration.domain.jam_code_redemption import JamCodeRedemption
 from leadr.registration.services.repositories import JamCodeRedemptionRepository, JamCodeRepository
@@ -134,13 +136,20 @@ class JamCodeService:
         """
         return await self.jam_code_repository.get_by_id(jam_code_id)
 
-    async def list_jam_codes(self) -> list[JamCode]:
-        """List all jam codes.
+    async def list_jam_codes(
+        self,
+        *,
+        pagination: PaginationParams,
+    ) -> PaginatedResult[JamCode]:
+        """List all jam codes with pagination.
+
+        Args:
+            pagination: Pagination parameters.
 
         Returns:
-            List of all jam codes.
+            Paginated result of jam codes.
         """
-        return await self.jam_code_repository.filter()
+        return await self.jam_code_repository.filter(pagination=pagination)
 
     async def update_jam_code(
         self,

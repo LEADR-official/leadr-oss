@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.api.pagination import PaginationParams
 from leadr.infra.email.adapters.repositories import EmailRepository
 from leadr.infra.email.domain.models import Email, EmailPriority, EmailStatus
 
@@ -96,9 +97,10 @@ class TestEmailRepository:
         await db_session.commit()
 
         # Filter by user1
-        results = await repository.filter(to="user1@example.com")
-        assert len(results) == 2
-        assert all(e.to == "user1@example.com" for e in results)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repository.filter(to="user1@example.com", pagination=pagination)
+        assert len(result.items) == 2
+        assert all(e.to == "user1@example.com" for e in result.items)
 
     async def test_filter_by_status(self, db_session: AsyncSession):
         """Test filtering emails by status."""
@@ -116,25 +118,27 @@ class TestEmailRepository:
         await repository.create(email3)
         await db_session.commit()
 
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+
         # Filter by PENDING
-        pending = await repository.filter(status=EmailStatus.PENDING)
-        assert len(pending) == 2
+        pending = await repository.filter(status=EmailStatus.PENDING, pagination=pagination)
+        assert len(pending.items) == 2
 
         # Filter by SENT
-        sent = await repository.filter(status=EmailStatus.SENT)
-        assert len(sent) == 1
-        assert sent[0].id == email2.id
+        sent = await repository.filter(status=EmailStatus.SENT, pagination=pagination)
+        assert len(sent.items) == 1
+        assert sent.items[0].id == email2.id
 
     async def test_filter_no_results(self, db_session: AsyncSession):
         """Test filtering with no matching results."""
         repository = EmailRepository(db_session)
 
-        results = await repository.filter(to="nonexistent@example.com")
-        assert results == []
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repository.filter(to="nonexistent@example.com", pagination=pagination)
+        assert result.items == []
 
     async def test_filter_with_account_id_ignored(self, db_session: AsyncSession):
         """Test that account_id parameter is ignored (emails are top-level)."""
-
         repository = EmailRepository(db_session)
 
         email = Email.create(to="user@example.com", subject="Test", body="Body")
@@ -142,8 +146,9 @@ class TestEmailRepository:
         await db_session.commit()
 
         # account_id should be ignored
-        results = await repository.filter(account_id=uuid4())
-        assert len(results) == 1
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repository.filter(account_id=uuid4(), pagination=pagination)
+        assert len(result.items) == 1
 
     async def test_roundtrip_with_all_fields(self, db_session: AsyncSession):
         """Test roundtrip with all email fields populated."""
