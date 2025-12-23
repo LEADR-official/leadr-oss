@@ -2,7 +2,7 @@
 
 import re
 from datetime import datetime
-from typing import Any, overload
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -170,69 +170,41 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         """
         return await self.get_by_id(template_id)
 
-    @overload
     async def list_board_templates_by_account(
         self,
         account_id: AccountID | None,
-        pagination: None = None,
-    ) -> list[BoardTemplate]: ...
-
-    @overload
-    async def list_board_templates_by_account(
-        self,
-        account_id: AccountID | None,
-        pagination: PaginationParams = ...,
-    ) -> PaginatedResult[BoardTemplate]: ...
-
-    async def list_board_templates_by_account(
-        self,
-        account_id: AccountID | None,
-        pagination: PaginationParams | None = None,
-    ) -> list[BoardTemplate] | PaginatedResult[BoardTemplate]:
-        """List all board templates for an account with optional pagination.
+        *,
+        pagination: PaginationParams,
+    ) -> PaginatedResult[BoardTemplate]:
+        """List all board templates for an account with pagination.
 
         Args:
             account_id: The ID of the account to list templates for. If None, returns all
                 templates (superadmin use case).
-            pagination: Optional pagination parameters.
+            pagination: Pagination parameters (required).
 
         Returns:
-            List of BoardTemplate entities if no pagination, PaginatedResult if pagination provided.
+            PaginatedResult containing BoardTemplate entities matching the filter criteria.
         """
         return await self.repository.filter(account_id, pagination=pagination)
 
-    @overload
     async def list_board_templates_by_game(
         self,
         account_id: AccountID | None,
         game_id: GameID,
-        pagination: None = None,
-    ) -> list[BoardTemplate]: ...
-
-    @overload
-    async def list_board_templates_by_game(
-        self,
-        account_id: AccountID | None,
-        game_id: GameID,
-        pagination: PaginationParams = ...,
-    ) -> PaginatedResult[BoardTemplate]: ...
-
-    async def list_board_templates_by_game(
-        self,
-        account_id: AccountID | None,
-        game_id: GameID,
-        pagination: PaginationParams | None = None,
-    ) -> list[BoardTemplate] | PaginatedResult[BoardTemplate]:
-        """List all board templates for a specific game with optional pagination.
+        *,
+        pagination: PaginationParams,
+    ) -> PaginatedResult[BoardTemplate]:
+        """List all board templates for a specific game with pagination.
 
         Args:
             account_id: The ID of the account. If None, returns templates from all accounts
                 (superadmin use case).
             game_id: The ID of the game to list templates for.
-            pagination: Optional pagination parameters.
+            pagination: Pagination parameters (required).
 
         Returns:
-            List of BoardTemplate entities if no pagination, PaginatedResult if pagination provided.
+            PaginatedResult containing BoardTemplate entities matching the filter criteria.
         """
         return await self.repository.filter(account_id, game_id=game_id, pagination=pagination)
 

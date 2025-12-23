@@ -10,6 +10,7 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.boards.services.repositories import BoardTemplateRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
@@ -248,16 +249,17 @@ class TestBoardTemplateRepository:
         await template_repo.create(template3)
 
         # Filter by account 1
-        account1_templates = await template_repo.filter(AccountID(account1_id))
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        account1_result = await template_repo.filter(AccountID(account1_id), pagination=pagination)
 
-        assert len(account1_templates) == 2
-        assert all(t.account_id == account1_id for t in account1_templates)
+        assert len(account1_result.items) == 2
+        assert all(t.account_id == account1_id for t in account1_result.items)
 
         # Filter by account 2
-        account2_templates = await template_repo.filter(AccountID(account2_id))
+        account2_result = await template_repo.filter(AccountID(account2_id), pagination=pagination)
 
-        assert len(account2_templates) == 1
-        assert account2_templates[0].account_id == account2_id
+        assert len(account2_result.items) == 1
+        assert account2_result.items[0].account_id == account2_id
 
     async def test_filter_board_templates_by_account_and_game(self, db_session: AsyncSession):
         """Test filtering board templates by account_id and game_id."""
@@ -346,16 +348,21 @@ class TestBoardTemplateRepository:
         await template_repo.create(template3)
 
         # Filter by game 1
-        game1_templates = await template_repo.filter(account_id, game_id=GameID(game1_id))
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        game1_result = await template_repo.filter(
+            account_id, game_id=GameID(game1_id), pagination=pagination
+        )
 
-        assert len(game1_templates) == 2
-        assert all(t.game_id == game1_id for t in game1_templates)
+        assert len(game1_result.items) == 2
+        assert all(t.game_id == game1_id for t in game1_result.items)
 
         # Filter by game 2
-        game2_templates = await template_repo.filter(account_id, game_id=GameID(game2_id))
+        game2_result = await template_repo.filter(
+            account_id, game_id=GameID(game2_id), pagination=pagination
+        )
 
-        assert len(game2_templates) == 1
-        assert game2_templates[0].game_id == game2_id
+        assert len(game2_result.items) == 1
+        assert game2_result.items[0].game_id == game2_id
 
     async def test_update_board_template(self, db_session: AsyncSession):
         """Test updating a board template."""
@@ -480,8 +487,9 @@ class TestBoardTemplateRepository:
         assert retrieved is None
 
         # Verify not in filter results
-        templates = await template_repo.filter(account_id)
-        assert len(templates) == 0
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await template_repo.filter(account_id, pagination=pagination)
+        assert len(result.items) == 0
 
     async def test_filter_excludes_soft_deleted_templates(self, db_session: AsyncSession):
         """Test that filter excludes soft-deleted templates."""
@@ -549,7 +557,8 @@ class TestBoardTemplateRepository:
         await template_repo.update(template2)
 
         # Filter should only return active template
-        templates = await template_repo.filter(account_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await template_repo.filter(account_id, pagination=pagination)
 
-        assert len(templates) == 1
-        assert templates[0].name == "Active Template"
+        assert len(result.items) == 1
+        assert result.items[0].name == "Active Template"

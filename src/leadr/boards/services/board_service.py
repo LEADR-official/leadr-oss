@@ -1,7 +1,7 @@
 """Board service for managing board operations."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -255,7 +255,6 @@ class BoardService(BaseService[Board, BoardRepository]):
         """
         return await self.repository.filter(account_id)
 
-    @overload
     async def list_boards(
         self,
         account_id: AccountID | None = None,
@@ -267,38 +266,10 @@ class BoardService(BaseService[Board, BoardRepository]):
         starts_after: datetime | None = None,
         ends_before: datetime | None = None,
         ends_after: datetime | None = None,
-        pagination: None = None,
-    ) -> list[Board]: ...
-
-    @overload
-    async def list_boards(
-        self,
-        account_id: AccountID | None = None,
-        game_id: GameID | None = None,
-        code: str | None = None,
-        is_active: bool | None = None,
-        is_published: bool | None = None,
-        starts_before: datetime | None = None,
-        starts_after: datetime | None = None,
-        ends_before: datetime | None = None,
-        ends_after: datetime | None = None,
-        pagination: PaginationParams = ...,
-    ) -> PaginatedResult[Board]: ...
-
-    async def list_boards(
-        self,
-        account_id: AccountID | None = None,
-        game_id: GameID | None = None,
-        code: str | None = None,
-        is_active: bool | None = None,
-        is_published: bool | None = None,
-        starts_before: datetime | None = None,
-        starts_after: datetime | None = None,
-        ends_before: datetime | None = None,
-        ends_after: datetime | None = None,
-        pagination: PaginationParams | None = None,
-    ) -> list[Board] | PaginatedResult[Board]:
-        """List boards with optional filtering.
+        *,
+        pagination: PaginationParams,
+    ) -> PaginatedResult[Board]:
+        """List boards with optional filtering and pagination.
 
         Args:
             account_id: Optional account ID to filter by
@@ -310,14 +281,12 @@ class BoardService(BaseService[Board, BoardRepository]):
             starts_after: Optional filter for boards starting after this time
             ends_before: Optional filter for boards ending before this time
             ends_after: Optional filter for boards ending after this time
-            pagination: Optional pagination parameters
+            pagination: Pagination parameters (required)
 
         Returns:
-            List of Board entities if no pagination, PaginatedResult if pagination provided.
+            PaginatedResult containing Board entities matching the filter criteria.
         """
-        # pyright: ignore needed due to Python overload resolution limitations
-        # when passing PaginationParams | None to overloaded method
-        return await self.repository.list_boards(  # pyright: ignore[reportCallIssue]
+        return await self.repository.list_boards(
             account_id=account_id,
             game_id=game_id,
             code=code,
@@ -327,7 +296,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             starts_after=starts_after,
             ends_before=ends_before,
             ends_after=ends_after,
-            pagination=pagination,  # pyright: ignore[reportArgumentType]
+            pagination=pagination,
         )
 
     async def update_board(

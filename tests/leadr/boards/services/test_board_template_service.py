@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.services.account_service import AccountService
 from leadr.boards.services.board_template_service import BoardTemplateService
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import BoardTemplateID, GameID
 from leadr.games.services.game_service import GameService
@@ -262,16 +263,21 @@ class TestBoardTemplateService:
         )
 
         # List account1 templates
-        account1_templates = await template_service.list_board_templates_by_account(account1.id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        account1_result = await template_service.list_board_templates_by_account(
+            account1.id, pagination=pagination
+        )
 
-        assert len(account1_templates) == 2
-        assert all(t.account_id == account1.id for t in account1_templates)
+        assert len(account1_result.items) == 2
+        assert all(t.account_id == account1.id for t in account1_result.items)
 
         # List account2 templates
-        account2_templates = await template_service.list_board_templates_by_account(account2.id)
+        account2_result = await template_service.list_board_templates_by_account(
+            account2.id, pagination=pagination
+        )
 
-        assert len(account2_templates) == 1
-        assert account2_templates[0].account_id == account2.id
+        assert len(account2_result.items) == 1
+        assert account2_result.items[0].account_id == account2.id
 
     async def test_list_board_templates_by_game(self, db_session: AsyncSession):
         """Test listing board templates by game."""
@@ -326,20 +332,21 @@ class TestBoardTemplateService:
         )
 
         # List game1 templates
-        game1_templates = await template_service.list_board_templates_by_game(
-            account_id=account.id, game_id=game1.id
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        game1_result = await template_service.list_board_templates_by_game(
+            account_id=account.id, game_id=game1.id, pagination=pagination
         )
 
-        assert len(game1_templates) == 2
-        assert all(t.game_id == game1.id for t in game1_templates)
+        assert len(game1_result.items) == 2
+        assert all(t.game_id == game1.id for t in game1_result.items)
 
         # List game2 templates
-        game2_templates = await template_service.list_board_templates_by_game(
-            account_id=account.id, game_id=game2.id
+        game2_result = await template_service.list_board_templates_by_game(
+            account_id=account.id, game_id=game2.id, pagination=pagination
         )
 
-        assert len(game2_templates) == 1
-        assert game2_templates[0].game_id == game2.id
+        assert len(game2_result.items) == 1
+        assert game2_result.items[0].game_id == game2.id
 
     async def test_update_board_template(self, db_session: AsyncSession):
         """Test updating a board template."""
@@ -476,8 +483,11 @@ class TestBoardTemplateService:
         assert retrieved is None
 
         # Verify not in list after deletion
-        templates = await template_service.list_board_templates_by_account(account.id)
-        assert len(templates) == 0
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await template_service.list_board_templates_by_account(
+            account.id, pagination=pagination
+        )
+        assert len(result.items) == 0
 
     async def test_advance_template_schedule(self, db_session: AsyncSession):
         """Test advancing a template's schedule."""

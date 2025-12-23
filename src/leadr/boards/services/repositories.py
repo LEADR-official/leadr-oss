@@ -1,7 +1,7 @@
 """Board repository services."""
 
 from datetime import datetime
-from typing import Any, overload
+from typing import Any
 
 from pydantic import UUID4
 from sqlalchemy import func, select
@@ -164,7 +164,6 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
-    @overload
     async def list_boards(
         self,
         account_id: UUID4 | AccountID | None = None,
@@ -176,38 +175,10 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         starts_after: datetime | None = None,
         ends_before: datetime | None = None,
         ends_after: datetime | None = None,
-        pagination: None = None,
-    ) -> list[Board]: ...
-
-    @overload
-    async def list_boards(
-        self,
-        account_id: UUID4 | AccountID | None = None,
-        game_id: UUID4 | GameID | None = None,
-        code: str | None = None,
-        is_active: bool | None = None,
-        is_published: bool | None = None,
-        starts_before: datetime | None = None,
-        starts_after: datetime | None = None,
-        ends_before: datetime | None = None,
-        ends_after: datetime | None = None,
-        pagination: PaginationParams = ...,
-    ) -> PaginatedResult[Board]: ...
-
-    async def list_boards(
-        self,
-        account_id: UUID4 | AccountID | None = None,
-        game_id: UUID4 | GameID | None = None,
-        code: str | None = None,
-        is_active: bool | None = None,
-        is_published: bool | None = None,
-        starts_before: datetime | None = None,
-        starts_after: datetime | None = None,
-        ends_before: datetime | None = None,
-        ends_after: datetime | None = None,
-        pagination: PaginationParams | None = None,
-    ) -> list[Board] | PaginatedResult[Board]:
-        """List boards with optional filtering.
+        *,
+        pagination: PaginationParams,
+    ) -> PaginatedResult[Board]:
+        """List boards with optional filtering and pagination.
 
         Args:
             account_id: Optional account ID to filter by
@@ -219,10 +190,10 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             starts_after: Optional filter for boards starting after this time
             ends_before: Optional filter for boards ending before this time
             ends_after: Optional filter for boards ending after this time
-            pagination: Optional pagination parameters
+            pagination: Pagination parameters (required)
 
         Returns:
-            List of boards if no pagination, PaginatedResult if pagination provided
+            PaginatedResult containing boards matching the filter criteria
 
         Raises:
             ValueError: If sort field is not in SORTABLE_FIELDS
@@ -270,12 +241,6 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         if ends_after is not None:
             query = query.where(BoardORM.ends_at >= ends_after)
             filters_dict["ends_after"] = ends_after.isoformat()
-
-        # If no pagination, return list (backward compatibility)
-        if pagination is None:
-            result = await self.session.execute(query)
-            orms = result.scalars().all()
-            return [self._to_domain(orm) for orm in orms]
 
         # Validate sort fields
         for sort_field in pagination.sort_spec:
@@ -342,42 +307,25 @@ class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
         """Get the ORM model class."""
         return BoardTemplateORM
 
-    @overload
-    async def filter(
-        self,
-        account_id: AccountID | None = None,
-        game_id: GameID | None = None,
-        pagination: None = None,
-        **kwargs: Any,
-    ) -> list[BoardTemplate]: ...
-
-    @overload
-    async def filter(
-        self,
-        account_id: AccountID | None = None,
-        game_id: GameID | None = None,
-        pagination: PaginationParams = ...,
-        **kwargs: Any,
-    ) -> PaginatedResult[BoardTemplate]: ...
-
     async def filter(  # type: ignore[override]
         self,
         account_id: AccountID | None = None,
         game_id: GameID | None = None,
-        pagination: PaginationParams | None = None,
+        *,
+        pagination: PaginationParams,
         **kwargs: Any,
-    ) -> list[BoardTemplate] | PaginatedResult[BoardTemplate]:
-        """Filter board templates by account and optional game.
+    ) -> PaginatedResult[BoardTemplate]:
+        """Filter board templates by account and optional game with pagination.
 
         Args:
             account_id: Optional account ID to filter by. If None, returns all templates
                 (superadmin use case). Regular users should always pass account_id.
             game_id: OPTIONAL - Game ID to filter by
-            pagination: Optional pagination parameters
+            pagination: Pagination parameters (required)
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of board templates if no pagination, PaginatedResult if pagination provided
+            PaginatedResult containing board templates matching the filter criteria
 
         Raises:
             ValueError: If sort field is not in SORTABLE_FIELDS
@@ -395,12 +343,6 @@ class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
             game_uuid = self._extract_uuid(game_id)
             query = query.where(BoardTemplateORM.game_id == game_uuid)
             filters_dict["game_id"] = str(game_id)
-
-        # If no pagination, return list (backward compatibility)
-        if pagination is None:
-            result = await self.session.execute(query)
-            orms = result.scalars().all()
-            return [self._to_domain(orm) for orm in orms]
 
         # Validate sort fields
         for sort_field in pagination.sort_spec:

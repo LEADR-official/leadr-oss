@@ -11,6 +11,7 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
 from leadr.boards.services.repositories import BoardRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
@@ -918,11 +919,12 @@ class TestBoardRepository:
         await board_repo.create(board2)
 
         # Filter by game_id
-        boards = await board_repo.list_boards(game_id=game1_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await board_repo.list_boards(game_id=game1_id, pagination=pagination)
 
-        assert len(boards) == 1
-        assert boards[0].name == "Game 1 Board"
-        assert boards[0].game_id == game1_id
+        assert len(result.items) == 1
+        assert result.items[0].name == "Game 1 Board"
+        assert result.items[0].game_id == game1_id
 
     async def test_list_boards_filter_by_is_active(self, db_session: AsyncSession):
         """Test filtering boards by is_active status."""
@@ -987,14 +989,15 @@ class TestBoardRepository:
         await board_repo.create(inactive_board)
 
         # Filter active only
-        active_boards = await board_repo.list_boards(is_active=True)
-        assert len(active_boards) == 1
-        assert active_boards[0].name == "Active Board"
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        active_result = await board_repo.list_boards(is_active=True, pagination=pagination)
+        assert len(active_result.items) == 1
+        assert active_result.items[0].name == "Active Board"
 
         # Filter inactive only
-        inactive_boards = await board_repo.list_boards(is_active=False)
-        assert len(inactive_boards) == 1
-        assert inactive_boards[0].name == "Inactive Board"
+        inactive_result = await board_repo.list_boards(is_active=False, pagination=pagination)
+        assert len(inactive_result.items) == 1
+        assert inactive_result.items[0].name == "Inactive Board"
 
     async def test_list_boards_filter_by_starts_before(self, db_session: AsyncSession):
         """Test filtering boards starting before a given date."""
@@ -1063,9 +1066,10 @@ class TestBoardRepository:
         await board_repo.create(late_board)
 
         # Filter boards starting before now
-        boards = await board_repo.list_boards(starts_before=now)
-        assert len(boards) == 1
-        assert boards[0].name == "Early Board"
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await board_repo.list_boards(starts_before=now, pagination=pagination)
+        assert len(result.items) == 1
+        assert result.items[0].name == "Early Board"
 
     async def test_list_boards_filter_by_starts_after(self, db_session: AsyncSession):
         """Test filtering boards starting after a given date."""
@@ -1134,9 +1138,10 @@ class TestBoardRepository:
         await board_repo.create(late_board)
 
         # Filter boards starting after now
-        boards = await board_repo.list_boards(starts_after=now)
-        assert len(boards) == 1
-        assert boards[0].name == "Late Board"
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await board_repo.list_boards(starts_after=now, pagination=pagination)
+        assert len(result.items) == 1
+        assert result.items[0].name == "Late Board"
 
     async def test_list_boards_filter_by_ends_before(self, db_session: AsyncSession):
         """Test filtering boards ending before a given date."""
@@ -1205,9 +1210,10 @@ class TestBoardRepository:
         await board_repo.create(ongoing_board)
 
         # Filter boards ending before now
-        boards = await board_repo.list_boards(ends_before=now)
-        assert len(boards) == 1
-        assert boards[0].name == "Ended Board"
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await board_repo.list_boards(ends_before=now, pagination=pagination)
+        assert len(result.items) == 1
+        assert result.items[0].name == "Ended Board"
 
     async def test_list_boards_filter_by_ends_after(self, db_session: AsyncSession):
         """Test filtering boards ending after a given date."""
@@ -1276,9 +1282,10 @@ class TestBoardRepository:
         await board_repo.create(ongoing_board)
 
         # Filter boards ending after now
-        boards = await board_repo.list_boards(ends_after=now)
-        assert len(boards) == 1
-        assert boards[0].name == "Ongoing Board"
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await board_repo.list_boards(ends_after=now, pagination=pagination)
+        assert len(result.items) == 1
+        assert result.items[0].name == "Ongoing Board"
 
     async def test_list_boards_filter_by_multiple_criteria(self, db_session: AsyncSession):
         """Test filtering boards by multiple criteria at once."""
@@ -1368,13 +1375,15 @@ class TestBoardRepository:
         await board_repo.create(board3)
 
         # Filter: active AND started before now
-        boards = await board_repo.list_boards(
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await board_repo.list_boards(
             game_id=game_id,
             is_active=True,
             starts_before=now,
+            pagination=pagination,
         )
-        assert len(boards) == 1
-        assert boards[0].name == "Active Past Board"
+        assert len(result.items) == 1
+        assert result.items[0].name == "Active Past Board"
 
     async def test_list_boards_with_game_id_supports_pagination(self, db_session: AsyncSession):
         """Test that filtering by game_id works with pagination."""
