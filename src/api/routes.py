@@ -46,6 +46,16 @@ async def health_check(db: DatabaseSession) -> HealthResponse:
     )
 
 
+@router.get("/health/live", tags=["Public"])
+async def liveness_check() -> dict[str, str]:
+    """Liveness probe endpoint.
+
+    Simple HTTP ping for container health checks. Returns immediately
+    without checking database or other dependencies.
+    """
+    return {"status": "ok"}
+
+
 @router.get("/", tags=["Public"])
 async def root():
     """Root endpoint.
