@@ -178,10 +178,14 @@ def setup_logging(
     root_logger.setLevel(log_level)
 
     # Configure uvicorn loggers to use our handlers
-    for logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
+    # Note: uvicorn.access is disabled - we use AccessLogMiddleware for access logging with timing
+    for logger_name in ["uvicorn", "uvicorn.error"]:
         uv_logger = logging.getLogger(logger_name)
         uv_logger.handlers = handlers
         uv_logger.propagate = False
+
+    # Disable uvicorn's access logger (replaced by AccessLogMiddleware)
+    logging.getLogger("uvicorn.access").disabled = True
 
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
