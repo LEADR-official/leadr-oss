@@ -2,14 +2,13 @@
 
 from typing import Any
 
-from pydantic import UUID4
 from sqlalchemy import select
 
 from leadr.accounts.adapters.orm import AccountORM, AccountStatusEnum, UserORM
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
 from leadr.common.api.pagination import PaginationParams
-from leadr.common.domain.ids import AccountID, PrefixedID, UserID
+from leadr.common.domain.ids import AccountID, UserID
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 
@@ -58,9 +57,9 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
         """Get account by slug, returns None if not found or soft-deleted."""
         return await self._get_by_field("slug", slug)
 
-    async def filter(  # type: ignore[override]
+    async def filter(
         self,
-        account_id: UUID4 | PrefixedID | None = None,
+        account_id: AccountID | None = None,
         *,
         pagination: PaginationParams,
         **kwargs: Any,
@@ -172,9 +171,9 @@ class UserRepository(BaseRepository[User, UserORM]):
         """Get user by email, returns None if not found or soft-deleted."""
         return await self._get_by_field("email", email)
 
-    async def filter(  # type: ignore[override]
+    async def filter(
         self,
-        account_id: UUID4 | PrefixedID | None = None,
+        account_id: AccountID | None = None,
         *,
         pagination: PaginationParams,
         **kwargs: Any,

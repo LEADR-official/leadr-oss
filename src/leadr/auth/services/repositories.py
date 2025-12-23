@@ -83,7 +83,7 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         """Get API key by prefix, returns None if not found or soft-deleted."""
         return await self._get_by_field("key_prefix", key_prefix)
 
-    async def filter(  # type: ignore[override]
+    async def filter(
         self,
         account_id: AccountID | None = None,
         *,
@@ -212,7 +212,7 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
-    async def filter(  # type: ignore[override]
+    async def filter(
         self,
         account_id: AccountID | None = None,
         *,
@@ -335,7 +335,7 @@ class DeviceSessionRepository(BaseRepository[DeviceSession, DeviceSessionORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
-    async def filter(  # type: ignore[override]
+    async def filter(
         self,
         account_id: AccountID | None = None,
         *,
@@ -435,11 +435,11 @@ class NonceRepository(BaseRepository[Nonce, NonceORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
-    async def filter(  # type: ignore[override]
+    async def filter(  # type: ignore[override] - intentionally unpaginated (nonces are short-lived)
         self,
         account_id: AccountID | None = None,
         device_id: DeviceID | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> list[Nonce]:
         """Filter nonces by account and optional criteria.
 

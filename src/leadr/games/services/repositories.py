@@ -2,11 +2,10 @@
 
 from typing import Any
 
-from pydantic import UUID4
 from sqlalchemy import select
 
 from leadr.common.api.pagination import PaginationParams
-from leadr.common.domain.ids import AccountID, BoardID, GameID, PrefixedID
+from leadr.common.domain.ids import AccountID, BoardID, GameID
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 from leadr.games.adapters.orm import GameORM
@@ -83,9 +82,9 @@ class GameRepository(BaseRepository[Game, GameORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
-    async def filter(  # type: ignore[override]
+    async def filter(
         self,
-        account_id: UUID4 | PrefixedID | None = None,
+        account_id: AccountID | None = None,
         *,
         pagination: PaginationParams,
         **kwargs: Any,

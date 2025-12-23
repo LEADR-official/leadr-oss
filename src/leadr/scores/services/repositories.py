@@ -2,11 +2,10 @@
 
 from typing import Any
 
-from pydantic import UUID4
 from sqlalchemy import select
 
 from leadr.common.api.pagination import PaginationParams
-from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, PrefixedID, ScoreID
+from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 from leadr.scores.adapters.orm import ScoreORM
@@ -102,9 +101,9 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         "updated_at",
     }
 
-    async def filter(  # type: ignore[override]  # Intentionally returns PaginatedResult, not list
+    async def filter(
         self,
-        account_id: UUID4 | PrefixedID | None = None,
+        account_id: AccountID | None = None,
         board_id: BoardID | None = None,
         game_id: GameID | None = None,
         device_id: DeviceID | None = None,

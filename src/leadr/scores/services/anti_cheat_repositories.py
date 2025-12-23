@@ -68,7 +68,7 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
         """Get the ORM model class."""
         return ScoreSubmissionMetaORM
 
-    async def filter(  # type: ignore[override]
+    async def filter(
         self,
         account_id: AccountID | None = None,
         board_id: BoardID | None = None,
@@ -227,7 +227,7 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
         """Get the ORM model class."""
         return ScoreFlagORM
 
-    async def filter(  # type: ignore[override]
+    async def filter(
         self,
         account_id: AccountID | None = None,
         board_id: BoardID | None = None,
