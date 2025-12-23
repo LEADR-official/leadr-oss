@@ -1,7 +1,6 @@
 """API Key service for managing API key operations."""
 
 from datetime import UTC, datetime
-from typing import overload
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -201,47 +200,32 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         """
         return await self.get_by_id(key_id)
 
-    @overload
     async def list_api_keys(
         self,
         account_id: AccountID | None,
+        *,
         status: str | None = None,
-        pagination: None = None,
-    ) -> list[APIKey]: ...
-
-    @overload
-    async def list_api_keys(
-        self,
-        account_id: AccountID | None,
-        status: str | None = None,
-        pagination: PaginationParams = ...,
-    ) -> PaginatedResult[APIKey]: ...
-
-    async def list_api_keys(
-        self,
-        account_id: AccountID | None,
-        status: str | None = None,
-        pagination: PaginationParams | None = None,
-    ) -> list[APIKey] | PaginatedResult[APIKey]:
+        pagination: PaginationParams,
+    ) -> PaginatedResult[APIKey]:
         """List API keys for an account with optional filters and pagination.
 
         Args:
             account_id: Account ID to filter by. If None, returns all API keys
                 (superadmin use case).
             status: Optional status string to filter by.
-            pagination: Optional pagination parameters.
+            pagination: Pagination parameters (required).
 
         Returns:
-            List of APIKey entities if no pagination, PaginatedResult if pagination provided.
+            PaginatedResult containing APIKey entities.
         """
         from leadr.auth.domain.api_key import APIKeyStatus
 
-        # Build filter kwargs
-        kwargs = {}
+        # Convert status string to enum if provided
+        status_enum: APIKeyStatus | None = None
         if status is not None:
-            kwargs["status"] = APIKeyStatus(status)
+            status_enum = APIKeyStatus(status)
 
-        return await self.repository.filter(account_id, pagination=pagination, **kwargs)
+        return await self.repository.filter(account_id, status=status_enum, pagination=pagination)
 
     async def list_account_api_keys(
         self,
@@ -250,6 +234,9 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
     ) -> list[APIKey]:
         """List all API keys for an account.
 
+        This is an internal helper that returns a plain list. API keys per account
+        are typically limited, so pagination isn't needed for internal use cases.
+
         Args:
             account_id: The account ID to list keys for.
             active_only: If True, only return active (non-revoked) keys.
@@ -257,11 +244,12 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         Returns:
             List of APIKey domain entities.
         """
-        kwargs = {}
-        if active_only:
-            kwargs["active_only"] = True
-
-        return await self.repository.filter(account_id, **kwargs)
+        # Use a high limit for internal queries - API keys per account are limited
+        pagination = PaginationParams(cursor=None, limit=1000, sort=None)
+        result = await self.repository.filter(
+            account_id, active_only=active_only, pagination=pagination
+        )
+        return list(result.items)
 
     async def count_active_api_keys(self, account_id: AccountID) -> int:
         """Count active API keys for an account.

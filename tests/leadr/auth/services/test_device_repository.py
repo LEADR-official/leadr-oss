@@ -10,6 +10,7 @@ from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import DeviceORM
 from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
 from leadr.auth.services.repositories import DeviceRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, DeviceID, GameID
 from leadr.games.adapters.orm import GameORM
 
@@ -166,12 +167,13 @@ class TestDeviceRepository:
 
         # Filter by account1
         repository = DeviceRepository(db_session)
-        devices = await repository.filter(account_id=AccountID(account1.id))
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repository.filter(account_id=AccountID(account1.id), pagination=pagination)
 
-        assert len(devices) == 1
-        assert devices[0].account_id == account1.id
+        assert len(result.items) == 1
+        assert result.items[0].account_id == account1.id
         assert (
-            devices[0].client_fingerprint
+            result.items[0].client_fingerprint
             == "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
         )
 
