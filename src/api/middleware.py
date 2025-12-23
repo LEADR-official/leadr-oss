@@ -1,14 +1,77 @@
 """FastAPI middleware for request processing."""
 
 import logging
+import time
+from typing import Any
 
+import structlog
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
 from leadr.common.geoip import GeoIPService
+from leadr.common.utils.ip import extract_client_ip
+from leadr.logging import get_logger
 
 logger = logging.getLogger(__name__)
+
+
+class AccessLogMiddleware(BaseHTTPMiddleware):
+    """Middleware to log HTTP requests with timing information.
+
+    Logs each request with:
+    - HTTP method and path as the event
+    - status_code: HTTP response status
+    - duration_ms: Request processing time in milliseconds
+    - client_ip: Client IP address (from headers or direct connection)
+
+    Example log output (JSON format):
+        {"event": "GET /v1/health", "status_code": 200, "duration_ms": 12.5, ...}
+
+    Example:
+        app.add_middleware(AccessLogMiddleware)
+    """
+
+    def __init__(
+        self,
+        app: Any,
+        logger: structlog.stdlib.BoundLogger | None = None,
+    ):
+        """Initialize access log middleware.
+
+        Args:
+            app: The FastAPI/Starlette application
+            logger: Optional structlog logger instance (defaults to module logger)
+        """
+        super().__init__(app)
+        self._logger = logger or get_logger(__name__)
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        """Process request, measure timing, and log.
+
+        Args:
+            request: The incoming request
+            call_next: The next middleware/route handler
+
+        Returns:
+            Response from the next handler
+        """
+        start_time = time.perf_counter()
+
+        response = await call_next(request)
+
+        duration_ms = (time.perf_counter() - start_time) * 1000
+
+        self._logger.info(
+            "%s %s",
+            request.method,
+            request.url.path,
+            status_code=response.status_code,
+            duration_ms=round(duration_ms, 2),
+            client_ip=extract_client_ip(request),
+        )
+
+        return response
 
 
 class GeoIPMiddleware(BaseHTTPMiddleware):
@@ -85,8 +148,8 @@ class GeoIPMiddleware(BaseHTTPMiddleware):
                 logger.debug("GeoIP service not available, skipping geo extraction")
                 return await call_next(request)
 
-            # Extract client IP
-            client_ip = self._extract_ip(request)
+            # Extract client IP (dev override takes priority)
+            client_ip = self.dev_override_ip or extract_client_ip(request)
             if not client_ip:
                 logger.debug("No client IP found for request to %s", request.url.path)
                 return await call_next(request)
@@ -103,49 +166,9 @@ class GeoIPMiddleware(BaseHTTPMiddleware):
             logger.exception(
                 "UNEXPECTED ERROR in GeoIP middleware for %s from IP %s - geo fields set to None",
                 request.url.path,
-                self._extract_ip(request) or "unknown",
+                self.dev_override_ip or extract_client_ip(request) or "unknown",
             )
             # Geo fields already set to None above
 
         # Continue processing the request
         return await call_next(request)
-
-    def _extract_ip(self, request: Request) -> str | None:
-        """Extract client IP address from request headers.
-
-        Checks headers in priority order:
-        1. DEV_OVERRIDE_IP (if set) - for development/testing
-        2. X-Real-IP - common proxy header
-        3. X-Forwarded-For - standard proxy header (uses leftmost IP)
-        4. CF-Connecting-IP - Cloudflare header
-        5. request.client.host - fallback to direct connection
-
-        Args:
-            request: The incoming request
-
-        Returns:
-            IP address string, or None if unable to extract
-        """
-        # Development override
-        if self.dev_override_ip:
-            return self.dev_override_ip
-
-        # Check X-Real-IP header
-        if "x-real-ip" in request.headers:
-            return request.headers["x-real-ip"]
-
-        # Check X-Forwarded-For header (use leftmost IP = original client)
-        if "x-forwarded-for" in request.headers:
-            forwarded_ips = request.headers["x-forwarded-for"].split(",")
-            if forwarded_ips:
-                return forwarded_ips[0].strip()
-
-        # Check CF-Connecting-IP header (Cloudflare)
-        if "cf-connecting-ip" in request.headers:
-            return request.headers["cf-connecting-ip"]
-
-        # Fallback to direct client host
-        if request.client:
-            return request.client.host
-
-        return None
