@@ -74,10 +74,12 @@ class TestScoreSubmissionMetaRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) >= 1
-        assert data[0]["device_id"] == str(device.id)
-        assert data[0]["board_id"] == str(board.id)
-        assert data[0]["submission_count"] == 1
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) >= 1
+        assert data["data"][0]["device_id"] == str(device.id)
+        assert data["data"][0]["board_id"] == str(board.id)
+        assert data["data"][0]["submission_count"] == 1
 
     async def test_list_submission_meta_filter_by_board(
         self, client: AsyncClient, db_session, test_api_key
@@ -164,8 +166,8 @@ class TestScoreSubmissionMetaRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["board_id"] == str(board1.id)
+        assert len(data["data"]) == 1
+        assert data["data"][0]["board_id"] == str(board1.id)
 
     async def test_list_submission_meta_filter_by_device(
         self, client: AsyncClient, db_session, test_api_key
@@ -246,8 +248,8 @@ class TestScoreSubmissionMetaRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["device_id"] == str(device1.id)
+        assert len(data["data"]) == 1
+        assert data["data"][0]["device_id"] == str(device1.id)
 
     async def test_get_submission_meta(self, client: AsyncClient, db_session, test_api_key):
         """Test getting a single submission metadata by ID via API."""
@@ -448,8 +450,10 @@ class TestScoreSubmissionMetaRoutes:
 
         assert response.status_code == 200
         data = response.json()
+        assert "data" in data
+        assert "pagination" in data
 
         # Should contain metadata from both accounts (at least 2 entries)
-        device_ids = {m["device_id"] for m in data}
+        device_ids = {m["device_id"] for m in data["data"]}
         assert str(device1.id) in device_ids
         assert str(device2.id) in device_ids

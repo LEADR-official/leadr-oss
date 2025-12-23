@@ -2,7 +2,9 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, ScoreSubmissionMetaID
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
 from leadr.scores.services.anti_cheat_repositories import ScoreSubmissionMetaRepository
@@ -27,28 +29,33 @@ class ScoreSubmissionMetaService(BaseService[ScoreSubmissionMeta, ScoreSubmissio
         account_id: AccountID | None,
         board_id: BoardID | None = None,
         device_id: DeviceID | None = None,
-    ) -> list[ScoreSubmissionMeta]:
-        """List score submission metadata for an account with optional filters.
+        *,
+        pagination: PaginationParams,
+    ) -> PaginatedResult[ScoreSubmissionMeta]:
+        """List score submission metadata for an account with optional filters and pagination.
 
         Args:
             account_id: Account ID to filter by. If None, returns all metadata
                 (superadmin use case).
             board_id: Optional board ID to filter by
             device_id: Optional device ID to filter by
+            pagination: Pagination parameters (required)
 
         Returns:
-            List of submission metadata matching the filter criteria
+            PaginatedResult containing submission metadata matching the filter criteria
 
         Example:
             >>> metas = await service.list_submission_meta(
             ...     account_id=account.id,
             ...     board_id=board.id,
+            ...     pagination=PaginationParams(cursor=None, limit=100, sort=None),
             ... )
         """
         return await self.repository.filter(
             account_id=account_id,
             board_id=board_id,
             device_id=device_id,
+            pagination=pagination,
         )
 
     async def get_submission_meta(

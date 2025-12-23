@@ -2,9 +2,11 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from leadr.auth.dependencies import AdminAuthContextDep
+from leadr.common.api.pagination import PaginatedResponse, PaginationParams
+from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, ScoreSubmissionMetaID
 from leadr.scores.api.score_submission_meta_schemas import ScoreSubmissionMetaResponse
 from leadr.scores.services.dependencies import ScoreSubmissionMetaServiceDep
@@ -12,18 +14,22 @@ from leadr.scores.services.dependencies import ScoreSubmissionMetaServiceDep
 router = APIRouter()
 
 
-@router.get("/score-submission-metadata", response_model=list[ScoreSubmissionMetaResponse])
+@router.get(
+    "/score-submission-metadata", response_model=PaginatedResponse[ScoreSubmissionMetaResponse]
+)
 async def list_submission_meta(
     auth: AdminAuthContextDep,
     service: ScoreSubmissionMetaServiceDep,
+    pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     board_id: BoardID | None = None,
     device_id: DeviceID | None = None,
-) -> list[ScoreSubmissionMetaResponse]:
-    """List score submission metadata for an account with optional filters.
+) -> PaginatedResponse[ScoreSubmissionMetaResponse]:
+    """List score submission metadata for an account with optional filters and pagination.
 
-    Returns all non-deleted submission metadata for the specified account, with optional
-    filtering by board or device.
+    Returns paginated submission metadata for the specified account, with optional
+    filtering by board or device. Supports cursor-based pagination with bidirectional
+    navigation and custom sorting.
 
     For regular users, account_id is automatically derived from their API key.
     For superadmins, account_id is optional - if omitted, returns metadata from all accounts.
@@ -31,27 +37,48 @@ async def list_submission_meta(
     Args:
         auth: Authentication context with user info.
         service: Injected submission metadata service dependency.
+        pagination: Pagination parameters (cursor, limit, sort).
         account_id: Optional account_id query parameter (superadmins can omit to see all).
         board_id: Optional board ID to filter by.
         device_id: Optional device ID to filter by.
 
     Returns:
-        List of ScoreSubmissionMetaResponse objects matching the filter criteria.
+        PaginatedResponse containing ScoreSubmissionMetaResponse objects matching the filter.
 
     Raises:
+        400: Invalid cursor or sort field.
         403: User does not have access to the specified account.
     """
     # Superadmin without account_id = None (all accounts)
     # Superadmin with account_id = that specific account
     # Regular user = always their account_id (ignores query param)
     effective_account_id = account_id if auth.is_superadmin else auth.account_id
-    metas = await service.list_submission_meta(
-        account_id=effective_account_id,
-        board_id=board_id,
-        device_id=device_id,
-    )
 
-    return [ScoreSubmissionMetaResponse.from_domain(meta) for meta in metas]
+    try:
+        result = await service.list_submission_meta(
+            account_id=effective_account_id,
+            board_id=board_id,
+            device_id=device_id,
+            pagination=pagination,
+        )
+    except (CursorValidationError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+
+    # Build filters dict for cursor validation
+    filters_dict = {}
+    if effective_account_id is not None:
+        filters_dict["account_id"] = str(effective_account_id)
+    if board_id is not None:
+        filters_dict["board_id"] = str(board_id)
+    if device_id is not None:
+        filters_dict["device_id"] = str(device_id)
+
+    return PaginatedResponse.from_paginated_result(
+        result=result,
+        pagination=pagination,
+        filters=filters_dict,
+        response_model=ScoreSubmissionMetaResponse,
+    )
 
 
 @router.get(

@@ -2,9 +2,11 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from leadr.auth.dependencies import AdminAuthContextDep
+from leadr.common.api.pagination import PaginatedResponse, PaginationParams
+from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, BoardID, GameID, ScoreFlagID
 from leadr.scores.api.score_flag_schemas import ScoreFlagResponse, ScoreFlagUpdateRequest
 from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
@@ -13,20 +15,22 @@ from leadr.scores.services.dependencies import ScoreFlagServiceDep
 router = APIRouter()
 
 
-@router.get("/score-flags", response_model=list[ScoreFlagResponse])
+@router.get("/score-flags", response_model=PaginatedResponse[ScoreFlagResponse])
 async def list_score_flags(
     auth: AdminAuthContextDep,
     service: ScoreFlagServiceDep,
+    pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     board_id: BoardID | None = None,
     game_id: GameID | None = None,
     status: str | None = None,
     flag_type: str | None = None,
-) -> list[ScoreFlagResponse]:
-    """List score flags for an account with optional filters.
+) -> PaginatedResponse[ScoreFlagResponse]:
+    """List score flags for an account with optional filters and pagination.
 
-    Returns all non-deleted flags for the specified account, with optional
-    filtering by board, game, status, or flag type.
+    Returns paginated flags for the specified account, with optional
+    filtering by board, game, status, or flag type. Supports cursor-based
+    pagination with bidirectional navigation and custom sorting.
 
     For regular users, account_id is automatically derived from their API key.
     For superadmins, account_id is optional - if omitted, returns flags from all accounts.
@@ -34,6 +38,7 @@ async def list_score_flags(
     Args:
         auth: Authentication context with user info.
         service: Injected score flag service dependency.
+        pagination: Pagination parameters (cursor, limit, sort).
         account_id: Optional account_id query parameter (superadmins can omit to see all).
         board_id: Optional board ID to filter by.
         game_id: Optional game ID to filter by.
@@ -41,24 +46,48 @@ async def list_score_flags(
         flag_type: Optional flag type to filter by (VELOCITY, DUPLICATE, etc.).
 
     Returns:
-        List of ScoreFlagResponse objects matching the filter criteria.
+        PaginatedResponse containing ScoreFlagResponse objects matching the filter criteria.
 
     Raises:
+        400: Invalid cursor or sort field.
         403: User does not have access to the specified account.
     """
     # Superadmin without account_id = None (all accounts)
     # Superadmin with account_id = that specific account
     # Regular user = always their account_id (ignores query param)
     effective_account_id = account_id if auth.is_superadmin else auth.account_id
-    flags = await service.list_flags(
-        account_id=effective_account_id,
-        board_id=board_id,
-        game_id=game_id,
-        status=status,
-        flag_type=flag_type,
-    )
 
-    return [ScoreFlagResponse.from_domain(flag) for flag in flags]
+    try:
+        result = await service.list_flags(
+            account_id=effective_account_id,
+            board_id=board_id,
+            game_id=game_id,
+            status=status,
+            flag_type=flag_type,
+            pagination=pagination,
+        )
+    except (CursorValidationError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+
+    # Build filters dict for cursor validation
+    filters_dict = {}
+    if effective_account_id is not None:
+        filters_dict["account_id"] = str(effective_account_id)
+    if board_id is not None:
+        filters_dict["board_id"] = str(board_id)
+    if game_id is not None:
+        filters_dict["game_id"] = str(game_id)
+    if status is not None:
+        filters_dict["status"] = status
+    if flag_type is not None:
+        filters_dict["flag_type"] = flag_type
+
+    return PaginatedResponse.from_paginated_result(
+        result=result,
+        pagination=pagination,
+        filters=filters_dict,
+        response_model=ScoreFlagResponse,
+    )
 
 
 @router.get("/score-flags/{flag_id}", response_model=ScoreFlagResponse)

@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import select
 
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import (
     AccountID,
     BoardID,
@@ -13,6 +14,7 @@ from leadr.common.domain.ids import (
     ScoreID,
     ScoreSubmissionMetaID,
 )
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 from leadr.scores.adapters.orm import ScoreFlagORM, ScoreSubmissionMetaORM
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
@@ -20,6 +22,17 @@ from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
 
 class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSubmissionMetaORM]):
     """Repository for managing score submission metadata persistence."""
+
+    SORTABLE_FIELDS = {
+        "id",
+        "device_id",
+        "board_id",
+        "submission_count",
+        "last_submission_at",
+        "last_score_value",
+        "created_at",
+        "updated_at",
+    }
 
     def _to_domain(self, orm: ScoreSubmissionMetaORM) -> ScoreSubmissionMeta:
         """Convert ORM model to domain entity."""
@@ -60,9 +73,11 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
         account_id: AccountID | None = None,
         board_id: BoardID | None = None,
         device_id: DeviceID | None = None,
+        *,
+        pagination: PaginationParams,
         **kwargs: Any,
-    ) -> list[ScoreSubmissionMeta]:
-        """Filter submission metadata by account and optional criteria.
+    ) -> PaginatedResult[ScoreSubmissionMeta]:
+        """Filter submission metadata by account and optional criteria with pagination.
 
         Joins with scores table to filter by account_id since submission meta doesn't have
         a direct account relation.
@@ -72,15 +87,19 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
                 (superadmin use case). Regular users should always pass account_id.
             board_id: Optional board ID to filter by
             device_id: Optional device ID to filter by
+            pagination: Pagination parameters (required)
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of submission metadata for the account matching the filter criteria
+            PaginatedResult containing submission metadata matching the filter criteria
         """
         from leadr.scores.adapters.orm import ScoreORM
 
         # Build base query
         query = select(ScoreSubmissionMetaORM).where(ScoreSubmissionMetaORM.deleted_at.is_(None))
+
+        # Build filters dict for cursor validation
+        filters_dict: dict[str, Any] = {}
 
         if account_id is not None:
             account_uuid = self._extract_uuid(account_id)
@@ -88,19 +107,41 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
             query = query.join(ScoreORM, ScoreSubmissionMetaORM.score_id == ScoreORM.id).where(
                 ScoreORM.account_id == account_uuid
             )
+            filters_dict["account_id"] = str(account_uuid)
 
         # Apply optional filters
         if board_id is not None:
             board_uuid = self._extract_uuid(board_id)
             query = query.where(ScoreSubmissionMetaORM.board_id == board_uuid)
+            filters_dict["board_id"] = str(board_uuid)
 
         if device_id is not None:
             device_uuid = self._extract_uuid(device_id)
             query = query.where(ScoreSubmissionMetaORM.device_id == device_uuid)
+            filters_dict["device_id"] = str(device_uuid)
 
-        result = await self.session.execute(query)
-        orms = result.scalars().all()
-        return [self._to_domain(orm) for orm in orms]
+        # Validate sort fields
+        for sort_field in pagination.sort_spec:
+            if sort_field.name not in self.SORTABLE_FIELDS:
+                raise ValueError(
+                    f"Unknown sort field: {sort_field.name}. "
+                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
+                )
+
+        # Handle cursor if present
+        cursor = None
+        if pagination.has_cursor():
+            cursor = pagination.decode_cursor()
+            if cursor is not None:
+                cursor.validate_state(pagination.sort_spec, filters_dict)
+
+        # Execute paginated query
+        return await self._execute_paginated_query(
+            query=query,
+            sort_fields=pagination.sort_spec,
+            cursor=cursor,
+            limit=pagination.limit,
+        )
 
     async def get_by_device_and_board(
         self, device_id: DeviceID, board_id: BoardID
@@ -130,6 +171,16 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
 
 class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
     """Repository for managing score flag persistence."""
+
+    SORTABLE_FIELDS = {
+        "id",
+        "score_id",
+        "flag_type",
+        "confidence",
+        "status",
+        "created_at",
+        "updated_at",
+    }
 
     def _to_domain(self, orm: ScoreFlagORM) -> ScoreFlag:
         """Convert ORM model to domain entity."""
@@ -183,9 +234,11 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
         game_id: GameID | None = None,
         status: str | None = None,
         flag_type: str | None = None,
+        *,
+        pagination: PaginationParams,
         **kwargs: Any,
-    ) -> list[ScoreFlag]:
-        """Filter flags by account and optional criteria.
+    ) -> PaginatedResult[ScoreFlag]:
+        """Filter flags by account and optional criteria with pagination.
 
         Joins with scores table to filter by account_id since flags don't have
         a direct account relation.
@@ -197,41 +250,70 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
             game_id: Optional game ID to filter by
             status: Optional status to filter by (PENDING, CONFIRMED_CHEAT, etc.)
             flag_type: Optional flag type to filter by (VELOCITY, DUPLICATE, etc.)
+            pagination: Pagination parameters (required)
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of flags for the account matching the filter criteria
+            PaginatedResult containing flags matching the filter criteria
         """
         from leadr.scores.adapters.orm import ScoreORM
 
         # Build base query
         query = select(ScoreFlagORM).where(ScoreFlagORM.deleted_at.is_(None))
 
+        # Join with scores table if we need to filter by account, board, or game
+        needs_score_join = account_id is not None or board_id is not None or game_id is not None
+        if needs_score_join:
+            query = query.join(ScoreORM, ScoreFlagORM.score_id == ScoreORM.id)
+
+        # Build filters dict for cursor validation
+        filters_dict: dict[str, Any] = {}
+
         if account_id is not None:
             account_uuid = self._extract_uuid(account_id)
-            # Join with scores table to filter by account
-            query = query.join(ScoreORM, ScoreFlagORM.score_id == ScoreORM.id).where(
-                ScoreORM.account_id == account_uuid
-            )
+            query = query.where(ScoreORM.account_id == account_uuid)
+            filters_dict["account_id"] = str(account_uuid)
 
-        # Apply optional filters
         if board_id is not None:
             board_uuid = self._extract_uuid(board_id)
             query = query.where(ScoreORM.board_id == board_uuid)
+            filters_dict["board_id"] = str(board_uuid)
 
         if game_id is not None:
             game_uuid = self._extract_uuid(game_id)
             query = query.where(ScoreORM.game_id == game_uuid)
+            filters_dict["game_id"] = str(game_uuid)
 
         if status is not None:
             query = query.where(ScoreFlagORM.status == status)
+            filters_dict["status"] = status
 
         if flag_type is not None:
             query = query.where(ScoreFlagORM.flag_type == flag_type)
+            filters_dict["flag_type"] = flag_type
 
-        result = await self.session.execute(query)
-        orms = result.scalars().all()
-        return [self._to_domain(orm) for orm in orms]
+        # Validate sort fields
+        for sort_field in pagination.sort_spec:
+            if sort_field.name not in self.SORTABLE_FIELDS:
+                raise ValueError(
+                    f"Unknown sort field: {sort_field.name}. "
+                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
+                )
+
+        # Handle cursor if present
+        cursor = None
+        if pagination.has_cursor():
+            cursor = pagination.decode_cursor()
+            if cursor is not None:
+                cursor.validate_state(pagination.sort_spec, filters_dict)
+
+        # Execute paginated query
+        return await self._execute_paginated_query(
+            query=query,
+            sort_fields=pagination.sort_spec,
+            cursor=cursor,
+            limit=pagination.limit,
+        )
 
     async def get_flags_by_score_id(self, score_id: ScoreID) -> list[ScoreFlag]:
         """Get all flags for a specific score.
