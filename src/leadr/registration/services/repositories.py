@@ -35,7 +35,9 @@ class VerificationCodeRepository(BaseRepository[VerificationCode, VerificationCo
         """Get the ORM model class."""
         return VerificationCodeORM
 
-    async def filter(self, account_id: Any | None = None, **kwargs: Any) -> list[VerificationCode]:
+    async def filter(  # type: ignore[override] - intentionally unpaginated (short-lived codes)
+        self, account_id: Any | None = None, **kwargs: Any
+    ) -> list[VerificationCode]:
         """Filter verification codes by criteria.
 
         Args:
@@ -115,7 +117,9 @@ class JamCodeRepository(BaseRepository[JamCode, JamCodeORM]):
         """Get the ORM model class."""
         return JamCodeORM
 
-    async def filter(self, account_id: Any | None = None, **kwargs: Any) -> list[JamCode]:
+    async def filter(  # type: ignore[override] - intentionally unpaginated (small fixed set)
+        self, account_id: Any | None = None, **kwargs: Any
+    ) -> list[JamCode]:
         """Filter jam codes by criteria.
 
         Args:
@@ -164,7 +168,9 @@ class JamCodeRedemptionRepository(BaseRepository[JamCodeRedemption, JamCodeRedem
         """Get the ORM model class."""
         return JamCodeRedemptionORM
 
-    async def filter(self, account_id: Any | None = None, **kwargs: Any) -> list[JamCodeRedemption]:
+    async def filter(  # type: ignore[override] - intentionally unpaginated (small fixed set)
+        self, account_id: Any | None = None, **kwargs: Any
+    ) -> list[JamCodeRedemption]:
         """Filter jam code redemptions by criteria.
 
         Args:

@@ -3,14 +3,13 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import UUID4
 from sqlalchemy import func, select
 
 from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.common.api.pagination import PaginationParams
-from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID, PrefixedID
+from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 
@@ -88,32 +87,6 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         """Get the ORM model class."""
         return BoardORM
 
-    async def filter(
-        self, account_id: UUID4 | PrefixedID | None = None, **kwargs: Any
-    ) -> list[Board]:
-        """Filter boards by account and optional criteria.
-
-        Args:
-            account_id: Optional account ID to filter by. If None, returns all boards
-                (superadmin use case). Regular users should always pass account_id.
-            **kwargs: Additional filter parameters (reserved for future use)
-
-        Returns:
-            List of boards for the account matching the filter criteria
-        """
-        query = select(BoardORM).where(BoardORM.deleted_at.is_(None))
-        if account_id is not None:
-            account_uuid = self._extract_uuid(account_id)
-            query = query.where(BoardORM.account_id == account_uuid)
-
-        # Future: Add additional filters here as needed
-        # if "game_id" in kwargs:
-        #     query = query.where(BoardORM.game_id == kwargs["game_id"])
-
-        result = await self.session.execute(query)
-        orms = result.scalars().all()
-        return [self._to_domain(orm) for orm in orms]
-
     async def get_by_short_code(self, short_code: str) -> Board | None:
         """Get board by short_code.
 
@@ -127,8 +100,8 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
 
     async def get_by_slug(
         self,
-        account_id: UUID4 | AccountID,
-        game_id: UUID4 | GameID,
+        account_id: AccountID,
+        game_id: GameID,
         slug: str,
         is_active: bool | None = None,
     ) -> Board | None:
@@ -164,10 +137,10 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
-    async def list_boards(
+    async def filter(
         self,
-        account_id: UUID4 | AccountID | None = None,
-        game_id: UUID4 | GameID | None = None,
+        account_id: AccountID | None = None,
+        game_id: GameID | None = None,
         code: str | None = None,
         is_active: bool | None = None,
         is_published: bool | None = None,
@@ -177,8 +150,9 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         ends_after: datetime | None = None,
         *,
         pagination: PaginationParams,
+        **kwargs: Any,
     ) -> PaginatedResult[Board]:
-        """List boards with optional filtering and pagination.
+        """Filter boards with optional criteria and pagination.
 
         Args:
             account_id: Optional account ID to filter by
@@ -307,7 +281,7 @@ class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
         """Get the ORM model class."""
         return BoardTemplateORM
 
-    async def filter(  # type: ignore[override]
+    async def filter(
         self,
         account_id: AccountID | None = None,
         game_id: GameID | None = None,

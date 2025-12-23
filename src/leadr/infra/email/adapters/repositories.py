@@ -51,7 +51,9 @@ class EmailRepository(BaseRepository[Email, EmailORM]):
         """
         return EmailORM
 
-    async def filter(self, account_id: Any | None = None, **kwargs: Any) -> list[Email]:
+    async def filter(  # type: ignore[override] - intentionally unpaginated (internal email queue)
+        self, account_id: Any | None = None, **kwargs: Any
+    ) -> list[Email]:
         """Filter emails by criteria.
 
         Args:

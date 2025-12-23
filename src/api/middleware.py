@@ -162,7 +162,7 @@ class GeoIPMiddleware(BaseHTTPMiddleware):
                 request.state.geo_city = geo_info.city
 
         except Exception:
-            # UNEXPECTED ERROR: Log loudly but continue request gracefully
+            # DELIBERATE CATCHALL: Log loudly but continue request gracefully
             logger.exception(
                 "UNEXPECTED ERROR in GeoIP middleware for %s from IP %s - geo fields set to None",
                 request.url.path,
@@ -170,5 +170,4 @@ class GeoIPMiddleware(BaseHTTPMiddleware):
             )
             # Geo fields already set to None above
 
-        # Continue processing the request
         return await call_next(request)

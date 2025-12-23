@@ -409,10 +409,11 @@ class TestBoardRepository:
         await board_repo.create(board2)
 
         # Filter boards by account
-        boards = await board_repo.filter(account_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await board_repo.filter(account_id=account_id, pagination=pagination)
 
-        assert len(boards) == 2
-        names = {b.name for b in boards}
+        assert len(result.items) == 2
+        names = {b.name for b in result.items}
         assert "Board One" in names
         assert "Board Two" in names
 
@@ -505,11 +506,12 @@ class TestBoardRepository:
         await board_repo.create(board2)
 
         # Filter boards for account 1
-        boards = await board_repo.filter(account1_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await board_repo.filter(account_id=AccountID(account1_id), pagination=pagination)
 
-        assert len(boards) == 1
-        assert boards[0].name == "Account 1 Board"
-        assert boards[0].account_id == account1_id
+        assert len(result.items) == 1
+        assert result.items[0].name == "Account 1 Board"
+        assert result.items[0].account_id == AccountID(account1_id)
 
     async def test_delete_board_is_soft_delete(self, db_session: AsyncSession):
         """Test that delete performs soft-delete, not hard-delete."""
@@ -640,10 +642,11 @@ class TestBoardRepository:
         await board_repo.delete(board1.id)
 
         # List should only return non-deleted
-        boards = await board_repo.filter(account_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await board_repo.filter(account_id=account_id, pagination=pagination)
 
-        assert len(boards) == 1
-        assert boards[0].name == "Board Two"
+        assert len(result.items) == 1
+        assert result.items[0].name == "Board Two"
 
     async def test_unique_constraint_on_short_code(self, db_session: AsyncSession):
         """Test that short_code must be globally unique."""
@@ -920,7 +923,7 @@ class TestBoardRepository:
 
         # Filter by game_id
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await board_repo.list_boards(game_id=game1_id, pagination=pagination)
+        result = await board_repo.filter(game_id=game1_id, pagination=pagination)
 
         assert len(result.items) == 1
         assert result.items[0].name == "Game 1 Board"
@@ -990,12 +993,12 @@ class TestBoardRepository:
 
         # Filter active only
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        active_result = await board_repo.list_boards(is_active=True, pagination=pagination)
+        active_result = await board_repo.filter(is_active=True, pagination=pagination)
         assert len(active_result.items) == 1
         assert active_result.items[0].name == "Active Board"
 
         # Filter inactive only
-        inactive_result = await board_repo.list_boards(is_active=False, pagination=pagination)
+        inactive_result = await board_repo.filter(is_active=False, pagination=pagination)
         assert len(inactive_result.items) == 1
         assert inactive_result.items[0].name == "Inactive Board"
 
@@ -1067,7 +1070,7 @@ class TestBoardRepository:
 
         # Filter boards starting before now
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await board_repo.list_boards(starts_before=now, pagination=pagination)
+        result = await board_repo.filter(starts_before=now, pagination=pagination)
         assert len(result.items) == 1
         assert result.items[0].name == "Early Board"
 
@@ -1139,7 +1142,7 @@ class TestBoardRepository:
 
         # Filter boards starting after now
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await board_repo.list_boards(starts_after=now, pagination=pagination)
+        result = await board_repo.filter(starts_after=now, pagination=pagination)
         assert len(result.items) == 1
         assert result.items[0].name == "Late Board"
 
@@ -1211,7 +1214,7 @@ class TestBoardRepository:
 
         # Filter boards ending before now
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await board_repo.list_boards(ends_before=now, pagination=pagination)
+        result = await board_repo.filter(ends_before=now, pagination=pagination)
         assert len(result.items) == 1
         assert result.items[0].name == "Ended Board"
 
@@ -1283,7 +1286,7 @@ class TestBoardRepository:
 
         # Filter boards ending after now
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await board_repo.list_boards(ends_after=now, pagination=pagination)
+        result = await board_repo.filter(ends_after=now, pagination=pagination)
         assert len(result.items) == 1
         assert result.items[0].name == "Ongoing Board"
 
@@ -1376,7 +1379,7 @@ class TestBoardRepository:
 
         # Filter: active AND started before now
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await board_repo.list_boards(
+        result = await board_repo.filter(
             game_id=game_id,
             is_active=True,
             starts_before=now,
@@ -1437,7 +1440,7 @@ class TestBoardRepository:
 
         # Paginate with game_id filter
         pagination = PaginationParams(limit=2, sort=None, cursor=None)
-        result = await board_repo.list_boards(game_id=game_id, pagination=pagination)
+        result = await board_repo.filter(game_id=game_id, pagination=pagination)
 
         assert len(result.items) == 2
         assert result.has_next is True

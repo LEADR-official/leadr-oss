@@ -82,7 +82,7 @@ class TestRepository(BaseRepository[TestEntity, TestEntityORM]):
         """Get the ORM model class."""
         return TestEntityORM
 
-    async def filter(
+    async def filter(  # type: ignore[override] - test repository, intentionally unpaginated
         self, account_id: UUID4 | PrefixedID | None = None, **kwargs: Any
     ) -> list[TestEntity]:
         """Filter test entities.

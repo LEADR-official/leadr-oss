@@ -286,7 +286,7 @@ class TestGameRepository:
 
         # List games for account 1
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await game_repo.filter(account1_id, pagination=pagination)
+        result = await game_repo.filter(AccountID(account1_id), pagination=pagination)
 
         assert len(result.items) == 1
         assert result.items[0].name == "Account 1 Game"

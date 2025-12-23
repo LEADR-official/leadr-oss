@@ -253,7 +253,9 @@ class BoardService(BaseService[Board, BoardRepository]):
         Returns:
             List of Board domain entities for the account.
         """
-        return await self.repository.filter(account_id)
+        pagination = PaginationParams(cursor=None, limit=1000, sort=None)
+        result = await self.repository.filter(account_id=account_id, pagination=pagination)
+        return list(result.items)
 
     async def list_boards(
         self,
@@ -286,7 +288,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         Returns:
             PaginatedResult containing Board entities matching the filter criteria.
         """
-        return await self.repository.list_boards(
+        return await self.repository.filter(
             account_id=account_id,
             game_id=game_id,
             code=code,
