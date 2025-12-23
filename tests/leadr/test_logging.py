@@ -167,13 +167,21 @@ class TestSetupLogging:
         assert log_entry["env"] == "TestEnv"
 
     def test_setup_logging_configures_uvicorn_loggers(self):
-        """Uvicorn loggers should be configured with our handlers."""
+        """Uvicorn loggers should be configured with our handlers.
+
+        Note: uvicorn.access is disabled because we use AccessLogMiddleware instead.
+        """
         setup_logging(log_level="INFO", json_format=True)
 
-        for logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
+        # uvicorn and uvicorn.error should have handlers
+        for logger_name in ["uvicorn", "uvicorn.error"]:
             uv_logger = logging.getLogger(logger_name)
             assert len(uv_logger.handlers) >= 1
             assert uv_logger.propagate is False
+
+        # uvicorn.access should be disabled (replaced by AccessLogMiddleware)
+        access_logger = logging.getLogger("uvicorn.access")
+        assert access_logger.disabled is True
 
 
 class TestGetLogger:
