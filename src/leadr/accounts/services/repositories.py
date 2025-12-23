@@ -1,6 +1,6 @@
 """Account and User repository services."""
 
-from typing import Any, overload
+from typing import Any
 
 from pydantic import UUID4
 from sqlalchemy import select
@@ -58,42 +58,27 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
         """Get account by slug, returns None if not found or soft-deleted."""
         return await self._get_by_field("slug", slug)
 
-    @overload
-    async def filter(
+    async def filter(  # type: ignore[override]
         self,
         account_id: UUID4 | PrefixedID | None = None,
-        pagination: None = None,
+        *,
+        pagination: PaginationParams,
         **kwargs: Any,
-    ) -> list[Account]: ...
-
-    @overload
-    async def filter(
-        self,
-        account_id: UUID4 | PrefixedID | None = None,
-        pagination: PaginationParams = ...,
-        **kwargs: Any,
-    ) -> PaginatedResult[Account]: ...
-
-    async def filter(
-        self,
-        account_id: UUID4 | PrefixedID | None = None,
-        pagination: PaginationParams | None = None,
-        **kwargs: Any,
-    ) -> list[Account] | PaginatedResult[Account]:
-        """Filter accounts by optional criteria with optional pagination.
+    ) -> PaginatedResult[Account]:
+        """Filter accounts by optional criteria with pagination.
 
         Account is the top-level tenant boundary, so no account_id filtering is required.
         The account_id parameter is accepted for interface compatibility but is not used.
 
         Args:
             account_id: Not used. Account is the top-level tenant.
-            pagination: Optional pagination parameters
+            pagination: Pagination parameters (required).
             status: Optional AccountStatus to filter by
             slug: Optional slug to filter by
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of accounts if no pagination, PaginatedResult if pagination provided
+            PaginatedResult containing accounts matching the filter criteria.
 
         Raises:
             ValueError: If sort field is not in SORTABLE_FIELDS
@@ -103,7 +88,7 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
         query = select(AccountORM).where(AccountORM.deleted_at.is_(None))
 
         # Build filters dict for cursor validation
-        filters_dict = {}
+        filters_dict: dict[str, str] = {}
 
         # Apply optional filters
         if "status" in kwargs and kwargs["status"] is not None:
@@ -116,12 +101,6 @@ class AccountRepository(BaseRepository[Account, AccountORM]):
         if "slug" in kwargs and kwargs["slug"] is not None:
             query = query.where(AccountORM.slug == kwargs["slug"])
             filters_dict["slug"] = kwargs["slug"]
-
-        # If no pagination, return list (backward compatibility)
-        if pagination is None:
-            result = await self.session.execute(query)
-            orms = result.scalars().all()
-            return [self._to_domain(orm) for orm in orms]
 
         # Validate sort fields
         for sort_field in pagination.sort_spec:
@@ -193,38 +172,23 @@ class UserRepository(BaseRepository[User, UserORM]):
         """Get user by email, returns None if not found or soft-deleted."""
         return await self._get_by_field("email", email)
 
-    @overload
-    async def filter(
+    async def filter(  # type: ignore[override]
         self,
         account_id: UUID4 | PrefixedID | None = None,
-        pagination: None = None,
+        *,
+        pagination: PaginationParams,
         **kwargs: Any,
-    ) -> list[User]: ...
-
-    @overload
-    async def filter(
-        self,
-        account_id: UUID4 | PrefixedID | None = None,
-        pagination: PaginationParams = ...,
-        **kwargs: Any,
-    ) -> PaginatedResult[User]: ...
-
-    async def filter(
-        self,
-        account_id: UUID4 | PrefixedID | None = None,
-        pagination: PaginationParams | None = None,
-        **kwargs: Any,
-    ) -> list[User] | PaginatedResult[User]:
-        """Filter users by account and optional criteria with optional pagination.
+    ) -> PaginatedResult[User]:
+        """Filter users by account and optional criteria with pagination.
 
         Args:
             account_id: Optional account ID to filter by. If None, returns all users
                 (superadmin use case). Regular users should always pass account_id.
-            pagination: Optional pagination parameters
+            pagination: Pagination parameters (required).
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of users if no pagination, PaginatedResult if pagination provided
+            PaginatedResult containing users matching the filter criteria.
 
         Raises:
             ValueError: If sort field is not in SORTABLE_FIELDS
@@ -236,18 +200,12 @@ class UserRepository(BaseRepository[User, UserORM]):
             query = query.where(UserORM.account_id == account_uuid)
 
         # Build filters dict for cursor validation
-        filters_dict = {}
+        filters_dict: dict[str, str] = {}
 
         # Future: Add additional filters here as needed
         # if "status" in kwargs:
         #     query = query.where(UserORM.status == kwargs["status"])
         #     filters_dict["status"] = kwargs["status"]
-
-        # If no pagination, return list (backward compatibility)
-        if pagination is None:
-            result = await self.session.execute(query)
-            orms = result.scalars().all()
-            return [self._to_domain(orm) for orm in orms]
 
         # Validate sort fields
         for sort_field in pagination.sort_spec:

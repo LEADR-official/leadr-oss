@@ -1,7 +1,5 @@
 """User service for managing user operations."""
 
-from typing import overload
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.user import User
@@ -83,28 +81,21 @@ class UserService(BaseService[User, UserRepository]):
         """
         return await self.repository.get_by_email(email)
 
-    @overload
     async def list_users_by_account(
-        self, account_id: AccountID | None, pagination: None = None
-    ) -> list[User]: ...
-
-    @overload
-    async def list_users_by_account(
-        self, account_id: AccountID | None, pagination: PaginationParams = ...
-    ) -> PaginatedResult[User]: ...
-
-    async def list_users_by_account(
-        self, account_id: AccountID | None, pagination: PaginationParams | None = None
-    ) -> list[User] | PaginatedResult[User]:
-        """List all users for an account with optional pagination.
+        self,
+        account_id: AccountID | None,
+        *,
+        pagination: PaginationParams,
+    ) -> PaginatedResult[User]:
+        """List all users for an account with pagination.
 
         Args:
             account_id: The account ID to list users for. If None, returns all users
                 (superadmin use case).
-            pagination: Optional pagination parameters.
+            pagination: Pagination parameters (required).
 
         Returns:
-            List of User entities if no pagination, PaginatedResult if pagination provided.
+            PaginatedResult containing User entities.
         """
         return await self.repository.filter(account_id, pagination=pagination)
 

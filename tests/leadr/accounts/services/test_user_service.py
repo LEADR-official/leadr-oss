@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.accounts.services.user_service import UserService
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import AccountID, UserID
 
@@ -144,10 +145,11 @@ class TestUserService:
         )
 
         # List them
-        users = await service.list_users_by_account(account_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.list_users_by_account(account_id, pagination=pagination)
 
-        assert len(users) == 2
-        emails = {u.email for u in users}
+        assert len(result.items) == 2
+        emails = {u.email for u in result.items}
         assert "user1@example.com" in emails
         assert "user2@example.com" in emails
 
@@ -182,10 +184,11 @@ class TestUserService:
         await service.delete_user(user1.id)
 
         # List should only return non-deleted
-        users = await service.list_users_by_account(account_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.list_users_by_account(account_id, pagination=pagination)
 
-        assert len(users) == 1
-        assert users[0].email == "user2@example.com"
+        assert len(result.items) == 1
+        assert result.items[0].email == "user2@example.com"
 
     async def test_update_user(self, db_session: AsyncSession):
         """Test updating a user."""
