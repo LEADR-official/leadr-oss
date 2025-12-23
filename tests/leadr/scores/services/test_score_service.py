@@ -9,6 +9,7 @@ from leadr.accounts.services.account_service import AccountService
 from leadr.auth.services.device_service import DeviceService
 from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import BoardID, ScoreID
 from leadr.games.services.game_service import GameService
@@ -407,10 +408,11 @@ class TestScoreService:
         )
 
         # List them
-        scores = await score_service.list_scores(account_id=account.id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await score_service.list_scores(account_id=account.id, pagination=pagination)
 
-        assert len(scores) == 2
-        names = {s.player_name for s in scores}
+        assert len(result.items) == 2
+        names = {s.player_name for s in result.items}
         assert "Player1" in names
         assert "Player2" in names
 
@@ -479,10 +481,13 @@ class TestScoreService:
         )
 
         # Filter by board1
-        scores = await score_service.list_scores(account_id=account.id, board_id=board1.id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await score_service.list_scores(
+            account_id=account.id, board_id=board1.id, pagination=pagination
+        )
 
-        assert len(scores) == 1
-        assert scores[0].player_name == "Board1Score"
+        assert len(result.items) == 1
+        assert result.items[0].player_name == "Board1Score"
 
     async def test_update_score(self, db_session: AsyncSession):
         """Test updating a score via service."""
@@ -846,14 +851,16 @@ class TestScoreService:
         assert score2.id != score3.id
 
         # List scores for this board and device - should get all 3
-        all_scores = await score_service.list_scores(
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await score_service.list_scores(
             account_id=account.id,
             board_id=board.id,
             device_id=device.id,
+            pagination=pagination,
         )
 
-        assert len(all_scores) == 3
-        values = {s.value for s in all_scores}
+        assert len(result.items) == 3
+        values = {s.value for s in result.items}
         assert values == {100.0, 200.0, 150.0}
 
     async def test_keep_strategy_first_only_keeps_first_score(self, db_session: AsyncSession):
@@ -920,15 +927,17 @@ class TestScoreService:
         assert returned_score.value == 100.0
 
         # Verify only one score exists in DB
-        all_scores = await score_service.list_scores(
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await score_service.list_scores(
             account_id=account.id,
             board_id=board.id,
             device_id=device.id,
+            pagination=pagination,
         )
 
-        assert len(all_scores) == 1
-        assert all_scores[0].id == first_score.id
-        assert all_scores[0].value == 100.0
+        assert len(result.items) == 1
+        assert result.items[0].id == first_score.id
+        assert result.items[0].value == 100.0
 
     async def test_keep_strategy_first_only_allows_different_devices(
         self, db_session: AsyncSession
@@ -996,13 +1005,15 @@ class TestScoreService:
         assert score1.id != score2.id
 
         # Verify both scores exist in DB
-        all_scores = await score_service.list_scores(
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await score_service.list_scores(
             account_id=account.id,
             board_id=board.id,
+            pagination=pagination,
         )
 
-        assert len(all_scores) == 2
-        values = {s.value for s in all_scores}
+        assert len(result.items) == 2
+        values = {s.value for s in result.items}
         assert values == {100.0, 200.0}
 
     async def test_keep_strategy_latest_only_keeps_latest_score(self, db_session: AsyncSession):
@@ -1073,13 +1084,15 @@ class TestScoreService:
         assert first_score_check is None  # Soft-deleted scores not returned by get
 
         # Verify only second score is active
-        active_scores = await score_service.list_scores(
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await score_service.list_scores(
             account_id=account.id,
             board_id=board.id,
             device_id=device.id,
+            pagination=pagination,
         )
-        assert len(active_scores) == 1
-        assert active_scores[0].id == second_score.id
+        assert len(result.items) == 1
+        assert result.items[0].id == second_score.id
 
         # Create third score - should soft-delete second
         third_score, _ = await score_service.create_score(
@@ -1096,14 +1109,15 @@ class TestScoreService:
         assert third_score.id != second_score.id
 
         # Verify only third score is active
-        active_scores = await score_service.list_scores(
+        result = await score_service.list_scores(
             account_id=account.id,
             board_id=board.id,
             device_id=device.id,
+            pagination=pagination,
         )
-        assert len(active_scores) == 1
-        assert active_scores[0].id == third_score.id
-        assert active_scores[0].value == 150.0
+        assert len(result.items) == 1
+        assert result.items[0].id == third_score.id
+        assert result.items[0].value == 150.0
 
     async def test_keep_strategy_best_only_ascending_keeps_best_score(
         self, db_session: AsyncSession
@@ -1173,14 +1187,16 @@ class TestScoreService:
         assert first_check is None
 
         # Verify only better score is active
-        active_scores = await score_service.list_scores(
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await score_service.list_scores(
             account_id=account.id,
             board_id=board.id,
             device_id=device.id,
+            pagination=pagination,
         )
-        assert len(active_scores) == 1
-        assert active_scores[0].id == better_score.id
-        assert active_scores[0].value == 50.0
+        assert len(result.items) == 1
+        assert result.items[0].id == better_score.id
+        assert result.items[0].value == 50.0
 
         # Submit worse score (150 > 50) - should return existing, not save new
         returned_score, _ = await score_service.create_score(
@@ -1197,13 +1213,14 @@ class TestScoreService:
         assert returned_score.value == 50.0
 
         # Verify still only one active score
-        active_scores = await score_service.list_scores(
+        result = await score_service.list_scores(
             account_id=account.id,
             board_id=board.id,
             device_id=device.id,
+            pagination=pagination,
         )
-        assert len(active_scores) == 1
-        assert active_scores[0].id == better_score.id
+        assert len(result.items) == 1
+        assert result.items[0].id == better_score.id
 
         # Submit equal score (50 == 50) - should return existing, not save new
         equal_returned, _ = await score_service.create_score(
@@ -1217,12 +1234,13 @@ class TestScoreService:
         assert equal_returned.id == better_score.id
 
         # Still only one score
-        active_scores = await score_service.list_scores(
+        result = await score_service.list_scores(
             account_id=account.id,
             board_id=board.id,
             device_id=device.id,
+            pagination=pagination,
         )
-        assert len(active_scores) == 1
+        assert len(result.items) == 1
 
     async def test_keep_strategy_best_only_descending_keeps_best_score(
         self, db_session: AsyncSession
@@ -1292,14 +1310,16 @@ class TestScoreService:
         assert first_check is None
 
         # Verify only better score is active
-        active_scores = await score_service.list_scores(
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await score_service.list_scores(
             account_id=account.id,
             board_id=board.id,
             device_id=device.id,
+            pagination=pagination,
         )
-        assert len(active_scores) == 1
-        assert active_scores[0].id == better_score.id
-        assert active_scores[0].value == 150.0
+        assert len(result.items) == 1
+        assert result.items[0].id == better_score.id
+        assert result.items[0].value == 150.0
 
         # Submit worse score (50 < 150) - should return existing, not save new
         returned_score, _ = await score_service.create_score(
@@ -1316,10 +1336,123 @@ class TestScoreService:
         assert returned_score.value == 150.0
 
         # Verify still only one active score
-        active_scores = await score_service.list_scores(
+        result = await score_service.list_scores(
             account_id=account.id,
             board_id=board.id,
             device_id=device.id,
+            pagination=pagination,
         )
-        assert len(active_scores) == 1
-        assert active_scores[0].id == better_score.id
+        assert len(result.items) == 1
+        assert result.items[0].id == better_score.id
+
+
+@pytest.mark.asyncio
+class TestScoreRepository:
+    """Test suite for ScoreRepository."""
+
+    async def test_get_by_device_and_board_returns_score(self, db_session: AsyncSession):
+        """Test that get_by_device_and_board returns the score for a device on a board."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        # Create a score
+        score_service = ScoreService(db_session)
+        created_score, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="TestPlayer",
+            value=100.0,
+        )
+
+        # Use repository method to retrieve by device and board
+        from leadr.scores.services.repositories import ScoreRepository
+
+        repo = ScoreRepository(db_session)
+        found_score = await repo.get_by_device_and_board(
+            account_id=account.id,
+            device_id=device.id,
+            board_id=board.id,
+        )
+
+        assert found_score is not None
+        assert found_score.id == created_score.id
+        assert found_score.value == 100.0
+
+    async def test_get_by_device_and_board_returns_none_when_not_found(
+        self, db_session: AsyncSession
+    ):
+        """Test that get_by_device_and_board returns None when no score exists."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        # Don't create any score - just try to retrieve
+        from leadr.scores.services.repositories import ScoreRepository
+
+        repo = ScoreRepository(db_session)
+        found_score = await repo.get_by_device_and_board(
+            account_id=account.id,
+            device_id=device.id,
+            board_id=board.id,
+        )
+
+        assert found_score is None

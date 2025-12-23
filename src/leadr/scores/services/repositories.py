@@ -1,6 +1,6 @@
 """Score repository services."""
 
-from typing import Any, overload
+from typing import Any
 
 from pydantic import UUID4
 from sqlalchemy import select
@@ -60,6 +60,36 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         """Get the ORM model class."""
         return ScoreORM
 
+    async def get_by_device_and_board(
+        self,
+        account_id: AccountID,
+        device_id: DeviceID,
+        board_id: BoardID,
+    ) -> Score | None:
+        """Get the active score for a specific device on a board.
+
+        This is an optimized single-record lookup for keep_strategy logic.
+
+        Args:
+            account_id: Account ID to filter by (multi-tenant safety).
+            device_id: Device ID to search for.
+            board_id: Board ID to search for.
+
+        Returns:
+            The first matching Score or None if no score exists.
+        """
+        query = (
+            select(ScoreORM)
+            .where(ScoreORM.deleted_at.is_(None))
+            .where(ScoreORM.account_id == self._extract_uuid(account_id))
+            .where(ScoreORM.device_id == self._extract_uuid(device_id))
+            .where(ScoreORM.board_id == self._extract_uuid(board_id))
+            .limit(1)
+        )
+        result = await self.session.execute(query)
+        orm = result.scalars().first()
+        return self._to_domain(orm) if orm else None
+
     # Valid sortable fields for scores
     SORTABLE_FIELDS = {
         "id",
@@ -72,37 +102,16 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         "updated_at",
     }
 
-    @overload
-    async def filter(
+    async def filter(  # type: ignore[override]  # Intentionally returns PaginatedResult, not list
         self,
         account_id: UUID4 | PrefixedID | None = None,
         board_id: BoardID | None = None,
         game_id: GameID | None = None,
         device_id: DeviceID | None = None,
-        pagination: None = None,
+        *,
+        pagination: PaginationParams,
         **kwargs: Any,
-    ) -> list[Score]: ...
-
-    @overload
-    async def filter(
-        self,
-        account_id: UUID4 | PrefixedID | None = None,
-        board_id: BoardID | None = None,
-        game_id: GameID | None = None,
-        device_id: DeviceID | None = None,
-        pagination: PaginationParams = ...,
-        **kwargs: Any,
-    ) -> PaginatedResult[Score]: ...
-
-    async def filter(
-        self,
-        account_id: UUID4 | PrefixedID | None = None,
-        board_id: BoardID | None = None,
-        game_id: GameID | None = None,
-        device_id: DeviceID | None = None,
-        pagination: PaginationParams | None = None,
-        **kwargs: Any,
-    ) -> list[Score] | PaginatedResult[Score]:
+    ) -> PaginatedResult[Score]:
         """Filter scores by account and optional criteria.
 
         Args:
@@ -111,11 +120,11 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             board_id: Optional board ID to filter by
             game_id: Optional game ID to filter by
             device_id: Optional device ID to filter by
-            pagination: Optional pagination parameters
+            pagination: Pagination parameters (required)
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of scores if no pagination, PaginatedResult if pagination provided
+            PaginatedResult containing scores
 
         Raises:
             ValueError: If sort field is not in SORTABLE_FIELDS
@@ -144,12 +153,6 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             device_uuid = self._extract_uuid(device_id)
             query = query.where(ScoreORM.device_id == device_uuid)
             filters_dict["device_id"] = str(device_id)
-
-        # If no pagination, return list (old behavior)
-        if pagination is None:
-            result = await self.session.execute(query)
-            orms = result.scalars().all()
-            return [self._to_domain(orm) for orm in orms]
 
         # Validate sort fields
         for sort_field in pagination.sort_spec:
