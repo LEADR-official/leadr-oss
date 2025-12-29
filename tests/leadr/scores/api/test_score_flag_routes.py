@@ -104,8 +104,10 @@ class TestScoreFlagRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 2
-        flag_types = {f["flag_type"] for f in data}
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 2
+        flag_types = {f["flag_type"] for f in data["data"]}
         assert "VELOCITY" in flag_types
         assert "DUPLICATE" in flag_types
 
@@ -200,8 +202,8 @@ class TestScoreFlagRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["flag_type"] == "VELOCITY"
+        assert len(data["data"]) == 1
+        assert data["data"][0]["flag_type"] == "VELOCITY"
 
     async def test_list_flags_filter_by_status(self, client: AsyncClient, db_session, test_api_key):
         """Test filtering flags by status via API."""
@@ -283,9 +285,9 @@ class TestScoreFlagRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["status"] == "PENDING"
-        assert data[0]["flag_type"] == "VELOCITY"
+        assert len(data["data"]) == 1
+        assert data["data"][0]["status"] == "PENDING"
+        assert data["data"][0]["flag_type"] == "VELOCITY"
 
     async def test_list_flags_filter_by_flag_type(
         self, client: AsyncClient, db_session, test_api_key
@@ -369,8 +371,8 @@ class TestScoreFlagRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["flag_type"] == "VELOCITY"
+        assert len(data["data"]) == 1
+        assert data["data"][0]["flag_type"] == "VELOCITY"
 
     async def test_get_flag(self, client: AsyncClient, db_session, test_api_key):
         """Test getting a single score flag by ID via API."""
@@ -668,7 +670,7 @@ class TestScoreFlagRoutes:
         )
 
         assert response.status_code == 200
-        assert len(response.json()) == 0
+        assert len(response.json()["data"]) == 0
 
     async def test_list_flags_excludes_deleted(self, client: AsyncClient, db_session, test_api_key):
         """Test that list_flags excludes soft-deleted flags."""
@@ -748,8 +750,8 @@ class TestScoreFlagRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["flag_type"] == "DUPLICATE"
+        assert len(data["data"]) == 1
+        assert data["data"][0]["flag_type"] == "DUPLICATE"
 
     async def test_superadmin_list_score_flags_without_account_id_returns_all(
         self, authenticated_client: AsyncClient, db_session
@@ -873,8 +875,10 @@ class TestScoreFlagRoutes:
 
         assert response.status_code == 200
         data = response.json()
+        assert "data" in data
+        assert "pagination" in data
 
         # Should contain flags from both accounts
-        flag_types = {f["flag_type"] for f in data}
+        flag_types = {f["flag_type"] for f in data["data"]}
         assert "VELOCITY" in flag_types
         assert "DUPLICATE" in flag_types

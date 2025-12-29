@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User
 from leadr.accounts.services.repositories import AccountRepository, UserRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, UserID
 
 
@@ -174,10 +175,11 @@ class TestAccountRepository:
         await repo.create(account2)
 
         # List them
-        accounts = await repo.filter()
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repo.filter(pagination=pagination)
 
-        assert len(accounts) == 2
-        slugs = {acc.slug for acc in accounts}
+        assert len(result.items) == 2
+        slugs = {acc.slug for acc in result.items}
         assert "acme-corp" in slugs
         assert "beta-industries" in slugs
 
@@ -235,10 +237,11 @@ class TestAccountRepository:
         await repo.delete(account1.id)
 
         # List should only return non-deleted
-        accounts = await repo.filter()
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repo.filter(pagination=pagination)
 
-        assert len(accounts) == 1
-        assert accounts[0].slug == "beta-industries"
+        assert len(result.items) == 1
+        assert result.items[0].slug == "beta-industries"
 
     async def test_get_by_slug_excludes_deleted(self, db_session: AsyncSession):
         """Test that get_by_slug excludes soft-deleted accounts."""
@@ -423,10 +426,11 @@ class TestUserRepository:
         await user_repo.create(user2)
 
         # List users for account
-        users = await user_repo.filter(account_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await user_repo.filter(account_id, pagination=pagination)
 
-        assert len(users) == 2
-        emails = {u.email for u in users}
+        assert len(result.items) == 2
+        emails = {u.email for u in result.items}
         assert "user1@example.com" in emails
         assert "user2@example.com" in emails
 
@@ -592,10 +596,11 @@ class TestUserRepository:
         await user_repo.delete(user1.id)
 
         # List should only return non-deleted
-        users = await user_repo.filter(account_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await user_repo.filter(account_id, pagination=pagination)
 
-        assert len(users) == 1
-        assert users[0].email == "user2@example.com"
+        assert len(result.items) == 1
+        assert result.items[0].email == "user2@example.com"
 
     async def test_get_by_email_excludes_deleted(self, db_session: AsyncSession):
         """Test that get_by_email excludes soft-deleted users."""

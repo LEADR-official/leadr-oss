@@ -11,6 +11,7 @@ from leadr.auth.domain.device import Device
 from leadr.auth.services.repositories import DeviceRepository
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
 from leadr.boards.services.repositories import BoardRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
@@ -465,11 +466,12 @@ class TestScoreRepository:
         await score_repo.create(score2)
 
         # Filter by account1
-        scores = await score_repo.filter(account_id=account1_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await score_repo.filter(account_id=account1_id, pagination=pagination)
 
-        assert len(scores) == 1
-        assert scores[0].player_name == "Player1Score"
-        assert scores[0].account_id == account1_id
+        assert len(result.items) == 1
+        assert result.items[0].player_name == "Player1Score"
+        assert result.items[0].account_id == account1_id
 
     async def test_filter_with_optional_parameters(self, db_session: AsyncSession):
         """Test filtering scores with optional board_id, game_id, device_id."""
@@ -613,25 +615,30 @@ class TestScoreRepository:
         await score_repo.create(score3)
 
         # Filter by board_id
-        scores = await score_repo.filter(account_id=account_id, board_id=board1_id)
-        assert len(scores) == 2
-        names = {s.player_name for s in scores}
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await score_repo.filter(
+            account_id=account_id, board_id=board1_id, pagination=pagination
+        )
+        assert len(result.items) == 2
+        names = {s.player_name for s in result.items}
         assert "Score1" in names
         assert "Score2" in names
 
         # Filter by device_id
-        scores = await score_repo.filter(account_id=account_id, device_id=device1_id)
-        assert len(scores) == 2
-        names = {s.player_name for s in scores}
+        result = await score_repo.filter(
+            account_id=account_id, device_id=device1_id, pagination=pagination
+        )
+        assert len(result.items) == 2
+        names = {s.player_name for s in result.items}
         assert "Score1" in names
         assert "Score3" in names
 
         # Filter by board_id and device_id
-        scores = await score_repo.filter(
-            account_id=account_id, board_id=board1_id, device_id=device1_id
+        result = await score_repo.filter(
+            account_id=account_id, board_id=board1_id, device_id=device1_id, pagination=pagination
         )
-        assert len(scores) == 1
-        assert scores[0].player_name == "Score1"
+        assert len(result.items) == 1
+        assert result.items[0].player_name == "Score1"
 
     async def test_filter_excludes_soft_deleted(self, db_session: AsyncSession):
         """Test that filter excludes soft-deleted scores."""
@@ -732,10 +739,11 @@ class TestScoreRepository:
         await score_repo.update(score1)
 
         # Filter should exclude soft-deleted
-        scores = await score_repo.filter(account_id=account_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await score_repo.filter(account_id=account_id, pagination=pagination)
 
-        assert len(scores) == 1
-        assert scores[0].player_name == "Score2"
+        assert len(result.items) == 1
+        assert result.items[0].player_name == "Score2"
 
     async def test_get_by_id_excludes_soft_deleted(self, db_session: AsyncSession):
         """Test that get_by_id excludes soft-deleted scores."""

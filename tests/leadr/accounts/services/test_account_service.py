@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import AccountStatus
 from leadr.accounts.services.account_service import AccountService
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import AccountID
 
@@ -95,10 +96,11 @@ class TestAccountService:
         )
 
         # List them
-        accounts = await service.list_accounts()
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.list_accounts(pagination=pagination)
 
-        assert len(accounts) == 2
-        slugs = {acc.slug for acc in accounts}
+        assert len(result.items) == 2
+        slugs = {acc.slug for acc in result.items}
         assert "acme-corp" in slugs
         assert "beta-industries" in slugs
 
@@ -208,7 +210,8 @@ class TestAccountService:
         await service.delete_account(account1.id)
 
         # List should only return non-deleted
-        accounts = await service.list_accounts()
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.list_accounts(pagination=pagination)
 
-        assert len(accounts) == 1
-        assert accounts[0].slug == "beta-industries"
+        assert len(result.items) == 1
+        assert result.items[0].slug == "beta-industries"

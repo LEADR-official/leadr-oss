@@ -120,6 +120,22 @@ class TestPaginationParams:
         # Should be the same object (cached)
         assert decoded1 is decoded2
 
+    def test_user_provided_sort_is_false_when_sort_is_none(self) -> None:
+        """Test that _user_provided_sort is False when sort param is None."""
+        params = PaginationParams(cursor=None, limit=20, sort=None)
+        assert params._user_provided_sort is False
+
+    def test_user_provided_sort_is_true_when_sort_is_provided(self) -> None:
+        """Test that _user_provided_sort is True when sort param is provided."""
+        params = PaginationParams(cursor=None, limit=20, sort="value:desc")
+        assert params._user_provided_sort is True
+
+    def test_user_provided_sort_is_true_even_for_default_sort(self) -> None:
+        """Test that _user_provided_sort is True even when user provides default sort order."""
+        # User explicitly passes the same sort as default - should still be marked as user-provided
+        params = PaginationParams(cursor=None, limit=20, sort="created_at:desc,id:asc")
+        assert params._user_provided_sort is True
+
 
 class TestPaginationMeta:
     """Test PaginationMeta model."""

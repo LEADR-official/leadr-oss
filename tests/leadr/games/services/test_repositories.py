@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, GameID
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
@@ -225,10 +226,11 @@ class TestGameRepository:
         await game_repo.create(game2)
 
         # List games for account
-        games = await game_repo.filter(account_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await game_repo.filter(account_id, pagination=pagination)
 
-        assert len(games) == 2
-        names = {g.name for g in games}
+        assert len(result.items) == 2
+        names = {g.name for g in result.items}
         assert "Game One" in names
         assert "Game Two" in names
 
@@ -283,11 +285,12 @@ class TestGameRepository:
         await game_repo.create(game2)
 
         # List games for account 1
-        games = await game_repo.filter(account1_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await game_repo.filter(AccountID(account1_id), pagination=pagination)
 
-        assert len(games) == 1
-        assert games[0].name == "Account 1 Game"
-        assert games[0].account_id == account1_id
+        assert len(result.items) == 1
+        assert result.items[0].name == "Account 1 Game"
+        assert result.items[0].account_id == account1_id
 
     async def test_delete_game_is_soft_delete(self, db_session: AsyncSession):
         """Test that delete performs soft-delete, not hard-delete."""
@@ -371,10 +374,11 @@ class TestGameRepository:
         await game_repo.delete(game1.id)
 
         # List should only return non-deleted
-        games = await game_repo.filter(account_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await game_repo.filter(account_id, pagination=pagination)
 
-        assert len(games) == 1
-        assert games[0].name == "Game Two"
+        assert len(result.items) == 1
+        assert result.items[0].name == "Game Two"
 
     async def test_unique_constraint_on_account_and_name(self, db_session: AsyncSession):
         """Test that game names must be unique within an account."""

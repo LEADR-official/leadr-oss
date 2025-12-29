@@ -12,6 +12,7 @@ from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM, DeviceStatusEnum
 from leadr.auth.domain.device import DeviceStatus
 from leadr.auth.services.device_service import DeviceService
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import AccountID, GameID
 from leadr.games.adapters.orm import GameORM
@@ -117,12 +118,15 @@ class TestDeviceService:
         from leadr.auth.services.repositories import DeviceSessionRepository
 
         session_repo = DeviceSessionRepository(db_session)
-        sessions = await session_repo.filter(account_id=AccountID(account_orm.id))
-        assert len(sessions) == 1
-        assert sessions[0].device_id == device.id
-        assert sessions[0].access_token_hash == "test_hash"
-        assert sessions[0].ip_address == "10.0.0.1"
-        assert sessions[0].user_agent == "TestApp/2.0"
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await session_repo.filter(
+            account_id=AccountID(account_orm.id), pagination=pagination
+        )
+        assert len(result.items) == 1
+        assert result.items[0].device_id == device.id
+        assert result.items[0].access_token_hash == "test_hash"
+        assert result.items[0].ip_address == "10.0.0.1"
+        assert result.items[0].user_agent == "TestApp/2.0"
 
     async def test_start_session_raises_for_nonexistent_game(
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM

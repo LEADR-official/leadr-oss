@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.services.account_service import AccountService
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import GameID
 from leadr.games.services.game_service import GameService
@@ -112,10 +113,11 @@ class TestGameService:
         )
 
         # List them
-        games = await game_service.list_games(account.id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await game_service.list_games(account.id, pagination=pagination)
 
-        assert len(games) == 2
-        names = {g.name for g in games}
+        assert len(result.items) == 2
+        names = {g.name for g in result.items}
         assert "Game One" in names
         assert "Game Two" in names
 
@@ -144,11 +146,12 @@ class TestGameService:
         )
 
         # List games for account 1
-        games = await game_service.list_games(account1.id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await game_service.list_games(account1.id, pagination=pagination)
 
-        assert len(games) == 1
-        assert games[0].name == "Account 1 Game"
-        assert games[0].account_id == account1.id
+        assert len(result.items) == 1
+        assert result.items[0].name == "Account 1 Game"
+        assert result.items[0].account_id == account1.id
 
     async def test_update_game(self, db_session: AsyncSession):
         """Test updating a game via service."""
@@ -268,10 +271,11 @@ class TestGameService:
         await game_service.soft_delete(game1.id)
 
         # List should only return non-deleted
-        games = await game_service.list_games(account.id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await game_service.list_games(account.id, pagination=pagination)
 
-        assert len(games) == 1
-        assert games[0].name == "Game Two"
+        assert len(result.items) == 1
+        assert result.items[0].name == "Game Two"
 
     async def test_soft_delete_game_not_found(self, db_session: AsyncSession):
         """Test that soft-deleting a non-existent game raises an error."""

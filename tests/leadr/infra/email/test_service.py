@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.api.pagination import PaginationParams
 from leadr.infra.email.adapters.repositories import EmailRepository
 from leadr.infra.email.domain.exceptions import EmailSendError
 from leadr.infra.email.domain.models import EmailPriority, EmailStatus
@@ -216,11 +217,12 @@ class TestEmailServiceSendEmail:
         # Retrieve the email from database
 
         repository = EmailRepository(db_session)
-        emails = await repository.filter(to="user@example.com")
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repository.filter(to="user@example.com", pagination=pagination)
 
-        assert len(emails) == 1
-        assert emails[0].status == EmailStatus.SENT
-        assert emails[0].provider_message_id == "msg-success"
+        assert len(result.items) == 1
+        assert result.items[0].status == EmailStatus.SENT
+        assert result.items[0].provider_message_id == "msg-success"
 
     @patch("leadr.infra.email.service.settings")
     async def test_send_email_updates_status_on_failure(
@@ -242,11 +244,12 @@ class TestEmailServiceSendEmail:
         # Retrieve the email from database
 
         repository = EmailRepository(db_session)
-        emails = await repository.filter(to="user@example.com")
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repository.filter(to="user@example.com", pagination=pagination)
 
-        assert len(emails) == 1
-        assert emails[0].status == EmailStatus.FAILED
-        assert emails[0].error_message == "Send failed"
+        assert len(result.items) == 1
+        assert result.items[0].status == EmailStatus.FAILED
+        assert result.items[0].error_message == "Send failed"
 
     @patch("leadr.infra.email.service.settings")
     async def test_send_email_without_db(self, mock_settings):
@@ -298,11 +301,12 @@ class TestEmailServiceConvenienceMethods:
         # Verify email was created with correct content
 
         repository = EmailRepository(db_session)
-        emails = await repository.filter()
-        assert len(emails) == 1
-        assert emails[0].subject == "Verify your LEADR account"
-        assert "ABC123" in emails[0].body
-        assert emails[0].priority == EmailPriority.HIGH
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repository.filter(pagination=pagination)
+        assert len(result.items) == 1
+        assert result.items[0].subject == "Verify your LEADR account"
+        assert "ABC123" in result.items[0].body
+        assert result.items[0].priority == EmailPriority.HIGH
 
     @patch("leadr.infra.email.service.settings")
     async def test_send_welcome_email(self, mock_settings, db_session: AsyncSession):
@@ -329,11 +333,12 @@ class TestEmailServiceConvenienceMethods:
         assert response["id"] == "msg-welcome"
 
         repository = EmailRepository(db_session)
-        emails = await repository.filter()
-        assert len(emails) == 1
-        assert "Welcome to LEADR, TestCo!" in emails[0].subject
-        assert "Test User" in emails[0].body
-        assert emails[0].priority == EmailPriority.NORMAL
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repository.filter(pagination=pagination)
+        assert len(result.items) == 1
+        assert "Welcome to LEADR, TestCo!" in result.items[0].subject
+        assert "Test User" in result.items[0].body
+        assert result.items[0].priority == EmailPriority.NORMAL
 
     @patch("leadr.infra.email.service.settings")
     async def test_send_notification_email(self, mock_settings, db_session: AsyncSession):
@@ -359,11 +364,12 @@ class TestEmailServiceConvenienceMethods:
         assert response["id"] == "msg-notification"
 
         repository = EmailRepository(db_session)
-        emails = await repository.filter()
-        assert len(emails) == 1
-        assert emails[0].subject == "Important Update"
-        assert "Your account has been upgraded!" in emails[0].body
-        assert emails[0].priority == EmailPriority.HIGH
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repository.filter(pagination=pagination)
+        assert len(result.items) == 1
+        assert result.items[0].subject == "Important Update"
+        assert "Your account has been upgraded!" in result.items[0].body
+        assert result.items[0].priority == EmailPriority.HIGH
 
 
 class TestEmailServiceUtilityMethods:

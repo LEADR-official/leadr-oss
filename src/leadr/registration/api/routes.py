@@ -1,11 +1,13 @@
 """Public registration API routes."""
 
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import AdminAuthContextDep
+from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.config import settings
 from leadr.registration.api.schemas import (
     CompleteRegistrationRequest,
@@ -173,15 +175,21 @@ async def create_jam_code(
 async def list_jam_codes(
     jam_code_service: JamCodeServiceDep,
     auth: AdminAuthContextDep,
-) -> list[JamCodeResponse]:
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[JamCodeResponse]:
     """List all jam codes (superadmin only).
 
-    Returns a list of all jam codes, including their usage statistics.
+    Returns a paginated list of all jam codes, including their usage statistics.
     """
     if not auth.is_superadmin:
         raise HTTPException(status_code=403, detail="Superadmin access required")
-    jam_codes = await jam_code_service.list_jam_codes()
-    return [JamCodeResponse.from_domain(code) for code in jam_codes]
+    result = await jam_code_service.list_jam_codes(pagination=pagination)
+    return PaginatedResponse.from_paginated_result(
+        result=result,
+        pagination=pagination,
+        filters={},
+        response_model=JamCodeResponse,
+    )
 
 
 @router.get("/jam-codes/{jam_code_id}")

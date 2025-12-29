@@ -7,6 +7,7 @@ from leadr.accounts.services.repositories import AccountRepository, UserReposito
 from leadr.accounts.services.user_service import UserService
 from leadr.auth.bootstrap import ensure_superadmin_exists
 from leadr.auth.services.repositories import APIKeyRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID
 from leadr.config import settings
 
@@ -47,9 +48,10 @@ class TestSuperadminBootstrap:
 
         # Verify API key was created
         api_key_repo = APIKeyRepository(db_session)
-        keys = await api_key_repo.filter(account_id=account.id)
-        assert len(keys) == 1
-        assert keys[0].name == settings.SUPERADMIN_API_KEY_NAME
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await api_key_repo.filter(account_id=account.id, pagination=pagination)
+        assert len(result.items) == 1
+        assert result.items[0].name == settings.SUPERADMIN_API_KEY_NAME
 
     async def test_ensure_superadmin_exists_is_idempotent(self, db_session: AsyncSession):
         """Test that ensure_superadmin_exists can be called multiple times safely."""
@@ -64,13 +66,18 @@ class TestSuperadminBootstrap:
 
         # Verify only one account with that slug
         account_repo = AccountRepository(db_session)
-        accounts = await account_repo.filter(slug=settings.SUPERADMIN_ACCOUNT_SLUG)
-        assert len(accounts) == 1
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        accounts_result = await account_repo.filter(
+            slug=settings.SUPERADMIN_ACCOUNT_SLUG, pagination=pagination
+        )
+        assert len(accounts_result.items) == 1
 
         # Verify only one API key for that account
         api_key_repo = APIKeyRepository(db_session)
-        keys = await api_key_repo.filter(account_id=accounts[0].id)
-        assert len(keys) == 1
+        keys_result = await api_key_repo.filter(
+            account_id=accounts_result.items[0].id, pagination=pagination
+        )
+        assert len(keys_result.items) == 1
 
     async def test_ensure_superadmin_exists_skips_if_superadmin_exists(
         self, db_session: AsyncSession
@@ -108,8 +115,11 @@ class TestSuperadminBootstrap:
         await ensure_superadmin_exists(db_session)
 
         # Verify no new account was created with the configured slug
-        accounts = await account_repo.filter(slug=settings.SUPERADMIN_ACCOUNT_SLUG)
-        assert len(accounts) == 0
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        accounts_result = await account_repo.filter(
+            slug=settings.SUPERADMIN_ACCOUNT_SLUG, pagination=pagination
+        )
+        assert len(accounts_result.items) == 0
 
         # Verify still only one superadmin
         superadmins = await user_service.find_superadmins()

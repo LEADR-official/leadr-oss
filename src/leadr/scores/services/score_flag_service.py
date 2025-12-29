@@ -4,7 +4,9 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, GameID, ScoreFlagID, UserID
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag
@@ -33,8 +35,10 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         game_id: GameID | None = None,
         status: str | None = None,
         flag_type: str | None = None,
-    ) -> list[ScoreFlag]:
-        """List score flags for an account with optional filters.
+        *,
+        pagination: PaginationParams,
+    ) -> PaginatedResult[ScoreFlag]:
+        """List score flags for an account with optional filters and pagination.
 
         Args:
             account_id: Account ID to filter by. If None, returns all flags
@@ -43,14 +47,16 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             game_id: Optional game ID to filter by
             status: Optional status to filter by (PENDING, CONFIRMED_CHEAT, etc.)
             flag_type: Optional flag type to filter by (VELOCITY, DUPLICATE, etc.)
+            pagination: Pagination parameters (required)
 
         Returns:
-            List of flags matching the filter criteria
+            PaginatedResult containing flags matching the filter criteria
 
         Example:
             >>> flags = await service.list_flags(
             ...     account_id=account.id,
             ...     status="PENDING",
+            ...     pagination=PaginationParams(cursor=None, limit=100, sort=None),
             ... )
         """
         return await self.repository.filter(
@@ -59,6 +65,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             game_id=game_id,
             status=status,
             flag_type=flag_type,
+            pagination=pagination,
         )
 
     async def get_flag(self, flag_id: ScoreFlagID) -> ScoreFlag | None:

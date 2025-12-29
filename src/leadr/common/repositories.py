@@ -9,9 +9,10 @@ from pydantic import UUID4
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.cursor import Cursor
 from leadr.common.domain.exceptions import EntityNotFoundError
-from leadr.common.domain.ids import PrefixedID
+from leadr.common.domain.ids import AccountID, PrefixedID
 from leadr.common.domain.models import Entity
 from leadr.common.domain.pagination import (
     CursorPosition,
@@ -193,39 +194,29 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
 
     @abstractmethod
     async def filter(
-        self, account_id: UUID4 | PrefixedID | None = None, **kwargs: Any
-    ) -> list[DomainEntityT]:
-        """Filter entities based on criteria.
+        self,
+        account_id: AccountID | None = None,
+        *,
+        pagination: PaginationParams,
+        **kwargs: Any,
+    ) -> PaginatedResult[DomainEntityT]:
+        """Filter entities based on criteria with pagination.
 
-        For multi-tenant entities, implementations MUST override this to make
-        account_id required (no default). For top-level entities like Account,
-        account_id can remain optional and unused.
+        All filter operations return paginated results. The pagination parameter
+        is required to enforce consistent API behavior across the codebase.
+
+        For multi-tenant entities, implementations should make account_id required
+        (no default). For top-level entities like Account, account_id can remain
+        optional and unused.
 
         Args:
             account_id: Optional account ID for filtering. Multi-tenant entities
-                       MUST override to make this required (account_id: UUID).
+                       should override to make this required.
+            pagination: Required pagination parameters (cursor, limit, sort).
             **kwargs: Additional filter parameters specific to the entity type.
 
         Returns:
-            List of domain entities matching the filter criteria
-
-        Example (multi-tenant - account_id required):
-            async def filter(
-                self,
-                account_id: UUID,  # Required, no default
-                status: str | None = None,
-                **kwargs
-            ) -> list[User]:
-                # Implementation with account_id required
-
-        Example (top-level tenant - account_id optional/unused):
-            async def filter(
-                self,
-                account_id: UUID | None = None,  # Optional, unused
-                status: str | None = None,
-                **kwargs
-            ) -> list[Account]:
-                # Implementation where account_id is not used
+            PaginatedResult containing matching entities and pagination metadata.
         """
 
     async def _list_all_unfiltered(self, include_deleted: bool = False) -> list[DomainEntityT]:

@@ -41,6 +41,7 @@ class PaginationParams:
         """
         self.cursor_str = cursor
         self.limit = limit
+        self._user_provided_sort = sort is not None
         self.sort_spec = self._parse_sort(sort)
         self._decoded_cursor: Cursor | None = None
 

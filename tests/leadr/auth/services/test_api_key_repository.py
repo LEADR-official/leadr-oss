@@ -11,6 +11,7 @@ from leadr.accounts.services.repositories import AccountRepository
 from leadr.accounts.services.user_service import UserService
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
 from leadr.auth.services.repositories import APIKeyRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, APIKeyID
 
 
@@ -232,10 +233,11 @@ class TestAPIKeyRepository:
         await api_key_repo.create(key2)
 
         # List keys for account
-        keys = await api_key_repo.filter(account_id)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await api_key_repo.filter(account_id, pagination=pagination)
 
-        assert len(keys) == 2
-        names = {key.name for key in keys}
+        assert len(result.items) == 2
+        names = {key.name for key in result.items}
         assert "Production Key" in names
         assert "Development Key" in names
 
@@ -294,11 +296,12 @@ class TestAPIKeyRepository:
         await api_key_repo.create(revoked_key)
 
         # List only active keys
-        active_keys = await api_key_repo.filter(account_id, active_only=True)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await api_key_repo.filter(account_id, active_only=True, pagination=pagination)
 
-        assert len(active_keys) == 1
-        assert active_keys[0].name == "Active Key"
-        assert active_keys[0].status == APIKeyStatus.ACTIVE
+        assert len(result.items) == 1
+        assert result.items[0].name == "Active Key"
+        assert result.items[0].status == APIKeyStatus.ACTIVE
 
     async def test_count_active_api_keys_by_account(self, db_session: AsyncSession):
         """Test counting active API keys for an account."""

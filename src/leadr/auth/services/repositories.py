@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, overload
+from typing import Any
 
 from sqlalchemy import delete, select
 
@@ -83,46 +83,27 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         """Get API key by prefix, returns None if not found or soft-deleted."""
         return await self._get_by_field("key_prefix", key_prefix)
 
-    @overload
     async def filter(
         self,
         account_id: AccountID | None = None,
+        *,
         status: APIKeyStatus | None = None,
         active_only: bool = False,
-        pagination: None = None,
+        pagination: PaginationParams,
         **kwargs: Any,
-    ) -> list[APIKey]: ...
-
-    @overload
-    async def filter(
-        self,
-        account_id: AccountID | None = None,
-        status: APIKeyStatus | None = None,
-        active_only: bool = False,
-        pagination: PaginationParams = ...,
-        **kwargs: Any,
-    ) -> PaginatedResult[APIKey]: ...
-
-    async def filter(  # type: ignore[override]
-        self,
-        account_id: AccountID | None = None,
-        status: APIKeyStatus | None = None,
-        active_only: bool = False,
-        pagination: PaginationParams | None = None,
-        **kwargs: Any,
-    ) -> list[APIKey] | PaginatedResult[APIKey]:
-        """Filter API keys by account and optional criteria.
+    ) -> PaginatedResult[APIKey]:
+        """Filter API keys by account and optional criteria with pagination.
 
         Args:
             account_id: Optional account ID to filter by. If None, returns all API keys
                 (superadmin use case). Regular users should always pass account_id.
             status: Optional APIKeyStatus to filter by
             active_only: If True, only return ACTIVE keys (bool)
-            pagination: Optional pagination parameters
+            pagination: Pagination parameters (required).
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of API keys if no pagination, PaginatedResult if pagination provided
+            PaginatedResult containing API keys.
 
         Raises:
             ValueError: If sort field is not in SORTABLE_FIELDS
@@ -134,7 +115,7 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
             query = query.where(APIKeyORM.account_id == account_uuid)
 
         # Build filters dict for cursor validation
-        filters_dict = {}
+        filters_dict: dict[str, str] = {}
 
         # Apply optional filters
         if status is not None:
@@ -145,12 +126,6 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
         if active_only:
             query = query.where(APIKeyORM.status == APIKeyStatusEnum.ACTIVE)
             filters_dict["active_only"] = "true"
-
-        # If no pagination, return list (backward compatibility)
-        if pagination is None:
-            result = await self.session.execute(query)
-            orms = result.scalars().all()
-            return [self._to_domain(orm) for orm in orms]
 
         # Validate sort fields
         for sort_field in pagination.sort_spec:
@@ -237,46 +212,27 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
-    @overload
     async def filter(
         self,
         account_id: AccountID | None = None,
+        *,
         game_id: GameID | None = None,
         status: str | None = None,
-        pagination: None = None,
+        pagination: PaginationParams,
         **kwargs: Any,
-    ) -> list[Device]: ...
-
-    @overload
-    async def filter(
-        self,
-        account_id: AccountID | None = None,
-        game_id: GameID | None = None,
-        status: str | None = None,
-        pagination: PaginationParams = ...,
-        **kwargs: Any,
-    ) -> PaginatedResult[Device]: ...
-
-    async def filter(  # type: ignore[override]
-        self,
-        account_id: AccountID | None = None,
-        game_id: GameID | None = None,
-        status: str | None = None,
-        pagination: PaginationParams | None = None,
-        **kwargs: Any,
-    ) -> list[Device] | PaginatedResult[Device]:
-        """Filter devices by account and optional criteria.
+    ) -> PaginatedResult[Device]:
+        """Filter devices by account and optional criteria with pagination.
 
         Args:
             account_id: Optional account ID to filter by. If None, returns all devices
                 (superadmin use case). Regular users should always pass account_id.
             game_id: Optional game ID to filter by
             status: Optional status string to filter by (active, banned, suspended)
-            pagination: Optional pagination parameters
+            pagination: Pagination parameters (required).
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of devices if no pagination, PaginatedResult if pagination provided
+            PaginatedResult containing devices.
 
         Raises:
             ValueError: If sort field is not in SORTABLE_FIELDS
@@ -288,7 +244,7 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
             query = query.where(DeviceORM.account_id == account_uuid)
 
         # Build filters dict for cursor validation
-        filters_dict = {}
+        filters_dict: dict[str, str] = {}
 
         if game_id is not None:
             game_uuid = self._extract_uuid(game_id)
@@ -298,12 +254,6 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
         if status is not None:
             query = query.where(DeviceORM.status == DeviceStatusEnum(status))
             filters_dict["status"] = status
-
-        # If no pagination, return list (backward compatibility)
-        if pagination is None:
-            result = await self.session.execute(query)
-            orms = result.scalars().all()
-            return [self._to_domain(orm) for orm in orms]
 
         # Validate sort fields
         for sort_field in pagination.sort_spec:
@@ -385,32 +335,15 @@ class DeviceSessionRepository(BaseRepository[DeviceSession, DeviceSessionORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
-    @overload
     async def filter(
         self,
         account_id: AccountID | None = None,
+        *,
         device_id: DeviceID | None = None,
-        pagination: None = None,
+        pagination: PaginationParams,
         **kwargs: Any,
-    ) -> list[DeviceSession]: ...
-
-    @overload
-    async def filter(
-        self,
-        account_id: AccountID | None = None,
-        device_id: DeviceID | None = None,
-        pagination: PaginationParams = ...,
-        **kwargs: Any,
-    ) -> PaginatedResult[DeviceSession]: ...
-
-    async def filter(  # type: ignore[override]
-        self,
-        account_id: AccountID | None = None,
-        device_id: DeviceID | None = None,
-        pagination: PaginationParams | None = None,
-        **kwargs: Any,
-    ) -> list[DeviceSession] | PaginatedResult[DeviceSession]:
-        """Filter sessions by account and optional criteria.
+    ) -> PaginatedResult[DeviceSession]:
+        """Filter sessions by account and optional criteria with pagination.
 
         Note: account_id is used for multi-tenant safety via JOIN with devices table.
 
@@ -418,11 +351,11 @@ class DeviceSessionRepository(BaseRepository[DeviceSession, DeviceSessionORM]):
             account_id: Optional account ID to filter by. If None, returns all sessions
                 (superadmin use case). Regular users should always pass account_id.
             device_id: Optional device ID to filter by
-            pagination: Optional pagination parameters
+            pagination: Pagination parameters (required).
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of sessions if no pagination, PaginatedResult if pagination provided
+            PaginatedResult containing device sessions.
 
         Raises:
             ValueError: If sort field is not in SORTABLE_FIELDS
@@ -439,18 +372,12 @@ class DeviceSessionRepository(BaseRepository[DeviceSession, DeviceSessionORM]):
             )
 
         # Build filters dict for cursor validation
-        filters_dict = {}
+        filters_dict: dict[str, str] = {}
 
         if device_id is not None:
             device_uuid = self._extract_uuid(device_id)
             query = query.where(DeviceSessionORM.device_id == device_uuid)
             filters_dict["device_id"] = str(device_id)
-
-        # If no pagination, return list (backward compatibility)
-        if pagination is None:
-            result = await self.session.execute(query)
-            orms = result.scalars().all()
-            return [self._to_domain(orm) for orm in orms]
 
         # Validate sort fields
         for sort_field in pagination.sort_spec:
@@ -508,11 +435,11 @@ class NonceRepository(BaseRepository[Nonce, NonceORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
-    async def filter(  # type: ignore[override]
+    async def filter(  # type: ignore[override] - intentionally unpaginated (nonces are short-lived)
         self,
         account_id: AccountID | None = None,
         device_id: DeviceID | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> list[Nonce]:
         """Filter nonces by account and optional criteria.
 

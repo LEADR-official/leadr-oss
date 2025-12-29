@@ -1,12 +1,11 @@
 """Game repository services."""
 
-from typing import Any, overload
+from typing import Any
 
-from pydantic import UUID4
 from sqlalchemy import select
 
 from leadr.common.api.pagination import PaginationParams
-from leadr.common.domain.ids import AccountID, BoardID, GameID, PrefixedID
+from leadr.common.domain.ids import AccountID, BoardID, GameID
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 from leadr.games.adapters.orm import GameORM
@@ -83,38 +82,23 @@ class GameRepository(BaseRepository[Game, GameORM]):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
 
-    @overload
     async def filter(
         self,
-        account_id: UUID4 | PrefixedID | None = None,
-        pagination: None = None,
+        account_id: AccountID | None = None,
+        *,
+        pagination: PaginationParams,
         **kwargs: Any,
-    ) -> list[Game]: ...
-
-    @overload
-    async def filter(
-        self,
-        account_id: UUID4 | PrefixedID | None = None,
-        pagination: PaginationParams = ...,
-        **kwargs: Any,
-    ) -> PaginatedResult[Game]: ...
-
-    async def filter(
-        self,
-        account_id: UUID4 | PrefixedID | None = None,
-        pagination: PaginationParams | None = None,
-        **kwargs: Any,
-    ) -> list[Game] | PaginatedResult[Game]:
-        """Filter games by account and optional criteria.
+    ) -> PaginatedResult[Game]:
+        """Filter games by account and optional criteria with pagination.
 
         Args:
             account_id: Optional account ID to filter by. If None, returns all games
                 (superadmin use case). Regular users should always pass account_id.
-            pagination: Optional pagination parameters
+            pagination: Pagination parameters (required)
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
-            List of games if no pagination, PaginatedResult if pagination provided
+            PaginatedResult containing games matching the filter criteria
 
         Raises:
             ValueError: If sort field is not in SORTABLE_FIELDS
@@ -132,12 +116,6 @@ class GameRepository(BaseRepository[Game, GameORM]):
         # if "name" in kwargs:
         #     query = query.where(GameORM.name == kwargs["name"])
         #     filters_dict["name"] = kwargs["name"]
-
-        # If no pagination, return list (backward compatibility)
-        if pagination is None:
-            result = await self.session.execute(query)
-            orms = result.scalars().all()
-            return [self._to_domain(orm) for orm in orms]
 
         # Validate sort fields
         for sort_field in pagination.sort_spec:

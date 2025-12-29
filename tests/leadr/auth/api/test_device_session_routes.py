@@ -5,6 +5,7 @@ from httpx import AsyncClient
 
 from leadr.accounts.services.account_service import AccountService
 from leadr.auth.services.device_service import DeviceService
+from leadr.common.api.pagination import PaginationParams
 from leadr.games.services.game_service import GameService
 
 
@@ -118,11 +119,13 @@ class TestDeviceSessionRoutes:
         )
 
         # Get the session
-        sessions = await device_service.session_repo.filter(
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await device_service.session_repo.filter(
             account_id=account.id,
             device_id=device.id,
+            pagination=pagination,
         )
-        session = sessions[0]
+        session = result.items[0]
 
         # Get session via API
         response = await client.get(
@@ -167,11 +170,13 @@ class TestDeviceSessionRoutes:
         )
 
         # Get the session
-        sessions = await device_service.session_repo.filter(
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await device_service.session_repo.filter(
             account_id=account.id,
             device_id=device.id,
+            pagination=pagination,
         )
-        session = sessions[0]
+        session = result.items[0]
 
         # Revoke session
         response = await client.patch(

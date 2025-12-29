@@ -1,15 +1,17 @@
 """Score service for managing score operations."""
 
 from datetime import UTC, datetime
-from typing import Any, overload
+from typing import Any
 
 from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.boards.domain.board import KeepStrategy, SortDirection
+from leadr.boards.domain.board import KeepStrategy
+from leadr.boards.domain.board import SortDirection as BoardSortDirection
 from leadr.boards.services.board_service import BoardService
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
+from leadr.common.domain.pagination import SortDirection, SortField
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.games.services.game_service import GameService
@@ -53,15 +55,14 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         Returns:
             The first active Score for this device/board combo, or None.
         """
-        scores = await self.repository.filter(
+        return await self.repository.get_by_device_and_board(
             account_id=account_id,
-            board_id=board_id,
             device_id=device_id,
+            board_id=board_id,
         )
-        return scores[0] if scores else None
 
     def _is_better_score(
-        self, new_value: float, existing_value: float, sort_direction: SortDirection
+        self, new_value: float, existing_value: float, sort_direction: BoardSortDirection
     ) -> bool:
         """Determine if new score is better than existing based on sort direction.
 
@@ -73,7 +74,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         Returns:
             True if new score is better (should replace existing), False otherwise.
         """
-        if sort_direction == SortDirection.ASCENDING:
+        if sort_direction == BoardSortDirection.ASCENDING:
             # Lower is better for ascending (e.g., race times)
             return new_value < existing_value
         else:  # DESCENDING
@@ -302,34 +303,15 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         """
         return await self.get_by_id(score_id)
 
-    @overload
     async def list_scores(
         self,
         account_id: AccountID | None,
         board_id: BoardID | None = None,
         game_id: GameID | None = None,
         device_id: DeviceID | None = None,
-        pagination: None = None,
-    ) -> list[Score]: ...
-
-    @overload
-    async def list_scores(
-        self,
-        account_id: AccountID | None,
-        board_id: BoardID | None = None,
-        game_id: GameID | None = None,
-        device_id: DeviceID | None = None,
-        pagination: PaginationParams = ...,
-    ) -> PaginatedResult[Score]: ...
-
-    async def list_scores(
-        self,
-        account_id: AccountID | None,
-        board_id: BoardID | None = None,
-        game_id: GameID | None = None,
-        device_id: DeviceID | None = None,
-        pagination: PaginationParams | None = None,
-    ) -> list[Score] | PaginatedResult[Score]:
+        *,
+        pagination: PaginationParams,
+    ) -> PaginatedResult[Score]:
         """List scores for an account with optional filters and pagination.
 
         Args:
@@ -338,11 +320,28 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             board_id: Optional board ID to filter by.
             game_id: Optional game ID to filter by.
             device_id: Optional device ID to filter by.
-            pagination: Optional pagination parameters.
+            pagination: Pagination parameters (required).
 
         Returns:
-            List of Score entities if no pagination, PaginatedResult if pagination provided.
+            PaginatedResult containing scores.
         """
+        # Apply board's default sort if filtering by board and no explicit sort provided
+        if board_id is not None and not pagination._user_provided_sort:
+            board_service = BoardService(self.repository.session)
+            board = await board_service.get_by_id(board_id)
+            if board is not None:
+                # Convert board's sort direction to pagination sort direction
+                value_direction = (
+                    SortDirection.ASC
+                    if board.sort_direction == BoardSortDirection.ASCENDING
+                    else SortDirection.DESC
+                )
+                pagination.sort_spec = [
+                    SortField(name="value", direction=value_direction),
+                    SortField(name="created_at", direction=SortDirection.DESC),
+                    SortField(name="id", direction=SortDirection.ASC),
+                ]
+
         return await self.repository.filter(
             account_id=account_id,
             board_id=board_id,

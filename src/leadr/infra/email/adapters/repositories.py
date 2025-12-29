@@ -5,6 +5,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.api.pagination import PaginationParams
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 from leadr.infra.email.adapters.orm import EmailORM
 from leadr.infra.email.domain.models import Email
@@ -12,6 +14,16 @@ from leadr.infra.email.domain.models import Email
 
 class EmailRepository(BaseRepository[Email, EmailORM]):
     """Repository for Email entities."""
+
+    SORTABLE_FIELDS = {
+        "id",
+        "to",
+        "status",
+        "priority",
+        "created_at",
+        "sent_at",
+        "updated_at",
+    }
 
     def __init__(self, db: AsyncSession):
         """Initialize email repository.
@@ -51,24 +63,59 @@ class EmailRepository(BaseRepository[Email, EmailORM]):
         """
         return EmailORM
 
-    async def filter(self, account_id: Any | None = None, **kwargs: Any) -> list[Email]:
-        """Filter emails by criteria.
+    async def filter(
+        self,
+        account_id: Any | None = None,
+        *,
+        pagination: PaginationParams,
+        **kwargs: Any,
+    ) -> PaginatedResult[Email]:
+        """Filter emails by criteria with pagination.
 
         Args:
             account_id: Not used for emails (top-level entity).
+            pagination: Pagination parameters (required).
             **kwargs: Filter parameters (to, status, etc.)
 
         Returns:
-            List of matching Email entities.
+            Paginated result of matching Email entities.
+
+        Raises:
+            ValueError: If sort field is not in SORTABLE_FIELDS.
+            CursorValidationError: If cursor is invalid or state doesn't match.
         """
         query = select(EmailORM)
+
+        # Build filters dict for cursor validation
+        filters_dict: dict[str, str] = {}
 
         # Apply filters based on kwargs
         if "to" in kwargs:
             query = query.where(EmailORM.to == kwargs["to"])
+            filters_dict["to"] = kwargs["to"]
         if "status" in kwargs:
             query = query.where(EmailORM.status == kwargs["status"])
+            filters_dict["status"] = str(kwargs["status"])
 
-        result = await self.session.execute(query)
-        orm_models = result.scalars().all()
-        return [self._to_domain(orm) for orm in orm_models]
+        # Validate sort fields
+        for sort_field in pagination.sort_spec:
+            if sort_field.name not in self.SORTABLE_FIELDS:
+                raise ValueError(
+                    f"Unknown sort field: {sort_field.name}. "
+                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
+                )
+
+        # Handle cursor if present
+        cursor = None
+        if pagination.has_cursor():
+            cursor = pagination.decode_cursor()
+            if cursor is not None:
+                cursor.validate_state(pagination.sort_spec, filters_dict)
+
+        # Execute paginated query
+        return await self._execute_paginated_query(
+            query=query,
+            sort_fields=pagination.sort_spec,
+            cursor=cursor,
+            limit=pagination.limit,
+        )

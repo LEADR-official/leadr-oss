@@ -451,3 +451,75 @@ class TestScorePagination:
         # Verify all scores are from device1
         for score in data["data"]:
             assert score["device_id"] == device1
+
+    async def test_pagination_default_sort_uses_board_sort_direction_descending(
+        self,
+        authenticated_client: AsyncClient,
+        test_account: Account,
+        test_board: Board,
+        test_device: Device,
+    ) -> None:
+        """Test that default sort uses board.sort_direction (DESCENDING - high scores first)."""
+        # Create scores with different values in mixed order
+        values = [100, 500, 300, 800, 200]
+        for i, value in enumerate(values):
+            await authenticated_client.post(
+                "/scores",
+                json={
+                    "account_id": str(test_account.id),
+                    "game_id": str(test_board.game_id),
+                    "board_id": str(test_board.id),
+                    "device_id": str(test_device.id),
+                    "player_name": f"Player{i}",
+                    "value": float(value),
+                },
+            )
+
+        # Get scores without explicit sort - should use board's sort_direction
+        response = await authenticated_client.get(
+            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}"
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        # test_board has DESCENDING sort_direction, so should be sorted high to low
+        scores = data["data"]
+        assert len(scores) == 5
+        score_values = [s["value"] for s in scores]
+        assert score_values == [800, 500, 300, 200, 100]
+
+    async def test_pagination_explicit_sort_overrides_board_default(
+        self,
+        authenticated_client: AsyncClient,
+        test_account: Account,
+        test_board: Board,
+        test_device: Device,
+    ) -> None:
+        """Test that explicit sort param overrides board's default sort_direction."""
+        # Create scores with different values
+        values = [100, 500, 300, 800, 200]
+        for i, value in enumerate(values):
+            await authenticated_client.post(
+                "/scores",
+                json={
+                    "account_id": str(test_account.id),
+                    "game_id": str(test_board.game_id),
+                    "board_id": str(test_board.id),
+                    "device_id": str(test_device.id),
+                    "player_name": f"Player{i}",
+                    "value": float(value),
+                },
+            )
+
+        # Get scores with explicit ascending sort (even though board is DESCENDING)
+        response = await authenticated_client.get(
+            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&sort=value:asc"
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should be sorted low to high because of explicit sort
+        scores = data["data"]
+        assert len(scores) == 5
+        score_values = [s["value"] for s in scores]
+        assert score_values == [100, 200, 300, 500, 800]

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID
 from leadr.registration.adapters.orm import VerificationCodeStatusEnum
 from leadr.registration.domain.jam_code import JamCode
@@ -200,9 +201,10 @@ class TestVerificationCodeRepository:
         await repository.create(code3)
         await db_session.commit()
 
-        results = await repository.filter(email="user1@example.com")
-        assert len(results) == 2
-        assert all(r.email == "user1@example.com" for r in results)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repository.filter(email="user1@example.com", pagination=pagination)
+        assert len(result.items) == 2
+        assert all(r.email == "user1@example.com" for r in result.items)
 
     async def test_filter_by_status(self, db_session: AsyncSession):
         """Test filtering verification codes by status."""
@@ -225,11 +227,16 @@ class TestVerificationCodeRepository:
         await repository.update(code2)
         await db_session.commit()
 
-        pending = await repository.filter(status=VerificationCodeStatusEnum.PENDING)
-        used = await repository.filter(status=VerificationCodeStatusEnum.USED)
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        pending = await repository.filter(
+            status=VerificationCodeStatusEnum.PENDING, pagination=pagination
+        )
+        used = await repository.filter(
+            status=VerificationCodeStatusEnum.USED, pagination=pagination
+        )
 
-        assert len(pending) == 1
-        assert len(used) == 1
+        assert len(pending.items) == 1
+        assert len(used.items) == 1
 
 
 @pytest.mark.asyncio
@@ -345,9 +352,10 @@ class TestJamCodeRepository:
         await repository.create(code2)
         await db_session.commit()
 
-        results = await repository.filter(code="CODE1")
-        assert len(results) == 1
-        assert results[0].code == "CODE1"
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repository.filter(code="CODE1", pagination=pagination)
+        assert len(result.items) == 1
+        assert result.items[0].code == "CODE1"
 
 
 @pytest.mark.asyncio
@@ -499,6 +507,7 @@ class TestJamCodeRedemptionRepository:
         await repository.create(redemption2)
         await db_session.commit()
 
-        results = await repository.filter(account_id=test_account.id.uuid)
-        assert len(results) == 1
-        assert results[0].account_id == test_account.id
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repository.filter(account_id=test_account.id.uuid, pagination=pagination)
+        assert len(result.items) == 1
+        assert result.items[0].account_id == test_account.id

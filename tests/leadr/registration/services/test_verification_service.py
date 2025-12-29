@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.api.pagination import PaginationParams
 from leadr.config import settings
 from leadr.registration.services.verification_service import VerificationService
 
@@ -24,10 +25,11 @@ class TestVerificationServiceInitiateVerification:
         await service.initiate_verification("test@example.com")
 
         # Verify code was created in database
-        codes = await service.repository.filter(email="test@example.com")
-        assert len(codes) == 1
-        assert codes[0].email == "test@example.com"
-        assert len(codes[0].code) == 6  # Code should be 6 characters
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.repository.filter(email="test@example.com", pagination=pagination)
+        assert len(result.items) == 1
+        assert result.items[0].email == "test@example.com"
+        assert len(result.items[0].code) == 6  # Code should be 6 characters
 
     async def test_initiate_verification_sends_email(self, db_session: AsyncSession):
         """Test that initiate_verification sends email."""
@@ -51,8 +53,11 @@ class TestVerificationServiceInitiateVerification:
 
         # Create initial code
         await service.initiate_verification("test@example.com")
-        first_codes = await service.repository.filter(email="test@example.com")
-        first_code = first_codes[0].code
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        first_result = await service.repository.filter(
+            email="test@example.com", pagination=pagination
+        )
+        first_code = first_result.items[0].code
 
         # Create another code
         await service.initiate_verification("test@example.com")
@@ -64,8 +69,10 @@ class TestVerificationServiceInitiateVerification:
         assert valid_code is None
 
         # Should have new valid code
-        all_codes = await service.repository.filter(email="test@example.com")
-        assert len(all_codes) == 2  # Both codes exist, but only one is valid
+        all_result = await service.repository.filter(
+            email="test@example.com", pagination=pagination
+        )
+        assert len(all_result.items) == 2  # Both codes exist, but only one is valid
 
     async def test_initiate_verification_sets_expiry(self, db_session: AsyncSession):
         """Test that initiate_verification sets correct expiry time."""
@@ -78,8 +85,9 @@ class TestVerificationServiceInitiateVerification:
         await service.initiate_verification("test@example.com")
         after = datetime.now(UTC)
 
-        codes = await service.repository.filter(email="test@example.com")
-        code = codes[0]
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.repository.filter(email="test@example.com", pagination=pagination)
+        code = result.items[0]
 
         expected_expiry_min = before + timedelta(seconds=settings.VERIFICATION_CODE_EXPIRY_SECONDS)
         expected_expiry_max = after + timedelta(seconds=settings.VERIFICATION_CODE_EXPIRY_SECONDS)
@@ -99,8 +107,9 @@ class TestVerificationServiceVerifyCode:
 
         # Create verification code
         await service.initiate_verification("test@example.com")
-        codes = await service.repository.filter(email="test@example.com")
-        code = codes[0].code
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.repository.filter(email="test@example.com", pagination=pagination)
+        code = result.items[0].code
 
         # Verify the code
         token = await service.verify_code("test@example.com", code)
@@ -125,8 +134,9 @@ class TestVerificationServiceVerifyCode:
 
         # Create code and manually expire it
         await service.initiate_verification("test@example.com")
-        codes = await service.repository.filter(email="test@example.com")
-        code_entity = codes[0]
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.repository.filter(email="test@example.com", pagination=pagination)
+        code_entity = result.items[0]
         code_entity.expires_at = datetime.now(UTC) - timedelta(seconds=1)
         await service.repository.update(code_entity)
         await db_session.commit()
@@ -142,8 +152,9 @@ class TestVerificationServiceVerifyCode:
 
         # Create and verify code
         await service.initiate_verification("test@example.com")
-        codes = await service.repository.filter(email="test@example.com")
-        code = codes[0].code
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.repository.filter(email="test@example.com", pagination=pagination)
+        code = result.items[0].code
 
         # First verification succeeds
         await service.verify_code("test@example.com", code)
@@ -159,8 +170,9 @@ class TestVerificationServiceVerifyCode:
         service = VerificationService(db_session, mock_email_service)
 
         await service.initiate_verification("test@example.com")
-        codes = await service.repository.filter(email="test@example.com")
-        code = codes[0].code
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.repository.filter(email="test@example.com", pagination=pagination)
+        code = result.items[0].code
 
         await service.verify_code("test@example.com", code)
 
@@ -175,8 +187,9 @@ class TestVerificationServiceVerifyCode:
         service = VerificationService(db_session, mock_email_service)
 
         await service.initiate_verification("test@example.com")
-        codes = await service.repository.filter(email="test@example.com")
-        code = codes[0].code
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.repository.filter(email="test@example.com", pagination=pagination)
+        code = result.items[0].code
 
         # Verify with lowercase version
         token = await service.verify_code("test@example.com", code.lower())
@@ -195,8 +208,9 @@ class TestVerificationServiceValidateToken:
 
         # Create and verify code to get token
         await service.initiate_verification("test@example.com")
-        codes = await service.repository.filter(email="test@example.com")
-        code = codes[0].code
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.repository.filter(email="test@example.com", pagination=pagination)
+        code = result.items[0].code
         token = await service.verify_code("test@example.com", code)
 
         # Validate the token
