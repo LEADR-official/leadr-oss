@@ -2,10 +2,11 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
 from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
+from leadr.config import settings
 
 
 class BoardCreateRequest(BaseModel):
@@ -115,6 +116,17 @@ class BoardResponse(BaseModel):
     description: str | None = Field(default=None, description="Short description of the board")
     created_at: datetime = Field(description="Timestamp when the board was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def url_short(self) -> str | None:
+        """Short URL for direct board access via short_code.
+
+        Returns the URL if BOARDS_UI_DOMAIN is configured, otherwise None.
+        """
+        if not settings.BOARDS_UI_DOMAIN:
+            return None
+        return f"{settings.BOARDS_UI_DOMAIN}/b/{self.short_code}"
 
     @classmethod
     def from_domain(cls, board: Board) -> "BoardResponse":

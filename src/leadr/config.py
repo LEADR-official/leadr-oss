@@ -67,6 +67,11 @@ class CommonSettings(BaseSettings):
         default=HttpUrl("http://localhost:8000"),
         description="URL for the web dashboard (e.g., 'https://dashboard.leadr.gg')",
     )
+    BOARDS_UI_DOMAIN: str | None = Field(
+        default=None,
+        description="Base URL for public board UI (e.g., 'https://boards.leadr.gg'). "
+        "When set, enables url/url_short fields in Game and Board API responses.",
+    )
 
     # Database Configuration
     DB_HOST: str = Field(

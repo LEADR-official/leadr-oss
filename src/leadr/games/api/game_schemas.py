@@ -2,9 +2,10 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from leadr.common.domain.ids import AccountID, BoardID, GameID
+from leadr.config import settings
 from leadr.games.domain.game import Game
 
 
@@ -72,6 +73,17 @@ class GameResponse(BaseModel):
     page_url: str | None = Field(default=None, description="URL to the game's page")
     created_at: datetime = Field(description="Timestamp when the game was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def url(self) -> str | None:
+        """Public URL to view this game's leaderboards.
+
+        Returns the URL if BOARDS_UI_DOMAIN is configured, otherwise None.
+        """
+        if not settings.BOARDS_UI_DOMAIN:
+            return None
+        return f"{settings.BOARDS_UI_DOMAIN}/games/{self.slug}"
 
     @classmethod
     def from_domain(cls, game: Game) -> "GameResponse":

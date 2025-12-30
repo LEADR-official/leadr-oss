@@ -1,4 +1,4 @@
-# 👑 LEADR - Lightweight Game Leaderboard API
+# LEADR - Cross-platform Leaderboards for Game Devs
 
 > **LEADR is the lightweight cross-platform leaderboard backend that turns any game into a social experience**
 
@@ -6,23 +6,29 @@ Whether you're building a retro arcade game, puzzle platformer, or competitive m
 
 ## Game Features
 
-- **🤯 Completely Cross Platform** - No need to individually integrate Steam, Unity Cloud, Google Play Services...
-- **🥰 Developer Friendly** - The best docs. The clearest SDKs. Actual interest in the community
-- **🔒 Anti-cheat by Default** - Secure and sophisticated server implementation to minimise and help triage abuse
-- **🎯 We Do Leaderboards** - Different modes, levels, difficulties, geographies, units, sorting and more
-- **📆 Seasons & Temporary Boards** - Automated leaderboards that reset or disable based on date & time
-- **📊 More Than Scores** - Store ghost replays, custom metadata and user-generated content with every score
-- **🔥 Beautiful Web Views** - Make your leaderboards a feature, with automatically generated, shareable, modern pages
+- **Completely Cross Platform** - No need to individually integrate Steam, Unity Cloud, Google Play Services...
+- **Developer Friendly** - The best docs. The clearest SDKs. Actual interest in the community
+- **Anti-cheat by Default** - Secure and sophisticated server implementation to minimise and help triage abuse
+- **We Do Leaderboards** - Different modes, levels, difficulties, geographies, units, sorting and more
+- **Seasons & Temporary Boards** - Automated leaderboards that reset or disable based on date & time
+- **More Than Just Scores** - Store ghost replay data, integrate your boards,
 
 ## Software Features
 
-- **🎉 Open-Source Core** - LEADR's cloud service is built on the very same software you're looking at right now
-- **📦 Docker Ready** - Deploy to any cloud platform in minutes
-- **💾 Zero Config** - Works out of the box
-- **⚡ Lightning Fast** - Built to the latest industry standards by expert backend software developers (sadly we're better at making web apps than games)
+- **Open-Source Core** - LEADR's cloud service is built on this very same open-source core
+- **Fully documented** - Clear, complete, developer-friendly docs
+- **Docker Ready** - Deploy to any cloud platform in minutes
+- **Zero Config** - Works out of the box
+- **Secure & Scalable** - Built to the latest industry standards by expert backend software developers (sadly we're better at making web apps than games)
 
 > [!TIP]
 > Don't want the hassle of deploying it yourself? Get started for free at https://leadr.gg
+
+## LEADR Cloud Features
+
+- **Free Tier Available** - Get started in seconds at no cost, only pay when your game explodes
+- **Beautiful Web Views** - Make your leaderboards more useful, with automatically generated, shareable, modern pages
+- **More coming soon** - LEADR is under active development and [we've got lots planned](https://docs.leadr.gg/latest/roadmap/)...
 
 ## Quick Start
 
@@ -43,7 +49,7 @@ docker run -d \
   ghcr.io/LEADR-official/leadr:latest
 
 # Test it's working
-curl http://localhost:3000/health
+curl http://localhost:3000/v1/health
 ```
 
 **Required Environment Variables:**
@@ -93,6 +99,7 @@ Use `next_cursor` as the `cursor` parameter for the next page.
 
 LEADR works with any cloud platform that supports Docker:
 
+- **Hetzner**: Europe-based cloud host - used by LEADR's cloud service
 - **Railway**: Deploy with one click using their Docker template
 - **Fly.io**: Use `fly launch` with the included Dockerfile
 - **Google Cloud Run**: Perfect for serverless deployments
