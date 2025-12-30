@@ -357,7 +357,7 @@ async def list_scores_client(
         auth.account_id,
         board_id,
         auth.device.game_id,
-        auth.device.id,
+        None,  # Don't filter by device, return all scores
     )
 
 
