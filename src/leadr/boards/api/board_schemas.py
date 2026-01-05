@@ -122,9 +122,10 @@ class BoardResponse(BaseModel):
     def url_short(self) -> str | None:
         """Short URL for direct board access via short_code.
 
-        Returns the URL if BOARDS_UI_DOMAIN is configured, otherwise None.
+        Returns the URL if BOARDS_UI_DOMAIN is configured and the board is published,
+        otherwise None.
         """
-        if not settings.BOARDS_UI_DOMAIN:
+        if not settings.BOARDS_UI_DOMAIN or not self.is_published:
             return None
         return f"{settings.BOARDS_UI_DOMAIN}/b/{self.short_code}"
 

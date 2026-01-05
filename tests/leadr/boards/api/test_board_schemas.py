@@ -100,3 +100,27 @@ class TestBoardResponseUrlShort:
         json_data = response.model_dump_json()
 
         assert '"url_short":' in json_data
+
+    def test_url_short_is_none_when_board_is_not_published(self):
+        """Test that url_short is None when board is not published."""
+        now = datetime.now(UTC)
+        board = Board(
+            id=BoardID(),
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="Unpublished Board",
+            slug="unpublished-board",
+            short_code="ABC123",
+            is_active=True,
+            is_published=False,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        response = BoardResponse.from_domain(board)
+
+        # Even if BOARDS_UI_DOMAIN is set, url_short should be None
+        with patch("leadr.boards.api.board_schemas.settings") as mock_settings:
+            mock_settings.BOARDS_UI_DOMAIN = "https://boards.example.com"
+            assert response.url_short is None
