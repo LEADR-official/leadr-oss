@@ -1,5 +1,9 @@
 # LEADR - Cross-platform Leaderboards for Game Devs
 
+![GitHub Tag](https://img.shields.io/github/v/tag/LEADR-Official/leadr-oss)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/LEADR-Official/leadr-oss)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 > **LEADR is the lightweight cross-platform leaderboard backend that turns any game into a social experience**
 
 Whether you're building a retro arcade game, puzzle platformer, or competitive multiplayer experience, LEADR handles your leaderboard needs without the bloat and complexity - for any engine, any platform, any team.
