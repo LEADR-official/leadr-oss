@@ -113,13 +113,15 @@ class BoardService(BaseService[Board, BoardRepository]):
             # Auto-generate unique slug from name with collision handling
             async def check_slug_exists(slug_to_check: str) -> bool:
                 """Check if slug exists for this account/game combination."""
-                existing = await self.repository.get_by_slug(
+                pagination = PaginationParams(cursor=None, limit=1, sort=None)
+                result = await self.repository.filter(
                     account_id=account_id,
                     game_id=game_id,
                     slug=slug_to_check,
                     is_active=True,
+                    pagination=pagination,
                 )
-                return existing is not None
+                return len(result.items) > 0
 
             slug = await generate_unique_slug_with_retry(
                 base_text=name,
@@ -129,13 +131,15 @@ class BoardService(BaseService[Board, BoardRepository]):
         else:
             # Use provided slug - validation will happen in Board domain model
             # Check for uniqueness constraint violation (active board with same slug)
-            existing = await self.repository.get_by_slug(
+            pagination = PaginationParams(cursor=None, limit=1, sort=None)
+            result = await self.repository.filter(
                 account_id=account_id,
                 game_id=game_id,
                 slug=slug,
                 is_active=True,
+                pagination=pagination,
             )
-            if existing is not None:
+            if len(result.items) > 0:
                 raise ValueError(f"An active board with slug '{slug}' already exists for this game")
 
         board = Board(
@@ -262,6 +266,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         account_id: AccountID | None = None,
         game_id: GameID | None = None,
         code: str | None = None,
+        slug: str | None = None,
         is_active: bool | None = None,
         is_published: bool | None = None,
         starts_before: datetime | None = None,
@@ -277,6 +282,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             account_id: Optional account ID to filter by
             game_id: Optional game ID to filter by
             code: Optional short code to filter by
+            slug: Optional slug to filter by
             is_active: Optional filter for active status
             is_published: Optional filter for published status
             starts_before: Optional filter for boards starting before this time
@@ -292,6 +298,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             account_id=account_id,
             game_id=game_id,
             code=code,
+            slug=slug,
             is_active=is_active,
             is_published=is_published,
             starts_before=starts_before,

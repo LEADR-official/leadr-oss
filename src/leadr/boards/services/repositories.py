@@ -98,50 +98,12 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         """
         return await self._get_by_field("short_code", short_code)
 
-    async def get_by_slug(
-        self,
-        account_id: AccountID,
-        game_id: GameID,
-        slug: str,
-        is_active: bool | None = None,
-    ) -> Board | None:
-        """Get board by slug within account and game scope.
-
-        Lookups are scoped to account_id and game_id to respect the partial
-        unique constraint (account_id, game_id, slug) WHERE is_active=true.
-
-        Args:
-            account_id: The account ID to filter by
-            game_id: The game ID to filter by
-            slug: The slug to search for
-            is_active: Optional filter for active status. If None, returns board
-                regardless of active status.
-
-        Returns:
-            Board entity if found, None otherwise
-        """
-        account_uuid = self._extract_uuid(account_id)
-        game_uuid = self._extract_uuid(game_id)
-
-        query = select(BoardORM).where(
-            BoardORM.account_id == account_uuid,
-            BoardORM.game_id == game_uuid,
-            BoardORM.slug == slug,
-            BoardORM.deleted_at.is_(None),
-        )
-
-        if is_active is not None:
-            query = query.where(BoardORM.is_active == is_active)
-
-        result = await self.session.execute(query)
-        orm = result.scalar_one_or_none()
-        return self._to_domain(orm) if orm else None
-
     async def filter(
         self,
         account_id: AccountID | None = None,
         game_id: GameID | None = None,
         code: str | None = None,
+        slug: str | None = None,
         is_active: bool | None = None,
         is_published: bool | None = None,
         starts_before: datetime | None = None,
@@ -158,6 +120,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             account_id: Optional account ID to filter by
             game_id: Optional game ID to filter by
             code: Optional short code to filter by
+            slug: Optional slug to filter by
             is_active: Optional filter for active status
             is_published: Optional filter for published status
             starts_before: Optional filter for boards starting before this time
@@ -191,6 +154,10 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
         if code is not None:
             query = query.where(BoardORM.short_code == code)
             filters_dict["code"] = code
+
+        if slug is not None:
+            query = query.where(BoardORM.slug == slug)
+            filters_dict["slug"] = slug
 
         if is_active is not None:
             query = query.where(BoardORM.is_active == is_active)

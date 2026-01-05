@@ -19,7 +19,7 @@ from leadr.boards.api.board_schemas import (
 )
 from leadr.boards.services.board_service import BoardService
 from leadr.boards.services.dependencies import BoardServiceDep
-from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
+from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, BoardID, GameID
 from leadr.games.services.dependencies import GameServiceDep
@@ -174,35 +174,11 @@ async def handle_list_boards(
         game_id = game.id
         account_id = game.account_id  # Use game's account for filtering
 
-    # Handle board slug filter - fetch specific board (special case)
-    if slug is not None:
-        if game_id is None:
-            raise HTTPException(
-                status_code=400,
-                detail="game_slug parameter is required when filtering by board slug",
-            )
-
-        # account_id is guaranteed to be set when game_slug is provided
-        if account_id is None:
-            raise HTTPException(status_code=400, detail="account_id is required")
-
-        board = await service.repository.get_by_slug(account_id, game_id, slug, is_active=is_active)
-        if board is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Board with slug '{slug}' not found for game '{game_slug}'",
-            )
-
-        # Return single board result
-        return PaginatedResponse(
-            data=[BoardResponse.from_domain(board)],
-            pagination=PaginationMeta(
-                next_cursor=None,
-                prev_cursor=None,
-                has_next=False,
-                has_prev=False,
-                count=1,
-            ),
+    # Validate that game_id is required when filtering by slug
+    if slug is not None and game_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="game_slug parameter is required when filtering by board slug",
         )
 
     # Unified query path for all filter combinations
@@ -211,6 +187,7 @@ async def handle_list_boards(
             account_id=account_id,
             game_id=game_id,
             code=code,
+            slug=slug,
             is_active=is_active,
             is_published=is_published,
             starts_before=starts_before,
@@ -230,6 +207,8 @@ async def handle_list_boards(
         filters_dict["game_id"] = str(game_id)
     if code is not None:
         filters_dict["code"] = code
+    if slug is not None:
+        filters_dict["slug"] = slug
     if is_active is not None:
         filters_dict["is_active"] = str(is_active)
     if is_published is not None:
@@ -367,7 +346,6 @@ async def list_boards_client(
     slug: Annotated[
         str | None, Query(description="Filter by board slug (requires game_slug)")
     ] = None,
-    is_active: Annotated[bool | None, Query(description="Filter by active status")] = None,
     is_published: Annotated[bool | None, Query(description="Filter by published status")] = None,
     starts_before: Annotated[
         datetime | None, Query(description="Filter boards starting before this time (ISO 8601)")
@@ -391,7 +369,6 @@ async def list_boards_client(
     - Use ?game_id={id} or ?game_slug={slug} to filter boards by game
     - Use ?game_slug={game_slug}&slug={slug} to find a specific board within a game
     - Use ?code={code} to filter boards by short code
-    - Use ?is_active=true/false to filter by active status
     - Use ?is_published=true/false to filter by published status
     - Use ?starts_before=<datetime>&starts_after=<datetime> for start date range
     - Use ?ends_before=<datetime>&ends_after=<datetime> for end date range
@@ -405,7 +382,7 @@ async def list_boards_client(
 
     Example:
         GET /v1/client/boards?code=WEEKLY-CHALLENGE&limit=50
-        GET /v1/client/boards?game_slug=my-game&is_active=true
+        GET /v1/client/boards?game_slug=my-game&is_published=true
         GET /v1/client/boards?game_slug=my-game&slug=weekly-challenge
         GET /v1/client/boards?starts_after=2025-01-01T00:00:00Z
 
@@ -418,7 +395,6 @@ async def list_boards_client(
         code: Optional short code to filter boards by.
         game_slug: Optional game slug to filter boards by game (resolves to game_id).
         slug: Optional board slug to filter by specific board (requires game_slug).
-        is_active: Optional filter for active status.
         is_published: Optional filter for published status.
         starts_before: Optional filter for boards starting before this time.
         starts_after: Optional filter for boards starting after this time.
@@ -442,7 +418,7 @@ async def list_boards_client(
         code=code,
         game_slug=game_slug,
         slug=slug,
-        is_active=is_active,
+        is_active=True,  # Clients can't access inactive boards
         is_published=is_published,
         starts_before=starts_before,
         starts_after=starts_after,

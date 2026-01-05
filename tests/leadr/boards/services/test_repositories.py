@@ -1445,3 +1445,233 @@ class TestBoardRepository:
         assert len(result.items) == 2
         assert result.has_next is True
         assert result.next_position is not None
+
+    async def test_filter_boards_by_slug(self, db_session: AsyncSession):
+        """Test filtering boards by slug."""
+        # Create account and game
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID(uuid4())
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create boards with different slugs
+        board_repo = BoardRepository(db_session)
+
+        board1 = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Weekly Board",
+            slug="weekly",
+            short_code="WEEK1",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        board2 = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Monthly Board",
+            slug="monthly",
+            short_code="MONTH1",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(board1)
+        await board_repo.create(board2)
+
+        # Filter by slug
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await board_repo.filter(slug="weekly", pagination=pagination)
+
+        assert len(result.items) == 1
+        assert result.items[0].name == "Weekly Board"
+        assert result.items[0].slug == "weekly"
+
+    async def test_filter_boards_by_slug_returns_multiple_when_inactive_exists(
+        self, db_session: AsyncSession
+    ):
+        """Test that slug filter returns multiple boards when inactive versions exist."""
+        # Create account and game
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID(uuid4())
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create multiple boards with same slug - one active, two inactive
+        # This simulates recurring boards like "weekly" where old ones are deactivated
+        board_repo = BoardRepository(db_session)
+
+        # Old inactive version
+        old_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Weekly Board (Old)",
+            slug="weekly",
+            short_code="WEEK1",
+            is_active=False,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        # Another old inactive version
+        older_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Weekly Board (Older)",
+            slug="weekly",
+            short_code="WEEK2",
+            is_active=False,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        # Current active version
+        current_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Weekly Board (Current)",
+            slug="weekly",
+            short_code="WEEK3",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(old_board)
+        await board_repo.create(older_board)
+        await board_repo.create(current_board)
+
+        # Filter by slug without is_active - should return all 3
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await board_repo.filter(slug="weekly", pagination=pagination)
+
+        assert len(result.items) == 3
+        slugs = {b.slug for b in result.items}
+        assert slugs == {"weekly"}
+
+    async def test_filter_boards_by_slug_with_is_active_true(self, db_session: AsyncSession):
+        """Test that slug filter with is_active=True returns only active board."""
+        # Create account and game
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID(uuid4())
+
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create multiple boards with same slug - one active, one inactive
+        board_repo = BoardRepository(db_session)
+
+        inactive_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Weekly Board (Inactive)",
+            slug="weekly",
+            short_code="WEEK1",
+            is_active=False,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        active_board = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
+            name="Weekly Board (Active)",
+            slug="weekly",
+            short_code="WEEK2",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(inactive_board)
+        await board_repo.create(active_board)
+
+        # Filter by slug WITH is_active=True - should return only 1
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await board_repo.filter(slug="weekly", is_active=True, pagination=pagination)
+
+        assert len(result.items) == 1
+        assert result.items[0].name == "Weekly Board (Active)"
+        assert result.items[0].is_active is True

@@ -1070,3 +1070,180 @@ class TestBoardRoutes:
         assert response.status_code == 201
         data = response.json()
         assert data["description"] is None
+
+    async def test_list_boards_by_slug_via_admin_api(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test listing boards filtered by slug via admin API."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+            slug="test-game",
+        )
+
+        # Create boards with different slugs
+        await client.post(
+            "/boards",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "Weekly Challenge",
+                "slug": "weekly",
+                "short_code": "WEEK1",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+        await client.post(
+            "/boards",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "Monthly Challenge",
+                "slug": "monthly",
+                "short_code": "MONTH1",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        # Filter by slug using game_slug
+        response = await client.get(
+            "/boards?game_slug=test-game&slug=weekly",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        assert data["data"][0]["slug"] == "weekly"
+        assert data["data"][0]["name"] == "Weekly Challenge"
+
+    async def test_list_boards_by_slug_requires_game_slug(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that filtering by slug without game_slug returns 400."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        # Try to filter by slug without game_slug
+        response = await client.get(
+            f"/boards?account_id={account.id}&slug=weekly",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 400
+        assert "game_slug" in response.json()["error"].lower()
+
+    async def test_list_boards_by_slug_returns_multiple_for_admin(
+        self, authenticated_client: AsyncClient, db_session
+    ):
+        """Test that admin can see multiple boards with same slug (active + inactive)."""
+        from leadr.boards.services.board_service import BoardService
+
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+            slug="test-game",
+        )
+
+        board_service = BoardService(db_session)
+
+        # Create inactive board (old week)
+        await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Week 1",
+            slug="weekly",
+            short_code="WEEK1",
+            is_active=False,
+        )
+
+        # Create active board (current week)
+        await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Week 2",
+            slug="weekly",
+            short_code="WEEK2",
+            is_active=True,
+        )
+
+        # Admin without is_active filter should see both
+        response = await authenticated_client.get(
+            "/boards?game_slug=test-game&slug=weekly",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 2
+        names = {b["name"] for b in data["data"]}
+        assert "Week 1" in names
+        assert "Week 2" in names
+
+    async def test_list_boards_by_slug_admin_with_is_active_filter(
+        self, authenticated_client: AsyncClient, db_session
+    ):
+        """Test that admin can filter by slug AND is_active to get single result."""
+        from leadr.boards.services.board_service import BoardService
+
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+            slug="test-game",
+        )
+
+        board_service = BoardService(db_session)
+
+        # Create inactive board
+        await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Week 1 (Old)",
+            slug="weekly",
+            short_code="WEEK1",
+            is_active=False,
+        )
+
+        # Create active board
+        await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Week 2 (Current)",
+            slug="weekly",
+            short_code="WEEK2",
+            is_active=True,
+        )
+
+        # Admin with is_active=true should see only active board
+        response = await authenticated_client.get(
+            "/boards?game_slug=test-game&slug=weekly&is_active=true",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        assert data["data"][0]["name"] == "Week 2 (Current)"
+        assert data["data"][0]["is_active"] is True
