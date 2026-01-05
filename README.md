@@ -1,6 +1,6 @@
 # LEADR - Cross-platform Leaderboards for Game Devs
 
-![GitHub Tag](https://img.shields.io/github/v/tag/LEADR-Official/leadr-oss)
+![GitHub Tag](https://img.shields.io/github/v/tag/LEADR-Official/leadr-oss?color=FF007A)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/LEADR-Official/leadr-oss)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
