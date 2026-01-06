@@ -1456,3 +1456,187 @@ class TestScoreRepository:
         )
 
         assert found_score is None
+
+
+@pytest.mark.asyncio
+class TestScoreServiceAroundScoreId:
+    """Test suite for list_scores with around_score_id parameter."""
+
+    async def test_list_scores_around_score_id_basic(self, db_session: AsyncSession):
+        """Test listing scores centered around a specific score."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account-around",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7",
+        )
+
+        # Create board with DESCENDING sort (higher is better)
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Around Test Board",
+            icon="trophy",
+            short_code="AROUND1",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        # Create 7 scores with different values
+        score_service = ScoreService(db_session)
+        scores = []
+        for value in [100, 200, 300, 400, 500, 600, 700]:
+            score, _ = await score_service.create_score(
+                account_id=account.id,
+                game_id=game.id,
+                board_id=board.id,
+                device_id=device.id,
+                player_name=f"Player{value}",
+                value=float(value),
+            )
+            scores.append(score)
+
+        # Get scores centered around the score with value 400 (scores[3])
+        target_score = scores[3]  # Player400
+        pagination = PaginationParams(cursor=None, limit=5, sort=None)
+        result = await score_service.list_scores(
+            account_id=account.id,
+            board_id=board.id,
+            pagination=pagination,
+            around_score_id=target_score.id,
+        )
+
+        # With DESC sort and limit=5:
+        # Expected: [600, 500, 400, 300, 200] - 2 above, target, 2 below
+        assert len(result.items) == 5
+        values = [s.value for s in result.items]
+        assert values == [600.0, 500.0, 400.0, 300.0, 200.0]
+
+        # Verify target is in the middle
+        assert result.items[2].id == target_score.id
+
+    async def test_list_scores_around_score_id_not_found(self, db_session: AsyncSession):
+        """Test that around_score_id raises error when score doesn't exist."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account-around-404",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Around Test Board",
+            icon="trophy",
+            short_code="AROUND404",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        score_service = ScoreService(db_session)
+        non_existent_id = ScoreID(uuid4())
+        pagination = PaginationParams(cursor=None, limit=5, sort=None)
+
+        with pytest.raises(EntityNotFoundError) as exc_info:
+            await score_service.list_scores(
+                account_id=account.id,
+                board_id=board.id,
+                pagination=pagination,
+                around_score_id=non_existent_id,
+            )
+
+        assert "Score not found" in str(exc_info.value)
+
+    async def test_list_scores_around_score_id_wrong_board(self, db_session: AsyncSession):
+        """Test that around_score_id raises error when score doesn't belong to specified board."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account-around-board",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8",
+        )
+
+        board_service = BoardService(db_session)
+        board1 = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Board 1",
+            icon="trophy",
+            short_code="BOARD1",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+        board2 = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Board 2",
+            icon="star",
+            short_code="BOARD2",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        # Create score on board1
+        score_service = ScoreService(db_session)
+        score_on_board1, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board1.id,
+            device_id=device.id,
+            player_name="TestPlayer",
+            value=100.0,
+        )
+
+        # Try to list scores on board2 with around_score_id from board1
+        pagination = PaginationParams(cursor=None, limit=5, sort=None)
+
+        with pytest.raises(ValueError) as exc_info:
+            await score_service.list_scores(
+                account_id=account.id,
+                board_id=board2.id,
+                pagination=pagination,
+                around_score_id=score_on_board1.id,
+            )
+
+        assert "does not belong to board" in str(exc_info.value).lower()

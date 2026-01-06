@@ -311,6 +311,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         device_id: DeviceID | None = None,
         *,
         pagination: PaginationParams,
+        around_score_id: ScoreID | None = None,
     ) -> PaginatedResult[Score]:
         """List scores for an account with optional filters and pagination.
 
@@ -321,12 +322,44 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             game_id: Optional game ID to filter by.
             device_id: Optional device ID to filter by.
             pagination: Pagination parameters (required).
+            around_score_id: Optional score ID to center results around. When provided,
+                returns a window of scores centered on this score. Mutually exclusive
+                with cursor pagination.
 
         Returns:
             PaginatedResult containing scores.
+
+        Raises:
+            EntityNotFoundError: If around_score_id is provided but score doesn't exist.
+            ValueError: If around_score_id score doesn't belong to the specified board_id.
         """
+        # Handle around_score_id: fetch and validate target score
+        around_score: Score | None = None
+        if around_score_id is not None:
+            around_score = await self.get_by_id_or_raise(around_score_id)
+
+            # Validate that the score belongs to the specified board (if board_id provided)
+            if board_id is not None and around_score.board_id != board_id:
+                raise ValueError(f"Score {around_score_id} does not belong to board {board_id}")
+
+            # Use the score's board for sort direction
+            board_service = BoardService(self.repository.session)
+            board = await board_service.get_by_id(around_score.board_id)
+            if board is not None:
+                # Convert board's sort direction to pagination sort direction
+                value_direction = (
+                    SortDirection.ASC
+                    if board.sort_direction == BoardSortDirection.ASCENDING
+                    else SortDirection.DESC
+                )
+                pagination.sort_spec = [
+                    SortField(name="value", direction=value_direction),
+                    SortField(name="created_at", direction=SortDirection.DESC),
+                    SortField(name="id", direction=SortDirection.ASC),
+                ]
+
         # Apply board's default sort if filtering by board and no explicit sort provided
-        if board_id is not None and not pagination._user_provided_sort:
+        elif board_id is not None and not pagination._user_provided_sort:
             board_service = BoardService(self.repository.session)
             board = await board_service.get_by_id(board_id)
             if board is not None:
@@ -348,6 +381,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             game_id=game_id,
             device_id=device_id,
             pagination=pagination,
+            around_score=around_score,
         )
 
     async def update_score(

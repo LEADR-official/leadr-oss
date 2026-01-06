@@ -1033,3 +1033,434 @@ class TestScoreRepository:
         retrieved = await score_repo.get_by_id(score_id)
         assert retrieved is not None
         assert retrieved.metadata == new_metadata
+
+    async def test_filter_around_score_desc_board(self, db_session: AsyncSession):
+        """Test filtering scores around a target score with DESC board (higher is better)."""
+        # Create supporting entities
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID()
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        device_repo = DeviceRepository(db_session)
+        device_id = DeviceID()
+        device = Device(
+            id=device_id,
+            account_id=account_id,
+            game_id=game_id,
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device)
+
+        # Create DESC board (higher value is better)
+        board_repo = BoardRepository(db_session)
+        board_id = BoardID()
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Highscore Board",
+            slug="highscore-board",
+            icon="trophy",
+            short_code="HSB",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(board)
+
+        # Create 7 scores with different values
+        score_repo = ScoreRepository(db_session)
+        scores = []
+        for value in [100, 200, 300, 400, 500, 600, 700]:
+            score = Score(
+                id=ScoreID(),
+                account_id=account_id,
+                game_id=game_id,
+                board_id=board_id,
+                device_id=device_id,
+                player_name=f"Player{value}",
+                value=float(value),
+                created_at=now,
+                updated_at=now,
+            )
+            await score_repo.create(score)
+            scores.append(score)
+
+        # Target score is value=400 (middle score)
+        target_score = scores[3]  # Player400
+
+        # Filter around the target with limit=5 (should get 2 above + target + 2 below)
+        from leadr.common.domain.pagination import SortDirection as PaginationSortDirection
+        from leadr.common.domain.pagination import SortField
+
+        sort_fields = [
+            SortField(name="value", direction=PaginationSortDirection.DESC),
+            SortField(name="created_at", direction=PaginationSortDirection.DESC),
+            SortField(name="id", direction=PaginationSortDirection.ASC),
+        ]
+        pagination = PaginationParams(cursor=None, limit=5, sort=None)
+        pagination.sort_spec = sort_fields
+
+        result = await score_repo.filter(
+            account_id=account_id,
+            board_id=board_id,
+            pagination=pagination,
+            around_score=target_score,
+        )
+
+        # Should have 5 scores: 600, 500, 400 (target), 300, 200
+        assert len(result.items) == 5
+        values = [s.value for s in result.items]
+        assert values == [600.0, 500.0, 400.0, 300.0, 200.0]
+
+    async def test_filter_around_score_asc_board(self, db_session: AsyncSession):
+        """Test filtering scores around a target score with ASC board (lower is better)."""
+        # Create supporting entities
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID()
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        device_repo = DeviceRepository(db_session)
+        device_id = DeviceID()
+        device = Device(
+            id=device_id,
+            account_id=account_id,
+            game_id=game_id,
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device)
+
+        # Create ASC board (lower value is better, e.g., time trial)
+        board_repo = BoardRepository(db_session)
+        board_id = BoardID()
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Time Trial Board",
+            slug="time-trial-board",
+            icon="clock",
+            short_code="TTB",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(board)
+
+        # Create 7 scores with different values (lower is better)
+        score_repo = ScoreRepository(db_session)
+        scores = []
+        for value in [10, 20, 30, 40, 50, 60, 70]:
+            score = Score(
+                id=ScoreID(),
+                account_id=account_id,
+                game_id=game_id,
+                board_id=board_id,
+                device_id=device_id,
+                player_name=f"Player{value}",
+                value=float(value),
+                created_at=now,
+                updated_at=now,
+            )
+            await score_repo.create(score)
+            scores.append(score)
+
+        # Target score is value=40 (middle score)
+        target_score = scores[3]  # Player40
+
+        # Filter around the target with limit=5
+        from leadr.common.domain.pagination import SortDirection as PaginationSortDirection
+        from leadr.common.domain.pagination import SortField
+
+        sort_fields = [
+            SortField(name="value", direction=PaginationSortDirection.ASC),
+            SortField(name="created_at", direction=PaginationSortDirection.DESC),
+            SortField(name="id", direction=PaginationSortDirection.ASC),
+        ]
+        pagination = PaginationParams(cursor=None, limit=5, sort=None)
+        pagination.sort_spec = sort_fields
+
+        result = await score_repo.filter(
+            account_id=account_id,
+            board_id=board_id,
+            pagination=pagination,
+            around_score=target_score,
+        )
+
+        # Should have 5 scores: 20, 30, 40 (target), 50, 60
+        # (lower values are "better"/above in ASC sort)
+        assert len(result.items) == 5
+        values = [s.value for s in result.items]
+        assert values == [20.0, 30.0, 40.0, 50.0, 60.0]
+
+    async def test_filter_around_score_at_top(self, db_session: AsyncSession):
+        """Test filtering around a score at the top of the board (no above scores)."""
+        # Create supporting entities
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID()
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        device_repo = DeviceRepository(db_session)
+        device_id = DeviceID()
+        device = Device(
+            id=device_id,
+            account_id=account_id,
+            game_id=game_id,
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device)
+
+        board_repo = BoardRepository(db_session)
+        board_id = BoardID()
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Highscore Board",
+            slug="highscore-board",
+            icon="trophy",
+            short_code="HSB2",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(board)
+
+        # Create 5 scores
+        score_repo = ScoreRepository(db_session)
+        scores = []
+        for value in [100, 200, 300, 400, 500]:
+            score = Score(
+                id=ScoreID(),
+                account_id=account_id,
+                game_id=game_id,
+                board_id=board_id,
+                device_id=device_id,
+                player_name=f"Player{value}",
+                value=float(value),
+                created_at=now,
+                updated_at=now,
+            )
+            await score_repo.create(score)
+            scores.append(score)
+
+        # Target is the top score (500)
+        target_score = scores[4]  # Player500
+
+        from leadr.common.domain.pagination import SortDirection as PaginationSortDirection
+        from leadr.common.domain.pagination import SortField
+
+        sort_fields = [
+            SortField(name="value", direction=PaginationSortDirection.DESC),
+            SortField(name="created_at", direction=PaginationSortDirection.DESC),
+            SortField(name="id", direction=PaginationSortDirection.ASC),
+        ]
+        pagination = PaginationParams(cursor=None, limit=5, sort=None)
+        pagination.sort_spec = sort_fields
+
+        result = await score_repo.filter(
+            account_id=account_id,
+            board_id=board_id,
+            pagination=pagination,
+            around_score=target_score,
+        )
+
+        # Should have 5 scores: 500 (target), 400, 300, 200, 100
+        # No above scores since target is at top
+        assert len(result.items) == 5
+        values = [s.value for s in result.items]
+        assert values == [500.0, 400.0, 300.0, 200.0, 100.0]
+
+    async def test_filter_around_score_at_bottom(self, db_session: AsyncSession):
+        """Test filtering around a score at the bottom of the board (no below scores)."""
+        # Create supporting entities
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        game_repo = GameRepository(db_session)
+        game_id = GameID()
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        device_repo = DeviceRepository(db_session)
+        device_id = DeviceID()
+        device = Device(
+            id=device_id,
+            account_id=account_id,
+            game_id=game_id,
+            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            first_seen_at=now,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        await device_repo.create(device)
+
+        board_repo = BoardRepository(db_session)
+        board_id = BoardID()
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Highscore Board",
+            slug="highscore-board",
+            icon="trophy",
+            short_code="HSB3",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(board)
+
+        # Create 5 scores
+        score_repo = ScoreRepository(db_session)
+        scores = []
+        for value in [100, 200, 300, 400, 500]:
+            score = Score(
+                id=ScoreID(),
+                account_id=account_id,
+                game_id=game_id,
+                board_id=board_id,
+                device_id=device_id,
+                player_name=f"Player{value}",
+                value=float(value),
+                created_at=now,
+                updated_at=now,
+            )
+            await score_repo.create(score)
+            scores.append(score)
+
+        # Target is the bottom score (100)
+        target_score = scores[0]  # Player100
+
+        from leadr.common.domain.pagination import SortDirection as PaginationSortDirection
+        from leadr.common.domain.pagination import SortField
+
+        sort_fields = [
+            SortField(name="value", direction=PaginationSortDirection.DESC),
+            SortField(name="created_at", direction=PaginationSortDirection.DESC),
+            SortField(name="id", direction=PaginationSortDirection.ASC),
+        ]
+        pagination = PaginationParams(cursor=None, limit=5, sort=None)
+        pagination.sort_spec = sort_fields
+
+        result = await score_repo.filter(
+            account_id=account_id,
+            board_id=board_id,
+            pagination=pagination,
+            around_score=target_score,
+        )
+
+        # Should have 5 scores: 500, 400, 300, 200, 100 (target)
+        # No below scores since target is at bottom
+        assert len(result.items) == 5
+        values = [s.value for s in result.items]
+        assert values == [500.0, 400.0, 300.0, 200.0, 100.0]
