@@ -2,10 +2,11 @@
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import Select, and_, or_, select
 
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
+from leadr.common.domain.pagination import SortDirection, SortField
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 from leadr.scores.adapters.orm import ScoreORM
@@ -109,6 +110,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         device_id: DeviceID | None = None,
         *,
         pagination: PaginationParams,
+        around_score: Score | None = None,
         **kwargs: Any,
     ) -> PaginatedResult[Score]:
         """Filter scores by account and optional criteria.
@@ -120,6 +122,9 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             game_id: Optional game ID to filter by
             device_id: Optional device ID to filter by
             pagination: Pagination parameters (required)
+            around_score: Optional target score to center results around. When provided,
+                returns a window of scores centered on this score (mutually exclusive
+                with cursor pagination).
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
@@ -161,6 +166,15 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
                     f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
                 )
 
+        # Branch: around_score query vs normal cursor pagination
+        if around_score is not None:
+            return await self._execute_around_query(
+                base_query=query,
+                target_score=around_score,
+                sort_fields=pagination.sort_spec,
+                limit=pagination.limit,
+            )
+
         # Handle cursor if present
         cursor = None
         if pagination.has_cursor():
@@ -176,3 +190,300 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             cursor=cursor,
             limit=pagination.limit,
         )
+
+    async def _execute_around_query(
+        self,
+        base_query: Select[tuple[ScoreORM]],
+        target_score: Score,
+        sort_fields: list[SortField],
+        limit: int,
+    ) -> PaginatedResult[Score]:
+        """Execute a query that returns scores centered around a target score.
+
+        This method fetches scores in a window around the target score, respecting
+        the sort order. For example, with limit=5 and a DESC value sort, it returns
+        2 scores above (better ranked), the target, and 2 scores below (worse ranked).
+
+        When the target is near an edge (top or bottom of the leaderboard), the window
+        adjusts: if there aren't enough scores on one side, more are fetched from the
+        other side to fill up to the limit.
+
+        Args:
+            base_query: SQLAlchemy query with all filters applied (account, board, etc.)
+            target_score: The score to center results around
+            sort_fields: List of sort fields defining the ranking order
+            limit: Total number of scores to return (including target)
+
+        Returns:
+            PaginatedResult with scores centered around target and pagination metadata
+        """
+        # Calculate initial window sizes (ideal split)
+        ideal_above_count = limit // 2
+        ideal_below_count = limit - ideal_above_count - 1
+        max_side_items = limit - 1  # Max items from one side (excluding target)
+
+        # Extract target position values for all sort fields
+        target_values = self._extract_target_values(target_score, sort_fields)
+
+        # Build "above" query (scores ranked better than target, closest first)
+        # Fetch more than needed to allow compensation when below is short
+        above_query = self._build_around_subquery(
+            base_query=base_query,
+            target_values=target_values,
+            sort_fields=sort_fields,
+            direction="above",
+            limit=max_side_items + 1,  # +1 to detect has_prev
+        )
+
+        # Build "below" query (scores ranked worse than target, closest first)
+        # Fetch more than needed to allow compensation when above is short
+        below_query = self._build_around_subquery(
+            base_query=base_query,
+            target_values=target_values,
+            sort_fields=sort_fields,
+            direction="below",
+            limit=max_side_items + 1,  # +1 to detect has_next
+        )
+
+        # Execute both queries
+        above_result = await self.session.execute(above_query)
+        above_orms = list(above_result.scalars().all())
+
+        below_result = await self.session.execute(below_query)
+        below_orms = list(below_result.scalars().all())
+
+        # Adjust window sizes based on available items
+        # If one side is short, give more slots to the other side
+        available_above = len(above_orms)
+        available_below = len(below_orms)
+
+        if available_above < ideal_above_count:
+            # Not enough above, give extra slots to below
+            actual_above_count = available_above
+            actual_below_count = min(available_below, limit - 1 - actual_above_count)
+        elif available_below < ideal_below_count:
+            # Not enough below, give extra slots to above
+            actual_below_count = available_below
+            actual_above_count = min(available_above, limit - 1 - actual_below_count)
+        else:
+            # Both sides have enough, use ideal split
+            actual_above_count = ideal_above_count
+            actual_below_count = ideal_below_count
+
+        # Determine pagination flags (there's more beyond what we're showing)
+        has_prev = available_above > actual_above_count
+        has_next = available_below > actual_below_count
+
+        # Trim to adjusted window sizes
+        above_orms = above_orms[:actual_above_count]
+        below_orms = below_orms[:actual_below_count]
+
+        # Reverse above results (they were fetched closest-first, need best-first)
+        above_orms.reverse()
+
+        # Fetch target score ORM to include in results
+        target_orm = await self._get_target_orm(target_score)
+
+        # Combine: above + target + below
+        all_orms: list[ScoreORM] = []
+        all_orms.extend(above_orms)
+        if target_orm:
+            all_orms.append(target_orm)
+        all_orms.extend(below_orms)
+
+        # Convert to domain entities
+        items = [self._to_domain(orm) for orm in all_orms]
+
+        # Build cursor positions for pagination
+        prev_position = None
+        next_position = None
+
+        if all_orms and has_prev:
+            prev_position = self._extract_cursor_position(all_orms[0], sort_fields)
+        if all_orms and has_next:
+            next_position = self._extract_cursor_position(all_orms[-1], sort_fields)
+
+        return PaginatedResult(
+            items=items,
+            has_next=has_next,
+            has_prev=has_prev,
+            next_position=next_position,
+            prev_position=prev_position,
+        )
+
+    def _extract_target_values(
+        self,
+        target_score: Score,
+        sort_fields: list[SortField],
+    ) -> dict[str, Any]:
+        """Extract values from target score for each sort field.
+
+        Args:
+            target_score: The target score domain entity
+            sort_fields: List of sort fields
+
+        Returns:
+            Dict mapping field names to their values from the target score
+        """
+        # Map ORM field names to domain entity attribute names
+        field_mapping = {
+            "filter_timezone": "timezone",
+            "filter_country": "country",
+            "filter_city": "city",
+        }
+
+        values = {}
+        for sort_field in sort_fields:
+            # Get the attribute name on the domain entity
+            attr_name = field_mapping.get(sort_field.name, sort_field.name)
+            value = getattr(target_score, attr_name)
+            # For ID fields, extract the UUID
+            if hasattr(value, "uuid"):
+                value = value.uuid
+            values[sort_field.name] = value
+        return values
+
+    def _build_around_subquery(
+        self,
+        base_query: Select[tuple[ScoreORM]],
+        target_values: dict[str, Any],
+        sort_fields: list[SortField],
+        direction: str,
+        limit: int,
+    ) -> Select[tuple[ScoreORM]]:
+        """Build a subquery for scores above or below the target.
+
+        For "above" (better ranked): find scores that come BEFORE target in sort order,
+        ordered by inverted sort (closest to target first).
+
+        For "below" (worse ranked): find scores that come AFTER target in sort order,
+        ordered by normal sort (closest to target first).
+
+        Args:
+            base_query: Base query with all filters applied
+            target_values: Dict of sort field values from target score
+            sort_fields: List of sort fields defining the ranking order
+            direction: "above" for better ranked, "below" for worse ranked
+            limit: Maximum number of results
+
+        Returns:
+            SQLAlchemy query for the subquery
+        """
+        # Build WHERE clause for position comparison
+        # "above" means rows that come BEFORE target in sort order
+        # "below" means rows that come AFTER target in sort order
+        position_clause = self._build_position_clause(
+            target_values=target_values,
+            sort_fields=sort_fields,
+            before_target=(direction == "above"),
+        )
+
+        query = base_query.where(position_clause)
+
+        # Apply sort order
+        # For "above": use inverted sort to get closest to target first
+        # For "below": use normal sort to get closest to target first
+        if direction == "above":
+            sort_fields_for_query = self._invert_sort_fields(sort_fields)
+        else:
+            sort_fields_for_query = sort_fields
+
+        query = self._apply_sort(query, sort_fields_for_query)
+        query = query.limit(limit)
+
+        return query
+
+    def _build_position_clause(
+        self,
+        target_values: dict[str, Any],
+        sort_fields: list[SortField],
+        before_target: bool,
+    ) -> Any:
+        """Build WHERE clause for rows before or after target position.
+
+        This creates a compound comparison clause that respects the multi-field sort.
+        For (value DESC, created_at DESC, id ASC) looking for rows BEFORE target:
+        - value > target_value
+        - OR (value = target_value AND created_at > target_created_at)
+        - OR (value = target_value AND created_at = target_created_at AND id < target_id)
+
+        Args:
+            target_values: Dict of sort field values from target score
+            sort_fields: List of sort fields
+            before_target: True for rows before target (better ranked), False for after
+
+        Returns:
+            SQLAlchemy WHERE clause
+        """
+        or_conditions = []
+
+        for i, sort_field in enumerate(sort_fields):
+            # Determine comparison operator
+            # For DESC: "before" means greater value, "after" means lesser value
+            # For ASC: "before" means lesser value, "after" means greater value
+            if before_target:
+                if sort_field.direction == SortDirection.DESC:
+                    comp_op = "__gt__"
+                else:
+                    comp_op = "__lt__"
+            else:
+                if sort_field.direction == SortDirection.DESC:
+                    comp_op = "__lt__"
+                else:
+                    comp_op = "__gt__"
+
+            # Build equality conditions for all previous fields
+            equality_conditions = []
+            for j in range(i):
+                prev_field = sort_fields[j]
+                prev_column = self._get_orm_column(prev_field.name)
+                prev_value = target_values[prev_field.name]
+                equality_conditions.append(prev_column == prev_value)
+
+            # Add comparison condition for current field
+            current_column = self._get_orm_column(sort_field.name)
+            current_value = target_values[sort_field.name]
+            comparison = getattr(current_column, comp_op)(current_value)
+
+            # Combine: all previous equals AND current comparison
+            if equality_conditions:
+                or_conditions.append(and_(*equality_conditions, comparison))
+            else:
+                or_conditions.append(comparison)
+
+        return or_(*or_conditions)
+
+    def _invert_sort_fields(self, sort_fields: list[SortField]) -> list[SortField]:
+        """Invert the direction of all sort fields.
+
+        Args:
+            sort_fields: Original sort fields
+
+        Returns:
+            New list with inverted sort directions
+        """
+        return [
+            SortField(
+                name=f.name,
+                direction=SortDirection.ASC
+                if f.direction == SortDirection.DESC
+                else SortDirection.DESC,
+            )
+            for f in sort_fields
+        ]
+
+    async def _get_target_orm(self, target_score: Score) -> ScoreORM | None:
+        """Fetch the ORM model for the target score.
+
+        Args:
+            target_score: Target score domain entity
+
+        Returns:
+            ScoreORM instance or None if not found
+        """
+        query = select(ScoreORM).where(
+            ScoreORM.id == target_score.id.uuid,
+            ScoreORM.deleted_at.is_(None),
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()

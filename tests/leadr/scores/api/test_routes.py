@@ -1075,3 +1075,145 @@ class TestScoreRoutes:
         player_names = {s["player_name"] for s in data["data"]}
         assert "Player From Account 1" in player_names
         assert "Player From Account 2" in player_names
+
+    async def test_list_scores_client_filter_by_device_id(self, client: AsyncClient, db_session):
+        """Test that client can filter scores by device_id."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        # Create two devices for the same game
+        device1, access_token1, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="aaa93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfa0",
+        )
+        device2, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="bbb93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        # Create scores from both devices
+        score_service = ScoreService(db_session)
+        await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device1.id,
+            player_name="Device1Player",
+            value=100.0,
+        )
+        await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device2.id,
+            player_name="Device2Player",
+            value=200.0,
+        )
+
+        # List scores with device_id filter using device1's token
+        response = await client.get(
+            f"/client/scores?device_id={device1.id}",
+            headers={"Authorization": f"Bearer {access_token1}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        assert data["data"][0]["player_name"] == "Device1Player"
+
+    async def test_list_scores_client_no_device_id_returns_all(
+        self, client: AsyncClient, db_session
+    ):
+        """Test that client without device_id filter returns all scores for the game."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        # Create two devices for the same game
+        device1, access_token1, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="ccc93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfc0",
+        )
+        device2, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="ddd93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfd0",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2026",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        # Create scores from both devices
+        score_service = ScoreService(db_session)
+        await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device1.id,
+            player_name="Device1Player",
+            value=100.0,
+        )
+        await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device2.id,
+            player_name="Device2Player",
+            value=200.0,
+        )
+
+        # List scores WITHOUT device_id filter - should return all scores
+        response = await client.get(
+            "/client/scores",
+            headers={"Authorization": f"Bearer {access_token1}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 2
+        player_names = {s["player_name"] for s in data["data"]}
+        assert "Device1Player" in player_names
+        assert "Device2Player" in player_names
