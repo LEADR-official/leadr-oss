@@ -260,10 +260,10 @@ class TestBoardURLs:
         error_msg = str(response_data.get("detail", response_data.get("error", ""))).lower()
         assert "not found" in error_msg
 
-    async def test_nonexistent_board_slug_returns_404(
+    async def test_nonexistent_board_slug_returns_empty_list(
         self, client: AsyncClient, account_with_boards: tuple[str, Account, Game, list[Board]]
     ):
-        """Test that nonexistent board slug returns 404."""
+        """Test that nonexistent board slug returns empty list."""
         api_key, account, game, boards = account_with_boards
 
         response = await client.get(
@@ -276,7 +276,6 @@ class TestBoardURLs:
             headers={"leadr-api-key": api_key},
         )
 
-        assert response.status_code == 404
+        assert response.status_code == 200
         response_data = response.json()
-        error_msg = str(response_data.get("detail", response_data.get("error", ""))).lower()
-        assert "not found" in error_msg
+        assert response_data["data"] == []
