@@ -20,6 +20,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.new }}
 
     steps:
       - name: Checkout code
@@ -111,3 +113,10 @@ jobs:
             VERSION=${{ steps.version.outputs.new }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  publish-docs:
+    needs: [release]
+    uses: ./.github/workflows/docs.yaml
+    with:
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit
