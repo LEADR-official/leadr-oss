@@ -34,13 +34,23 @@ class VerifyCodeResponse(BaseModel):
 
     verification_token: str = Field(description="Temporary token for completing registration")
     expires_in: int = Field(description="Seconds until the token expires")
+    type: str = Field(
+        description="Type of verification: REGISTRATION for new accounts, INVITE for invited users"
+    )
 
 
 class CompleteRegistrationRequest(BaseModel):
-    """Request to complete registration and create account."""
+    """Request to complete registration or invite acceptance.
+
+    Used for both new account registration and invited user activation.
+    The verification token type determines which flow is executed.
+    """
 
     verification_token: str = Field(description="Token from code verification step")
-    account_name: str = Field(description="Name for the new account", min_length=1, max_length=100)
+    account_name: str | None = Field(
+        default=None,
+        description="Name for the new account (required for registration, ignored for invite)",
+    )
     account_slug: str | None = Field(
         default=None, description="Optional URL slug (auto-generated if not provided)"
     )
@@ -60,7 +70,7 @@ class CompleteRegistrationRequest(BaseModel):
 
 
 class CompleteRegistrationResponse(BaseModel):
-    """Response after completing registration."""
+    """Response after completing registration or invite acceptance."""
 
     account_id: AccountID = Field(description="ID of the created account")
     account_name: str = Field(description="Name of the account")

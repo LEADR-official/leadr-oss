@@ -115,6 +115,7 @@ class TestVerifyCode:
         data = response.json()
         assert "verification_token" in data
         assert data["expires_in"] == 600
+        assert data["type"] == "REGISTRATION"
 
         app.dependency_overrides.clear()
 
@@ -159,6 +160,42 @@ class TestVerifyCode:
         response_data = response.json()
         # After a code is used, it becomes invalid/expired
         assert "Invalid or expired" in response_data.get("error", "")
+
+        app.dependency_overrides.clear()
+
+    async def test_verify_invite_code_returns_invite_type(
+        self, client: AsyncClient, db_session: AsyncSession, test_user: User
+    ):
+        """Test that verifying an invite code returns INVITE type."""
+        mock_email_service = Mock(spec=EmailService)
+        mock_email_service.send_verification_code = AsyncMock()
+
+        async def mock_email_service_dep():
+            return mock_email_service
+
+        async def mock_verification_service_dep():
+            return VerificationService(db_session, email_service=mock_email_service)
+
+        app.dependency_overrides[get_email_service] = mock_email_service_dep
+        app.dependency_overrides[get_verification_service] = mock_verification_service_dep
+
+        # Create invite verification code
+        service = VerificationService(db_session, mock_email_service)
+        invite_code = await service.create_invite_code(
+            email="invited@example.com",
+            user_id=test_user.id,
+        )
+
+        # Verify the code
+        response = await client.post(
+            "/register/verify",
+            json={"email": "invited@example.com", "code": invite_code.code},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "verification_token" in data
+        assert data["type"] == "INVITE"
 
         app.dependency_overrides.clear()
 

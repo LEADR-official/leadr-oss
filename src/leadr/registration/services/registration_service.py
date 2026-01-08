@@ -1,4 +1,4 @@
-"""Registration service for orchestrating account creation flow."""
+"""Registration service for orchestrating account creation and invite completion flows."""
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,7 +15,12 @@ from leadr.registration.services.verification_service import VerificationService
 
 
 class RegistrationService:
-    """Service for orchestrating the complete account registration flow."""
+    """Service for orchestrating registration and invite completion flows.
+
+    Handles two distinct flows:
+    - Registration: Creates new account, user (as owner), and API key
+    - Invite: Activates existing invited user and creates API key
+    """
 
     def __init__(
         self,

@@ -67,10 +67,14 @@ async def verify_code(
     """Verify an email verification code and return a temporary token.
 
     This endpoint validates the verification code and returns a short-lived
-    token that can be used to complete the registration process.
+    token that can be used to complete the registration process. The response
+    includes the type (REGISTRATION or INVITE) so the client can determine
+    which fields to prompt for.
     """
     try:
-        verification_token = await verification_service.verify_code(request.email, request.code)
+        verification_token, code_type = await verification_service.verify_code(
+            request.email, request.code
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -80,6 +84,7 @@ async def verify_code(
     return VerifyCodeResponse(
         verification_token=verification_token,
         expires_in=settings.VERIFICATION_TOKEN_EXPIRY_SECONDS,
+        type=code_type.value,
     )
 
 
@@ -88,13 +93,20 @@ async def complete_registration(
     request: CompleteRegistrationRequest,
     registration_service: RegistrationServiceDep,
 ) -> CompleteRegistrationResponse:
-    """Complete registration by creating the account, user, and API key.
+    """Complete registration or invite acceptance.
 
-    This endpoint creates the full account structure:
-    - Account with the specified name and slug
-    - User associated with the verified email
-    - API key for CLI authentication
-    - Optional jam code redemption
+    This endpoint handles two flows based on the verification token type:
+
+    Registration flow (new account):
+    - Creates account with the specified name and slug
+    - Creates user as account owner
+    - Creates API key for CLI authentication
+    - Optionally redeems jam code
+
+    Invite flow (joining existing account):
+    - Activates the invited user (changes status from INVITED to ACTIVE)
+    - Creates API key for CLI authentication
+    - account_name and jam_code are ignored
 
     The API key is returned in plaintext and should be stored securely by the client.
     """

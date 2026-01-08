@@ -105,7 +105,7 @@ class TestVerificationServiceVerifyCode:
     """Test VerificationService.verify_code method."""
 
     async def test_verify_code_success(self, db_session: AsyncSession):
-        """Test successful code verification returns token."""
+        """Test successful code verification returns token and type."""
         mock_email_service = AsyncMock()
 
         service = VerificationService(db_session, mock_email_service)
@@ -117,10 +117,11 @@ class TestVerificationServiceVerifyCode:
         code = result.items[0].code
 
         # Verify the code
-        token = await service.verify_code("test@example.com", code)
+        token, code_type = await service.verify_code("test@example.com", code)
 
         assert token is not None
         assert isinstance(token, str)
+        assert code_type == VerificationCodeType.REGISTRATION
 
     async def test_verify_code_invalid_code(self, db_session: AsyncSession):
         """Test verifying invalid code raises error."""
@@ -197,8 +198,9 @@ class TestVerificationServiceVerifyCode:
         code = result.items[0].code
 
         # Verify with lowercase version
-        token = await service.verify_code("test@example.com", code.lower())
+        token, code_type = await service.verify_code("test@example.com", code.lower())
         assert token is not None
+        assert code_type == VerificationCodeType.REGISTRATION
 
 
 @pytest.mark.asyncio
@@ -216,7 +218,7 @@ class TestVerificationServiceValidateToken:
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
         result = await service.repository.filter(email="test@example.com", pagination=pagination)
         code = result.items[0].code
-        token = await service.verify_code("test@example.com", code)
+        token, _ = await service.verify_code("test@example.com", code)
 
         # Validate the token
         email = service.validate_verification_token(token)
@@ -381,7 +383,7 @@ class TestVerificationServiceVerifyInviteCode:
     async def test_verify_invite_code_returns_token_with_user_id(
         self, db_session: AsyncSession, test_user: User
     ):
-        """Test that verifying invite code returns token containing user_id."""
+        """Test that verifying invite code returns token containing user_id and INVITE type."""
         mock_email_service = AsyncMock()
 
         service = VerificationService(db_session, mock_email_service)
@@ -393,7 +395,10 @@ class TestVerificationServiceVerifyInviteCode:
         )
 
         # Verify the code
-        token = await service.verify_code("invited@example.com", code.code)
+        token, code_type = await service.verify_code("invited@example.com", code.code)
+
+        # Should return INVITE type
+        assert code_type == VerificationCodeType.INVITE
 
         # Token should contain user_id
         payload = jwt.decode(token, settings.API_KEY_SECRET, algorithms=["HS256"])
@@ -418,7 +423,7 @@ class TestVerificationServiceGetInviteUserId:
             email="invited@example.com",
             user_id=test_user.id,
         )
-        token = await service.verify_code("invited@example.com", code.code)
+        token, _ = await service.verify_code("invited@example.com", code.code)
 
         # Get user_id from token
         result_user_id = service.get_invite_user_id(token)
@@ -439,7 +444,7 @@ class TestVerificationServiceGetInviteUserId:
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
         result = await service.repository.filter(email="test@example.com", pagination=pagination)
         code = result.items[0].code
-        token = await service.verify_code("test@example.com", code)
+        token, _ = await service.verify_code("test@example.com", code)
 
         # Should return None for registration token
         result_user_id = service.get_invite_user_id(token)
@@ -514,7 +519,7 @@ class TestVerificationServiceValidateInviteToken:
             email="invited@example.com",
             user_id=test_user.id,
         )
-        token = await service.verify_code("invited@example.com", code.code)
+        token, _ = await service.verify_code("invited@example.com", code.code)
 
         # Validate the token
         email = service.validate_verification_token(token)

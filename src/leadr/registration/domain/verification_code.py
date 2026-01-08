@@ -35,9 +35,13 @@ class VerificationCodeType(str, Enum):
 class VerificationCode(Entity):
     """Verification code domain entity.
 
-    Represents a one-time email verification code used during account registration.
-    Codes are 6-character alphanumeric strings with a 10-minute expiration window.
+    Represents a one-time email verification code used during registration or invite flows.
+    Codes are 6-character alphanumeric strings with configurable expiration windows
+    (10 minutes for registration, 24 hours for invites by default).
     Once used or expired, codes become invalid and cannot be reused.
+
+    The code_type field distinguishes between REGISTRATION codes (for new account signup)
+    and INVITE codes (for invited users joining an existing account).
     """
 
     email: EmailStr = Field(description="Email address this code was sent to")

@@ -92,16 +92,16 @@ class VerificationService:
 
         return verification_code
 
-    async def verify_code(self, email: str, code: str) -> str:
-        """Verify a code and return a short-lived verification token.
+    async def verify_code(self, email: str, code: str) -> tuple[str, VerificationCodeType]:
+        """Verify a code and return a short-lived verification token with its type.
 
         Args:
             email: Email address to verify.
             code: Verification code to check.
 
         Returns:
-            A JWT verification token valid for 10 minutes.
-            For invite codes, includes user_id in the token.
+            A tuple of (JWT verification token, VerificationCodeType).
+            For invite codes, the token includes user_id.
 
         Raises:
             ValueError: If the code is invalid, expired, or already used.
@@ -132,9 +132,10 @@ class VerificationService:
                 verification_type="invite",
                 user_id=verification_code.user_id,
             )
+            return token, VerificationCodeType.INVITE
         else:
             token = self._generate_verification_token(email, verification_type="registration")
-        return token
+            return token, VerificationCodeType.REGISTRATION
 
     def validate_verification_token(self, token: str) -> str:
         """Validate a verification token and return the email.
