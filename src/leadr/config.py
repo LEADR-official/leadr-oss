@@ -199,6 +199,10 @@ class CommonSettings(BaseSettings):
         default="mailgun_api_key",
         description="Mailgun API key for email sending",
     )
+    MAILGUN_API_URL: str = Field(
+        default="https://api.eu.mailgun.net",
+        description="Mailgun API URL for email sending",
+    )
     MAILGUN_DOMAIN: str = Field(
         default="example.mailgun.org",
         description="Mailgun domain for email sending",
@@ -216,6 +220,10 @@ class CommonSettings(BaseSettings):
     REGISTRATION_RATE_LIMIT_PER_HOUR: int = Field(
         default=3,
         description="Maximum verification code requests per email per hour (default: 3)",
+    )
+    INVITE_CODE_EXPIRY_SECONDS: int = Field(
+        default=86400,
+        description="Expiry time for invite codes in seconds (default: 24 hours)",
     )
 
     # Background Task Configuration

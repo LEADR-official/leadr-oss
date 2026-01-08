@@ -17,7 +17,7 @@ class MailgunEmailProvider(EmailProvider):
         """Initialize Mailgun provider with settings configuration."""
         self.api_key = settings.MAILGUN_API_KEY
         self.domain = settings.MAILGUN_DOMAIN
-        self.client = Client(auth=("api", self.api_key))
+        self.client = Client(auth=("api", self.api_key), api_url=settings.MAILGUN_API_URL)
 
     def validate_config(self) -> bool:
         """Validate Mailgun configuration."""
