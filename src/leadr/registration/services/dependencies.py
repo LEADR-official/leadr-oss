@@ -8,6 +8,7 @@ from leadr.accounts.services.dependencies import AccountServiceDep, UserServiceD
 from leadr.auth.services.dependencies import APIKeyServiceDep
 from leadr.common.dependencies import DatabaseSession
 from leadr.infra.email import EmailService, create_email_service
+from leadr.registration.services.invite_service import InviteService
 from leadr.registration.services.jam_code_service import JamCodeService
 from leadr.registration.services.registration_service import RegistrationService
 from leadr.registration.services.verification_service import VerificationService
@@ -97,3 +98,34 @@ async def get_registration_service(
 
 
 RegistrationServiceDep = Annotated[RegistrationService, Depends(get_registration_service)]
+
+
+async def get_invite_service(
+    db: DatabaseSession,
+    account_service: AccountServiceDep,
+    user_service: UserServiceDep,
+    verification_service: VerificationServiceDep,
+    email_service: EmailServiceDep,
+) -> InviteService:
+    """Get InviteService dependency.
+
+    Args:
+        db: Database session.
+        account_service: Account service.
+        user_service: User service.
+        verification_service: Verification service.
+        email_service: Email service.
+
+    Returns:
+        InviteService instance.
+    """
+    return InviteService(
+        db,
+        account_service,
+        user_service,
+        verification_service,
+        email_service,
+    )
+
+
+InviteServiceDep = Annotated[InviteService, Depends(get_invite_service)]

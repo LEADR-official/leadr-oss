@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
-from leadr.accounts.domain.user import User
+from leadr.accounts.domain.user import User, UserStatus
 from leadr.common.domain.ids import AccountID, UserID
 from leadr.registration.domain.jam_code import JamCode
 from leadr.registration.services.registration_service import RegistrationService
@@ -28,6 +28,7 @@ class TestRegistrationServiceCompleteRegistration:
 
         # Setup mock returns
         mock_verification_service.validate_verification_token.return_value = "test@example.com"
+        mock_verification_service.get_invite_user_id.return_value = None
 
         mock_account = Account(
             id=AccountID(),
@@ -71,7 +72,12 @@ class TestRegistrationServiceCompleteRegistration:
         mock_account_service.create_account.assert_called_once_with(
             name="Test Account", slug="test-account"
         )
-        mock_user_service.create_user.assert_called_once()
+        mock_user_service.create_user.assert_called_once_with(
+            account_id=mock_account.id,
+            email="test@example.com",
+            display_name="test",
+            is_owner=True,
+        )
         mock_api_key_service.create_api_key.assert_called_once()
 
     async def test_complete_registration_auto_generates_slug(self, db_session: AsyncSession):
@@ -84,6 +90,7 @@ class TestRegistrationServiceCompleteRegistration:
         mock_email_service = AsyncMock()
 
         mock_verification_service.validate_verification_token.return_value = "test@example.com"
+        mock_verification_service.get_invite_user_id.return_value = None
 
         mock_account = Account(
             id=AccountID(),
@@ -134,6 +141,7 @@ class TestRegistrationServiceCompleteRegistration:
         mock_email_service = AsyncMock()
 
         mock_verification_service.validate_verification_token.return_value = "test@example.com"
+        mock_verification_service.get_invite_user_id.return_value = None
 
         mock_account = Account(
             id=AccountID(),
@@ -191,6 +199,7 @@ class TestRegistrationServiceCompleteRegistration:
         mock_email_service = AsyncMock()
 
         mock_verification_service.validate_verification_token.return_value = "test@example.com"
+        mock_verification_service.get_invite_user_id.return_value = None
         mock_jam_code_service.validate_and_get_jam_code.return_value = None  # Invalid code
 
         service = RegistrationService(
@@ -251,6 +260,7 @@ class TestRegistrationServiceCompleteRegistration:
         mock_email_service = AsyncMock()
 
         mock_verification_service.validate_verification_token.return_value = "test@example.com"
+        mock_verification_service.get_invite_user_id.return_value = None
 
         mock_account = Account(
             id=AccountID(),
@@ -305,6 +315,7 @@ class TestRegistrationServiceCompleteRegistration:
         mock_email_service = AsyncMock()
 
         mock_verification_service.validate_verification_token.return_value = "test@example.com"
+        mock_verification_service.get_invite_user_id.return_value = None
 
         mock_account = Account(
             id=AccountID(),
@@ -360,6 +371,7 @@ class TestRegistrationServiceCompleteRegistration:
         mock_email_service = AsyncMock()
 
         mock_verification_service.validate_verification_token.return_value = "john.doe@example.com"
+        mock_verification_service.get_invite_user_id.return_value = None
 
         mock_account = Account(
             id=AccountID(),
@@ -409,6 +421,7 @@ class TestRegistrationServiceCompleteRegistration:
         mock_email_service = AsyncMock()
 
         mock_verification_service.validate_verification_token.return_value = "john.doe@example.com"
+        mock_verification_service.get_invite_user_id.return_value = None
 
         mock_account = Account(
             id=AccountID(),
@@ -460,6 +473,7 @@ class TestRegistrationServiceCompleteRegistration:
         mock_email_service = AsyncMock()
 
         mock_verification_service.validate_verification_token.return_value = "test@example.com"
+        mock_verification_service.get_invite_user_id.return_value = None
 
         mock_account = Account(
             id=AccountID(),
@@ -511,6 +525,7 @@ class TestRegistrationServiceCompleteRegistration:
         mock_email_service = AsyncMock()
 
         mock_verification_service.validate_verification_token.return_value = "test@example.com"
+        mock_verification_service.get_invite_user_id.return_value = None
 
         mock_account = Account(
             id=AccountID(),
@@ -647,3 +662,370 @@ class TestRegistrationServiceGenerateUniqueSlug:
         # Should eventually return a slug with random suffix
         assert slug.startswith("test-account-")
         assert len(slug) >= len("test-account-xxxx")  # Has random suffix (4 chars)
+
+
+@pytest.mark.asyncio
+class TestRegistrationServiceInviteFlow:
+    """Test RegistrationService invite completion flow."""
+
+    async def test_complete_registration_invite_flow_activates_user(self, db_session: AsyncSession):
+        """Test that invite flow activates the invited user."""
+        mock_account_service = AsyncMock()
+        mock_user_service = AsyncMock()
+        mock_api_key_service = AsyncMock()
+        mock_verification_service = Mock()
+        mock_jam_code_service = AsyncMock()
+        mock_email_service = AsyncMock()
+
+        account_id = AccountID()
+        user_id = UserID()
+
+        mock_verification_service.validate_verification_token.return_value = "invited@example.com"
+        mock_verification_service.get_invite_user_id.return_value = user_id
+
+        mock_account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_account_service.get_by_id_or_raise.return_value = mock_account
+
+        mock_user = User(
+            id=user_id,
+            account_id=account_id,
+            email="invited@example.com",
+            display_name="invited",
+            status=UserStatus.INVITED,
+        )
+        mock_user_service.get_by_id_or_raise.return_value = mock_user
+        mock_user_service.repository = AsyncMock()
+        mock_user_service.repository.update.return_value = mock_user
+
+        mock_api_key_service.create_api_key.return_value = (Mock(), "ldr_invite_key")
+
+        service = RegistrationService(
+            db=db_session,
+            account_service=mock_account_service,
+            user_service=mock_user_service,
+            api_key_service=mock_api_key_service,
+            verification_service=mock_verification_service,
+            jam_code_service=mock_jam_code_service,
+            email_service=mock_email_service,
+        )
+
+        account, user, api_key = await service.complete_registration(
+            verification_token="valid_invite_token",
+            account_name=None,  # Not needed for invite flow
+        )
+
+        assert api_key == "ldr_invite_key"
+        # Should not create new account
+        mock_account_service.create_account.assert_not_called()
+        # Should not create new user
+        mock_user_service.create_user.assert_not_called()
+        # Should update user
+        mock_user_service.repository.update.assert_called_once()
+
+    async def test_complete_registration_invite_flow_updates_display_name(
+        self, db_session: AsyncSession
+    ):
+        """Test that invite flow can update display name."""
+        mock_account_service = AsyncMock()
+        mock_user_service = AsyncMock()
+        mock_api_key_service = AsyncMock()
+        mock_verification_service = Mock()
+        mock_jam_code_service = AsyncMock()
+        mock_email_service = AsyncMock()
+
+        account_id = AccountID()
+        user_id = UserID()
+
+        mock_verification_service.validate_verification_token.return_value = "invited@example.com"
+        mock_verification_service.get_invite_user_id.return_value = user_id
+
+        mock_account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_account_service.get_by_id_or_raise.return_value = mock_account
+
+        mock_user = User(
+            id=user_id,
+            account_id=account_id,
+            email="invited@example.com",
+            display_name="invited",
+            status=UserStatus.INVITED,
+        )
+        mock_user_service.get_by_id_or_raise.return_value = mock_user
+        mock_user_service.repository = AsyncMock()
+        mock_user_service.repository.update.return_value = mock_user
+
+        mock_api_key_service.create_api_key.return_value = (Mock(), "ldr_key")
+
+        service = RegistrationService(
+            db=db_session,
+            account_service=mock_account_service,
+            user_service=mock_user_service,
+            api_key_service=mock_api_key_service,
+            verification_service=mock_verification_service,
+            jam_code_service=mock_jam_code_service,
+            email_service=mock_email_service,
+        )
+
+        await service.complete_registration(
+            verification_token="valid_invite_token",
+            display_name="New Display Name",
+        )
+
+        # User's display_name should have been updated
+        assert mock_user.display_name == "New Display Name"
+
+    async def test_complete_registration_invite_flow_keeps_display_name_if_not_provided(
+        self, db_session: AsyncSession
+    ):
+        """Test that invite flow keeps existing display name if not provided."""
+        mock_account_service = AsyncMock()
+        mock_user_service = AsyncMock()
+        mock_api_key_service = AsyncMock()
+        mock_verification_service = Mock()
+        mock_jam_code_service = AsyncMock()
+        mock_email_service = AsyncMock()
+
+        account_id = AccountID()
+        user_id = UserID()
+
+        mock_verification_service.validate_verification_token.return_value = "invited@example.com"
+        mock_verification_service.get_invite_user_id.return_value = user_id
+
+        mock_account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_account_service.get_by_id_or_raise.return_value = mock_account
+
+        mock_user = User(
+            id=user_id,
+            account_id=account_id,
+            email="invited@example.com",
+            display_name="Original Name",
+            status=UserStatus.INVITED,
+        )
+        mock_user_service.get_by_id_or_raise.return_value = mock_user
+        mock_user_service.repository = AsyncMock()
+        mock_user_service.repository.update.return_value = mock_user
+
+        mock_api_key_service.create_api_key.return_value = (Mock(), "ldr_key")
+
+        service = RegistrationService(
+            db=db_session,
+            account_service=mock_account_service,
+            user_service=mock_user_service,
+            api_key_service=mock_api_key_service,
+            verification_service=mock_verification_service,
+            jam_code_service=mock_jam_code_service,
+            email_service=mock_email_service,
+        )
+
+        await service.complete_registration(
+            verification_token="valid_invite_token",
+            display_name=None,
+        )
+
+        # User's display_name should remain unchanged
+        assert mock_user.display_name == "Original Name"
+
+    async def test_complete_registration_invite_flow_fails_for_non_invited_user(
+        self, db_session: AsyncSession
+    ):
+        """Test that invite flow fails if user is not in INVITED status."""
+        mock_account_service = AsyncMock()
+        mock_user_service = AsyncMock()
+        mock_api_key_service = AsyncMock()
+        mock_verification_service = Mock()
+        mock_jam_code_service = AsyncMock()
+        mock_email_service = AsyncMock()
+
+        account_id = AccountID()
+        user_id = UserID()
+
+        mock_verification_service.validate_verification_token.return_value = "active@example.com"
+        mock_verification_service.get_invite_user_id.return_value = user_id
+
+        # User is already ACTIVE, not INVITED
+        mock_user = User(
+            id=user_id,
+            account_id=account_id,
+            email="active@example.com",
+            display_name="Active User",
+            status=UserStatus.ACTIVE,
+        )
+        mock_user_service.get_by_id_or_raise.return_value = mock_user
+
+        service = RegistrationService(
+            db=db_session,
+            account_service=mock_account_service,
+            user_service=mock_user_service,
+            api_key_service=mock_api_key_service,
+            verification_service=mock_verification_service,
+            jam_code_service=mock_jam_code_service,
+            email_service=mock_email_service,
+        )
+
+        with pytest.raises(ValueError, match="not in invited status"):
+            await service.complete_registration(
+                verification_token="valid_invite_token",
+            )
+
+    async def test_complete_registration_invite_flow_sends_welcome_email(
+        self, db_session: AsyncSession
+    ):
+        """Test that invite flow sends welcome email."""
+        mock_account_service = AsyncMock()
+        mock_user_service = AsyncMock()
+        mock_api_key_service = AsyncMock()
+        mock_verification_service = Mock()
+        mock_jam_code_service = AsyncMock()
+        mock_email_service = AsyncMock()
+
+        account_id = AccountID()
+        user_id = UserID()
+
+        mock_verification_service.validate_verification_token.return_value = "invited@example.com"
+        mock_verification_service.get_invite_user_id.return_value = user_id
+
+        mock_account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_account_service.get_by_id_or_raise.return_value = mock_account
+
+        mock_user = User(
+            id=user_id,
+            account_id=account_id,
+            email="invited@example.com",
+            display_name="invited",
+            status=UserStatus.INVITED,
+        )
+        mock_user_service.get_by_id_or_raise.return_value = mock_user
+        mock_user_service.repository = AsyncMock()
+        mock_user_service.repository.update.return_value = mock_user
+
+        mock_api_key_service.create_api_key.return_value = (Mock(), "ldr_key")
+
+        service = RegistrationService(
+            db=db_session,
+            account_service=mock_account_service,
+            user_service=mock_user_service,
+            api_key_service=mock_api_key_service,
+            verification_service=mock_verification_service,
+            jam_code_service=mock_jam_code_service,
+            email_service=mock_email_service,
+        )
+
+        await service.complete_registration(
+            verification_token="valid_invite_token",
+        )
+
+        mock_email_service.send_welcome_email.assert_called_once_with(
+            to="invited@example.com",
+            user_name="invited",
+            account_name="Test Account",
+            account_slug="test-account",
+        )
+
+    async def test_complete_registration_invite_flow_email_failure_doesnt_fail(
+        self, db_session: AsyncSession
+    ):
+        """Test that email failure doesn't fail invite completion."""
+        mock_account_service = AsyncMock()
+        mock_user_service = AsyncMock()
+        mock_api_key_service = AsyncMock()
+        mock_verification_service = Mock()
+        mock_jam_code_service = AsyncMock()
+        mock_email_service = AsyncMock()
+
+        account_id = AccountID()
+        user_id = UserID()
+
+        mock_verification_service.validate_verification_token.return_value = "invited@example.com"
+        mock_verification_service.get_invite_user_id.return_value = user_id
+
+        mock_account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_account_service.get_by_id_or_raise.return_value = mock_account
+
+        mock_user = User(
+            id=user_id,
+            account_id=account_id,
+            email="invited@example.com",
+            display_name="invited",
+            status=UserStatus.INVITED,
+        )
+        mock_user_service.get_by_id_or_raise.return_value = mock_user
+        mock_user_service.repository = AsyncMock()
+        mock_user_service.repository.update.return_value = mock_user
+
+        mock_api_key_service.create_api_key.return_value = (Mock(), "ldr_key")
+
+        # Email fails
+        mock_email_service.send_welcome_email.side_effect = Exception("SMTP error")
+
+        service = RegistrationService(
+            db=db_session,
+            account_service=mock_account_service,
+            user_service=mock_user_service,
+            api_key_service=mock_api_key_service,
+            verification_service=mock_verification_service,
+            jam_code_service=mock_jam_code_service,
+            email_service=mock_email_service,
+        )
+
+        # Should not raise
+        account, user, api_key = await service.complete_registration(
+            verification_token="valid_invite_token",
+        )
+
+        assert account is not None
+        assert user is not None
+        assert api_key is not None
+
+    async def test_complete_registration_requires_account_name_for_new_registration(
+        self, db_session: AsyncSession
+    ):
+        """Test that account_name is required for new registration (not invite)."""
+        mock_account_service = AsyncMock()
+        mock_user_service = AsyncMock()
+        mock_api_key_service = AsyncMock()
+        mock_verification_service = Mock()
+        mock_jam_code_service = AsyncMock()
+        mock_email_service = AsyncMock()
+
+        mock_verification_service.validate_verification_token.return_value = "test@example.com"
+        mock_verification_service.get_invite_user_id.return_value = None  # Not an invite
+
+        service = RegistrationService(
+            db=db_session,
+            account_service=mock_account_service,
+            user_service=mock_user_service,
+            api_key_service=mock_api_key_service,
+            verification_service=mock_verification_service,
+            jam_code_service=mock_jam_code_service,
+            email_service=mock_email_service,
+        )
+
+        with pytest.raises(ValueError, match="Account name is required"):
+            await service.complete_registration(
+                verification_token="valid_token",
+                account_name=None,  # Missing account name
+            )

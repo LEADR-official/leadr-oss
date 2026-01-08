@@ -31,6 +31,7 @@ class UserService(BaseService[User, UserRepository]):
         email: str,
         display_name: str,
         super_admin: bool = False,
+        is_owner: bool = False,
     ) -> User:
         """Create a new user.
 
@@ -39,6 +40,7 @@ class UserService(BaseService[User, UserRepository]):
             email: The user's email address.
             display_name: The user's display name.
             super_admin: Whether this user has superadmin privileges (default: False).
+            is_owner: Whether this user is the account owner (default: False).
 
         Returns:
             The created User domain entity.
@@ -55,6 +57,7 @@ class UserService(BaseService[User, UserRepository]):
             email=email,
             display_name=display_name,
             super_admin=super_admin,
+            is_owner=is_owner,
         )
 
         return await self.repository.create(user)

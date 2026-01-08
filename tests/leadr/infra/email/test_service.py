@@ -166,8 +166,8 @@ class TestEmailServiceSendEmail:
         )
 
         email_arg = mock_provider.send.call_args[0][0]
-        # from_email should be overridden with postmaster
-        assert email_arg.from_email == "postmaster@mg.leadr.gg"
+        # from_email should be overridden with noreply
+        assert email_arg.from_email == "noreply@mg.leadr.gg"
 
     @patch("leadr.infra.email.service.settings")
     async def test_send_email_with_all_fields(self, mock_settings, db_session: AsyncSession):

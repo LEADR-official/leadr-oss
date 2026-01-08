@@ -1,0 +1,11 @@
+You've been invited to join {account_name} on LEADR!
+
+To get started, install the LEADR CLI: https://docs.leadr.gg/latest/quick-start/#download-the-cli
+
+Then run "leadr register" and enter your verification code when prompted.
+
+Your verification code: {code}
+
+This code expires in 24 hours.
+
+{footer}

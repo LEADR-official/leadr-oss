@@ -6,6 +6,7 @@ from enum import Enum
 
 from pydantic import EmailStr, Field, field_validator
 
+from leadr.common.domain.ids import UserID
 from leadr.common.domain.models import Entity
 
 
@@ -15,6 +16,20 @@ class VerificationCodeStatus(Enum):
     PENDING = "pending"
     USED = "used"
     EXPIRED = "expired"
+
+
+class VerificationCodeType(str, Enum):
+    """Verification code type enumeration.
+
+    Distinguishes between codes used for initial registration
+    and codes used for user invitations.
+    """
+
+    REGISTRATION = "REGISTRATION"
+    """Code for new account registration flow."""
+
+    INVITE = "INVITE"
+    """Code for invited user to join an existing account."""
 
 
 class VerificationCode(Entity):
@@ -32,6 +47,14 @@ class VerificationCode(Entity):
         max_length=6,
     )
     status: VerificationCodeStatus = VerificationCodeStatus.PENDING
+    code_type: VerificationCodeType = Field(
+        default=VerificationCodeType.REGISTRATION,
+        description="Type of verification code (registration or invite)",
+    )
+    user_id: UserID | None = Field(
+        default=None,
+        description="User ID for invite codes (links invite to existing user record)",
+    )
     expires_at: datetime = Field(description="When this code expires (UTC)")
     used_at: datetime | None = None
 
@@ -95,3 +118,13 @@ class VerificationCode(Entity):
         old codes or when explicitly invalidating codes.
         """
         self.status = VerificationCodeStatus.EXPIRED
+
+    @property
+    def is_invite(self) -> bool:
+        """Check if this is an invite code."""
+        return self.code_type == VerificationCodeType.INVITE
+
+    @property
+    def is_registration(self) -> bool:
+        """Check if this is a registration code."""
+        return self.code_type == VerificationCodeType.REGISTRATION

@@ -6,7 +6,12 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from leadr.registration.domain.verification_code import VerificationCode, VerificationCodeStatus
+from leadr.common.domain.ids import UserID
+from leadr.registration.domain.verification_code import (
+    VerificationCode,
+    VerificationCodeStatus,
+    VerificationCodeType,
+)
 
 
 class TestVerificationCodeStatus:
@@ -425,3 +430,131 @@ class TestVerificationCode:
         )
 
         assert code1 != code2
+
+
+class TestVerificationCodeType:
+    """Test suite for VerificationCodeType enum and type field."""
+
+    def test_verification_code_type_enum_values(self):
+        """Test that VerificationCodeType has expected values."""
+        assert VerificationCodeType.REGISTRATION.value == "REGISTRATION"
+        assert VerificationCodeType.INVITE.value == "INVITE"
+
+    def test_verification_code_type_defaults_to_registration(self):
+        """Test that code type defaults to REGISTRATION when not specified."""
+        now = datetime.now(UTC)
+        expires_at = now + timedelta(minutes=10)
+
+        code = VerificationCode(
+            email="user@example.com",
+            code="ABC123",
+            expires_at=expires_at,
+            created_at=now,
+        )
+
+        assert code.code_type == VerificationCodeType.REGISTRATION
+
+    def test_verification_code_can_be_created_with_invite_type(self):
+        """Test that verification code can be created with INVITE type."""
+        now = datetime.now(UTC)
+        expires_at = now + timedelta(hours=24)
+        user_id = UserID(uuid4())
+
+        code = VerificationCode(
+            email="invited@example.com",
+            code="XYZ789",
+            code_type=VerificationCodeType.INVITE,
+            user_id=user_id,
+            expires_at=expires_at,
+            created_at=now,
+        )
+
+        assert code.code_type == VerificationCodeType.INVITE
+        assert code.user_id == user_id
+
+    def test_user_id_defaults_to_none(self):
+        """Test that user_id defaults to None for registration codes."""
+        now = datetime.now(UTC)
+        expires_at = now + timedelta(minutes=10)
+
+        code = VerificationCode(
+            email="user@example.com",
+            code="ABC123",
+            expires_at=expires_at,
+            created_at=now,
+        )
+
+        assert code.user_id is None
+
+    def test_invite_code_requires_user_id(self):
+        """Test that invite codes should have a user_id set."""
+        now = datetime.now(UTC)
+        expires_at = now + timedelta(hours=24)
+        user_id = UserID(uuid4())
+
+        # Invite code with user_id
+        code = VerificationCode(
+            email="invited@example.com",
+            code="ABC123",
+            code_type=VerificationCodeType.INVITE,
+            user_id=user_id,
+            expires_at=expires_at,
+            created_at=now,
+        )
+
+        assert code.code_type == VerificationCodeType.INVITE
+        assert code.user_id == user_id
+        assert code.user_id is not None
+        assert code.user_id.uuid == user_id.uuid
+
+    def test_is_invite_property(self):
+        """Test is_invite property returns True for INVITE type."""
+        now = datetime.now(UTC)
+        expires_at = now + timedelta(hours=24)
+        user_id = UserID(uuid4())
+
+        invite_code = VerificationCode(
+            email="invited@example.com",
+            code="ABC123",
+            code_type=VerificationCodeType.INVITE,
+            user_id=user_id,
+            expires_at=expires_at,
+            created_at=now,
+        )
+
+        registration_code = VerificationCode(
+            email="user@example.com",
+            code="XYZ789",
+            code_type=VerificationCodeType.REGISTRATION,
+            expires_at=expires_at,
+            created_at=now,
+        )
+
+        assert invite_code.is_invite is True
+        assert registration_code.is_invite is False
+
+    def test_is_registration_property(self):
+        """Test is_registration property returns True for REGISTRATION type."""
+        now = datetime.now(UTC)
+        expires_at = now + timedelta(minutes=10)
+        user_id = UserID(uuid4())
+
+        registration_code = VerificationCode(
+            email="user@example.com",
+            code="ABC123",
+            code_type=VerificationCodeType.REGISTRATION,
+            expires_at=expires_at,
+            created_at=now,
+        )
+
+        invite_code = VerificationCode(
+            email="invited@example.com",
+            code="XYZ789",
+            code_type=VerificationCodeType.INVITE,
+            user_id=user_id,
+            expires_at=expires_at,
+            created_at=now,
+        )
+
+        assert registration_code.is_registration is True
+        assert invite_code.is_registration is False

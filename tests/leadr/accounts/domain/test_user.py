@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from leadr.accounts.domain.user import User
+from leadr.accounts.domain.user import User, UserStatus
 from leadr.common.domain.ids import AccountID, UserID
 
 
@@ -303,3 +303,297 @@ class TestUser:
         # Can be revoked
         user.super_admin = False
         assert user.super_admin is False
+
+
+class TestUserStatus:
+    """Test suite for UserStatus enum and status field."""
+
+    def test_user_status_enum_values(self):
+        """Test that UserStatus enum has expected values."""
+        assert UserStatus.INVITED.value == "INVITED"
+        assert UserStatus.ACTIVE.value == "ACTIVE"
+        assert UserStatus.SUSPENDED.value == "SUSPENDED"
+
+    def test_user_status_defaults_to_active(self):
+        """Test that user status defaults to ACTIVE when not specified."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.status == UserStatus.ACTIVE
+
+    def test_user_can_be_created_with_invited_status(self):
+        """Test that user can be created with INVITED status."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="invited@example.com",
+            display_name="Invited User",
+            status=UserStatus.INVITED,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.status == UserStatus.INVITED
+
+    def test_user_can_be_created_with_suspended_status(self):
+        """Test that user can be created with SUSPENDED status."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="suspended@example.com",
+            display_name="Suspended User",
+            status=UserStatus.SUSPENDED,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.status == UserStatus.SUSPENDED
+
+    def test_activate_changes_status_to_active(self):
+        """Test that activate() changes status from INVITED to ACTIVE."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="invited@example.com",
+            display_name="Invited User",
+            status=UserStatus.INVITED,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.status == UserStatus.INVITED
+
+        user.activate()
+
+        assert user.status == UserStatus.ACTIVE
+
+    def test_activate_from_suspended_status(self):
+        """Test that activate() changes status from SUSPENDED to ACTIVE."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="suspended@example.com",
+            display_name="Suspended User",
+            status=UserStatus.SUSPENDED,
+            created_at=now,
+            updated_at=now,
+        )
+
+        user.activate()
+
+        assert user.status == UserStatus.ACTIVE
+
+    def test_activate_already_active_is_idempotent(self):
+        """Test that activate() on an already active user is a no-op."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="Active User",
+            status=UserStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+
+        user.activate()
+
+        assert user.status == UserStatus.ACTIVE
+
+    def test_suspend_changes_status_to_suspended(self):
+        """Test that suspend() changes status to SUSPENDED."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="Active User",
+            status=UserStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+
+        user.suspend()
+
+        assert user.status == UserStatus.SUSPENDED
+
+    def test_is_invited_property(self):
+        """Test is_invited property returns True for INVITED status."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        invited_user = User(
+            id=user_id,
+            account_id=account_id,
+            email="invited@example.com",
+            display_name="Invited User",
+            status=UserStatus.INVITED,
+            created_at=now,
+            updated_at=now,
+        )
+
+        active_user = User(
+            id=UserID(uuid4()),
+            account_id=account_id,
+            email="active@example.com",
+            display_name="Active User",
+            status=UserStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert invited_user.is_invited is True
+        assert active_user.is_invited is False
+
+    def test_is_active_property(self):
+        """Test is_active property returns True for ACTIVE status."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        active_user = User(
+            id=user_id,
+            account_id=account_id,
+            email="active@example.com",
+            display_name="Active User",
+            status=UserStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+
+        invited_user = User(
+            id=UserID(uuid4()),
+            account_id=account_id,
+            email="invited@example.com",
+            display_name="Invited User",
+            status=UserStatus.INVITED,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert active_user.is_active is True
+        assert invited_user.is_active is False
+
+    def test_is_suspended_property(self):
+        """Test is_suspended property returns True for SUSPENDED status."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        suspended_user = User(
+            id=user_id,
+            account_id=account_id,
+            email="suspended@example.com",
+            display_name="Suspended User",
+            status=UserStatus.SUSPENDED,
+            created_at=now,
+            updated_at=now,
+        )
+
+        active_user = User(
+            id=UserID(uuid4()),
+            account_id=account_id,
+            email="active@example.com",
+            display_name="Active User",
+            status=UserStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert suspended_user.is_suspended is True
+        assert active_user.is_suspended is False
+
+
+class TestUserIsOwner:
+    """Test suite for is_owner field."""
+
+    def test_is_owner_defaults_to_false(self):
+        """Test that is_owner defaults to False when not specified."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.is_owner is False
+
+    def test_user_can_be_created_as_owner(self):
+        """Test that user can be created with is_owner=True."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="owner@example.com",
+            display_name="Account Owner",
+            is_owner=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.is_owner is True
+
+    def test_is_owner_can_be_updated(self):
+        """Test that is_owner flag can be updated after creation."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.is_owner is False
+
+        user.is_owner = True
+        assert user.is_owner is True
+
+        user.is_owner = False
+        assert user.is_owner is False

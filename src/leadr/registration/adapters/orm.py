@@ -11,7 +11,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 from leadr.common.orm import Base
 from leadr.registration.domain.jam_code import JamCode
 from leadr.registration.domain.jam_code_redemption import JamCodeRedemption
-from leadr.registration.domain.verification_code import VerificationCode, VerificationCodeStatus
+from leadr.registration.domain.verification_code import (
+    VerificationCode,
+    VerificationCodeStatus,
+    VerificationCodeType,
+)
 
 
 class VerificationCodeStatusEnum(str, enum.Enum):
@@ -20,6 +24,13 @@ class VerificationCodeStatusEnum(str, enum.Enum):
     PENDING = "pending"
     USED = "used"
     EXPIRED = "expired"
+
+
+class VerificationCodeTypeEnum(str, enum.Enum):
+    """Verification code type enum for database."""
+
+    REGISTRATION = "REGISTRATION"
+    INVITE = "INVITE"
 
 
 class VerificationCodeORM(Base):
@@ -45,6 +56,22 @@ class VerificationCodeORM(Base):
         default=VerificationCodeStatusEnum.PENDING,
         server_default="pending",
     )
+    code_type: Mapped[VerificationCodeTypeEnum] = mapped_column(
+        Enum(
+            VerificationCodeTypeEnum,
+            name="verification_code_type",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=VerificationCodeTypeEnum.REGISTRATION,
+        server_default="REGISTRATION",
+    )
+    user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -55,7 +82,10 @@ class VerificationCodeORM(Base):
         nullable=True,
     )
 
-    __table_args__ = (Index("ix_verification_codes_email_status", "email", "status"),)
+    __table_args__ = (
+        Index("ix_verification_codes_email_status", "email", "status"),
+        Index("ix_verification_codes_type_user_id", "code_type", "user_id"),
+    )
 
     @classmethod
     def from_domain(cls, domain: VerificationCode) -> "VerificationCodeORM":
@@ -72,6 +102,8 @@ class VerificationCodeORM(Base):
             email=domain.email,
             code=domain.code,
             status=VerificationCodeStatusEnum(domain.status.value),
+            code_type=VerificationCodeTypeEnum(domain.code_type.value),
+            user_id=domain.user_id.uuid if domain.user_id else None,
             expires_at=domain.expires_at,
             used_at=domain.used_at,
             created_at=domain.created_at,
@@ -85,11 +117,15 @@ class VerificationCodeORM(Base):
         Returns:
             The domain entity instance.
         """
+        from leadr.common.domain.ids import UserID
+
         return VerificationCode(
             id=self.id,
             email=self.email,
             code=self.code,
             status=VerificationCodeStatus(self.status.value),
+            code_type=VerificationCodeType(self.code_type.value),
+            user_id=UserID(self.user_id) if self.user_id else None,
             expires_at=self.expires_at,
             used_at=self.used_at,
             created_at=self.created_at,
