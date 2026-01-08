@@ -10,13 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.main import app
 from leadr.accounts.domain.account import Account, AccountStatus
-from leadr.accounts.domain.user import User
+from leadr.accounts.domain.user import User, UserStatus
 from leadr.auth.dependencies import require_admin_auth
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, UserID
 from leadr.infra.email.service import EmailService
 from leadr.registration.services.dependencies import (
     get_email_service,
+    get_invite_service,
     get_registration_service,
     get_verification_service,
 )
@@ -457,6 +458,228 @@ class TestResendVerificationCode:
         )
 
         assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+class TestInviteUser:
+    """Test POST /register/invite endpoint (admin only)."""
+
+    async def test_invite_user_success(self, authenticated_client: AsyncClient):
+        """Test successful user invite by admin."""
+        # Mock auth context as admin
+        mock_auth = Mock()
+        mock_auth.is_superadmin = False
+        account_id = AccountID()
+        mock_auth.account_id = account_id
+        mock_auth.user_id = UserID()
+
+        async def override_auth():
+            return mock_auth
+
+        # Mock invite service
+        mock_invite_service = AsyncMock()
+        mock_user = User(
+            id=UserID(),
+            account_id=account_id,
+            email="invited@example.com",
+            display_name="invited",
+            status=UserStatus.INVITED,
+        )
+        mock_invite_service.send_invite.return_value = mock_user
+
+        async def override_invite_service():
+            return mock_invite_service
+
+        app.dependency_overrides[require_admin_auth] = override_auth
+        app.dependency_overrides[get_invite_service] = override_invite_service
+
+        response = await authenticated_client.post(
+            "/register/invite",
+            json={
+                "email": "invited@example.com",
+                "account_id": str(account_id.uuid),
+            },
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["email"] == "invited@example.com"
+        assert data["status"] == "INVITED"
+        assert "user_id" in data
+        assert "message" in data
+
+        app.dependency_overrides.clear()
+
+    async def test_invite_user_with_display_name(self, authenticated_client: AsyncClient):
+        """Test user invite with custom display name."""
+        mock_auth = Mock()
+        mock_auth.is_superadmin = True
+        account_id = AccountID()
+        mock_auth.account_id = account_id
+        mock_auth.user_id = UserID()
+
+        async def override_auth():
+            return mock_auth
+
+        mock_invite_service = AsyncMock()
+        mock_user = User(
+            id=UserID(),
+            account_id=account_id,
+            email="invited@example.com",
+            display_name="Custom Name",
+            status=UserStatus.INVITED,
+        )
+        mock_invite_service.send_invite.return_value = mock_user
+
+        async def override_invite_service():
+            return mock_invite_service
+
+        app.dependency_overrides[require_admin_auth] = override_auth
+        app.dependency_overrides[get_invite_service] = override_invite_service
+
+        response = await authenticated_client.post(
+            "/register/invite",
+            json={
+                "email": "invited@example.com",
+                "account_id": str(account_id.uuid),
+                "display_name": "Custom Name",
+            },
+        )
+
+        assert response.status_code == 201
+        mock_invite_service.send_invite.assert_called_once()
+        call_kwargs = mock_invite_service.send_invite.call_args.kwargs
+        assert call_kwargs["display_name"] == "Custom Name"
+
+        app.dependency_overrides.clear()
+
+    async def test_invite_user_non_admin_to_different_account(
+        self, authenticated_client: AsyncClient
+    ):
+        """Test non-superadmin cannot invite to other accounts."""
+        mock_auth = Mock()
+        mock_auth.is_superadmin = False
+        mock_auth.account_id = AccountID()  # Admin's account
+        mock_auth.user_id = UserID()
+
+        async def override_auth():
+            return mock_auth
+
+        app.dependency_overrides[require_admin_auth] = override_auth
+
+        different_account_id = AccountID()  # Different account
+
+        response = await authenticated_client.post(
+            "/register/invite",
+            json={
+                "email": "invited@example.com",
+                "account_id": str(different_account_id.uuid),
+            },
+        )
+
+        assert response.status_code == 403
+        assert "own account" in response.json()["error"]
+
+        app.dependency_overrides.clear()
+
+    async def test_invite_user_superadmin_to_any_account(self, authenticated_client: AsyncClient):
+        """Test superadmin can invite to any account."""
+        mock_auth = Mock()
+        mock_auth.is_superadmin = True
+        mock_auth.account_id = AccountID()  # Superadmin's account
+        mock_auth.user_id = UserID()
+
+        async def override_auth():
+            return mock_auth
+
+        different_account_id = AccountID()  # Different account
+
+        mock_invite_service = AsyncMock()
+        mock_user = User(
+            id=UserID(),
+            account_id=different_account_id,
+            email="invited@example.com",
+            display_name="invited",
+            status=UserStatus.INVITED,
+        )
+        mock_invite_service.send_invite.return_value = mock_user
+
+        async def override_invite_service():
+            return mock_invite_service
+
+        app.dependency_overrides[require_admin_auth] = override_auth
+        app.dependency_overrides[get_invite_service] = override_invite_service
+
+        response = await authenticated_client.post(
+            "/register/invite",
+            json={
+                "email": "invited@example.com",
+                "account_id": str(different_account_id.uuid),
+            },
+        )
+
+        assert response.status_code == 201
+
+        app.dependency_overrides.clear()
+
+    async def test_invite_user_already_active(self, authenticated_client: AsyncClient):
+        """Test inviting already-active user returns error."""
+        mock_auth = Mock()
+        mock_auth.is_superadmin = True
+        account_id = AccountID()
+        mock_auth.account_id = account_id
+        mock_auth.user_id = UserID()
+
+        async def override_auth():
+            return mock_auth
+
+        mock_invite_service = AsyncMock()
+        mock_invite_service.send_invite.side_effect = ValueError(
+            "User with email already exists and is active"
+        )
+
+        async def override_invite_service():
+            return mock_invite_service
+
+        app.dependency_overrides[require_admin_auth] = override_auth
+        app.dependency_overrides[get_invite_service] = override_invite_service
+
+        response = await authenticated_client.post(
+            "/register/invite",
+            json={
+                "email": "active@example.com",
+                "account_id": str(account_id.uuid),
+            },
+        )
+
+        assert response.status_code == 400
+        assert "already exists" in response.json()["error"]
+
+        app.dependency_overrides.clear()
+
+    async def test_invite_user_invalid_email(self, authenticated_client: AsyncClient):
+        """Test invite with invalid email format."""
+        mock_auth = Mock()
+        mock_auth.is_superadmin = True
+        mock_auth.account_id = AccountID()
+        mock_auth.user_id = UserID()
+
+        async def override_auth():
+            return mock_auth
+
+        app.dependency_overrides[require_admin_auth] = override_auth
+
+        response = await authenticated_client.post(
+            "/register/invite",
+            json={
+                "email": "not-an-email",
+                "account_id": str(AccountID().uuid),
+            },
+        )
+
+        assert response.status_code == 422
+
+        app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio

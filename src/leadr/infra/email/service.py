@@ -82,7 +82,7 @@ class EmailService:
 
         if from_email is not None:
             logger.warning("From email cannot be customised")
-        from_email = f"postmaster@{settings.MAILGUN_DOMAIN}"
+        from_email = f"noreply@{settings.MAILGUN_DOMAIN}"
         reply_to = from_email
 
         # Create email domain object
@@ -184,6 +184,38 @@ class EmailService:
 
         return await self.send_email(
             to=to, subject=subject, body=body, from_email=from_email, priority=priority
+        )
+
+    async def send_invite_email(
+        self,
+        to: str,
+        account_name: str,
+        code: str,
+    ) -> dict[str, Any]:
+        """Send an invite email when a user is invited to an account.
+
+        Args:
+            to: Email address to send the invite to.
+            account_name: Name of the account the user is being invited to.
+            code: The 6-character verification code.
+
+        Returns:
+            Email provider response dict.
+        """
+        subject = f"You've been invited to join {account_name} on LEADR"
+        template = self._load_template("invite")
+        body = template.format(
+            account_name=account_name,
+            email=to,
+            code=code,
+            footer=self._footer,
+        )
+
+        return await self.send_email(
+            to=to,
+            subject=subject,
+            body=body,
+            priority=EmailPriority.HIGH,
         )
 
     def get_default_from_email(self) -> str:

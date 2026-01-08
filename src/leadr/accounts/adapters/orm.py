@@ -16,6 +16,14 @@ class AccountStatusEnum(str, enum.Enum):
     SUSPENDED = "suspended"
 
 
+class UserStatusEnum(str, enum.Enum):
+    """User status enum for database."""
+
+    INVITED = "INVITED"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+
+
 class AccountORM(Base):
     """Account ORM model.
 
@@ -62,6 +70,17 @@ class UserORM(Base):
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String, nullable=False)
     super_admin: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
+    status: Mapped[UserStatusEnum] = mapped_column(
+        Enum(
+            UserStatusEnum,
+            name="user_status",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=UserStatusEnum.ACTIVE,
+        server_default="ACTIVE",
+    )
 
     # Relationships
     account: Mapped["AccountORM"] = relationship(back_populates="users")

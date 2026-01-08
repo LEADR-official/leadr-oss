@@ -8,7 +8,7 @@ from uuid import UUID
 from sqlalchemy import select
 
 from leadr.common.api.pagination import PaginationParams
-from leadr.common.domain.ids import AccountID
+from leadr.common.domain.ids import AccountID, UserID
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 from leadr.registration.adapters.orm import (
@@ -16,6 +16,7 @@ from leadr.registration.adapters.orm import (
     JamCodeRedemptionORM,
     VerificationCodeORM,
     VerificationCodeStatusEnum,
+    VerificationCodeTypeEnum,
 )
 from leadr.registration.domain.jam_code import JamCode
 from leadr.registration.domain.jam_code_redemption import JamCodeRedemption
@@ -102,12 +103,18 @@ class VerificationCodeRepository(BaseRepository[VerificationCode, VerificationCo
             limit=pagination.limit,
         )
 
-    async def find_valid_code_by_email(self, email: str, code: str) -> VerificationCode | None:
+    async def find_valid_code_by_email(
+        self,
+        email: str,
+        code: str,
+        code_type: VerificationCodeTypeEnum | None = None,
+    ) -> VerificationCode | None:
         """Find a valid (pending) verification code by email and code value.
 
         Args:
             email: The email address.
             code: The verification code.
+            code_type: Optional code type filter (REGISTRATION or INVITE).
 
         Returns:
             The verification code if found and valid, None otherwise.
@@ -115,6 +122,26 @@ class VerificationCodeRepository(BaseRepository[VerificationCode, VerificationCo
         query = select(VerificationCodeORM).where(
             VerificationCodeORM.email == email,
             VerificationCodeORM.code == code.upper(),
+            VerificationCodeORM.status == VerificationCodeStatusEnum.PENDING,
+        )
+        if code_type is not None:
+            query = query.where(VerificationCodeORM.code_type == code_type)
+        result = await self.session.execute(query)
+        orm = result.scalar_one_or_none()
+        return self._to_domain(orm) if orm else None
+
+    async def get_pending_invite_for_user(self, user_id: UserID) -> VerificationCode | None:
+        """Get a pending invite code for a specific user.
+
+        Args:
+            user_id: The user ID to look up invite code for.
+
+        Returns:
+            The pending invite verification code if found, None otherwise.
+        """
+        query = select(VerificationCodeORM).where(
+            VerificationCodeORM.user_id == user_id.uuid,
+            VerificationCodeORM.code_type == VerificationCodeTypeEnum.INVITE,
             VerificationCodeORM.status == VerificationCodeStatusEnum.PENDING,
         )
         result = await self.session.execute(query)

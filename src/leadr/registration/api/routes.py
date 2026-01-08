@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
+from leadr.common.domain.ids import AccountID
 from leadr.config import settings
 from leadr.registration.api.schemas import (
     CompleteRegistrationRequest,
@@ -15,12 +16,15 @@ from leadr.registration.api.schemas import (
     CreateJamCodeRequest,
     InitiateRegistrationRequest,
     InitiateRegistrationResponse,
+    InviteUserRequest,
+    InviteUserResponse,
     JamCodeResponse,
     UpdateJamCodeRequest,
     VerifyCodeRequest,
     VerifyCodeResponse,
 )
 from leadr.registration.services.dependencies import (
+    InviteServiceDep,
     JamCodeServiceDep,
     RegistrationServiceDep,
     VerificationServiceDep,
@@ -136,6 +140,46 @@ async def resend_verification_code(
         message="Verification code sent to email",
         code_expires_in=settings.VERIFICATION_CODE_EXPIRY_SECONDS,
     )
+
+
+# Admin Invite Endpoint (Requires Admin Auth)
+
+
+@router.post("/register/invite", status_code=status.HTTP_201_CREATED)
+async def invite_user(
+    request: InviteUserRequest,
+    invite_service: InviteServiceDep,
+    auth: AdminAuthContextDep,
+) -> InviteUserResponse:
+    """Invite a user to an account.
+
+    Creates a user with INVITED status and sends an invite email with
+    a verification code. If the user already exists with INVITED status,
+    resends the invite (invalidates old code, sends new one).
+
+    Requires admin authentication. Admins can only invite users to their own
+    account unless they are superadmins.
+    """
+    # Validate admin has access to the target account
+    if not auth.is_superadmin and auth.account_id != AccountID(request.account_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only invite users to your own account",
+        )
+
+    try:
+        user = await invite_service.send_invite(
+            email=request.email,
+            account_id=AccountID(request.account_id),
+            display_name=request.display_name,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from None
+
+    return InviteUserResponse.from_domain(user)
 
 
 # Admin Jam Code Management Endpoints (Superadmin Only)

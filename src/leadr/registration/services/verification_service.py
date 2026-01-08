@@ -6,9 +6,10 @@ from datetime import UTC, datetime, timedelta
 import jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.common.domain.ids import UserID
 from leadr.config import settings
 from leadr.infra.email import EmailService
-from leadr.registration.domain.verification_code import VerificationCode
+from leadr.registration.domain.verification_code import VerificationCode, VerificationCodeType
 from leadr.registration.services.repositories import VerificationCodeRepository
 
 
@@ -57,6 +58,40 @@ class VerificationService:
         # Send verification email
         await self.email_service.send_verification_code(email, code)
 
+    async def create_invite_code(self, email: str, user_id: UserID) -> VerificationCode:
+        """Create an invite verification code for an existing user.
+
+        Invalidates any existing pending invite codes for the email before creating a new one.
+
+        Args:
+            email: Email address to send the invite code to.
+            user_id: The ID of the user being invited.
+
+        Returns:
+            The created verification code entity.
+        """
+        # Invalidate existing pending codes for this email
+        await self.repository.invalidate_codes_for_email(email)
+
+        # Generate new verification code with 24-hour expiry
+        code = self._generate_code()
+        expires_at = datetime.now(UTC) + timedelta(seconds=settings.INVITE_CODE_EXPIRY_SECONDS)
+
+        # Create invite verification code entity
+        verification_code = VerificationCode(
+            email=email,
+            code=code,
+            code_type=VerificationCodeType.INVITE,
+            user_id=user_id,
+            expires_at=expires_at,
+        )
+
+        # Save to database
+        await self.repository.create(verification_code)
+        await self.db.commit()
+
+        return verification_code
+
     async def verify_code(self, email: str, code: str) -> str:
         """Verify a code and return a short-lived verification token.
 
@@ -66,6 +101,7 @@ class VerificationService:
 
         Returns:
             A JWT verification token valid for 10 minutes.
+            For invite codes, includes user_id in the token.
 
         Raises:
             ValueError: If the code is invalid, expired, or already used.
@@ -89,8 +125,15 @@ class VerificationService:
         await self.repository.update(verification_code)
         await self.db.commit()
 
-        # Generate verification token
-        token = self._generate_verification_token(email)
+        # Generate verification token with appropriate type
+        if verification_code.is_invite:
+            token = self._generate_verification_token(
+                email,
+                verification_type="invite",
+                user_id=verification_code.user_id,
+            )
+        else:
+            token = self._generate_verification_token(email, verification_type="registration")
         return token
 
     def validate_verification_token(self, token: str) -> str:
@@ -112,7 +155,9 @@ class VerificationService:
                 algorithms=["HS256"],
             )
 
-            if payload.get("type") != "registration":
+            # Accept both registration and invite token types
+            token_type = payload.get("type")
+            if token_type not in ("registration", "invite"):
                 raise ValueError("Invalid token type")
 
             email = payload.get("email")
@@ -120,6 +165,41 @@ class VerificationService:
                 raise ValueError("Missing email in token")
 
             return email
+
+        except jwt.ExpiredSignatureError as e:
+            raise ValueError("Verification token has expired") from e
+        except jwt.InvalidTokenError as e:
+            raise ValueError("Invalid verification token") from e
+
+    def get_invite_user_id(self, token: str) -> UserID | None:
+        """Extract the user_id from an invite verification token.
+
+        Args:
+            token: JWT verification token.
+
+        Returns:
+            The UserID if this is an invite token, None otherwise.
+
+        Raises:
+            ValueError: If the token is invalid or expired.
+        """
+        try:
+            payload = jwt.decode(
+                token,
+                settings.API_KEY_SECRET,
+                algorithms=["HS256"],
+            )
+
+            if payload.get("type") != "invite":
+                return None
+
+            user_id_str = payload.get("user_id")
+            if not user_id_str:
+                return None
+
+            from uuid import UUID
+
+            return UserID(UUID(user_id_str))
 
         except jwt.ExpiredSignatureError as e:
             raise ValueError("Verification token has expired") from e
@@ -136,11 +216,18 @@ class VerificationService:
         characters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
         return "".join(random.choice(characters) for _ in range(6))  # noqa: S311
 
-    def _generate_verification_token(self, email: str) -> str:
+    def _generate_verification_token(
+        self,
+        email: str,
+        verification_type: str = "registration",
+        user_id: UserID | None = None,
+    ) -> str:
         """Generate a short-lived JWT verification token.
 
         Args:
             email: Email address to include in the token.
+            verification_type: Type of token ("registration" or "invite").
+            user_id: Optional user ID for invite tokens.
 
         Returns:
             A JWT token valid for the configured duration.
@@ -148,12 +235,16 @@ class VerificationService:
         now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=settings.VERIFICATION_TOKEN_EXPIRY_SECONDS)
 
-        payload = {
+        payload: dict[str, str | float] = {
             "email": email,
-            "type": "registration",
+            "type": verification_type,
             "iat": now.timestamp(),
             "exp": expires_at.timestamp(),
         }
+
+        # Include user_id for invite tokens
+        if user_id is not None:
+            payload["user_id"] = str(user_id.uuid)
 
         token = jwt.encode(payload, settings.API_KEY_SECRET, algorithm="HS256")
         return token

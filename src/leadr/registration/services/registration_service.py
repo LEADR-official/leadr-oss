@@ -3,10 +3,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account
-from leadr.accounts.domain.user import User
+from leadr.accounts.domain.user import User, UserStatus
 from leadr.accounts.services.account_service import AccountService
 from leadr.accounts.services.user_service import UserService
 from leadr.auth.services.api_key_service import APIKeyService
+from leadr.common.domain.ids import AccountID, UserID
 from leadr.common.utils.slug import generate_slug
 from leadr.infra.email import EmailService
 from leadr.registration.services.jam_code_service import JamCodeService
@@ -48,15 +49,126 @@ class RegistrationService:
     async def complete_registration(
         self,
         verification_token: str,
-        account_name: str,
+        account_name: str | None = None,
         account_slug: str | None = None,
         jam_code: str | None = None,
         display_name: str | None = None,
     ) -> tuple[Account, User, str]:
         """Complete the registration process and create account, user, and API key.
 
+        For invite flow: If the verification token contains a user_id, this is an
+        invite completion. The existing invited user is activated and an API key
+        is created. Account creation is skipped.
+
+        For registration flow: A new account, user, and API key are created.
+
         Args:
             verification_token: JWT token from email verification.
+            account_name: Name for the new account (required for registration, ignored for invite).
+            account_slug: Optional slug (will be auto-generated if not provided).
+            jam_code: Optional jam code for promotional features (registration only).
+            display_name: Optional display name (will use email prefix if not provided).
+
+        Returns:
+            Tuple of (Account, User, plain_api_key).
+
+        Raises:
+            ValueError: If verification token is invalid or jam code is invalid.
+            ValueError: If account_name is missing for registration flow.
+        """
+        # Validate verification token and get email
+        email = self.verification_service.validate_verification_token(verification_token)
+
+        # Check if this is an invite flow
+        invite_user_id = self.verification_service.get_invite_user_id(verification_token)
+
+        if invite_user_id:
+            # INVITE FLOW: Activate existing invited user
+            return await self._complete_invite_registration(
+                user_id=invite_user_id,
+                display_name=display_name,
+            )
+        else:
+            # REGISTRATION FLOW: Create new account and user
+            if not account_name:
+                raise ValueError("Account name is required for registration")
+
+            return await self._complete_new_registration(
+                email=email,
+                account_name=account_name,
+                account_slug=account_slug,
+                jam_code=jam_code,
+                display_name=display_name,
+            )
+
+    async def _complete_invite_registration(
+        self,
+        user_id: UserID,
+        display_name: str | None = None,
+    ) -> tuple[Account, User, str]:
+        """Complete registration for an invited user.
+
+        Args:
+            user_id: ID of the invited user.
+            display_name: Optional new display name for the user.
+
+        Returns:
+            Tuple of (Account, User, plain_api_key).
+
+        Raises:
+            ValueError: If user not found or not in INVITED status.
+        """
+        # Get the invited user
+        user = await self.user_service.get_by_id_or_raise(user_id)
+
+        if user.status != UserStatus.INVITED:
+            raise ValueError("User is not in invited status")
+
+        # Update display name if provided
+        if display_name and display_name.strip():
+            user.display_name = display_name
+
+        # Activate the user
+        user.activate()
+        user = await self.user_service.repository.update(user)
+
+        # Get the account
+        account = await self.account_service.get_by_id_or_raise(AccountID(user.account_id.uuid))
+
+        # Create API key for the user
+        api_key, plain_api_key = await self.api_key_service.create_api_key(
+            account_id=account.id,
+            user_id=user.id,
+            name=f"{user.display_name}'s Key",
+        )
+
+        await self.db.commit()
+
+        # Send welcome email
+        try:
+            await self.email_service.send_welcome_email(
+                to=user.email,
+                user_name=user.display_name,
+                account_name=account.name,
+                account_slug=account.slug,
+            )
+        except Exception:  # noqa: S110
+            pass
+
+        return account, user, plain_api_key
+
+    async def _complete_new_registration(
+        self,
+        email: str,
+        account_name: str,
+        account_slug: str | None = None,
+        jam_code: str | None = None,
+        display_name: str | None = None,
+    ) -> tuple[Account, User, str]:
+        """Complete registration for a new account.
+
+        Args:
+            email: Verified email address.
             account_name: Name for the new account.
             account_slug: Optional slug (will be auto-generated if not provided).
             jam_code: Optional jam code for promotional features.
@@ -66,11 +178,8 @@ class RegistrationService:
             Tuple of (Account, User, plain_api_key).
 
         Raises:
-            ValueError: If verification token is invalid or jam code is invalid.
+            ValueError: If jam code is invalid.
         """
-        # Validate verification token and get email
-        email = self.verification_service.validate_verification_token(verification_token)
-
         # Generate slug if not provided
         if not account_slug:
             account_slug = await self._generate_unique_slug(account_name)

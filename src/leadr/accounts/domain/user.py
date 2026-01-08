@@ -1,9 +1,27 @@
 """User domain model."""
 
+from enum import Enum
+
 from pydantic import EmailStr, Field, field_validator
 
 from leadr.common.domain.ids import AccountID, UserID
 from leadr.common.domain.models import Entity
+
+
+class UserStatus(str, Enum):
+    """User status enum.
+
+    Represents the lifecycle state of a user.
+    """
+
+    INVITED = "INVITED"
+    """User has been invited but hasn't completed registration."""
+
+    ACTIVE = "ACTIVE"
+    """User is active and can use the system."""
+
+    SUSPENDED = "SUSPENDED"
+    """User has been suspended and cannot access the system."""
 
 
 class User(Entity):
@@ -34,6 +52,7 @@ class User(Entity):
     super_admin: bool = Field(
         default=False, description="Whether this user has superadmin privileges"
     )
+    status: UserStatus = Field(default=UserStatus.ACTIVE, description="User's current status")
 
     @field_validator("display_name")
     @classmethod
@@ -56,3 +75,32 @@ class User(Entity):
         if len(value) > 100:
             raise ValueError("Display name must not exceed 100 characters")
         return value.strip()
+
+    def activate(self) -> None:
+        """Activate the user.
+
+        Changes status to ACTIVE. Idempotent if already active.
+        """
+        self.status = UserStatus.ACTIVE
+
+    def suspend(self) -> None:
+        """Suspend the user.
+
+        Changes status to SUSPENDED.
+        """
+        self.status = UserStatus.SUSPENDED
+
+    @property
+    def is_invited(self) -> bool:
+        """Check if user is in invited state."""
+        return self.status == UserStatus.INVITED
+
+    @property
+    def is_active(self) -> bool:
+        """Check if user is active."""
+        return self.status == UserStatus.ACTIVE
+
+    @property
+    def is_suspended(self) -> bool:
+        """Check if user is suspended."""
+        return self.status == UserStatus.SUSPENDED

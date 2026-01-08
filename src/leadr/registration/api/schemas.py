@@ -1,10 +1,11 @@
 """API schemas for registration endpoints."""
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from leadr.common.domain.ids import AccountID, JamCodeID, JamCodeRedemptionID
+from leadr.common.domain.ids import AccountID, JamCodeID, JamCodeRedemptionID, UserID
 
 # Public Registration Schemas
 
@@ -63,6 +64,7 @@ class CompleteRegistrationResponse(BaseModel):
     """Response after completing registration."""
 
     account_id: AccountID = Field(description="ID of the created account")
+    account_name: str = Field(description="Name of the account")
     account_slug: str = Field(description="URL slug of the account")
     api_key: str = Field(description="API key for authentication")
     display_name: str = Field(description="Display name of the created user")
@@ -81,9 +83,50 @@ class CompleteRegistrationResponse(BaseModel):
         """
         return cls(
             account_id=account.id.uuid,
+            account_name=account.name,
             account_slug=account.slug,
             api_key=api_key,
             display_name=user.display_name,
+        )
+
+
+# Admin Invite Schemas
+
+
+class InviteUserRequest(BaseModel):
+    """Request to invite a user to an account."""
+
+    email: EmailStr = Field(description="Email address to invite")
+    account_id: UUID = Field(description="Account ID to invite user to")
+    display_name: str | None = Field(
+        default=None,
+        description="Optional display name (defaults to email prefix if not provided)",
+    )
+
+
+class InviteUserResponse(BaseModel):
+    """Response after inviting a user."""
+
+    user_id: UserID = Field(description="ID of the invited user")
+    email: str = Field(description="Email address of the invited user")
+    status: str = Field(description="User status (INVITED)")
+    message: str = Field(description="Success message")
+
+    @classmethod
+    def from_domain(cls, user) -> "InviteUserResponse":
+        """Create response from domain entity.
+
+        Args:
+            user: User domain entity.
+
+        Returns:
+            InviteUserResponse instance.
+        """
+        return cls(
+            user_id=user.id,
+            email=user.email,
+            status=user.status.value,
+            message=f"Invitation sent to {user.email}",
         )
 
 

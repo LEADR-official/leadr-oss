@@ -3,11 +3,16 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
+import jwt
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.accounts.domain.user import User
 from leadr.common.api.pagination import PaginationParams
+from leadr.common.domain.ids import UserID
 from leadr.config import settings
+from leadr.registration.adapters.orm import VerificationCodeTypeEnum
+from leadr.registration.domain.verification_code import VerificationCodeType
 from leadr.registration.services.verification_service import VerificationService
 
 
@@ -289,3 +294,229 @@ class TestVerificationServiceValidateToken:
 
         with pytest.raises(ValueError, match="Missing email in token"):
             service.validate_verification_token(no_email_token)
+
+
+@pytest.mark.asyncio
+class TestVerificationServiceCreateInviteCode:
+    """Test VerificationService.create_invite_code method."""
+
+    async def test_create_invite_code_success(self, db_session: AsyncSession, test_user: User):
+        """Test creating an invite code."""
+        mock_email_service = AsyncMock()
+
+        service = VerificationService(db_session, mock_email_service)
+
+        code = await service.create_invite_code(
+            email="invited@example.com",
+            user_id=test_user.id,
+        )
+
+        assert code is not None
+        assert code.email == "invited@example.com"
+        assert code.code_type == VerificationCodeType.INVITE
+        assert code.user_id == test_user.id
+        assert len(code.code) == 6
+
+    async def test_create_invite_code_sets_24h_expiry(
+        self, db_session: AsyncSession, test_user: User
+    ):
+        """Test that invite codes have 24 hour expiry."""
+        mock_email_service = AsyncMock()
+
+        service = VerificationService(db_session, mock_email_service)
+
+        before = datetime.now(UTC)
+        code = await service.create_invite_code(
+            email="invited@example.com",
+            user_id=test_user.id,
+        )
+        after = datetime.now(UTC)
+
+        expected_expiry_min = before + timedelta(seconds=settings.INVITE_CODE_EXPIRY_SECONDS)
+        expected_expiry_max = after + timedelta(seconds=settings.INVITE_CODE_EXPIRY_SECONDS)
+
+        assert expected_expiry_min <= code.expires_at <= expected_expiry_max
+
+    async def test_create_invite_code_invalidates_old_codes(
+        self, db_session: AsyncSession, test_user: User
+    ):
+        """Test that creating invite code invalidates old pending codes."""
+        mock_email_service = AsyncMock()
+
+        service = VerificationService(db_session, mock_email_service)
+
+        # Create first invite code
+        first_code = await service.create_invite_code(
+            email="invited@example.com",
+            user_id=test_user.id,
+        )
+
+        # Create second invite code
+        second_code = await service.create_invite_code(
+            email="invited@example.com",
+            user_id=test_user.id,
+        )
+
+        # First code should no longer be valid
+        valid_code = await service.repository.find_valid_code_by_email(
+            "invited@example.com",
+            first_code.code,
+            code_type=VerificationCodeTypeEnum.INVITE,
+        )
+        assert valid_code is None
+
+        # Second code should be valid
+        valid_code = await service.repository.find_valid_code_by_email(
+            "invited@example.com",
+            second_code.code,
+            code_type=VerificationCodeTypeEnum.INVITE,
+        )
+        assert valid_code is not None
+
+
+@pytest.mark.asyncio
+class TestVerificationServiceVerifyInviteCode:
+    """Test VerificationService.verify_code for invite codes."""
+
+    async def test_verify_invite_code_returns_token_with_user_id(
+        self, db_session: AsyncSession, test_user: User
+    ):
+        """Test that verifying invite code returns token containing user_id."""
+        mock_email_service = AsyncMock()
+
+        service = VerificationService(db_session, mock_email_service)
+
+        # Create invite code
+        code = await service.create_invite_code(
+            email="invited@example.com",
+            user_id=test_user.id,
+        )
+
+        # Verify the code
+        token = await service.verify_code("invited@example.com", code.code)
+
+        # Token should contain user_id
+        payload = jwt.decode(token, settings.API_KEY_SECRET, algorithms=["HS256"])
+        assert payload["type"] == "invite"
+        assert payload["user_id"] == str(test_user.id.uuid)
+
+
+@pytest.mark.asyncio
+class TestVerificationServiceGetInviteUserId:
+    """Test VerificationService.get_invite_user_id method."""
+
+    async def test_get_invite_user_id_returns_user_id_for_invite_token(
+        self, db_session: AsyncSession, test_user: User
+    ):
+        """Test that get_invite_user_id returns user_id from invite token."""
+        mock_email_service = AsyncMock()
+
+        service = VerificationService(db_session, mock_email_service)
+
+        # Create and verify invite code to get token
+        code = await service.create_invite_code(
+            email="invited@example.com",
+            user_id=test_user.id,
+        )
+        token = await service.verify_code("invited@example.com", code.code)
+
+        # Get user_id from token
+        result_user_id = service.get_invite_user_id(token)
+
+        assert result_user_id is not None
+        assert result_user_id == test_user.id
+
+    async def test_get_invite_user_id_returns_none_for_registration_token(
+        self, db_session: AsyncSession
+    ):
+        """Test that get_invite_user_id returns None for registration token."""
+        mock_email_service = AsyncMock()
+
+        service = VerificationService(db_session, mock_email_service)
+
+        # Create and verify registration code
+        await service.initiate_verification("test@example.com")
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await service.repository.filter(email="test@example.com", pagination=pagination)
+        code = result.items[0].code
+        token = await service.verify_code("test@example.com", code)
+
+        # Should return None for registration token
+        result_user_id = service.get_invite_user_id(token)
+
+        assert result_user_id is None
+
+    async def test_get_invite_user_id_raises_for_invalid_token(self, db_session: AsyncSession):
+        """Test that get_invite_user_id raises ValueError for invalid token."""
+        mock_email_service = AsyncMock()
+
+        service = VerificationService(db_session, mock_email_service)
+
+        with pytest.raises(ValueError, match="Invalid verification token"):
+            service.get_invite_user_id("invalid.token.here")
+
+    async def test_get_invite_user_id_raises_for_expired_token(self, db_session: AsyncSession):
+        """Test that get_invite_user_id raises ValueError for expired token."""
+        mock_email_service = AsyncMock()
+
+        service = VerificationService(db_session, mock_email_service)
+        user_id = UserID()
+
+        # Create an expired invite token
+        now = datetime.now(UTC)
+        expired_payload = {
+            "email": "test@example.com",
+            "type": "invite",
+            "user_id": str(user_id.uuid),
+            "iat": (now - timedelta(hours=1)).timestamp(),
+            "exp": (now - timedelta(seconds=1)).timestamp(),
+        }
+        expired_token = jwt.encode(expired_payload, settings.API_KEY_SECRET, algorithm="HS256")
+
+        with pytest.raises(ValueError, match="Verification token has expired"):
+            service.get_invite_user_id(expired_token)
+
+    async def test_get_invite_user_id_returns_none_for_invite_token_without_user_id(
+        self, db_session: AsyncSession
+    ):
+        """Test that get_invite_user_id returns None for invite token missing user_id."""
+        mock_email_service = AsyncMock()
+
+        service = VerificationService(db_session, mock_email_service)
+
+        # Create an invite token without user_id
+        now = datetime.now(UTC)
+        payload = {
+            "email": "test@example.com",
+            "type": "invite",  # Invite type but no user_id
+            "iat": now.timestamp(),
+            "exp": (now + timedelta(minutes=10)).timestamp(),
+        }
+        token = jwt.encode(payload, settings.API_KEY_SECRET, algorithm="HS256")
+
+        result_user_id = service.get_invite_user_id(token)
+
+        assert result_user_id is None
+
+
+@pytest.mark.asyncio
+class TestVerificationServiceValidateInviteToken:
+    """Test VerificationService.validate_verification_token for invite tokens."""
+
+    async def test_validate_invite_token_success(self, db_session: AsyncSession, test_user: User):
+        """Test validating an invite token returns email."""
+        mock_email_service = AsyncMock()
+
+        service = VerificationService(db_session, mock_email_service)
+
+        # Create and verify invite code
+        code = await service.create_invite_code(
+            email="invited@example.com",
+            user_id=test_user.id,
+        )
+        token = await service.verify_code("invited@example.com", code.code)
+
+        # Validate the token
+        email = service.validate_verification_token(token)
+
+        assert email == "invited@example.com"
