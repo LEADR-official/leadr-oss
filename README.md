@@ -36,81 +36,35 @@ Whether you're building a retro arcade game, puzzle platformer, or competitive m
 
 ## Quick Start
 
+### LEADR Cloud
+
+**Our fully managed and scalable hosted version of LEADR - just integrate LEADR via one of our SDKs.**
+
+Download the CLI and run `leadr register` to get started:
+
+#### MacOS / Linux
+
+```bash
+curl -sSL https://leadr.gg/cli/install.sh | bash
+```
+
+#### Windows / Manual isntall
+
+Download binaries from the [Releases page](https://github.com/LEADR-official/leadr-cli-releases/releases).
+
+Double click the .exe and follow the instructions.
+
+See the [LEADR docs](https://docs.leadr.gg/latest/) for more information and [quick start](https://docs.leadr.gg/latest/quick-start/) guides.
+
+### Self host
+
 Deploy our prebuilt & production-ready image to your preferred cloud host:
 
 ```plaintext
 ghcr.io/LEADR-official/leadr-oss:latest
 ```
 
-Or try it out locally:
-
-```bash
-# Pull and run with Docker
-docker run -d \
-  -p 3000:3000 \
-  -v leadr_data:/app/data \
-  -e SUPERADMIN_API_KEY=ldr_your_secure_api_key \
-  ghcr.io/LEADR-official/leadr:latest
-
-# Test it's working
-curl http://localhost:3000/v1/health
-```
-
-**Required Environment Variables:**
-
-- `SUPERADMIN_API_KEY` - Superadmin authentication key for initial setup (must start with `ldr_`)
-- `SUPERADMIN_EMAIL` - Email for superadmin user
-
-Generate a secure API key:
-
-```bash
-# Generate a secure random API key
-echo "ldr_$(openssl rand -base64 60 | tr -d '/+=')"
-```
-
-Store this in your `.env` file:
-
-```bash
-SUPERADMIN_API_KEY=ldr_your_generated_key_here
-```
-
-**Optional Configuration:**
-
-- `DATABASE_URL` - Specify a different PostgreSQL database to connect to
-- `SUPERADMIN_ACCOUNT_NAME` - Name of system account (default: LEADR)
-
-## API Overview
-
-...
-
-### Pagination
-
-All list endpoints return paginated responses:
-
-```json
-{
-  "data": [...],
-  "has_more": true,
-  "next_cursor": "eyJpZCI6NDU2LCJzb3J0X3ZhbHVlIjoiMjAwMC4wIn0",
-  "total_returned": 25,
-  "page_size": 25
-}
-```
-
-Use `next_cursor` as the `cursor` parameter for the next page.
-
-## Cloud Deployment
-
-LEADR works with any cloud platform that supports Docker:
-
-- **Hetzner**: Europe-based cloud host - used by LEADR's cloud service
-- **Railway**: Deploy with one click using their Docker template
-- **Fly.io**: Use `fly launch` with the included Dockerfile
-- **Google Cloud Run**: Perfect for serverless deployments
-- **DigitalOcean App Platform**: Simple container hosting
-- **AWS ECS/Fargate**: For enterprise scale
-
-Remember to set a strong `SUPERADMIN_API_KEY` environment variable (must start with `ldr_`)
+Check out the [self hosting docs](https://docs.leadr.gg/latest/api/self_host/) for more info.
 
 ______________________________________________________________________
 
@@ -134,39 +88,19 @@ docker run -p 3000:3000 \
 
 ### Database Management
 
-LEADR uses PostgreSQL and supports both local development databases and managed PostgreSQL services like [Neon](https://neon.tech).
+LEADR uses PostgreSQL and supports both local development databases and managed PostgreSQL services (LEADR Cloud uses [Neon](https://neon.tech).
 
-#### Environment Variables
-
-| Variable         | Description                                             | Default                 |
-| ---------------- | ------------------------------------------------------- | ----------------------- |
-| `DB_HOST`        | PostgreSQL host                                         | `localhost`             |
-| `DB_PORT`        | PostgreSQL port                                         | `5432`                  |
-| `DB_NAME`        | Database name                                           | `leadr`                 |
-| `DB_USER`        | Database user                                           | `leadr`                 |
-| `DB_PASSWORD`    | Database password                                       | `leadr`                 |
-| `DB_HOST_DIRECT` | Direct host for migrations (bypasses connection pooler) | Falls back to `DB_HOST` |
-
-#### Using Neon (Recommended for Production)
+#### Using External PostgreSQL (Recommended for Production)
 
 When using Neon's managed PostgreSQL, configure two endpoints:
 
 ```bash
-# Pooled endpoint for application connections (uses PgBouncer)
-DB_HOST=ep-xxx-pooler.region.aws.neon.tech
+# Pooled endpoint for connections using PgBouncer
+DB_HOST=your.public.db.endpoint
 
-# Direct endpoint for migrations (bypasses PgBouncer)
-DB_HOST_DIRECT=ep-xxx.region.aws.neon.tech
+# Direct endpoint used by migrations (bypasses PgBouncer)
+DB_HOST_DIRECT=your.public.db.endpoint
 ```
-
-**Connection behavior by environment:**
-
-| Environment  | SSL         | Client Pooling      | Notes                              |
-| ------------ | ----------- | ------------------- | ---------------------------------- |
-| `DEV`/`TEST` | Disabled    | Enabled (QueuePool) | Local development                  |
-| `PROD`       | verify-full | Disabled (NullPool) | Neon handles pooling via PgBouncer |
-
-Migrations always use `DB_HOST_DIRECT` (if set) with `NullPool` to avoid issues with PgBouncer during schema changes.
 
 #### Running Migrations
 
