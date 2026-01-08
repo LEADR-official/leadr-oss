@@ -205,11 +205,12 @@ class RegistrationService:
             display_name if display_name and display_name.strip() else email.split("@")[0]
         )
 
-        # Create user
+        # Create user as account owner
         user = await self.user_service.create_user(
             account_id=account.id,
             email=email,
             display_name=user_display_name,
+            is_owner=True,
         )
 
         # Create API key

@@ -52,6 +52,7 @@ class User(Entity):
     super_admin: bool = Field(
         default=False, description="Whether this user has superadmin privileges"
     )
+    is_owner: bool = Field(default=False, description="Whether this user is the account owner")
     status: UserStatus = Field(default=UserStatus.ACTIVE, description="User's current status")
 
     @field_validator("display_name")

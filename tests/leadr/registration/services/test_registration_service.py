@@ -72,7 +72,12 @@ class TestRegistrationServiceCompleteRegistration:
         mock_account_service.create_account.assert_called_once_with(
             name="Test Account", slug="test-account"
         )
-        mock_user_service.create_user.assert_called_once()
+        mock_user_service.create_user.assert_called_once_with(
+            account_id=mock_account.id,
+            email="test@example.com",
+            display_name="test",
+            is_owner=True,
+        )
         mock_api_key_service.create_api_key.assert_called_once()
 
     async def test_complete_registration_auto_generates_slug(self, db_session: AsyncSession):

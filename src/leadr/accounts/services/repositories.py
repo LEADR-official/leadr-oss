@@ -139,12 +139,16 @@ class UserRepository(BaseRepository[User, UserORM]):
 
     def _to_domain(self, orm: UserORM) -> User:
         """Convert ORM model to domain entity."""
+        from leadr.accounts.domain.user import UserStatus
+
         return User(
             id=UserID(orm.id),
             account_id=AccountID(orm.account_id),
             email=orm.email,
             display_name=orm.display_name,
             super_admin=orm.super_admin,
+            is_owner=orm.is_owner,
+            status=UserStatus(orm.status.value),
             created_at=orm.created_at,
             updated_at=orm.updated_at,
             deleted_at=orm.deleted_at,
@@ -152,12 +156,16 @@ class UserRepository(BaseRepository[User, UserORM]):
 
     def _to_orm(self, entity: User) -> UserORM:
         """Convert domain entity to ORM model."""
+        from leadr.accounts.adapters.orm import UserStatusEnum
+
         return UserORM(
             id=entity.id.uuid,
             account_id=entity.account_id.uuid,
             email=entity.email,
             display_name=entity.display_name,
             super_admin=entity.super_admin,
+            is_owner=entity.is_owner,
+            status=UserStatusEnum(entity.status.value),
             created_at=entity.created_at,
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,

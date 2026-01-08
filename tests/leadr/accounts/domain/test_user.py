@@ -535,3 +535,65 @@ class TestUserStatus:
 
         assert suspended_user.is_suspended is True
         assert active_user.is_suspended is False
+
+
+class TestUserIsOwner:
+    """Test suite for is_owner field."""
+
+    def test_is_owner_defaults_to_false(self):
+        """Test that is_owner defaults to False when not specified."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.is_owner is False
+
+    def test_user_can_be_created_as_owner(self):
+        """Test that user can be created with is_owner=True."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="owner@example.com",
+            display_name="Account Owner",
+            is_owner=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.is_owner is True
+
+    def test_is_owner_can_be_updated(self):
+        """Test that is_owner flag can be updated after creation."""
+        user_id = UserID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert user.is_owner is False
+
+        user.is_owner = True
+        assert user.is_owner is True
+
+        user.is_owner = False
+        assert user.is_owner is False
