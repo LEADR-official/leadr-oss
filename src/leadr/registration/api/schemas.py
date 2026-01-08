@@ -1,7 +1,6 @@
 """API schemas for registration endpoints."""
 
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -97,7 +96,6 @@ class InviteUserRequest(BaseModel):
     """Request to invite a user to an account."""
 
     email: EmailStr = Field(description="Email address to invite")
-    account_id: UUID = Field(description="Account ID to invite user to")
     display_name: str | None = Field(
         default=None,
         description="Optional display name (defaults to email prefix if not provided)",

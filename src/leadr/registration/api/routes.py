@@ -8,7 +8,6 @@ from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
-from leadr.common.domain.ids import AccountID
 from leadr.config import settings
 from leadr.registration.api.schemas import (
     CompleteRegistrationRequest,
@@ -151,26 +150,18 @@ async def invite_user(
     invite_service: InviteServiceDep,
     auth: AdminAuthContextDep,
 ) -> InviteUserResponse:
-    """Invite a user to an account.
+    """Invite a user to the authenticated admin's account.
 
     Creates a user with INVITED status and sends an invite email with
     a verification code. If the user already exists with INVITED status,
     resends the invite (invalidates old code, sends new one).
 
-    Requires admin authentication. Admins can only invite users to their own
-    account unless they are superadmins.
+    Requires admin authentication.
     """
-    # Validate admin has access to the target account
-    if not auth.is_superadmin and auth.account_id != AccountID(request.account_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only invite users to your own account",
-        )
-
     try:
         user = await invite_service.send_invite(
             email=request.email,
-            account_id=AccountID(request.account_id),
+            account_id=auth.account_id,
             display_name=request.display_name,
         )
     except ValueError as e:

@@ -497,7 +497,6 @@ class TestInviteUser:
             "/register/invite",
             json={
                 "email": "invited@example.com",
-                "account_id": str(account_id.uuid),
             },
         )
 
@@ -508,12 +507,19 @@ class TestInviteUser:
         assert "user_id" in data
         assert "message" in data
 
+        # Verify service was called with auth.account_id
+        mock_invite_service.send_invite.assert_called_once_with(
+            email="invited@example.com",
+            account_id=account_id,
+            display_name=None,
+        )
+
         app.dependency_overrides.clear()
 
     async def test_invite_user_with_display_name(self, authenticated_client: AsyncClient):
         """Test user invite with custom display name."""
         mock_auth = Mock()
-        mock_auth.is_superadmin = True
+        mock_auth.is_superadmin = False
         account_id = AccountID()
         mock_auth.account_id = account_id
         mock_auth.user_id = UserID()
@@ -541,91 +547,23 @@ class TestInviteUser:
             "/register/invite",
             json={
                 "email": "invited@example.com",
-                "account_id": str(account_id.uuid),
                 "display_name": "Custom Name",
             },
         )
 
         assert response.status_code == 201
-        mock_invite_service.send_invite.assert_called_once()
-        call_kwargs = mock_invite_service.send_invite.call_args.kwargs
-        assert call_kwargs["display_name"] == "Custom Name"
-
-        app.dependency_overrides.clear()
-
-    async def test_invite_user_non_admin_to_different_account(
-        self, authenticated_client: AsyncClient
-    ):
-        """Test non-superadmin cannot invite to other accounts."""
-        mock_auth = Mock()
-        mock_auth.is_superadmin = False
-        mock_auth.account_id = AccountID()  # Admin's account
-        mock_auth.user_id = UserID()
-
-        async def override_auth():
-            return mock_auth
-
-        app.dependency_overrides[require_admin_auth] = override_auth
-
-        different_account_id = AccountID()  # Different account
-
-        response = await authenticated_client.post(
-            "/register/invite",
-            json={
-                "email": "invited@example.com",
-                "account_id": str(different_account_id.uuid),
-            },
-        )
-
-        assert response.status_code == 403
-        assert "own account" in response.json()["error"]
-
-        app.dependency_overrides.clear()
-
-    async def test_invite_user_superadmin_to_any_account(self, authenticated_client: AsyncClient):
-        """Test superadmin can invite to any account."""
-        mock_auth = Mock()
-        mock_auth.is_superadmin = True
-        mock_auth.account_id = AccountID()  # Superadmin's account
-        mock_auth.user_id = UserID()
-
-        async def override_auth():
-            return mock_auth
-
-        different_account_id = AccountID()  # Different account
-
-        mock_invite_service = AsyncMock()
-        mock_user = User(
-            id=UserID(),
-            account_id=different_account_id,
+        mock_invite_service.send_invite.assert_called_once_with(
             email="invited@example.com",
-            display_name="invited",
-            status=UserStatus.INVITED,
+            account_id=account_id,
+            display_name="Custom Name",
         )
-        mock_invite_service.send_invite.return_value = mock_user
-
-        async def override_invite_service():
-            return mock_invite_service
-
-        app.dependency_overrides[require_admin_auth] = override_auth
-        app.dependency_overrides[get_invite_service] = override_invite_service
-
-        response = await authenticated_client.post(
-            "/register/invite",
-            json={
-                "email": "invited@example.com",
-                "account_id": str(different_account_id.uuid),
-            },
-        )
-
-        assert response.status_code == 201
 
         app.dependency_overrides.clear()
 
     async def test_invite_user_already_active(self, authenticated_client: AsyncClient):
         """Test inviting already-active user returns error."""
         mock_auth = Mock()
-        mock_auth.is_superadmin = True
+        mock_auth.is_superadmin = False
         account_id = AccountID()
         mock_auth.account_id = account_id
         mock_auth.user_id = UserID()
@@ -648,7 +586,6 @@ class TestInviteUser:
             "/register/invite",
             json={
                 "email": "active@example.com",
-                "account_id": str(account_id.uuid),
             },
         )
 
@@ -660,7 +597,7 @@ class TestInviteUser:
     async def test_invite_user_invalid_email(self, authenticated_client: AsyncClient):
         """Test invite with invalid email format."""
         mock_auth = Mock()
-        mock_auth.is_superadmin = True
+        mock_auth.is_superadmin = False
         mock_auth.account_id = AccountID()
         mock_auth.user_id = UserID()
 
@@ -673,7 +610,6 @@ class TestInviteUser:
             "/register/invite",
             json={
                 "email": "not-an-email",
-                "account_id": str(AccountID().uuid),
             },
         )
 
