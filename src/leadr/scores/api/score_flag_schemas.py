@@ -14,7 +14,7 @@ class ScoreFlagUpdateRequest(BaseModel):
 
     status: str | None = Field(
         default=None,
-        description="Updated status: PENDING, CONFIRMED_CHEAT, FALSE_POSITIVE, or DISMISSED",
+        description="Updated status: pending, confirmed_cheat, false_positive, or dismissed",
     )
     reviewer_decision: str | None = Field(
         default=None,
@@ -28,11 +28,11 @@ class ScoreFlagResponse(BaseModel):
 
     id: ScoreFlagID = Field(description="Unique identifier for the score flag")
     score_id: ScoreID = Field(description="ID of the score that was flagged")
-    flag_type: str = Field(description="Type of flag (e.g., VELOCITY, DUPLICATE, RATE_LIMIT)")
-    confidence: str = Field(description="Confidence level of the flag (LOW, MEDIUM, HIGH)")
+    flag_type: str = Field(description="Type of flag (e.g., velocity, duplicate, rate_limit)")
+    confidence: str = Field(description="Confidence level of the flag (low, medium, high)")
     metadata: dict[str, Any] = Field(description="Additional metadata about the flag")
     status: str = Field(
-        description="Status: PENDING, CONFIRMED_CHEAT, FALSE_POSITIVE, or DISMISSED"
+        description="Status: pending, confirmed_cheat, false_positive, or dismissed"
     )
     reviewed_at: datetime | None = Field(
         default=None, description="Timestamp when flag was reviewed, or null"

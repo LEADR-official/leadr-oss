@@ -55,7 +55,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         Example:
             >>> flags = await service.list_flags(
             ...     account_id=account.id,
-            ...     status="PENDING",
+            ...     status="pending",
             ...     pagination=PaginationParams(cursor=None, limit=100, sort=None),
             ... )
         """

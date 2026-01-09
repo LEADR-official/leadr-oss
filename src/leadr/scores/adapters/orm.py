@@ -137,7 +137,7 @@ class ScoreFlagORM(Base):
     flag_metadata: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=False, default=dict, server_default="{}"
     )
-    status: Mapped[str] = mapped_column(String, nullable=False, default="PENDING", index=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending", index=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )

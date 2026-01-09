@@ -342,7 +342,7 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
             List of flags with status PENDING (excludes soft-deleted)
         """
         query = select(ScoreFlagORM).where(
-            ScoreFlagORM.status == "PENDING",
+            ScoreFlagORM.status == "pending",
             ScoreFlagORM.deleted_at.is_(None),
         )
 

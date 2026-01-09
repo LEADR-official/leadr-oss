@@ -115,7 +115,7 @@ class TestVerifyCode:
         data = response.json()
         assert "verification_token" in data
         assert data["expires_in"] == 600
-        assert data["type"] == "REGISTRATION"
+        assert data["type"] == "registration"
 
         app.dependency_overrides.clear()
 
@@ -195,7 +195,7 @@ class TestVerifyCode:
         assert response.status_code == 200
         data = response.json()
         assert "verification_token" in data
-        assert data["type"] == "INVITE"
+        assert data["type"] == "invite"
 
         app.dependency_overrides.clear()
 
@@ -540,7 +540,7 @@ class TestInviteUser:
         assert response.status_code == 201
         data = response.json()
         assert data["email"] == "invited@example.com"
-        assert data["status"] == "INVITED"
+        assert data["status"] == "invited"
         assert "user_id" in data
         assert "message" in data
 

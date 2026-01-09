@@ -649,7 +649,7 @@ class TestUserAPI:
         assert response.status_code == 200
         data = response.json()
         assert "status" in data
-        assert data["status"] == "ACTIVE"
+        assert data["status"] == "active"
 
     async def test_update_user_status_to_suspended(
         self, authenticated_client: AsyncClient, db_session
@@ -687,16 +687,16 @@ class TestUserAPI:
         # Suspend the user via PATCH
         response = await authenticated_client.patch(
             f"/users/{user_id}",
-            json={"status": "SUSPENDED"},
+            json={"status": "suspended"},
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "SUSPENDED"
+        assert data["status"] == "suspended"
 
         # Verify persisted
         get_response = await authenticated_client.get(f"/users/{user_id}")
-        assert get_response.json()["status"] == "SUSPENDED"
+        assert get_response.json()["status"] == "suspended"
 
     async def test_update_user_status_to_active(
         self, authenticated_client: AsyncClient, db_session
@@ -734,16 +734,16 @@ class TestUserAPI:
         # Activate the user via PATCH
         response = await authenticated_client.patch(
             f"/users/{user_id}",
-            json={"status": "ACTIVE"},
+            json={"status": "active"},
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "ACTIVE"
+        assert data["status"] == "active"
 
         # Verify persisted
         get_response = await authenticated_client.get(f"/users/{user_id}")
-        assert get_response.json()["status"] == "ACTIVE"
+        assert get_response.json()["status"] == "active"
 
     async def test_list_users_includes_status(self, authenticated_client: AsyncClient, db_session):
         """Test that list users response includes status field for each user."""
@@ -800,5 +800,5 @@ class TestUserAPI:
 
         # Check correct statuses
         statuses = {u["email"]: u["status"] for u in data}
-        assert statuses["active@example.com"] == "ACTIVE"
-        assert statuses["suspended@example.com"] == "SUSPENDED"
+        assert statuses["active@example.com"] == "active"
+        assert statuses["suspended@example.com"] == "suspended"

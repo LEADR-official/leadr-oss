@@ -12,13 +12,13 @@ class TrustTier(str, Enum):
     - Tier C (Unverified): Strictest thresholds, lowest rate limits
     """
 
-    A = "A"
+    A = "a"
     """Tier A - Trusted devices with verified attestation."""
 
-    B = "B"
+    B = "b"
     """Tier B - Verified devices without full attestation."""
 
-    C = "C"
+    C = "c"
     """Tier C - Unverified or new devices."""
 
 
@@ -29,28 +29,28 @@ class FlagType(str, Enum):
     potentially suspicious score submissions.
     """
 
-    RATE_LIMIT = "RATE_LIMIT"
+    RATE_LIMIT = "rate_limit"
     """Score submission exceeds rate limits for the user/board."""
 
-    DUPLICATE = "DUPLICATE"
+    DUPLICATE = "duplicate"
     """Identical score value submitted multiple times in short time window."""
 
-    VELOCITY = "VELOCITY"
+    VELOCITY = "velocity"
     """Submissions are happening too quickly (< 2 seconds apart)."""
 
-    OUTLIER = "OUTLIER"
+    OUTLIER = "outlier"
     """Score is statistically anomalous compared to board distribution."""
 
-    IMPOSSIBLE_VALUE = "IMPOSSIBLE_VALUE"
+    IMPOSSIBLE_VALUE = "impossible_value"
     """Score contains mathematically impossible value (negative, NaN, etc)."""
 
-    PATTERN = "PATTERN"
+    PATTERN = "pattern"
     """Suspicious pattern detected in submission history (all round numbers, etc)."""
 
-    PROGRESSION = "PROGRESSION"
+    PROGRESSION = "progression"
     """Unrealistic improvement percentage between submissions."""
 
-    CLUSTER = "CLUSTER"
+    CLUSTER = "cluster"
     """Multiple users submitting identical scores in short time window."""
 
 
@@ -63,13 +63,13 @@ class FlagConfidence(str, Enum):
     - LOW: Log for analysis, accept submission
     """
 
-    LOW = "LOW"
+    LOW = "low"
     """Low confidence detection - log but accept."""
 
-    MEDIUM = "MEDIUM"
+    MEDIUM = "medium"
     """Medium confidence detection - flag for review but accept."""
 
-    HIGH = "HIGH"
+    HIGH = "high"
     """High confidence detection - reject submission."""
 
 
@@ -79,13 +79,13 @@ class FlagAction(str, Enum):
     Determines how the score submission should be handled.
     """
 
-    ACCEPT = "ACCEPT"
+    ACCEPT = "accept"
     """Accept the score submission without any flags."""
 
-    FLAG = "FLAG"
+    FLAG = "flag"
     """Accept the score but flag it for manual review."""
 
-    REJECT = "REJECT"
+    REJECT = "reject"
     """Reject the score submission (do not save to database)."""
 
 
@@ -95,14 +95,14 @@ class ScoreFlagStatus(str, Enum):
     Indicates whether a flag has been reviewed and what decision was made.
     """
 
-    PENDING = "PENDING"
+    PENDING = "pending"
     """Flag has not been reviewed yet."""
 
-    CONFIRMED_CHEAT = "CONFIRMED_CHEAT"
+    CONFIRMED_CHEAT = "confirmed_cheat"
     """Admin confirmed this is cheating behavior."""
 
-    FALSE_POSITIVE = "FALSE_POSITIVE"
+    FALSE_POSITIVE = "false_positive"
     """Admin determined this was legitimate gameplay."""
 
-    DISMISSED = "DISMISSED"
+    DISMISSED = "dismissed"
     """Admin dismissed the flag without a specific determination."""

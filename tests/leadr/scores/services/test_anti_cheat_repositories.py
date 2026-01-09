@@ -150,7 +150,7 @@ class TestScoreFlagRepository:
         assert created.flag_type == FlagType.RATE_LIMIT
         assert created.confidence == FlagConfidence.HIGH
         assert created.metadata == {"submissions_count": 101, "limit": 100}
-        assert created.status == "PENDING"
+        assert created.status == "pending"
 
     async def test_get_flag_by_id(self, db_session: AsyncSession, test_score):
         """Test retrieving a flag by ID."""
@@ -203,7 +203,7 @@ class TestScoreFlagRepository:
         flag.reviewer_decision = "Legitimate speed"
         updated = await repo.update(flag)
 
-        assert updated.status == "FALSE_POSITIVE"
+        assert updated.status == "false_positive"
         assert updated.reviewed_at == reviewed_at
         assert updated.reviewer_id == reviewer_id
         assert updated.reviewer_decision == "Legitimate speed"
@@ -263,5 +263,5 @@ class TestScoreFlagRepository:
         pending = await repo.get_pending_flags()
 
         assert len(pending) == 1
-        assert pending[0].status == "PENDING"
+        assert pending[0].status == "pending"
         assert pending[0].flag_type == FlagType.RATE_LIMIT

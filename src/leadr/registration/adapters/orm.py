@@ -29,8 +29,8 @@ class VerificationCodeStatusEnum(str, enum.Enum):
 class VerificationCodeTypeEnum(str, enum.Enum):
     """Verification code type enum for database."""
 
-    REGISTRATION = "REGISTRATION"
-    INVITE = "INVITE"
+    REGISTRATION = "registration"
+    INVITE = "invite"
 
 
 class VerificationCodeORM(Base):
@@ -65,7 +65,7 @@ class VerificationCodeORM(Base):
         ),
         nullable=False,
         default=VerificationCodeTypeEnum.REGISTRATION,
-        server_default="REGISTRATION",
+        server_default="registration",
     )
     user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),

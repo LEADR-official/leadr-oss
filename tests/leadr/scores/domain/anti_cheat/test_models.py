@@ -94,7 +94,7 @@ class TestScoreFlag:
         assert flag.flag_type == FlagType.RATE_LIMIT
         assert flag.confidence == FlagConfidence.HIGH
         assert flag.metadata == {"submissions_count": 101, "limit": 100}
-        assert flag.status == "PENDING"  # Default
+        assert flag.status == "pending"  # Default
         assert flag.reviewed_at is None
         assert flag.reviewer_id is None
         assert flag.reviewer_decision is None
@@ -119,7 +119,7 @@ class TestScoreFlag:
             confidence=FlagConfidence.HIGH,
         )
 
-        assert flag.status == "PENDING"
+        assert flag.status == "pending"
 
     def test_flag_with_review_data(self):
         """Test creating a flag with review information."""

@@ -310,9 +310,9 @@ class TestUserStatus:
 
     def test_user_status_enum_values(self):
         """Test that UserStatus enum has expected values."""
-        assert UserStatus.INVITED.value == "INVITED"
-        assert UserStatus.ACTIVE.value == "ACTIVE"
-        assert UserStatus.SUSPENDED.value == "SUSPENDED"
+        assert UserStatus.INVITED.value == "invited"
+        assert UserStatus.ACTIVE.value == "active"
+        assert UserStatus.SUSPENDED.value == "suspended"
 
     def test_user_status_defaults_to_active(self):
         """Test that user status defaults to ACTIVE when not specified."""

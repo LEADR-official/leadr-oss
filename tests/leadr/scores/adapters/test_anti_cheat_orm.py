@@ -102,7 +102,7 @@ class TestScoreFlagORM:
             flag_type=FlagType.RATE_LIMIT.value,
             confidence=FlagConfidence.HIGH.value,
             flag_metadata={"submissions_count": 101, "limit": 100},
-            status="PENDING",
+            status="pending",
         )
 
         db_session.add(orm)
@@ -110,10 +110,10 @@ class TestScoreFlagORM:
 
         assert orm.id is not None
         assert orm.score_id == score_orm.id
-        assert orm.flag_type == "RATE_LIMIT"
-        assert orm.confidence == "HIGH"
+        assert orm.flag_type == "rate_limit"
+        assert orm.confidence == "high"
         assert orm.flag_metadata == {"submissions_count": 101, "limit": 100}
-        assert orm.status == "PENDING"
+        assert orm.status == "pending"
         assert orm.reviewed_at is None
         assert orm.reviewer_id is None
         assert orm.reviewer_decision is None
@@ -127,7 +127,7 @@ class TestScoreFlagORM:
             flag_type=FlagType.DUPLICATE.value,
             confidence=FlagConfidence.MEDIUM.value,
             flag_metadata={"duplicate_count": 3},
-            status="PENDING",
+            status="pending",
         )
 
         db_session.add(orm)
@@ -141,7 +141,7 @@ class TestScoreFlagORM:
         assert domain.flag_type == FlagType.DUPLICATE
         assert domain.confidence == FlagConfidence.MEDIUM
         assert domain.metadata == {"duplicate_count": 3}
-        assert domain.status == "PENDING"
+        assert domain.status == "pending"
         assert domain.created_at == orm.created_at
 
     async def test_score_flag_from_domain(self, db_session, score_orm):
@@ -160,10 +160,10 @@ class TestScoreFlagORM:
 
         assert orm.id == domain.id
         assert orm.score_id == score_orm.id
-        assert orm.flag_type == "VELOCITY"
-        assert orm.confidence == "HIGH"
+        assert orm.flag_type == "velocity"
+        assert orm.confidence == "high"
         assert orm.flag_metadata == {"time_delta_seconds": 0.5}
-        assert orm.status == "PENDING"
+        assert orm.status == "pending"
         assert orm.created_at == domain.created_at
 
     async def test_score_flag_with_review_data(self, db_session, score_orm, account_orm):
@@ -188,7 +188,7 @@ class TestScoreFlagORM:
             flag_type=FlagType.OUTLIER.value,
             confidence=FlagConfidence.MEDIUM.value,
             flag_metadata={"z_score": 4.5},
-            status="FALSE_POSITIVE",
+            status="false_positive",
             reviewed_at=reviewed_at,
             reviewer_id=user.id,
             reviewer_decision="Legitimate exceptional performance",
@@ -199,7 +199,7 @@ class TestScoreFlagORM:
 
         domain = orm.to_domain()
 
-        assert domain.status == "FALSE_POSITIVE"
+        assert domain.status == "false_positive"
         assert domain.reviewed_at == reviewed_at
         assert domain.reviewer_id is not None
         assert domain.reviewer_id == UserID(user.id)

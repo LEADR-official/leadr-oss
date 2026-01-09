@@ -437,8 +437,8 @@ class TestVerificationCodeType:
 
     def test_verification_code_type_enum_values(self):
         """Test that VerificationCodeType has expected values."""
-        assert VerificationCodeType.REGISTRATION.value == "REGISTRATION"
-        assert VerificationCodeType.INVITE.value == "INVITE"
+        assert VerificationCodeType.REGISTRATION.value == "registration"
+        assert VerificationCodeType.INVITE.value == "invite"
 
     def test_verification_code_type_defaults_to_registration(self):
         """Test that code type defaults to REGISTRATION when not specified."""

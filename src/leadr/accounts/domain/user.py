@@ -14,13 +14,13 @@ class UserStatus(str, Enum):
     Represents the lifecycle state of a user.
     """
 
-    INVITED = "INVITED"
+    INVITED = "invited"
     """User has been invited but hasn't completed registration."""
 
-    ACTIVE = "ACTIVE"
+    ACTIVE = "active"
     """User is active and can use the system."""
 
-    SUSPENDED = "SUSPENDED"
+    SUSPENDED = "suspended"
     """User has been suspended and cannot access the system."""
 
 

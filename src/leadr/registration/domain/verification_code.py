@@ -25,10 +25,10 @@ class VerificationCodeType(str, Enum):
     and codes used for user invitations.
     """
 
-    REGISTRATION = "REGISTRATION"
+    REGISTRATION = "registration"
     """Code for new account registration flow."""
 
-    INVITE = "INVITE"
+    INVITE = "invite"
     """Code for invited user to join an existing account."""
 
 

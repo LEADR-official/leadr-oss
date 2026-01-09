@@ -108,8 +108,8 @@ class TestScoreFlagRoutes:
         assert "pagination" in data
         assert len(data["data"]) == 2
         flag_types = {f["flag_type"] for f in data["data"]}
-        assert "VELOCITY" in flag_types
-        assert "DUPLICATE" in flag_types
+        assert "velocity" in flag_types
+        assert "duplicate" in flag_types
 
     async def test_list_flags_filter_by_board(self, client: AsyncClient, db_session, test_api_key):
         """Test filtering flags by board_id via API."""
@@ -203,7 +203,7 @@ class TestScoreFlagRoutes:
         assert response.status_code == 200
         data = response.json()
         assert len(data["data"]) == 1
-        assert data["data"][0]["flag_type"] == "VELOCITY"
+        assert data["data"][0]["flag_type"] == "velocity"
 
     async def test_list_flags_filter_by_status(self, client: AsyncClient, db_session, test_api_key):
         """Test filtering flags by status via API."""
@@ -277,17 +277,17 @@ class TestScoreFlagRoutes:
         await flag_repo.create(flag1)
         await flag_repo.create(flag2)
 
-        # Filter by PENDING status
+        # Filter by pending status
         response = await client.get(
-            f"/score-flags?account_id={account.id}&status=PENDING",
+            f"/score-flags?account_id={account.id}&status=pending",
             headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 200
         data = response.json()
         assert len(data["data"]) == 1
-        assert data["data"][0]["status"] == "PENDING"
-        assert data["data"][0]["flag_type"] == "VELOCITY"
+        assert data["data"][0]["status"] == "pending"
+        assert data["data"][0]["flag_type"] == "velocity"
 
     async def test_list_flags_filter_by_flag_type(
         self, client: AsyncClient, db_session, test_api_key
@@ -363,16 +363,16 @@ class TestScoreFlagRoutes:
         await flag_repo.create(flag1)
         await flag_repo.create(flag2)
 
-        # Filter by VELOCITY type
+        # Filter by velocity type
         response = await client.get(
-            f"/score-flags?account_id={account.id}&flag_type=VELOCITY",
+            f"/score-flags?account_id={account.id}&flag_type=velocity",
             headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 200
         data = response.json()
         assert len(data["data"]) == 1
-        assert data["data"][0]["flag_type"] == "VELOCITY"
+        assert data["data"][0]["flag_type"] == "velocity"
 
     async def test_get_flag(self, client: AsyncClient, db_session, test_api_key):
         """Test getting a single score flag by ID via API."""
@@ -439,9 +439,9 @@ class TestScoreFlagRoutes:
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == str(created_flag.id)
-        assert data["flag_type"] == "VELOCITY"
-        assert data["confidence"] == "MEDIUM"
-        assert data["status"] == "PENDING"
+        assert data["flag_type"] == "velocity"
+        assert data["confidence"] == "medium"
+        assert data["status"] == "pending"
         assert data["metadata"]["reason"] == "score improved too quickly"
 
     async def test_get_flag_not_found(self, client: AsyncClient, db_session, test_api_key):
@@ -513,7 +513,7 @@ class TestScoreFlagRoutes:
         response = await client.patch(
             f"/score-flags/{created_flag.id}",
             json={
-                "status": "CONFIRMED_CHEAT",
+                "status": "confirmed_cheat",
                 "reviewer_decision": "Verified cheating behavior",
             },
             headers={"leadr-api-key": test_api_key},
@@ -521,7 +521,7 @@ class TestScoreFlagRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "CONFIRMED_CHEAT"
+        assert data["status"] == "confirmed_cheat"
         assert data["reviewer_decision"] == "Verified cheating behavior"
         assert data["reviewed_at"] is not None
 
@@ -587,7 +587,7 @@ class TestScoreFlagRoutes:
         response = await client.patch(
             f"/score-flags/{created_flag.id}",
             json={
-                "status": "FALSE_POSITIVE",
+                "status": "false_positive",
                 "reviewer_decision": "Legitimate gameplay",
             },
             headers={"leadr-api-key": test_api_key},
@@ -595,7 +595,7 @@ class TestScoreFlagRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "FALSE_POSITIVE"
+        assert data["status"] == "false_positive"
         assert data["reviewer_decision"] == "Legitimate gameplay"
 
     async def test_soft_delete_flag(self, client: AsyncClient, db_session, test_api_key):
@@ -751,7 +751,7 @@ class TestScoreFlagRoutes:
         assert response.status_code == 200
         data = response.json()
         assert len(data["data"]) == 1
-        assert data["data"][0]["flag_type"] == "DUPLICATE"
+        assert data["data"][0]["flag_type"] == "duplicate"
 
     async def test_superadmin_list_score_flags_without_account_id_returns_all(
         self, authenticated_client: AsyncClient, db_session
@@ -880,5 +880,5 @@ class TestScoreFlagRoutes:
 
         # Should contain flags from both accounts
         flag_types = {f["flag_type"] for f in data["data"]}
-        assert "VELOCITY" in flag_types
-        assert "DUPLICATE" in flag_types
+        assert "velocity" in flag_types
+        assert "duplicate" in flag_types

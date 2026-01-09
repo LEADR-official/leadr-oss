@@ -19,9 +19,9 @@ class AccountStatusEnum(str, enum.Enum):
 class UserStatusEnum(str, enum.Enum):
     """User status enum for database."""
 
-    INVITED = "INVITED"
-    ACTIVE = "ACTIVE"
-    SUSPENDED = "SUSPENDED"
+    INVITED = "invited"
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
 
 
 class AccountORM(Base):
@@ -80,7 +80,7 @@ class UserORM(Base):
         ),
         nullable=False,
         default=UserStatusEnum.ACTIVE,
-        server_default="ACTIVE",
+        server_default="active",
     )
 
     # Relationships
