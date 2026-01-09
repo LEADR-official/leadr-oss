@@ -217,6 +217,7 @@ class AuthContextDependency:
         require_client: bool = False,
         require_nonce: bool = False,
         require_superadmin_account_id: bool = False,
+        require_superadmin: bool = False,
     ):
         """Initialize authentication requirements.
 
@@ -226,10 +227,16 @@ class AuthContextDependency:
             require_nonce: If True, nonce validation is required for client auth (mutations).
             require_superadmin_account_id: If True, superadmins must provide account_id
                 query parameter on GET requests. Used for list endpoints.
+            require_superadmin: If True, only superadmin users are allowed. Returns 403
+                for non-superadmin users. Implies require_admin=True.
 
         Raises:
             ValueError: If neither require_admin nor require_client is True.
         """
+        # require_superadmin implies require_admin
+        if require_superadmin:
+            require_admin = True
+
         if not require_admin and not require_client:
             raise ValueError("At least one of require_admin or require_client must be True")
 
@@ -237,6 +244,7 @@ class AuthContextDependency:
         self.require_client = require_client
         self.require_nonce = require_nonce
         self.require_superadmin_account_id = require_superadmin_account_id
+        self.require_superadmin = require_superadmin
 
     async def __call__(
         self,
@@ -313,6 +321,13 @@ class AuthContextDependency:
                 user_service=user_service,
                 request=request,
             )
+
+            # Check superadmin requirement
+            if self.require_superadmin and not auth_context.is_superadmin:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Superadmin access required",
+                )
 
             # Check access if an account_id was provided
             account_id_to_check = body_account_id or query_account_id
@@ -489,6 +504,7 @@ require_admin_auth = AuthContextDependency(require_admin=True)
 require_admin_auth_with_account_id = AuthContextDependency(
     require_admin=True, require_superadmin_account_id=True
 )
+require_superadmin_auth = AuthContextDependency(require_superadmin=True)
 require_client_auth = AuthContextDependency(require_client=True)
 require_client_auth_with_nonce = AuthContextDependency(require_client=True, require_nonce=True)
 
@@ -497,6 +513,7 @@ AdminAuthContextDep = Annotated[AdminAuthContext, Depends(require_admin_auth)]
 AdminAuthContextWithAccountIDDep = Annotated[
     AdminAuthContext, Depends(require_admin_auth_with_account_id)
 ]
+SuperAdminAuthContextDep = Annotated[AdminAuthContext, Depends(require_superadmin_auth)]
 ClientAuthContextDep = Annotated[ClientAuthContext, Depends(require_client_auth)]
 ClientAuthContextWithNonceDep = Annotated[
     ClientAuthContext, Depends(require_client_auth_with_nonce)
