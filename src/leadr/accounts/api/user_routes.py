@@ -10,6 +10,7 @@ from leadr.accounts.api.user_schemas import (
     UserResponse,
     UserUpdateRequest,
 )
+from leadr.accounts.domain.user import UserStatus
 from leadr.accounts.services.dependencies import UserServiceDep
 from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
@@ -152,7 +153,8 @@ async def update_user(
 ) -> UserResponse:
     """Update a user.
 
-    Supports updating email, display name, or soft-deleting the user.
+    Supports updating email, display name, status, or soft-deleting the user.
+    Status changes (active/suspended) are handled through dedicated service methods.
 
     Args:
         user_id: Unique identifier for the user.
@@ -182,12 +184,24 @@ async def update_user(
         user = await service.soft_delete(user_id)
         return UserResponse.from_domain(user)
 
-    # Update fields
-    user = await service.update_user(
-        user_id=user_id,
-        email=request.email,
-        display_name=request.display_name,
-        super_admin=request.super_admin,
-    )
+    # Handle status changes using dedicated service methods
+    user = existing_user
+    if request.status == UserStatus.SUSPENDED:
+        user = await service.suspend_user(user_id)
+    elif request.status == UserStatus.ACTIVE:
+        user = await service.activate_user(user_id)
+
+    # Handle field updates
+    if (
+        request.email is not None
+        or request.display_name is not None
+        or request.super_admin is not None
+    ):
+        user = await service.update_user(
+            user_id=user_id,
+            email=request.email,
+            display_name=request.display_name,
+            super_admin=request.super_admin,
+        )
 
     return UserResponse.from_domain(user)

@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
+from leadr.accounts.domain.user import UserStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.accounts.services.user_service import UserService
 from leadr.common.api.pagination import PaginationParams
@@ -482,3 +483,91 @@ class TestUserService:
         # superadmin_exists should return False
         exists = await service.superadmin_exists()
         assert exists is False
+
+    async def test_suspend_user(self, db_session: AsyncSession):
+        """Test suspending a user via service."""
+        # Create account and user
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+        )
+        await account_repo.create(account)
+
+        service = UserService(db_session)
+        user = await service.create_user(
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+        )
+
+        # Verify user starts as active
+        assert user.status == UserStatus.ACTIVE
+
+        # Suspend the user
+        suspended_user = await service.suspend_user(user.id)
+
+        assert suspended_user.status == UserStatus.SUSPENDED
+
+        # Verify persisted in database
+        retrieved = await service.get_user(user.id)
+        assert retrieved is not None
+        assert retrieved.status == UserStatus.SUSPENDED
+
+    async def test_suspend_user_not_found(self, db_session: AsyncSession):
+        """Test that suspending a non-existent user raises EntityNotFoundError."""
+        service = UserService(db_session)
+        non_existent_id = uuid4()
+
+        with pytest.raises(EntityNotFoundError) as exc_info:
+            await service.suspend_user(UserID(non_existent_id))
+
+        assert "User not found" in str(exc_info.value)
+
+    async def test_activate_user(self, db_session: AsyncSession):
+        """Test activating a suspended user via service."""
+        # Create account and user
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+        )
+        await account_repo.create(account)
+
+        service = UserService(db_session)
+        user = await service.create_user(
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+        )
+
+        # Suspend the user first
+        await service.suspend_user(user.id)
+
+        # Activate the user
+        activated_user = await service.activate_user(user.id)
+
+        assert activated_user.status == UserStatus.ACTIVE
+
+        # Verify persisted in database
+        retrieved = await service.get_user(user.id)
+        assert retrieved is not None
+        assert retrieved.status == UserStatus.ACTIVE
+
+    async def test_activate_user_not_found(self, db_session: AsyncSession):
+        """Test that activating a non-existent user raises EntityNotFoundError."""
+        service = UserService(db_session)
+        non_existent_id = uuid4()
+
+        with pytest.raises(EntityNotFoundError) as exc_info:
+            await service.activate_user(UserID(non_existent_id))
+
+        assert "User not found" in str(exc_info.value)

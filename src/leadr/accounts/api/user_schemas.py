@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
-from leadr.accounts.domain.user import User
+from leadr.accounts.domain.user import User, UserStatus
 from leadr.common.domain.ids import AccountID, UserID
 
 
@@ -24,6 +24,9 @@ class UserUpdateRequest(BaseModel):
     super_admin: bool | None = Field(
         default=None, description="Set superadmin privileges (true/false)"
     )
+    status: UserStatus | None = Field(
+        default=None, description="User status (INVITED, ACTIVE, SUSPENDED)"
+    )
     deleted: bool | None = Field(default=None, description="Set to true to soft delete the user")
 
 
@@ -35,6 +38,7 @@ class UserResponse(BaseModel):
     email: str = Field(description="User's email address")
     display_name: str = Field(description="User's display name")
     super_admin: bool = Field(description="Whether this user has superadmin privileges")
+    status: UserStatus = Field(description="User's current status (INVITED, ACTIVE, SUSPENDED)")
     created_at: datetime = Field(description="Timestamp when the user was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -54,6 +58,7 @@ class UserResponse(BaseModel):
             email=user.email,
             display_name=user.display_name,
             super_admin=user.super_admin,
+            status=user.status,
             created_at=user.created_at,
             updated_at=user.updated_at,
         )

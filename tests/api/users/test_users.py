@@ -6,7 +6,7 @@ import pytest
 from httpx import AsyncClient
 
 from leadr.accounts.domain.account import Account, AccountStatus
-from leadr.accounts.domain.user import User
+from leadr.accounts.domain.user import User, UserStatus
 from leadr.accounts.services.repositories import AccountRepository, UserRepository
 from leadr.common.domain.ids import AccountID, UserID
 
@@ -611,3 +611,194 @@ class TestUserAPI:
         # Confirm it's gone
         get_response = await authenticated_client.get(f"/users/{user_id}")
         assert get_response.status_code == 404
+
+    async def test_get_user_includes_status(self, authenticated_client: AsyncClient, db_session):
+        """Test that GET user response includes status field."""
+        # Create account and user
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        user_repo = UserRepository(db_session)
+        user_id = UserID()
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            status=UserStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await user_repo.create(user)
+
+        # Get it via API
+        response = await authenticated_client.get(f"/users/{user_id}")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "status" in data
+        assert data["status"] == "ACTIVE"
+
+    async def test_update_user_status_to_suspended(
+        self, authenticated_client: AsyncClient, db_session
+    ):
+        """Test updating user status to suspended via PATCH."""
+        # Create account and user
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        user_repo = UserRepository(db_session)
+        user_id = UserID()
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            status=UserStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await user_repo.create(user)
+
+        # Suspend the user via PATCH
+        response = await authenticated_client.patch(
+            f"/users/{user_id}",
+            json={"status": "SUSPENDED"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "SUSPENDED"
+
+        # Verify persisted
+        get_response = await authenticated_client.get(f"/users/{user_id}")
+        assert get_response.json()["status"] == "SUSPENDED"
+
+    async def test_update_user_status_to_active(
+        self, authenticated_client: AsyncClient, db_session
+    ):
+        """Test updating user status to active via PATCH."""
+        # Create account and suspended user
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        user_repo = UserRepository(db_session)
+        user_id = UserID()
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="user@example.com",
+            display_name="John Doe",
+            status=UserStatus.SUSPENDED,
+            created_at=now,
+            updated_at=now,
+        )
+        await user_repo.create(user)
+
+        # Activate the user via PATCH
+        response = await authenticated_client.patch(
+            f"/users/{user_id}",
+            json={"status": "ACTIVE"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ACTIVE"
+
+        # Verify persisted
+        get_response = await authenticated_client.get(f"/users/{user_id}")
+        assert get_response.json()["status"] == "ACTIVE"
+
+    async def test_list_users_includes_status(self, authenticated_client: AsyncClient, db_session):
+        """Test that list users response includes status field for each user."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create users with different statuses
+        user_repo = UserRepository(db_session)
+
+        user1 = User(
+            id=UserID(),
+            account_id=account_id,
+            email="active@example.com",
+            display_name="Active User",
+            status=UserStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        user2 = User(
+            id=UserID(),
+            account_id=account_id,
+            email="suspended@example.com",
+            display_name="Suspended User",
+            status=UserStatus.SUSPENDED,
+            created_at=now,
+            updated_at=now,
+        )
+
+        await user_repo.create(user1)
+        await user_repo.create(user2)
+
+        # List them
+        response = await authenticated_client.get(f"/users?account_id={account_id}")
+
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert len(data) == 2
+
+        # All users should have status field
+        for user_data in data:
+            assert "status" in user_data
+
+        # Check correct statuses
+        statuses = {u["email"]: u["status"] for u in data}
+        assert statuses["active@example.com"] == "ACTIVE"
+        assert statuses["suspended@example.com"] == "SUSPENDED"

@@ -162,3 +162,35 @@ class UserService(BaseService[User, UserRepository]):
         """
         superadmins = await self.find_superadmins()
         return len(superadmins) > 0
+
+    async def suspend_user(self, user_id: UserID) -> User:
+        """Suspend a user, preventing access.
+
+        Args:
+            user_id: The ID of the user to suspend.
+
+        Returns:
+            The updated User domain entity.
+
+        Raises:
+            EntityNotFoundError: If the user doesn't exist.
+        """
+        user = await self.get_by_id_or_raise(user_id)
+        user.suspend()
+        return await self.repository.update(user)
+
+    async def activate_user(self, user_id: UserID) -> User:
+        """Activate a user, allowing access.
+
+        Args:
+            user_id: The ID of the user to activate.
+
+        Returns:
+            The updated User domain entity.
+
+        Raises:
+            EntityNotFoundError: If the user doesn't exist.
+        """
+        user = await self.get_by_id_or_raise(user_id)
+        user.activate()
+        return await self.repository.update(user)
