@@ -3,8 +3,6 @@
 import time
 from unittest.mock import patch
 
-import pytest
-
 from leadr.infra.cache.adapters.memory import InMemoryCache
 from leadr.infra.cache.domain.interfaces import CacheBackend
 
