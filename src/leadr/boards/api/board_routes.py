@@ -19,6 +19,7 @@ from leadr.boards.api.board_schemas import (
 )
 from leadr.boards.services.board_service import BoardService
 from leadr.boards.services.dependencies import BoardServiceDep
+from leadr.common.api.hooks import PostCreateBoardHookDep, PreCreateBoardHookDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, BoardID, GameID
@@ -33,7 +34,11 @@ client_router = APIRouter()
 
 @router.post("/boards", status_code=status.HTTP_201_CREATED, response_model=BoardResponse)
 async def create_board(
-    request: BoardCreateRequest, service: BoardServiceDep, auth: AdminAuthContextDep
+    request: BoardCreateRequest,
+    service: BoardServiceDep,
+    auth: AdminAuthContextDep,
+    pre_create_hook: PreCreateBoardHookDep,
+    post_create_hook: PostCreateBoardHookDep,
 ) -> BoardResponse:
     """Create a new board.
 
@@ -47,6 +52,8 @@ async def create_board(
         request: Board creation details including account_id, game_id, name, and settings.
         service: Injected board service dependency.
         auth: Authentication context with user info.
+        pre_create_hook: Hook called before board creation (for quota checks).
+        post_create_hook: Hook called after successful board creation.
 
     Returns:
         BoardResponse with the created board including auto-generated ID and timestamps.
@@ -56,6 +63,8 @@ async def create_board(
         404: Game or account not found.
         400: Game doesn't belong to the specified account.
     """
+    await pre_create_hook(request.account_id, request.game_id, auth)
+
     try:
         board = await service.create_board(
             account_id=request.account_id,
@@ -82,6 +91,7 @@ async def create_board(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
+    await post_create_hook(request.account_id, request.game_id, auth)
     return BoardResponse.from_domain(board)
 
 

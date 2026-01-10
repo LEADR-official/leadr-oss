@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import AdminAuthContextDep
+from leadr.common.api.hooks import PostCreateGameHookDep, PreCreateGameHookDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, GameID
@@ -21,7 +22,11 @@ router = APIRouter()
 
 @router.post("/games", status_code=status.HTTP_201_CREATED, response_model=GameResponse)
 async def create_game(
-    request: GameCreateRequest, service: GameServiceDep, auth: AdminAuthContextDep
+    request: GameCreateRequest,
+    service: GameServiceDep,
+    auth: AdminAuthContextDep,
+    pre_create_hook: PreCreateGameHookDep,
+    post_create_hook: PostCreateGameHookDep,
 ) -> GameResponse:
     """Create a new game.
 
@@ -35,6 +40,8 @@ async def create_game(
         request: Game creation details including account_id, name, and optional settings.
         service: Injected game service dependency.
         auth: Authentication context with user info.
+        pre_create_hook: Hook called before game creation (for quota checks).
+        post_create_hook: Hook called after successful game creation.
 
     Returns:
         GameResponse with the created game including auto-generated ID and timestamps.
@@ -43,6 +50,8 @@ async def create_game(
         403: User does not have access to the specified account.
         404: Account not found.
     """
+    await pre_create_hook(request.account_id, auth)
+
     try:
         game = await service.create_game(
             account_id=request.account_id,
@@ -60,6 +69,7 @@ async def create_game(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
+    await post_create_hook(request.account_id, auth)
     return GameResponse.from_domain(game)
 
 
