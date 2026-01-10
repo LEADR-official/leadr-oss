@@ -166,7 +166,11 @@ jobs:
         ENABLE_ADMIN_API: true
         ENABLE_CLIENT_API: true
       run: |
-        uv run coverage run -m pytest
+        uv run pytest \
+          --cov=src --cov-report markdown \
+          tests -n auto \
+          -p no:pastebin -p no:nose -p no:doctest
+
         echo "pytest_exit_code=$?" >> $GITHUB_OUTPUT
 
     - name: Generate coverage report

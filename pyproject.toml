@@ -38,6 +38,8 @@ dev = [
     "pytest-asyncio>=1.2.0",
     "greenlet>=3.2.4",
     "griffe2md>=1.2.5",
+    "pytest-xdist[psutil]>=3.8.0",
+    "pytest-cov>=7.0.0",
 ]
 
 [tool.ruff]
