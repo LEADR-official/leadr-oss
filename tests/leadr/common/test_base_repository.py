@@ -27,7 +27,7 @@ class MockStatus(str, Enum):
     INACTIVE = "INACTIVE"
 
 
-class TestEntity(Entity):
+class MockEntity(Entity):
     """Test domain entity for BaseRepository testing."""
 
     name: str
@@ -42,7 +42,7 @@ class MockStatusEnum(str, Enum):
     INACTIVE = "INACTIVE"
 
 
-class TestEntityORM(Base):
+class MockEntityORM(Base):
     """Test ORM model for BaseRepository testing."""
 
     __tablename__ = "test_entities"
@@ -52,12 +52,12 @@ class TestEntityORM(Base):
 
 
 # Test Repository Implementation
-class TestRepository(BaseRepository[TestEntity, TestEntityORM]):
+class MockRepository(BaseRepository[MockEntity, MockEntityORM]):
     """Concrete test repository for testing BaseRepository functionality."""
 
-    def _to_domain(self, orm: TestEntityORM) -> TestEntity:
+    def _to_domain(self, orm: MockEntityORM) -> MockEntity:
         """Convert ORM to domain entity."""
-        return TestEntity(
+        return MockEntity(
             id=orm.id,
             name=orm.name,
             status=MockStatus(orm.status.value),
@@ -66,9 +66,9 @@ class TestRepository(BaseRepository[TestEntity, TestEntityORM]):
             deleted_at=orm.deleted_at,
         )
 
-    def _to_orm(self, entity: TestEntity) -> TestEntityORM:
+    def _to_orm(self, entity: MockEntity) -> MockEntityORM:
         """Convert domain entity to ORM."""
-        orm = TestEntityORM(
+        orm = MockEntityORM(
             id=entity.id,
             name=entity.name,
             status=MockStatusEnum(entity.status.value),
@@ -78,24 +78,24 @@ class TestRepository(BaseRepository[TestEntity, TestEntityORM]):
         )
         return orm
 
-    def _get_orm_class(self) -> type[TestEntityORM]:
+    def _get_orm_class(self) -> type[MockEntityORM]:
         """Get the ORM model class."""
-        return TestEntityORM
+        return MockEntityORM
 
     async def filter(  # type: ignore[override] - test repository, intentionally unpaginated
         self, account_id: UUID4 | PrefixedID | None = None, **kwargs: Any
-    ) -> list[TestEntity]:
+    ) -> list[MockEntity]:
         """Filter test entities.
 
         This test repository doesn't require account_id (top-level tenant).
         """
-        query = select(TestEntityORM).where(TestEntityORM.deleted_at.is_(None))
+        query = select(MockEntityORM).where(MockEntityORM.deleted_at.is_(None))
 
         if "status" in kwargs and kwargs["status"] is not None:
             status_value = kwargs["status"]
             if isinstance(status_value, MockStatus):
                 status_value = status_value.value
-            query = query.where(TestEntityORM.status == MockStatusEnum(status_value))
+            query = query.where(MockEntityORM.status == MockStatusEnum(status_value))
 
         result = await self.session.execute(query)
         orms = result.scalars().all()
@@ -110,15 +110,15 @@ class TestBaseRepository:
     async def setup_test_table(self, test_engine):
         """Create test table before each test."""
         async with test_engine.begin() as conn:
-            await conn.run_sync(TestEntityORM.__table__.create, checkfirst=True)  # type: ignore[attr-defined]
+            await conn.run_sync(MockEntityORM.__table__.create, checkfirst=True)  # type: ignore[attr-defined]
 
     async def test_create(self, db_session: AsyncSession):
         """Test creating an entity via repository."""
-        repo = TestRepository(db_session)
+        repo = MockRepository(db_session)
         entity_id = uuid4()
         now = datetime.now(UTC)
 
-        entity = TestEntity(
+        entity = MockEntity(
             id=entity_id,
             name="Test Entity",
             status=MockStatus.ACTIVE,
@@ -135,12 +135,12 @@ class TestBaseRepository:
 
     async def test_get_by_id_found(self, db_session: AsyncSession):
         """Test retrieving an entity by ID when it exists."""
-        repo = TestRepository(db_session)
+        repo = MockRepository(db_session)
         entity_id = uuid4()
         now = datetime.now(UTC)
 
         # Create entity
-        entity = TestEntity(
+        entity = MockEntity(
             id=entity_id,
             name="Test Entity",
             status=MockStatus.ACTIVE,
@@ -158,7 +158,7 @@ class TestBaseRepository:
 
     async def test_get_by_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent entity returns None."""
-        repo = TestRepository(db_session)
+        repo = MockRepository(db_session)
         non_existent_id = uuid4()
 
         result = await repo.get_by_id(non_existent_id)
@@ -167,12 +167,12 @@ class TestBaseRepository:
 
     async def test_get_by_id_excludes_deleted_by_default(self, db_session: AsyncSession):
         """Test that get_by_id excludes soft-deleted entities by default."""
-        repo = TestRepository(db_session)
+        repo = MockRepository(db_session)
         entity_id = uuid4()
         now = datetime.now(UTC)
 
         # Create and delete entity
-        entity = TestEntity(
+        entity = MockEntity(
             id=entity_id,
             name="Test Entity",
             status=MockStatus.ACTIVE,
@@ -188,12 +188,12 @@ class TestBaseRepository:
 
     async def test_get_by_id_includes_deleted_when_requested(self, db_session: AsyncSession):
         """Test that get_by_id can include soft-deleted entities."""
-        repo = TestRepository(db_session)
+        repo = MockRepository(db_session)
         entity_id = uuid4()
         now = datetime.now(UTC)
 
         # Create and delete entity
-        entity = TestEntity(
+        entity = MockEntity(
             id=entity_id,
             name="Test Entity",
             status=MockStatus.ACTIVE,
@@ -211,12 +211,12 @@ class TestBaseRepository:
 
     async def test_update(self, db_session: AsyncSession):
         """Test updating an entity via repository."""
-        repo = TestRepository(db_session)
+        repo = MockRepository(db_session)
         entity_id = uuid4()
         now = datetime.now(UTC)
 
         # Create entity
-        entity = TestEntity(
+        entity = MockEntity(
             id=entity_id,
             name="Test Entity",
             status=MockStatus.ACTIVE,
@@ -241,11 +241,11 @@ class TestBaseRepository:
 
     async def test_update_non_existent_raises_error(self, db_session: AsyncSession):
         """Test that updating a non-existent entity raises an error."""
-        repo = TestRepository(db_session)
+        repo = MockRepository(db_session)
         entity_id = uuid4()
         now = datetime.now(UTC)
 
-        entity = TestEntity(
+        entity = MockEntity(
             id=entity_id,
             name="Test Entity",
             status=MockStatus.ACTIVE,
@@ -258,12 +258,12 @@ class TestBaseRepository:
 
     async def test_delete_soft_deletes(self, db_session: AsyncSession):
         """Test that delete performs soft delete, not hard delete."""
-        repo = TestRepository(db_session)
+        repo = MockRepository(db_session)
         entity_id = uuid4()
         now = datetime.now(UTC)
 
         # Create entity
-        entity = TestEntity(
+        entity = MockEntity(
             id=entity_id,
             name="Test Entity",
             status=MockStatus.ACTIVE,
@@ -286,7 +286,7 @@ class TestBaseRepository:
 
     async def test_delete_non_existent_raises_error(self, db_session: AsyncSession):
         """Test that deleting a non-existent entity raises an error."""
-        repo = TestRepository(db_session)
+        repo = MockRepository(db_session)
         non_existent_id = uuid4()
 
         with pytest.raises(EntityNotFoundError):
@@ -294,14 +294,14 @@ class TestBaseRepository:
 
     async def test_filter(self, db_session: AsyncSession):
         """Test filtering entities."""
-        repo = TestRepository(db_session)
+        repo = MockRepository(db_session)
 
         # Create multiple entities
-        entity1 = TestEntity(
+        entity1 = MockEntity(
             name="Entity 1",
             status=MockStatus.ACTIVE,
         )
-        entity2 = TestEntity(
+        entity2 = MockEntity(
             name="Entity 2",
             status=MockStatus.INACTIVE,
         )
@@ -319,14 +319,14 @@ class TestBaseRepository:
 
     async def test_filter_excludes_deleted_by_default(self, db_session: AsyncSession):
         """Test that filter() excludes soft-deleted entities by default."""
-        repo = TestRepository(db_session)
+        repo = MockRepository(db_session)
 
         # Create entities
-        entity1 = TestEntity(
+        entity1 = MockEntity(
             name="Entity 1",
             status=MockStatus.ACTIVE,
         )
-        entity2 = TestEntity(
+        entity2 = MockEntity(
             name="Entity 2",
             status=MockStatus.INACTIVE,
         )
@@ -345,14 +345,14 @@ class TestBaseRepository:
 
     async def test_filter_with_status(self, db_session: AsyncSession):
         """Test that filter() can filter by status."""
-        repo = TestRepository(db_session)
+        repo = MockRepository(db_session)
 
         # Create entities
-        entity1 = TestEntity(
+        entity1 = MockEntity(
             name="Entity 1",
             status=MockStatus.ACTIVE,
         )
-        entity2 = TestEntity(
+        entity2 = MockEntity(
             name="Entity 2",
             status=MockStatus.INACTIVE,
         )
