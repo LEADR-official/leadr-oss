@@ -3,6 +3,7 @@
 import asyncio
 import sys
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -199,25 +200,42 @@ async def db_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, N
         yield session
 
 
+@asynccontextmanager
+async def noop_lifespan(app):
+    """No-op lifespan for tests - skips GeoIP, scheduler, superadmin bootstrap."""
+    yield
+
+
+@pytest.fixture
+def test_app():
+    """Create test app instance for dependency overrides.
+
+    Tests that need to set dependency_overrides should request this fixture
+    in addition to client/authenticated_client.
+    """
+    from api.main import create_app
+
+    return create_app(lifespan_override=noop_lifespan)
+
+
 @pytest_asyncio.fixture
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def client(db_session: AsyncSession, test_app) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client with database session override."""
-    from api.main import app
 
     # Override the get_db dependency to use our test session
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
-    app.dependency_overrides[get_db] = override_get_db
+    test_app.dependency_overrides[get_db] = override_get_db
 
     async with AsyncClient(
-        transport=ASGITransport(app=app),
+        transport=ASGITransport(app=test_app),
         base_url=f"http://testserver{settings.API_PREFIX}",
     ) as client:
         yield client
 
     # Clean up overrides
-    app.dependency_overrides.clear()
+    test_app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -460,27 +478,26 @@ async def test_api_key(db_session: AsyncSession) -> str:
 
 @pytest_asyncio.fixture
 async def authenticated_client(
-    db_session: AsyncSession, test_api_key: str
+    db_session: AsyncSession, test_api_key: str, test_app
 ) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client with API key authentication.
 
     This client automatically includes the API key in all requests,
     allowing tests to easily access protected endpoints.
     """
-    from api.main import app
 
     # Override the get_db dependency to use our test session
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
-    app.dependency_overrides[get_db] = override_get_db
+    test_app.dependency_overrides[get_db] = override_get_db
 
     async with AsyncClient(
-        transport=ASGITransport(app=app),
+        transport=ASGITransport(app=test_app),
         base_url=f"http://testserver{settings.API_PREFIX}",
         headers={"leadr-api-key": test_api_key},
     ) as client:
         yield client
 
     # Clean up overrides
-    app.dependency_overrides.clear()
+    test_app.dependency_overrides.clear()
