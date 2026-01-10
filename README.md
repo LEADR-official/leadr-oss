@@ -26,7 +26,7 @@ Whether you're building a retro arcade game, puzzle platformer, or competitive m
 - **Secure & Scalable** - Built to the latest industry standards by expert backend software developers (sadly we're better at making web apps than games)
 
 > [!TIP]
-> Don't want the hassle of deploying it yourself? Get started for free at https://leadr.gg
+> Don't want the hassle of deploying it yourself? Get started for free at https://www.leadr.gg
 
 ## LEADR Cloud Features
 
