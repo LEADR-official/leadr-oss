@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSON, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -61,6 +61,19 @@ class ScoreORM(Base):
     game: Mapped["GameORM"] = relationship("GameORM")  # type: ignore[name-defined]
     board: Mapped["BoardORM"] = relationship("BoardORM")  # type: ignore[name-defined]
     # Note: No relationship to DeviceORM as device_id has no FK constraint
+
+    # Indexes
+    __table_args__ = (
+        # Create composite index for efficient score ranking queries.
+        Index(
+            "ix_scores_ranking",
+            "board_id",
+            "value",
+            "created_at",
+            "id",
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
 
 class ScoreSubmissionMetaORM(Base):
