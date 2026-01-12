@@ -303,6 +303,45 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         """
         return await self.get_by_id(score_id)
 
+    async def get_score_with_rank(self, score_id: ScoreID) -> Score:
+        """Get a score with its rank computed.
+
+        The rank is computed using the score's board's sort direction.
+        This method is suitable for single score lookups where you need
+        to know the score's position in the leaderboard.
+
+        Args:
+            score_id: The ID of the score to retrieve.
+
+        Returns:
+            The Score domain entity with rank populated.
+
+        Raises:
+            EntityNotFoundError: If the score doesn't exist.
+        """
+        score = await self.get_by_id_or_raise(score_id)
+
+        # Get board's sort direction
+        board_service = BoardService(self.repository.session)
+        board = await board_service.get_by_id_or_raise(score.board_id)
+
+        # Build sort fields based on board direction
+        value_direction = (
+            SortDirection.ASC
+            if board.sort_direction == BoardSortDirection.ASCENDING
+            else SortDirection.DESC
+        )
+        sort_fields = [
+            SortField(name="value", direction=value_direction),
+            SortField(name="created_at", direction=SortDirection.DESC),
+            SortField(name="id", direction=SortDirection.ASC),
+        ]
+
+        # Compute rank
+        rank = await self.repository.get_score_rank(score, sort_fields)
+        score.rank = rank
+        return score
+
     async def list_scores(
         self,
         account_id: AccountID | None,

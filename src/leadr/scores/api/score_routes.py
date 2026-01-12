@@ -174,19 +174,22 @@ async def get_score(
 ) -> ScoreResponse:
     """Get a score by ID.
 
+    Returns the score with its computed rank based on the board's sort direction.
+    The rank represents the score's position in the leaderboard (1 = first place).
+
     Args:
         score_id: Score identifier to retrieve.
         service: Injected score service dependency.
         auth: Authentication context with user info.
 
     Returns:
-        ScoreResponse with the score details.
+        ScoreResponse with the score details including rank.
 
     Raises:
         403: User does not have access to this score's account.
         404: Score not found or soft-deleted.
     """
-    score = await service.get_by_id_or_raise(score_id)
+    score = await service.get_score_with_rank(score_id)
 
     # Check authorization
     if not auth.has_access_to_account(score.account_id):
