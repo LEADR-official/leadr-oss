@@ -179,14 +179,18 @@ jobs:
       run: |
         uv run coverage report --format=markdown --sort=Cover --skip-covered > coverage_report.md
         uv run coverage report --sort=Cover
+        echo "=== coverage_report.md contents ==="
+        cat coverage_report.md
+        echo "=== file info ==="
+        ls -la coverage_report.md
         echo "coverage_exit_code=$?" >> $GITHUB_OUTPUT
 
     - name: Comment coverage report on PR
       if: always() && github.event_name == 'pull_request'
-      uses: marocchino/sticky-pull-request-comment@v2
-      with:
-        header: coverage
-        path: coverage_report.md
+      run: |
+        gh pr comment ${{ github.event.pull_request.number }} --body-file coverage_report.md
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Check if tests and coverage passed
       if: always()
