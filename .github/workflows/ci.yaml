@@ -167,7 +167,7 @@ jobs:
         ENABLE_CLIENT_API: true
       run: |
         uv run pytest \
-          --cov=src --cov-report markdown \
+          --cov=src \
           tests -n auto \
           -p no:pastebin -p no:nose -p no:doctest
 
@@ -178,7 +178,7 @@ jobs:
       if: always()
       run: |
         uv run coverage report --format=markdown --sort=Cover --skip-covered > coverage_report.md
-        uv run coverage report
+        uv run coverage report --sort=Cover
         echo "coverage_exit_code=$?" >> $GITHUB_OUTPUT
 
     - name: Comment coverage report on PR
