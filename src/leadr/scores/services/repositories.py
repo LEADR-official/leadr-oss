@@ -176,13 +176,14 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
                 )
 
         # Branch: around_score query vs normal cursor pagination
+        # Note: around_score requires board_id (validated at route level), so rank is always
+        # computed
         if around_score is not None:
-            return await self._execute_around_query_with_rank(
+            return await self._execute_around_query(
                 base_query=query,
                 target_score=around_score,
                 sort_fields=pagination.sort_spec,
                 limit=pagination.limit,
-                compute_rank=(board_id is not None),
             )
 
         # Handle cursor if present
@@ -217,7 +218,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         sort_fields: list[SortField],
         limit: int,
     ) -> PaginatedResult[Score]:
-        """Execute a query that returns scores centered around a target score.
+        """Execute a query that returns scores centered around a target score with ranks.
 
         This method fetches scores in a window around the target score, respecting
         the sort order. For example, with limit=5 and a DESC value sort, it returns
@@ -227,6 +228,9 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         adjusts: if there aren't enough scores on one side, more are fetched from the
         other side to fill up to the limit.
 
+        Note: This method always computes ranks because around_score requires board_id
+        (validated at route level).
+
         Args:
             base_query: SQLAlchemy query with all filters applied (account, board, etc.)
             target_score: The score to center results around
@@ -234,8 +238,11 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             limit: Total number of scores to return (including target)
 
         Returns:
-            PaginatedResult with scores centered around target and pagination metadata
+            PaginatedResult with scores (including ranks) centered around target
         """
+        # Compute target score's rank first
+        target_rank = await self.get_score_rank(target_score, sort_fields)
+
         # Calculate initial window sizes (ideal split)
         ideal_above_count = limit // 2
         ideal_below_count = limit - ideal_above_count - 1
@@ -303,15 +310,23 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         # Fetch target score ORM to include in results
         target_orm = await self._get_target_orm(target_score)
 
-        # Combine: above + target + below
-        all_orms: list[ScoreORM] = []
-        all_orms.extend(above_orms)
-        if target_orm:
-            all_orms.append(target_orm)
-        all_orms.extend(below_orms)
+        # Build results with computed ranks
+        # Ranks for "above" items: target_rank - actual_above_count, ..., target_rank - 1
+        items: list[Score] = []
+        for i, orm in enumerate(above_orms):
+            rank = target_rank - (actual_above_count - i)
+            items.append(self._to_domain(orm, rank=rank))
 
-        # Convert to domain entities
-        items = [self._to_domain(orm) for orm in all_orms]
+        if target_orm:
+            items.append(self._to_domain(target_orm, rank=target_rank))
+
+        # Ranks for "below" items: target_rank + 1, target_rank + 2, ...
+        for i, orm in enumerate(below_orms):
+            rank = target_rank + i + 1
+            items.append(self._to_domain(orm, rank=rank))
+
+        # Combine ORMs for cursor extraction
+        all_orms: list[ScoreORM] = above_orms + ([target_orm] if target_orm else []) + below_orms
 
         # Build cursor positions for pagination
         prev_position = None
@@ -713,126 +728,6 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
                 or_conditions.append(comparison)
 
         return or_(*or_conditions)
-
-    async def _execute_around_query_with_rank(
-        self,
-        base_query: Select[tuple[ScoreORM]],
-        target_score: Score,
-        sort_fields: list[SortField],
-        limit: int,
-        compute_rank: bool,
-    ) -> PaginatedResult[Score]:
-        """Execute around query with optional rank computation.
-
-        Similar to _execute_around_query but adds rank computation when requested.
-
-        Args:
-            base_query: SQLAlchemy query with filters applied
-            target_score: Score to center results around
-            sort_fields: Sort fields
-            limit: Total items to return
-            compute_rank: Whether to compute rank for results
-
-        Returns:
-            PaginatedResult with scores (and ranks if compute_rank=True)
-        """
-        # If not computing rank, use the original method logic
-        if not compute_rank:
-            return await self._execute_around_query(
-                base_query=base_query,
-                target_score=target_score,
-                sort_fields=sort_fields,
-                limit=limit,
-            )
-
-        # Compute target score's rank first
-        target_rank = await self.get_score_rank(target_score, sort_fields)
-
-        # Calculate window bounds
-        ideal_above_count = limit // 2
-        ideal_below_count = limit - ideal_above_count - 1
-        max_side_items = limit - 1
-
-        target_values = self._extract_target_values(target_score, sort_fields)
-
-        # Build "above" and "below" queries
-        above_query = self._build_around_subquery(
-            base_query=base_query,
-            target_values=target_values,
-            sort_fields=sort_fields,
-            direction="above",
-            limit=max_side_items + 1,
-        )
-        below_query = self._build_around_subquery(
-            base_query=base_query,
-            target_values=target_values,
-            sort_fields=sort_fields,
-            direction="below",
-            limit=max_side_items + 1,
-        )
-
-        # Execute both queries
-        above_result = await self.session.execute(above_query)
-        above_orms = list(above_result.scalars().all())
-
-        below_result = await self.session.execute(below_query)
-        below_orms = list(below_result.scalars().all())
-
-        # Adjust window sizes
-        available_above = len(above_orms)
-        available_below = len(below_orms)
-
-        if available_above < ideal_above_count:
-            actual_above_count = available_above
-            actual_below_count = min(available_below, limit - 1 - actual_above_count)
-        elif available_below < ideal_below_count:
-            actual_below_count = available_below
-            actual_above_count = min(available_above, limit - 1 - actual_below_count)
-        else:
-            actual_above_count = ideal_above_count
-            actual_below_count = ideal_below_count
-
-        has_prev = available_above > actual_above_count
-        has_next = available_below > actual_below_count
-
-        above_orms = above_orms[:actual_above_count]
-        below_orms = below_orms[:actual_below_count]
-        above_orms.reverse()
-
-        target_orm = await self._get_target_orm(target_score)
-
-        # Build result with ranks
-        # Ranks for "above" items: target_rank - len(above_orms), ..., target_rank - 1
-        items = []
-        for i, orm in enumerate(above_orms):
-            rank = target_rank - (actual_above_count - i)
-            items.append(self._to_domain(orm, rank=rank))
-
-        if target_orm:
-            items.append(self._to_domain(target_orm, rank=target_rank))
-
-        # Ranks for "below" items: target_rank + 1, target_rank + 2, ...
-        for i, orm in enumerate(below_orms):
-            rank = target_rank + i + 1
-            items.append(self._to_domain(orm, rank=rank))
-
-        # Build cursor positions
-        all_orms = above_orms + ([target_orm] if target_orm else []) + below_orms
-        prev_position = None
-        next_position = None
-
-        if all_orms and has_prev:
-            prev_position = self._extract_cursor_position(all_orms[0], sort_fields)
-        if all_orms and has_next:
-            next_position = self._extract_cursor_position(all_orms[-1], sort_fields)
-
-        return PaginatedResult(
-            items=items,
-            has_next=has_next,
-            has_prev=has_prev,
-            next_position=next_position,
-            prev_position=prev_position,
-        )
 
     async def get_score_rank(
         self,
