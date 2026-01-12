@@ -4,11 +4,11 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
+from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.main import app
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User, UserStatus
 from leadr.auth.dependencies import require_admin_auth
@@ -30,7 +30,7 @@ class TestInitiateRegistration:
     """Test POST /register/initiate endpoint."""
 
     async def test_initiate_registration_success(
-        self, client: AsyncClient, db_session: AsyncSession
+        self, client: AsyncClient, db_session: AsyncSession, test_app: FastAPI
     ):
         """Test successful registration initiation."""
         # Mock email service to prevent actual email sending
@@ -44,8 +44,8 @@ class TestInitiateRegistration:
         async def mock_verification_service_dep():
             return VerificationService(db_session, email_service=mock_email_service)
 
-        app.dependency_overrides[get_email_service] = mock_email_service_dep
-        app.dependency_overrides[get_verification_service] = mock_verification_service_dep
+        test_app.dependency_overrides[get_email_service] = mock_email_service_dep
+        test_app.dependency_overrides[get_verification_service] = mock_verification_service_dep
 
         response = await client.post(
             "/register/initiate",
@@ -57,7 +57,7 @@ class TestInitiateRegistration:
         assert data["message"] == "Verification code sent to email"
         assert data["code_expires_in"] == 600
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
     async def test_initiate_registration_invalid_email(self, client: AsyncClient):
         """Test initiation with invalid email format."""
@@ -84,7 +84,9 @@ class TestInitiateRegistration:
 class TestVerifyCode:
     """Test POST /register/verify endpoint."""
 
-    async def test_verify_code_success(self, client: AsyncClient, db_session: AsyncSession):
+    async def test_verify_code_success(
+        self, client: AsyncClient, db_session: AsyncSession, test_app: FastAPI
+    ):
         """Test successful code verification."""
         mock_email_service = Mock(spec=EmailService)
         mock_email_service.send_verification_code = AsyncMock()
@@ -95,8 +97,8 @@ class TestVerifyCode:
         async def mock_verification_service_dep():
             return VerificationService(db_session, email_service=mock_email_service)
 
-        app.dependency_overrides[get_email_service] = mock_email_service_dep
-        app.dependency_overrides[get_verification_service] = mock_verification_service_dep
+        test_app.dependency_overrides[get_email_service] = mock_email_service_dep
+        test_app.dependency_overrides[get_verification_service] = mock_verification_service_dep
 
         # Create verification code
         service = VerificationService(db_session, mock_email_service)
@@ -117,7 +119,7 @@ class TestVerifyCode:
         assert data["expires_in"] == 600
         assert data["type"] == "registration"
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
     async def test_verify_code_invalid(self, client: AsyncClient):
         """Test verifying invalid code."""
@@ -128,7 +130,9 @@ class TestVerifyCode:
 
         assert response.status_code == 422
 
-    async def test_verify_code_already_used(self, client: AsyncClient, db_session: AsyncSession):
+    async def test_verify_code_already_used(
+        self, client: AsyncClient, db_session: AsyncSession, test_app: FastAPI
+    ):
         """Test verifying already-used code."""
         mock_email_service = Mock(spec=EmailService)
         mock_email_service.send_verification_code = AsyncMock()
@@ -139,8 +143,8 @@ class TestVerifyCode:
         async def mock_verification_service_dep():
             return VerificationService(db_session, email_service=mock_email_service)
 
-        app.dependency_overrides[get_email_service] = mock_email_service_dep
-        app.dependency_overrides[get_verification_service] = mock_verification_service_dep
+        test_app.dependency_overrides[get_email_service] = mock_email_service_dep
+        test_app.dependency_overrides[get_verification_service] = mock_verification_service_dep
 
         # Create and use code
         service = VerificationService(db_session, mock_email_service)
@@ -161,10 +165,10 @@ class TestVerifyCode:
         # After a code is used, it becomes invalid/expired
         assert "Invalid or expired" in response_data.get("error", "")
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
     async def test_verify_invite_code_returns_invite_type(
-        self, client: AsyncClient, db_session: AsyncSession, test_user: User
+        self, client: AsyncClient, db_session: AsyncSession, test_user: User, test_app: FastAPI
     ):
         """Test that verifying an invite code returns INVITE type."""
         mock_email_service = Mock(spec=EmailService)
@@ -176,8 +180,8 @@ class TestVerifyCode:
         async def mock_verification_service_dep():
             return VerificationService(db_session, email_service=mock_email_service)
 
-        app.dependency_overrides[get_email_service] = mock_email_service_dep
-        app.dependency_overrides[get_verification_service] = mock_verification_service_dep
+        test_app.dependency_overrides[get_email_service] = mock_email_service_dep
+        test_app.dependency_overrides[get_verification_service] = mock_verification_service_dep
 
         # Create invite verification code
         service = VerificationService(db_session, mock_email_service)
@@ -197,7 +201,7 @@ class TestVerifyCode:
         assert "verification_token" in data
         assert data["type"] == "invite"
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
@@ -205,7 +209,7 @@ class TestCompleteRegistration:
     """Test POST /register/complete endpoint."""
 
     async def test_complete_registration_success(
-        self, client: AsyncClient, db_session: AsyncSession
+        self, client: AsyncClient, db_session: AsyncSession, test_app: FastAPI
     ):
         """Test successful registration completion."""
         # Create mock registration service
@@ -231,7 +235,7 @@ class TestCompleteRegistration:
         async def override_registration_service():
             return mock_service
 
-        app.dependency_overrides[get_registration_service] = override_registration_service
+        test_app.dependency_overrides[get_registration_service] = override_registration_service
 
         response = await client.post(
             "/register/complete",
@@ -248,9 +252,11 @@ class TestCompleteRegistration:
         assert data["account_slug"] == "test-account"
         assert data["api_key"] == "ldr_test_key_123"
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
-    async def test_complete_registration_with_jam_code(self, client: AsyncClient):
+    async def test_complete_registration_with_jam_code(
+        self, client: AsyncClient, test_app: FastAPI
+    ):
         """Test registration with jam code."""
         mock_service = AsyncMock()
         mock_account = Account(
@@ -274,7 +280,7 @@ class TestCompleteRegistration:
         async def override_service():
             return mock_service
 
-        app.dependency_overrides[get_registration_service] = override_service
+        test_app.dependency_overrides[get_registration_service] = override_service
 
         response = await client.post(
             "/register/complete",
@@ -291,9 +297,11 @@ class TestCompleteRegistration:
         call_kwargs = mock_service.complete_registration.call_args.kwargs
         assert call_kwargs["jam_code"] == "GGJ2026"
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
-    async def test_complete_registration_invalid_token(self, client: AsyncClient):
+    async def test_complete_registration_invalid_token(
+        self, client: AsyncClient, test_app: FastAPI
+    ):
         """Test registration with invalid verification token."""
         mock_service = AsyncMock()
         mock_service.complete_registration.side_effect = ValueError("Invalid token")
@@ -301,7 +309,7 @@ class TestCompleteRegistration:
         async def override_service(*args, **kwargs):
             return mock_service
 
-        app.dependency_overrides[get_registration_service] = override_service
+        test_app.dependency_overrides[get_registration_service] = override_service
 
         response = await client.post(
             "/register/complete",
@@ -313,9 +321,11 @@ class TestCompleteRegistration:
 
         assert response.status_code == 422
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
-    async def test_complete_registration_response_includes_display_name(self, client: AsyncClient):
+    async def test_complete_registration_response_includes_display_name(
+        self, client: AsyncClient, test_app: FastAPI
+    ):
         """Test that registration response includes user display_name."""
         mock_service = AsyncMock()
         mock_account = Account(
@@ -339,7 +349,7 @@ class TestCompleteRegistration:
         async def override_service():
             return mock_service
 
-        app.dependency_overrides[get_registration_service] = override_service
+        test_app.dependency_overrides[get_registration_service] = override_service
 
         response = await client.post(
             "/register/complete",
@@ -354,9 +364,11 @@ class TestCompleteRegistration:
         assert "display_name" in data
         assert data["display_name"] == "john.doe"
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
-    async def test_complete_registration_with_custom_display_name(self, client: AsyncClient):
+    async def test_complete_registration_with_custom_display_name(
+        self, client: AsyncClient, test_app: FastAPI
+    ):
         """Test registration with custom display_name."""
         mock_service = AsyncMock()
         mock_account = Account(
@@ -380,7 +392,7 @@ class TestCompleteRegistration:
         async def override_service():
             return mock_service
 
-        app.dependency_overrides[get_registration_service] = override_service
+        test_app.dependency_overrides[get_registration_service] = override_service
 
         response = await client.post(
             "/register/complete",
@@ -400,9 +412,11 @@ class TestCompleteRegistration:
         call_kwargs = mock_service.complete_registration.call_args.kwargs
         assert call_kwargs["display_name"] == "My Custom Name"
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
-    async def test_complete_registration_without_display_name(self, client: AsyncClient):
+    async def test_complete_registration_without_display_name(
+        self, client: AsyncClient, test_app: FastAPI
+    ):
         """Test registration without display_name uses default."""
         mock_service = AsyncMock()
         mock_account = Account(
@@ -426,7 +440,7 @@ class TestCompleteRegistration:
         async def override_service():
             return mock_service
 
-        app.dependency_overrides[get_registration_service] = override_service
+        test_app.dependency_overrides[get_registration_service] = override_service
 
         response = await client.post(
             "/register/complete",
@@ -440,9 +454,11 @@ class TestCompleteRegistration:
         data = response.json()
         assert data["display_name"] == "jane"
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
-    async def test_complete_registration_duplicate_email(self, client: AsyncClient):
+    async def test_complete_registration_duplicate_email(
+        self, client: AsyncClient, test_app: FastAPI
+    ):
         """Test registration with already-registered email returns 409."""
         mock_service = AsyncMock()
         mock_service.complete_registration.side_effect = IntegrityError(
@@ -454,7 +470,7 @@ class TestCompleteRegistration:
         async def override_service():
             return mock_service
 
-        app.dependency_overrides[get_registration_service] = override_service
+        test_app.dependency_overrides[get_registration_service] = override_service
 
         response = await client.post(
             "/register/complete",
@@ -468,7 +484,7 @@ class TestCompleteRegistration:
         data = response.json()
         assert data["error"] == "Email already registered"
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
@@ -501,7 +517,7 @@ class TestResendVerificationCode:
 class TestInviteUser:
     """Test POST /register/invite endpoint (admin only)."""
 
-    async def test_invite_user_success(self, authenticated_client: AsyncClient):
+    async def test_invite_user_success(self, authenticated_client: AsyncClient, test_app: FastAPI):
         """Test successful user invite by admin."""
         # Mock auth context as admin
         mock_auth = Mock()
@@ -527,8 +543,8 @@ class TestInviteUser:
         async def override_invite_service():
             return mock_invite_service
 
-        app.dependency_overrides[require_admin_auth] = override_auth
-        app.dependency_overrides[get_invite_service] = override_invite_service
+        test_app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[get_invite_service] = override_invite_service
 
         response = await authenticated_client.post(
             "/register/invite",
@@ -551,9 +567,11 @@ class TestInviteUser:
             display_name=None,
         )
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
-    async def test_invite_user_with_display_name(self, authenticated_client: AsyncClient):
+    async def test_invite_user_with_display_name(
+        self, authenticated_client: AsyncClient, test_app: FastAPI
+    ):
         """Test user invite with custom display name."""
         mock_auth = Mock()
         mock_auth.is_superadmin = False
@@ -577,8 +595,8 @@ class TestInviteUser:
         async def override_invite_service():
             return mock_invite_service
 
-        app.dependency_overrides[require_admin_auth] = override_auth
-        app.dependency_overrides[get_invite_service] = override_invite_service
+        test_app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[get_invite_service] = override_invite_service
 
         response = await authenticated_client.post(
             "/register/invite",
@@ -595,9 +613,11 @@ class TestInviteUser:
             display_name="Custom Name",
         )
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
-    async def test_invite_user_already_active(self, authenticated_client: AsyncClient):
+    async def test_invite_user_already_active(
+        self, authenticated_client: AsyncClient, test_app: FastAPI
+    ):
         """Test inviting already-active user returns error."""
         mock_auth = Mock()
         mock_auth.is_superadmin = False
@@ -616,8 +636,8 @@ class TestInviteUser:
         async def override_invite_service():
             return mock_invite_service
 
-        app.dependency_overrides[require_admin_auth] = override_auth
-        app.dependency_overrides[get_invite_service] = override_invite_service
+        test_app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[get_invite_service] = override_invite_service
 
         response = await authenticated_client.post(
             "/register/invite",
@@ -629,9 +649,11 @@ class TestInviteUser:
         assert response.status_code == 400
         assert "already exists" in response.json()["error"]
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
-    async def test_invite_user_invalid_email(self, authenticated_client: AsyncClient):
+    async def test_invite_user_invalid_email(
+        self, authenticated_client: AsyncClient, test_app: FastAPI
+    ):
         """Test invite with invalid email format."""
         mock_auth = Mock()
         mock_auth.is_superadmin = False
@@ -641,7 +663,7 @@ class TestInviteUser:
         async def override_auth():
             return mock_auth
 
-        app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[require_admin_auth] = override_auth
 
         response = await authenticated_client.post(
             "/register/invite",
@@ -652,7 +674,7 @@ class TestInviteUser:
 
         assert response.status_code == 422
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
@@ -660,7 +682,7 @@ class TestCreateJamCode:
     """Test POST /jam-codes endpoint (admin only)."""
 
     async def test_create_jam_code_success(
-        self, authenticated_client: AsyncClient, db_session: AsyncSession
+        self, authenticated_client: AsyncClient, db_session: AsyncSession, test_app: FastAPI
     ):
         """Test creating jam code as superadmin."""
         # Mock auth context as superadmin
@@ -672,7 +694,7 @@ class TestCreateJamCode:
         async def override_auth():
             return mock_auth
 
-        app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[require_admin_auth] = override_auth
 
         response = await authenticated_client.post(
             "/jam-codes",
@@ -691,10 +713,10 @@ class TestCreateJamCode:
         assert data["features"] == {"discount": 20}
         assert data["max_uses"] == 100
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
     async def test_create_jam_code_non_superadmin(
-        self, authenticated_client: AsyncClient, db_session: AsyncSession
+        self, authenticated_client: AsyncClient, db_session: AsyncSession, test_app: FastAPI
     ):
         """Test creating jam code as non-superadmin fails."""
         mock_auth = Mock()
@@ -704,7 +726,7 @@ class TestCreateJamCode:
         async def override_auth():
             return mock_auth
 
-        app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[require_admin_auth] = override_auth
 
         response = await authenticated_client.post(
             "/jam-codes",
@@ -717,10 +739,10 @@ class TestCreateJamCode:
         assert response.status_code == 403
         assert "Superadmin access required" in response.json()["error"]
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
     async def test_create_jam_code_duplicate(
-        self, authenticated_client: AsyncClient, db_session: AsyncSession
+        self, authenticated_client: AsyncClient, db_session: AsyncSession, test_app: FastAPI
     ):
         """Test creating duplicate jam code fails."""
         mock_auth = Mock()
@@ -731,7 +753,7 @@ class TestCreateJamCode:
         async def override_auth():
             return mock_auth
 
-        app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[require_admin_auth] = override_auth
 
         # Create first code
         service = JamCodeService(db_session)
@@ -749,7 +771,7 @@ class TestCreateJamCode:
         assert response.status_code == 400
         assert "already exists" in response.json()["error"]
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
@@ -757,7 +779,7 @@ class TestListJamCodes:
     """Test GET /jam-codes endpoint (admin only)."""
 
     async def test_list_jam_codes_success(
-        self, authenticated_client: AsyncClient, db_session: AsyncSession
+        self, authenticated_client: AsyncClient, db_session: AsyncSession, test_app: FastAPI
     ):
         """Test listing jam codes as superadmin."""
         mock_auth = Mock()
@@ -767,7 +789,7 @@ class TestListJamCodes:
         async def override_auth():
             return mock_auth
 
-        app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[require_admin_auth] = override_auth
 
         # Create some codes
         service = JamCodeService(db_session)
@@ -780,9 +802,11 @@ class TestListJamCodes:
         data = response.json()
         assert len(data) == 2
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
-    async def test_list_jam_codes_non_superadmin(self, authenticated_client: AsyncClient):
+    async def test_list_jam_codes_non_superadmin(
+        self, authenticated_client: AsyncClient, test_app: FastAPI
+    ):
         """Test listing jam codes as non-superadmin fails."""
         mock_auth = Mock()
         mock_auth.is_superadmin = False
@@ -791,13 +815,13 @@ class TestListJamCodes:
         async def override_auth():
             return mock_auth
 
-        app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[require_admin_auth] = override_auth
 
         response = await authenticated_client.get("/jam-codes")
 
         assert response.status_code == 403
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
@@ -805,7 +829,7 @@ class TestGetJamCode:
     """Test GET /jam-codes/{id} endpoint (admin only)."""
 
     async def test_get_jam_code_success(
-        self, authenticated_client: AsyncClient, db_session: AsyncSession
+        self, authenticated_client: AsyncClient, db_session: AsyncSession, test_app: FastAPI
     ):
         """Test getting specific jam code."""
         mock_auth = Mock()
@@ -815,7 +839,7 @@ class TestGetJamCode:
         async def override_auth():
             return mock_auth
 
-        app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[require_admin_auth] = override_auth
 
         # Create code
         service = JamCodeService(db_session)
@@ -827,9 +851,11 @@ class TestGetJamCode:
         data = response.json()
         assert data["code"] == "GETME"
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
-    async def test_get_jam_code_not_found(self, authenticated_client: AsyncClient):
+    async def test_get_jam_code_not_found(
+        self, authenticated_client: AsyncClient, test_app: FastAPI
+    ):
         """Test getting non-existent jam code."""
         mock_auth = Mock()
         mock_auth.is_superadmin = True
@@ -838,13 +864,13 @@ class TestGetJamCode:
         async def override_auth():
             return mock_auth
 
-        app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[require_admin_auth] = override_auth
 
         response = await authenticated_client.get(f"/jam-codes/{uuid4()}")
 
         assert response.status_code == 404
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
@@ -852,7 +878,7 @@ class TestUpdateJamCode:
     """Test PATCH /jam-codes/{id} endpoint (admin only)."""
 
     async def test_update_jam_code_success(
-        self, authenticated_client: AsyncClient, db_session: AsyncSession
+        self, authenticated_client: AsyncClient, db_session: AsyncSession, test_app: FastAPI
     ):
         """Test updating jam code."""
         mock_auth = Mock()
@@ -863,7 +889,7 @@ class TestUpdateJamCode:
         async def override_auth():
             return mock_auth
 
-        app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[require_admin_auth] = override_auth
 
         # Create code
         service = JamCodeService(db_session)
@@ -878,9 +904,11 @@ class TestUpdateJamCode:
         data = response.json()
         assert data["description"] == "Updated"
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
-    async def test_update_jam_code_not_found(self, authenticated_client: AsyncClient):
+    async def test_update_jam_code_not_found(
+        self, authenticated_client: AsyncClient, test_app: FastAPI
+    ):
         """Test updating non-existent jam code."""
         mock_auth = Mock()
         mock_auth.is_superadmin = True
@@ -889,7 +917,7 @@ class TestUpdateJamCode:
         async def override_auth():
             return mock_auth
 
-        app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[require_admin_auth] = override_auth
 
         response = await authenticated_client.patch(
             f"/jam-codes/{uuid4()}",
@@ -898,10 +926,10 @@ class TestUpdateJamCode:
 
         assert response.status_code == 404
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()
 
     async def test_update_jam_code_multiple_fields(
-        self, authenticated_client: AsyncClient, db_session: AsyncSession
+        self, authenticated_client: AsyncClient, db_session: AsyncSession, test_app: FastAPI
     ):
         """Test updating multiple fields."""
         mock_auth = Mock()
@@ -912,7 +940,7 @@ class TestUpdateJamCode:
         async def override_auth():
             return mock_auth
 
-        app.dependency_overrides[require_admin_auth] = override_auth
+        test_app.dependency_overrides[require_admin_auth] = override_auth
 
         service = JamCodeService(db_session)
         jam_code = await service.create_jam_code(code="MULTI", description="Original")
@@ -934,4 +962,4 @@ class TestUpdateJamCode:
         assert data["max_uses"] == 50
         assert data["active"] is False
 
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()

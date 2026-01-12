@@ -1,5 +1,6 @@
 """Test database configuration and fixtures."""
 
+import ssl
 from collections.abc import AsyncGenerator
 from unittest.mock import patch
 
@@ -7,8 +8,17 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.pool import NullPool
 
-from leadr.common.database import build_database_url, get_db
+from leadr.common.database import (
+    _get_connect_args,
+    _get_pool_class,
+    _get_pool_options,
+    _get_ssl_context,
+    build_database_url,
+    build_direct_database_url,
+    get_db,
+)
 
 
 @pytest.mark.asyncio
@@ -109,6 +119,128 @@ class TestBuildDatabaseUrl:
         url = build_database_url()
         assert url.startswith("postgresql+asyncpg://")
         assert "user:pass@host:5432/db" in url
+
+
+class TestBuildDirectDatabaseUrl:
+    """Tests for build_direct_database_url function."""
+
+    @patch("leadr.common.database.settings")
+    def test_uses_direct_host_when_set(self, mock_settings) -> None:
+        """Test that DB_HOST_DIRECT is used when available."""
+        mock_settings.DB_USER = "user"
+        mock_settings.DB_PASSWORD = "pass"
+        mock_settings.DB_HOST = "pooler.example.com"
+        mock_settings.DB_HOST_DIRECT = "direct.example.com"
+        mock_settings.DB_PORT = 5432
+        mock_settings.DB_NAME = "db"
+
+        url = build_direct_database_url()
+        assert "direct.example.com" in url
+        assert "pooler.example.com" not in url
+
+    @patch("leadr.common.database.settings")
+    def test_falls_back_to_host_when_direct_not_set(self, mock_settings) -> None:
+        """Test that DB_HOST is used when DB_HOST_DIRECT is None."""
+        mock_settings.DB_USER = "user"
+        mock_settings.DB_PASSWORD = "pass"
+        mock_settings.DB_HOST = "pooler.example.com"
+        mock_settings.DB_HOST_DIRECT = None
+        mock_settings.DB_PORT = 5432
+        mock_settings.DB_NAME = "db"
+
+        url = build_direct_database_url()
+        assert "pooler.example.com" in url
+
+
+class TestGetSslContext:
+    """Tests for _get_ssl_context function."""
+
+    @patch("leadr.common.database.settings")
+    def test_returns_none_for_dev_env(self, mock_settings) -> None:
+        """Test that SSL context is None for DEV environment."""
+        mock_settings.ENV = "DEV"
+        assert _get_ssl_context() is None
+
+    @patch("leadr.common.database.settings")
+    def test_returns_none_for_test_env(self, mock_settings) -> None:
+        """Test that SSL context is None for TEST environment."""
+        mock_settings.ENV = "TEST"
+        assert _get_ssl_context() is None
+
+    @patch("leadr.common.database.settings")
+    def test_returns_ssl_context_for_production(self, mock_settings) -> None:
+        """Test that SSL context is created for production."""
+        mock_settings.ENV = "PROD"
+        ctx = _get_ssl_context()
+        assert ctx is not None
+        assert isinstance(ctx, ssl.SSLContext)
+        assert ctx.check_hostname is True
+
+
+class TestGetConnectArgs:
+    """Tests for _get_connect_args function."""
+
+    @patch("leadr.common.database.settings")
+    def test_returns_empty_for_dev_env(self, mock_settings) -> None:
+        """Test that no SSL args for DEV environment."""
+        mock_settings.ENV = "DEV"
+        args = _get_connect_args()
+        assert "ssl" not in args
+
+    @patch("leadr.common.database.settings")
+    def test_returns_ssl_for_production(self, mock_settings) -> None:
+        """Test that SSL args included for production."""
+        mock_settings.ENV = "PROD"
+        args = _get_connect_args()
+        assert "ssl" in args
+        assert isinstance(args["ssl"], ssl.SSLContext)
+
+
+class TestGetPoolClass:
+    """Tests for _get_pool_class function."""
+
+    @patch("leadr.common.database.settings")
+    def test_returns_none_for_dev_env(self, mock_settings) -> None:
+        """Test that default pool is used for DEV environment."""
+        mock_settings.ENV = "DEV"
+        assert _get_pool_class() is None
+
+    @patch("leadr.common.database.settings")
+    def test_returns_none_for_test_env(self, mock_settings) -> None:
+        """Test that default pool is used for TEST environment."""
+        mock_settings.ENV = "TEST"
+        assert _get_pool_class() is None
+
+    @patch("leadr.common.database.settings")
+    def test_returns_nullpool_for_production(self, mock_settings) -> None:
+        """Test that NullPool is used for production (Neon)."""
+        mock_settings.ENV = "PROD"
+        assert _get_pool_class() is NullPool
+
+
+class TestGetPoolOptions:
+    """Tests for _get_pool_options function."""
+
+    @patch("leadr.common.database.settings")
+    def test_returns_pool_options_for_dev_env(self, mock_settings) -> None:
+        """Test that pool options are set for DEV environment."""
+        mock_settings.ENV = "DEV"
+        mock_settings.DB_POOL_SIZE = 5
+        mock_settings.DB_POOL_MAX_OVERFLOW = 10
+        mock_settings.DB_POOL_RECYCLE = 3600
+
+        options = _get_pool_options()
+        assert options["pool_size"] == 5
+        assert options["max_overflow"] == 10
+        assert options["pool_recycle"] == 3600
+        assert options["pool_pre_ping"] is True
+
+    @patch("leadr.common.database.settings")
+    def test_returns_empty_for_production(self, mock_settings) -> None:
+        """Test that no pool options for production (using NullPool)."""
+        mock_settings.ENV = "PROD"
+        options = _get_pool_options()
+        assert options == {}
 
 
 class TestGetDb:

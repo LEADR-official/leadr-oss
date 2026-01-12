@@ -35,6 +35,7 @@ from leadr.common.api.exceptions import (
     http_exception_handler,
     validation_error_handler,
 )
+from leadr.common.api.hooks import require_rate_limit_check
 from leadr.common.background_tasks import get_scheduler
 from leadr.common.database import async_session_factory, engine
 from leadr.common.domain.exceptions import EntityNotFoundError
@@ -184,8 +185,13 @@ def create_app(
 
     # Create public and admin routers with separate authentication requirements
     public_router = APIRouter()
-    client_router = APIRouter(prefix=f"{settings.API_PREFIX}/client")
-    admin_router = APIRouter(dependencies=[Depends(require_admin_auth)])
+    client_router = APIRouter(
+        prefix=f"{settings.API_PREFIX}/client",
+        dependencies=[Depends(require_rate_limit_check)],
+    )
+    admin_router = APIRouter(
+        dependencies=[Depends(require_admin_auth), Depends(require_rate_limit_check)]
+    )
 
     # Public routes - accessible without authentication
     public_router.include_router(api_router)

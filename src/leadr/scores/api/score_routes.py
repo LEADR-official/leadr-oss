@@ -11,6 +11,7 @@ from leadr.auth.dependencies import (
     ClientAuthContextDep,
     ClientAuthContextWithNonceDep,
 )
+from leadr.common.api.hooks import PostCreateScoreHookDep, PreCreateScoreHookDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
@@ -101,6 +102,8 @@ async def create_score_client(
     service: ScoreServiceDep,
     background_tasks: BackgroundTasks,
     auth: ClientAuthContextWithNonceDep,
+    pre_create_hook: PreCreateScoreHookDep,
+    post_create_hook: PostCreateScoreHookDep,
 ) -> ScoreClientResponse:
     """Create a new score (Client API).
 
@@ -113,6 +116,8 @@ async def create_score_client(
         service: Injected score service dependency.
         background_tasks: FastAPI background tasks for async metadata updates.
         auth: Client authentication context with device info.
+        pre_create_hook: Hook called before score creation (for quota checks).
+        post_create_hook: Hook called after successful score creation.
 
     Returns:
         ScoreClientResponse with the created score (excludes device_id).
@@ -131,6 +136,8 @@ async def create_score_client(
     account_id = auth.account_id
     game_id = auth.device.game_id
     device_id = auth.device.id
+
+    await pre_create_hook(account_id, auth)
 
     try:
         score, _ = await service.create_score(
@@ -155,6 +162,7 @@ async def create_score_client(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
+    await post_create_hook(account_id, auth, background_tasks)
     return ScoreClientResponse.from_domain(score)
 
 

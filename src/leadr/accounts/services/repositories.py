@@ -251,3 +251,24 @@ class UserRepository(BaseRepository[User, UserORM]):
         result = await self.session.execute(query)
         orms = result.scalars().all()
         return [self._to_domain(orm) for orm in orms]
+
+    async def get_owner_email_for_account(self, account_id: AccountID) -> str | None:
+        """Get email for account owner.
+
+        Returns the email of the first owner user found for the account,
+        or None if no owner exists.
+
+        Args:
+            account_id: Account to get owner email for.
+
+        Returns:
+            Owner's email address, or None if not found.
+        """
+        result = await self.session.execute(
+            select(UserORM.email).where(
+                UserORM.account_id == account_id.uuid,
+                UserORM.is_owner.is_(True),
+                UserORM.deleted_at.is_(None),
+            )
+        )
+        return result.scalar_one_or_none()
