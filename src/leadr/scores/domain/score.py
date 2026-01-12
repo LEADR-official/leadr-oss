@@ -54,6 +54,11 @@ class Score(Entity):
         default=None,
         description="Optional JSON metadata for game-specific data (loadouts, seeds, etc.)",
     )
+    rank: int | None = Field(
+        default=None,
+        description="Position in leaderboard (1 = first place). "
+        "Populated when querying with board_id.",
+    )
 
     @field_validator("player_name")
     @classmethod

@@ -139,6 +139,10 @@ class ScoreResponse(BaseModel):
     country: str | None = Field(default=None, description="Country for categorization, or null")
     city: str | None = Field(default=None, description="City for categorization, or null")
     metadata: Any | None = Field(default=None, description="Game-specific metadata, or null")
+    rank: int | None = Field(
+        default=None,
+        description="Leaderboard position (1 = first). Null if not querying by board_id.",
+    )
     created_at: datetime = Field(description="Timestamp when the score was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -165,6 +169,7 @@ class ScoreResponse(BaseModel):
             country=score.country,
             city=score.city,
             metadata=score.metadata,
+            rank=score.rank,
             created_at=score.created_at,
             updated_at=score.updated_at,
         )
@@ -181,6 +186,10 @@ class ScoreClientResponse(BaseModel):
     value: float = Field(description="Numeric value of the score")
     value_display: str | None = Field(default=None, description="Formatted display string, or null")
     metadata: Any | None = Field(default=None, description="Game-specific metadata, or null")
+    rank: int | None = Field(
+        default=None,
+        description="Leaderboard position (1 = first). Null if not querying by board_id.",
+    )
     created_at: datetime = Field(description="Timestamp when the score was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -203,6 +212,7 @@ class ScoreClientResponse(BaseModel):
             value=score.value,
             value_display=score.value_display,
             metadata=score.metadata,
+            rank=score.rank,
             created_at=score.created_at,
             updated_at=score.updated_at,
         )
