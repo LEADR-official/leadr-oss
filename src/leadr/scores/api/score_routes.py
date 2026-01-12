@@ -162,7 +162,7 @@ async def create_score_client(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
-    await post_create_hook(account_id, auth)
+    await post_create_hook(account_id, auth, background_tasks)
     return ScoreClientResponse.from_domain(score)
 
 

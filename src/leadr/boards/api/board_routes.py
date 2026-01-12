@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
@@ -37,6 +37,7 @@ async def create_board(
     request: BoardCreateRequest,
     service: BoardServiceDep,
     auth: AdminAuthContextDep,
+    background_tasks: BackgroundTasks,
     pre_create_hook: PreCreateBoardHookDep,
     post_create_hook: PostCreateBoardHookDep,
 ) -> BoardResponse:
@@ -91,7 +92,7 @@ async def create_board(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
-    await post_create_hook(request.account_id, request.game_id, auth)
+    await post_create_hook(request.account_id, request.game_id, auth, background_tasks)
     return BoardResponse.from_domain(board)
 
 

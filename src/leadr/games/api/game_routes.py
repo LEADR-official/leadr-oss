@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import AdminAuthContextDep
@@ -25,6 +25,7 @@ async def create_game(
     request: GameCreateRequest,
     service: GameServiceDep,
     auth: AdminAuthContextDep,
+    background_tasks: BackgroundTasks,
     pre_create_hook: PreCreateGameHookDep,
     post_create_hook: PostCreateGameHookDep,
 ) -> GameResponse:
@@ -69,7 +70,7 @@ async def create_game(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
-    await post_create_hook(request.account_id, auth)
+    await post_create_hook(request.account_id, auth, background_tasks)
     return GameResponse.from_domain(game)
 
 

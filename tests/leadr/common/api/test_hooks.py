@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import Request
+from fastapi import BackgroundTasks, Request
 
 from leadr.auth.dependencies import AdminAuthContext, ClientAuthContext
 from leadr.common.api.hooks import (
@@ -49,9 +49,10 @@ class TestNoopHooks:
         """Test noop_post_create_game executes without error."""
         account_id = AccountID()
         auth = MagicMock(spec=AdminAuthContext)
+        background_tasks = MagicMock(spec=BackgroundTasks)
 
         # Should not raise
-        await noop_post_create_game(account_id, auth)
+        await noop_post_create_game(account_id, auth, background_tasks)
 
     @pytest.mark.asyncio
     async def test_noop_pre_create_board(self) -> None:
@@ -69,9 +70,10 @@ class TestNoopHooks:
         account_id = AccountID()
         game_id = GameID()
         auth = MagicMock(spec=AdminAuthContext)
+        background_tasks = MagicMock(spec=BackgroundTasks)
 
         # Should not raise
-        await noop_post_create_board(account_id, game_id, auth)
+        await noop_post_create_board(account_id, game_id, auth, background_tasks)
 
     @pytest.mark.asyncio
     async def test_noop_pre_create_score(self) -> None:
@@ -87,9 +89,10 @@ class TestNoopHooks:
         """Test noop_post_create_score executes without error."""
         account_id = AccountID()
         auth = MagicMock(spec=ClientAuthContext)
+        background_tasks = MagicMock(spec=BackgroundTasks)
 
         # Should not raise
-        await noop_post_create_score(account_id, auth)
+        await noop_post_create_score(account_id, auth, background_tasks)
 
     @pytest.mark.asyncio
     async def test_noop_rate_limit_check(self) -> None:

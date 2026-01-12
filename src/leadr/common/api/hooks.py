@@ -6,7 +6,7 @@ These hooks are no-ops in OSS but can be overridden via FastAPI dependency_overr
 from collections.abc import Awaitable, Callable
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import BackgroundTasks, Depends, Request
 
 from leadr.auth.dependencies import AdminAuthContext, ClientAuthContext
 from leadr.common.domain.ids import AccountID, GameID
@@ -14,12 +14,14 @@ from leadr.common.domain.ids import AccountID, GameID
 # Type aliases for hook signatures
 # Games/Boards: Admin-only routes
 PreCreateGameHook = Callable[[AccountID, AdminAuthContext], Awaitable[None]]
-PostCreateGameHook = Callable[[AccountID, AdminAuthContext], Awaitable[None]]
+PostCreateGameHook = Callable[[AccountID, AdminAuthContext, BackgroundTasks], Awaitable[None]]
 PreCreateBoardHook = Callable[[AccountID, GameID, AdminAuthContext], Awaitable[None]]
-PostCreateBoardHook = Callable[[AccountID, GameID, AdminAuthContext], Awaitable[None]]
+PostCreateBoardHook = Callable[
+    [AccountID, GameID, AdminAuthContext, BackgroundTasks], Awaitable[None]
+]
 # Scores: Client-only route (admin score creation doesn't consume quotas)
 PreCreateScoreHook = Callable[[AccountID, ClientAuthContext], Awaitable[None]]
-PostCreateScoreHook = Callable[[AccountID, ClientAuthContext], Awaitable[None]]
+PostCreateScoreHook = Callable[[AccountID, ClientAuthContext, BackgroundTasks], Awaitable[None]]
 RateLimitHook = Callable[[Request], Awaitable[None]]
 
 
@@ -30,7 +32,9 @@ async def noop_pre_create_game(account_id: AccountID, auth: AdminAuthContext) ->
     """No-op pre-create game hook."""
 
 
-async def noop_post_create_game(account_id: AccountID, auth: AdminAuthContext) -> None:
+async def noop_post_create_game(
+    account_id: AccountID, auth: AdminAuthContext, background_tasks: BackgroundTasks
+) -> None:
     """No-op post-create game hook."""
 
 
@@ -41,7 +45,10 @@ async def noop_pre_create_board(
 
 
 async def noop_post_create_board(
-    account_id: AccountID, game_id: GameID, auth: AdminAuthContext
+    account_id: AccountID,
+    game_id: GameID,
+    auth: AdminAuthContext,
+    background_tasks: BackgroundTasks,
 ) -> None:
     """No-op post-create board hook."""
 
@@ -50,7 +57,9 @@ async def noop_pre_create_score(account_id: AccountID, auth: ClientAuthContext) 
     """No-op pre-create score hook."""
 
 
-async def noop_post_create_score(account_id: AccountID, auth: ClientAuthContext) -> None:
+async def noop_post_create_score(
+    account_id: AccountID, auth: ClientAuthContext, background_tasks: BackgroundTasks
+) -> None:
     """No-op post-create score hook."""
 
 
