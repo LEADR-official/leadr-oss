@@ -143,6 +143,10 @@ class ScoreResponse(BaseModel):
         default=None,
         description="Leaderboard position (1 = first). Null if not querying by board_id.",
     )
+    is_placeholder: bool = Field(
+        default=False,
+        description="True if this is a synthetic placeholder score (from around_score_value query)",
+    )
     created_at: datetime = Field(description="Timestamp when the score was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -170,6 +174,7 @@ class ScoreResponse(BaseModel):
             city=score.city,
             metadata=score.metadata,
             rank=score.rank,
+            is_placeholder=score.is_placeholder,
             created_at=score.created_at,
             updated_at=score.updated_at,
         )
@@ -189,6 +194,10 @@ class ScoreClientResponse(BaseModel):
     rank: int | None = Field(
         default=None,
         description="Leaderboard position (1 = first). Null if not querying by board_id.",
+    )
+    is_placeholder: bool = Field(
+        default=False,
+        description="True if this is a synthetic placeholder score (from around_score_value query)",
     )
     created_at: datetime = Field(description="Timestamp when the score was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
@@ -213,6 +222,7 @@ class ScoreClientResponse(BaseModel):
             value_display=score.value_display,
             metadata=score.metadata,
             rank=score.rank,
+            is_placeholder=score.is_placeholder,
             created_at=score.created_at,
             updated_at=score.updated_at,
         )

@@ -351,6 +351,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         *,
         pagination: PaginationParams,
         around_score_id: ScoreID | None = None,
+        around_score_value: float | None = None,
     ) -> PaginatedResult[Score]:
         """List scores for an account with optional filters and pagination.
 
@@ -363,7 +364,10 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             pagination: Pagination parameters (required).
             around_score_id: Optional score ID to center results around. When provided,
                 returns a window of scores centered on this score. Mutually exclusive
-                with cursor pagination.
+                with cursor pagination and around_score_value.
+            around_score_value: Optional value to center results around. Returns a
+                placeholder score with is_placeholder=True at the appropriate position.
+                Mutually exclusive with cursor pagination and around_score_id.
 
         Returns:
             PaginatedResult containing scores.
@@ -396,6 +400,34 @@ class ScoreService(BaseService[Score, ScoreRepository]):
                     SortField(name="created_at", direction=SortDirection.DESC),
                     SortField(name="id", direction=SortDirection.ASC),
                 ]
+
+        # Handle around_score_value: fetch board and set sort direction
+        elif around_score_value is not None and board_id is not None:
+            board_service = BoardService(self.repository.session)
+            board = await board_service.get_by_id_or_raise(board_id)
+
+            # Convert board's sort direction to pagination sort direction
+            value_direction = (
+                SortDirection.ASC
+                if board.sort_direction == BoardSortDirection.ASCENDING
+                else SortDirection.DESC
+            )
+            pagination.sort_spec = [
+                SortField(name="value", direction=value_direction),
+                SortField(name="created_at", direction=SortDirection.DESC),
+                SortField(name="id", direction=SortDirection.ASC),
+            ]
+
+            # Pass board to repository for placeholder creation
+            return await self.repository.filter(
+                account_id=account_id,
+                board_id=board_id,
+                game_id=game_id,
+                device_id=device_id,
+                pagination=pagination,
+                around_score_value=around_score_value,
+                around_value_board=board,
+            )
 
         # Apply board's default sort if filtering by board and no explicit sort provided
         elif board_id is not None and not pagination._user_provided_sort:

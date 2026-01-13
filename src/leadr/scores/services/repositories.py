@@ -1,6 +1,8 @@
 """Score repository services."""
 
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from sqlalchemy import Select, and_, func, or_, select
 
@@ -11,6 +13,12 @@ from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 from leadr.scores.adapters.orm import ScoreORM
 from leadr.scores.domain.score import Score
+
+if TYPE_CHECKING:
+    from leadr.boards.domain.board import Board
+
+# Sentinel nil UUID for placeholder scores
+NIL_UUID = UUID("00000000-0000-0000-0000-000000000000")
 
 
 class ScoreRepository(BaseRepository[Score, ScoreORM]):
@@ -120,6 +128,8 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         *,
         pagination: PaginationParams,
         around_score: Score | None = None,
+        around_score_value: float | None = None,
+        around_value_board: "Board | None" = None,
         **kwargs: Any,
     ) -> PaginatedResult[Score]:
         """Filter scores by account and optional criteria.
@@ -134,6 +144,9 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             around_score: Optional target score to center results around. When provided,
                 returns a window of scores centered on this score (mutually exclusive
                 with cursor pagination).
+            around_score_value: Optional value to center results around. Returns a
+                placeholder score with is_placeholder=True at the appropriate position.
+            around_value_board: The board entity (required when around_score_value is set).
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
@@ -175,13 +188,22 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
                     f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
                 )
 
-        # Branch: around_score query vs normal cursor pagination
-        # Note: around_score requires board_id (validated at route level), so rank is always
-        # computed
+        # Branch: around_score query vs around_score_value vs normal cursor pagination
+        # Note: around_score/around_score_value require board_id (validated at route level),
+        # so rank is always computed
         if around_score is not None:
             return await self._execute_around_query(
                 base_query=query,
                 target_score=around_score,
+                sort_fields=pagination.sort_spec,
+                limit=pagination.limit,
+            )
+
+        if around_score_value is not None and around_value_board is not None:
+            return await self._execute_around_value_query(
+                base_query=query,
+                value=around_score_value,
+                board=around_value_board,
                 sort_fields=pagination.sort_spec,
                 limit=pagination.limit,
             )
@@ -344,6 +366,257 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             next_position=next_position,
             prev_position=prev_position,
         )
+
+    async def _execute_around_value_query(
+        self,
+        base_query: Select[tuple[ScoreORM]],
+        value: float,
+        board: "Board",
+        sort_fields: list[SortField],
+        limit: int,
+    ) -> PaginatedResult[Score]:
+        """Execute a query that returns scores centered around a hypothetical value.
+
+        Creates a synthetic placeholder score with the given value and returns it
+        along with neighboring scores. The placeholder has is_placeholder=True and
+        uses sentinel nil UUIDs for id and device_id.
+
+        Args:
+            base_query: SQLAlchemy query with all filters applied (account, board, etc.)
+            value: The hypothetical score value to center results around
+            board: The board entity (for deriving account_id, game_id)
+            sort_fields: List of sort fields defining the ranking order
+            limit: Total number of scores to return (including placeholder)
+
+        Returns:
+            PaginatedResult with scores (including placeholder) centered around value
+        """
+        # Create placeholder score with sentinel IDs
+        now = datetime.now(UTC)
+        placeholder = Score(
+            id=ScoreID(NIL_UUID),
+            account_id=board.account_id,
+            game_id=board.game_id,
+            board_id=board.id,
+            device_id=DeviceID(NIL_UUID),
+            player_name="",  # Empty for placeholder
+            value=value,
+            is_placeholder=True,
+            created_at=now,
+            updated_at=now,
+        )
+
+        # Extract placeholder position values for sort field comparison
+        target_values = self._extract_target_values(placeholder, sort_fields)
+
+        # Compute placeholder's hypothetical rank
+        placeholder_rank = await self._get_value_rank(value, board.id, sort_fields)
+
+        # Calculate window sizes (ideal split)
+        ideal_above_count = limit // 2
+        ideal_below_count = limit - ideal_above_count - 1
+        max_side_items = limit - 1  # Max items from one side (excluding placeholder)
+
+        # Build "above" query (scores ranked better than placeholder, closest first)
+        above_query = self._build_around_subquery(
+            base_query=base_query,
+            target_values=target_values,
+            sort_fields=sort_fields,
+            direction="above",
+            limit=max_side_items + 1,  # +1 to detect has_prev
+        )
+
+        # Build "below" query (scores ranked worse than placeholder, closest first)
+        # For tie-breaking, placeholder is "newest" so same-value scores go below
+        below_query = self._build_around_value_below_subquery(
+            base_query=base_query,
+            target_values=target_values,
+            sort_fields=sort_fields,
+            limit=max_side_items + 1,  # +1 to detect has_next
+        )
+
+        # Execute both queries
+        above_result = await self.session.execute(above_query)
+        above_orms = list(above_result.scalars().all())
+
+        below_result = await self.session.execute(below_query)
+        below_orms = list(below_result.scalars().all())
+
+        # Adjust window sizes based on available items
+        available_above = len(above_orms)
+        available_below = len(below_orms)
+
+        if available_above < ideal_above_count:
+            actual_above_count = available_above
+            actual_below_count = min(available_below, limit - 1 - actual_above_count)
+        elif available_below < ideal_below_count:
+            actual_below_count = available_below
+            actual_above_count = min(available_above, limit - 1 - actual_below_count)
+        else:
+            actual_above_count = ideal_above_count
+            actual_below_count = ideal_below_count
+
+        # Determine pagination flags
+        has_prev = available_above > actual_above_count
+        has_next = available_below > actual_below_count
+
+        # Trim to adjusted window sizes
+        above_orms = above_orms[:actual_above_count]
+        below_orms = below_orms[:actual_below_count]
+
+        # Reverse above results (they were fetched closest-first, need best-first)
+        above_orms.reverse()
+
+        # Build results with computed ranks
+        items: list[Score] = []
+
+        # Add above items with ranks
+        for i, orm in enumerate(above_orms):
+            rank = placeholder_rank - (actual_above_count - i)
+            items.append(self._to_domain(orm, rank=rank))
+
+        # Add placeholder
+        placeholder.rank = placeholder_rank
+        items.append(placeholder)
+
+        # Add below items with ranks
+        for i, orm in enumerate(below_orms):
+            rank = placeholder_rank + i + 1
+            items.append(self._to_domain(orm, rank=rank))
+
+        # Build cursor positions for pagination (using real scores, not placeholder)
+        prev_position = None
+        next_position = None
+
+        if above_orms and has_prev:
+            prev_position = self._extract_cursor_position(above_orms[0], sort_fields)
+        if below_orms and has_next:
+            next_position = self._extract_cursor_position(below_orms[-1], sort_fields)
+
+        return PaginatedResult(
+            items=items,
+            has_next=has_next,
+            has_prev=has_prev,
+            next_position=next_position,
+            prev_position=prev_position,
+        )
+
+    def _build_around_value_below_subquery(
+        self,
+        base_query: Select[tuple[ScoreORM]],
+        target_values: dict[str, Any],
+        sort_fields: list[SortField],
+        limit: int,
+    ) -> Select[tuple[ScoreORM]]:
+        """Build subquery for scores below a hypothetical value.
+
+        For "below" with a placeholder (newest timestamp), scores with the same value
+        are considered "below" because the placeholder would be at the top of same-value
+        scores due to having the newest created_at.
+
+        Args:
+            base_query: Base query with all filters applied
+            target_values: Dict of sort field values from placeholder
+            sort_fields: List of sort fields defining the ranking order
+            limit: Maximum number of results
+
+        Returns:
+            SQLAlchemy query for scores that would rank below the value
+        """
+        # Build WHERE clause for scores worse than or equal to placeholder value
+        # but excluding the exact same position (which would be the placeholder itself)
+        # Since placeholder has newest timestamp, all same-value scores are "below"
+        position_clause = self._build_position_clause_for_value(
+            target_values=target_values,
+            sort_fields=sort_fields,
+        )
+
+        query = base_query.where(position_clause)
+
+        # Apply normal sort (closest to placeholder first)
+        query = self._apply_sort(query, sort_fields)
+        query = query.limit(limit)
+
+        return query
+
+    def _build_position_clause_for_value(
+        self,
+        target_values: dict[str, Any],
+        sort_fields: list[SortField],
+    ) -> Any:
+        """Build WHERE clause for rows after a hypothetical value position.
+
+        For a placeholder with the newest timestamp, scores that rank "below" are:
+        - Scores with worse value (according to sort direction)
+        - Scores with same value (since placeholder has newest created_at)
+
+        This uses a simplified comparison on just the value field since the placeholder
+        is assumed to be at the top of any same-value group.
+
+        Args:
+            target_values: Dict of sort field values from placeholder
+            sort_fields: List of sort fields
+
+        Returns:
+            SQLAlchemy WHERE clause
+        """
+        # Get the primary sort field (should be "value")
+        primary_field = sort_fields[0]
+        value_column = self._get_orm_column(primary_field.name)
+        target_value = target_values[primary_field.name]
+
+        # For DESC: below means value <= target (same or worse)
+        # For ASC: below means value >= target (same or worse)
+        if primary_field.direction == SortDirection.DESC:
+            return value_column <= target_value
+        else:
+            return value_column >= target_value
+
+    async def _get_value_rank(
+        self,
+        value: float,
+        board_id: BoardID,
+        sort_fields: list[SortField],
+    ) -> int:
+        """Compute hypothetical rank for a value using COUNT approach.
+
+        Counts how many scores rank better than the given value.
+        For a placeholder (newest timestamp), scores with the same value
+        are counted as "below" since the placeholder would be at the top
+        of any same-value group.
+
+        Args:
+            value: The score value to compute rank for
+            board_id: Board ID to filter by
+            sort_fields: Sort fields defining the ranking order
+
+        Returns:
+            Rank (1-indexed, where 1 is the best)
+        """
+        # Get the primary sort field (should be "value")
+        primary_field = sort_fields[0]
+        value_column = self._get_orm_column(primary_field.name)
+
+        # For DESC: better means value > target
+        # For ASC: better means value < target
+        if primary_field.direction == SortDirection.DESC:
+            better_condition = value_column > value
+        else:
+            better_condition = value_column < value
+
+        # Count scores that rank better
+        count_query = (
+            select(func.count())
+            .select_from(ScoreORM)
+            .where(ScoreORM.deleted_at.is_(None))
+            .where(ScoreORM.board_id == self._extract_uuid(board_id))
+            .where(better_condition)
+        )
+
+        result = await self.session.execute(count_query)
+        better_count = result.scalar_one()
+
+        return better_count + 1  # Rank is 1-indexed
 
     def _extract_target_values(
         self,

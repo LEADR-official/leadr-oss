@@ -3,7 +3,7 @@
 import json
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.common.domain.models import Entity
@@ -59,25 +59,40 @@ class Score(Entity):
         description="Position in leaderboard (1 = first place). "
         "Populated when querying with board_id.",
     )
+    is_placeholder: bool = Field(
+        default=False,
+        description="True if this is a synthetic placeholder score (from around_score_value query)",
+    )
 
     @field_validator("player_name")
     @classmethod
-    def validate_player_name(cls, v: str) -> str:
-        """Validate that player_name is not empty and strip whitespace.
+    def strip_player_name(cls, v: str) -> str:
+        """Strip whitespace from player_name.
 
         Args:
             v: The player_name to validate.
 
         Returns:
-            The validated and trimmed player_name.
+            The trimmed player_name.
+        """
+        return v.strip()
+
+    @model_validator(mode="after")
+    def validate_player_name_not_empty(self) -> "Score":
+        """Validate that player_name is not empty for non-placeholder scores.
+
+        Placeholder scores are allowed to have empty player_name since they
+        are synthetic scores created for around_score_value queries.
+
+        Returns:
+            The validated Score instance.
 
         Raises:
-            ValueError: If player_name is empty or whitespace only.
+            ValueError: If player_name is empty and this is not a placeholder.
         """
-        v = v.strip()
-        if not v:
+        if not self.is_placeholder and not self.player_name:
             raise ValueError("player_name cannot be empty")
-        return v
+        return self
 
     @field_validator("metadata")
     @classmethod

@@ -210,6 +210,7 @@ async def handle_list_scores(
     game_id: GameID | None,
     device_id: DeviceID | None,
     around_score_id: ScoreID | None = None,
+    around_score_value: float | None = None,
 ) -> PaginatedResponse[ScoreResponse] | PaginatedResponse[ScoreClientResponse]:
     """Handle list scores logic for both admin and client endpoints.
 
@@ -227,13 +228,14 @@ async def handle_list_scores(
         game_id: Optional game ID filter.
         device_id: Optional device ID filter.
         around_score_id: Optional score ID to center results around.
+        around_score_value: Optional score value to center results around (with placeholder).
 
     Returns:
         PaginatedResponse with scores and appropriate response model based on auth type.
 
     Raises:
         HTTPException: 400 if cursor is invalid, sort field is invalid,
-            or validation fails for around_score_id.
+            or validation fails for around_score_id/around_score_value.
         HTTPException: 404 if around_score_id score not found.
     """
     # Validate around_score_id constraints
@@ -244,11 +246,32 @@ async def handle_list_scores(
                 status_code=400,
                 detail="Cannot use both cursor and around_score_id parameters",
             )
+        # around_score_id and around_score_value are mutually exclusive
+        if around_score_value is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot use both around_score_id and around_score_value parameters",
+            )
         # around_score_id requires board_id
         if board_id is None:
             raise HTTPException(
                 status_code=400,
                 detail="board_id is required when using around_score_id",
+            )
+
+    # Validate around_score_value constraints
+    if around_score_value is not None:
+        # around_score_value and cursor are mutually exclusive
+        if pagination.has_cursor():
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot use both cursor and around_score_value parameters",
+            )
+        # around_score_value requires board_id
+        if board_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="board_id is required when using around_score_value",
             )
 
     try:
@@ -259,6 +282,7 @@ async def handle_list_scores(
             device_id=device_id,
             pagination=pagination,
             around_score_id=around_score_id,
+            around_score_value=around_score_value,
         )
     except (CursorValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
@@ -301,6 +325,10 @@ async def list_scores_admin(
     around_score_id: Annotated[
         ScoreID | None, Query(description="Center results around this score ID")
     ] = None,
+    around_score_value: Annotated[
+        float | None,
+        Query(description="Center results around this score value (returns placeholder)"),
+    ] = None,
 ) -> PaginatedResponse[ScoreResponse]:
     """List scores for an account with optional filters and pagination.
 
@@ -320,14 +348,17 @@ async def list_scores_admin(
 
     Around Score:
     - Use around_score_id to get scores centered around a specific score
-    - Requires board_id to be specified
-    - Mutually exclusive with cursor pagination
+    - Use around_score_value to get scores centered around a hypothetical value
+      (returns a placeholder score with is_placeholder=True)
+    - Both require board_id to be specified
+    - Mutually exclusive with cursor pagination and each other
     - Returns a window of scores with the target in the middle
     - Respects limit (e.g., limit=5 returns 2 above + target + 2 below)
 
     Example:
         GET /v1/scores?board_id=brd_123&limit=50&sort=value:desc,created_at:asc
         GET /v1/scores?board_id=brd_123&around_score_id=scr_456&limit=11
+        GET /v1/scores?board_id=brd_123&around_score_value=1500&limit=11
 
     Args:
         auth: Authentication context with user info.
@@ -338,12 +369,13 @@ async def list_scores_admin(
         game_id: Optional game ID to filter by.
         device_id: Optional device ID to filter by.
         around_score_id: Optional score ID to center results around.
+        around_score_value: Optional value to center results around (with placeholder).
 
     Returns:
         PaginatedResponse with scores and pagination metadata.
 
     Raises:
-        400: Invalid cursor, sort field, cursor state mismatch, or around_score_id validation.
+        400: Invalid cursor, sort field, cursor state mismatch, or around validation.
         400: Superadmin did not provide account_id.
         403: User does not have access to the specified account.
         404: around_score_id score not found.
@@ -361,6 +393,7 @@ async def list_scores_admin(
         game_id,
         device_id,
         around_score_id,
+        around_score_value,
     )
 
 
@@ -373,6 +406,10 @@ async def list_scores_client(
     device_id: DeviceID | None = None,
     around_score_id: Annotated[
         ScoreID | None, Query(description="Center results around this score ID")
+    ] = None,
+    around_score_value: Annotated[
+        float | None,
+        Query(description="Center results around this score value (returns placeholder)"),
     ] = None,
 ) -> PaginatedResponse[ScoreClientResponse]:
     """List scores for an account with optional filters and pagination.
@@ -390,14 +427,17 @@ async def list_scores_client(
 
     Around Score:
     - Use around_score_id to get scores centered around a specific score
-    - Requires board_id to be specified
-    - Mutually exclusive with cursor pagination
+    - Use around_score_value to get scores centered around a hypothetical value
+      (returns a placeholder score with is_placeholder=True)
+    - Both require board_id to be specified
+    - Mutually exclusive with cursor pagination and each other
     - Returns a window of scores with the target in the middle
     - Respects limit (e.g., limit=5 returns 2 above + target + 2 below)
 
     Example:
         GET /client/scores?board_id=brd_123&limit=50&sort=value:desc,created_at:asc
         GET /client/scores?board_id=brd_123&around_score_id=scr_456&limit=11
+        GET /client/scores?board_id=brd_123&around_score_value=1500&limit=11
 
     Args:
         auth: Authentication context with user info.
@@ -406,12 +446,13 @@ async def list_scores_client(
         board_id: Optional board ID to filter by.
         device_id: Optional device ID to filter by (e.g., to get "my scores").
         around_score_id: Optional score ID to center results around.
+        around_score_value: Optional value to center results around (with placeholder).
 
     Returns:
         PaginatedResponse with scores and pagination metadata.
 
     Raises:
-        400: Invalid cursor, sort field, cursor state mismatch, or around_score_id validation.
+        400: Invalid cursor, sort field, cursor state mismatch, or around validation.
         403: User does not have access to the specified account.
         404: around_score_id score not found.
     """
@@ -424,6 +465,7 @@ async def list_scores_client(
         auth.device.game_id,
         device_id,
         around_score_id,
+        around_score_value,
     )
 
 
