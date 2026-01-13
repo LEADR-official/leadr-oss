@@ -51,7 +51,7 @@ async def create_game(
         403: User does not have access to the specified account.
         404: Account not found.
     """
-    await pre_create_hook(request.account_id, auth)
+    await pre_create_hook(request, auth, background_tasks)
 
     try:
         game = await service.create_game(
@@ -70,7 +70,7 @@ async def create_game(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
-    await post_create_hook(request.account_id, auth, background_tasks)
+    await post_create_hook(request, auth, background_tasks)
     return GameResponse.from_domain(game)
 
 

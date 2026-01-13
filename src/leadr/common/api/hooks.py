@@ -4,67 +4,133 @@ These hooks are no-ops in OSS but can be overridden via FastAPI dependency_overr
 """
 
 from collections.abc import Awaitable, Callable
-from typing import Annotated
+from typing import Annotated, Protocol, TypeAlias, TypeVar
 
 from fastapi import BackgroundTasks, Depends, Request
 
 from leadr.auth.dependencies import AdminAuthContext, ClientAuthContext
-from leadr.common.domain.ids import AccountID, GameID
+from leadr.boards.api.board_schemas import BoardCreateRequest
+from leadr.boards.api.board_template_schemas import (
+    BoardTemplateCreateRequest,
+    BoardTemplateUpdateRequest,
+)
+from leadr.common.domain.ids import AccountID
+from leadr.games.api.game_schemas import GameCreateRequest
+from leadr.scores.api.score_schemas import ScoreClientCreateRequest
 
-# Type aliases for hook signatures
-# Games/Boards: Admin-only routes
-PreCreateGameHook = Callable[[AccountID, AdminAuthContext], Awaitable[None]]
-PostCreateGameHook = Callable[[AccountID, AdminAuthContext, BackgroundTasks], Awaitable[None]]
-PreCreateBoardHook = Callable[[AccountID, GameID, AdminAuthContext], Awaitable[None]]
-PostCreateBoardHook = Callable[
-    [AccountID, GameID, AdminAuthContext, BackgroundTasks], Awaitable[None]
-]
-# Scores: Client-only route (admin score creation doesn't consume quotas)
-PreCreateScoreHook = Callable[[AccountID, ClientAuthContext], Awaitable[None]]
-PostCreateScoreHook = Callable[[AccountID, ClientAuthContext, BackgroundTasks], Awaitable[None]]
+# --- Generic hook protocols ---
+
+RequestT = TypeVar("RequestT", contravariant=True)
+AuthT = TypeVar("AuthT", contravariant=True)
+
+
+class Hook(Protocol[RequestT, AuthT]):
+    """Generic hook type for resource lifecycle events.
+
+    All hooks follow the signature: (request, auth, background_tasks) -> None
+    - request: The Pydantic request schema for the operation
+    - auth: The authentication context (AdminAuthContext or ClientAuthContext)
+    - background_tasks: FastAPI BackgroundTasks for scheduling async work
+    """
+
+    async def __call__(
+        self, request: RequestT, auth: AuthT, background_tasks: BackgroundTasks
+    ) -> None: ...
+
+
+class UpdateHook(Protocol[RequestT, AuthT]):
+    """Hook type for update operations that need the resource's account_id.
+
+    Update hooks receive account_id separately since it comes from the existing
+    resource, not the update request body.
+    """
+
+    async def __call__(
+        self,
+        account_id: AccountID,
+        request: RequestT,
+        auth: AuthT,
+        background_tasks: BackgroundTasks,
+    ) -> None: ...
+
+
+# --- Hook type aliases ---
+# Games - Admin auth
+PreCreateGameHook: TypeAlias = Hook[GameCreateRequest, AdminAuthContext]
+PostCreateGameHook: TypeAlias = Hook[GameCreateRequest, AdminAuthContext]
+
+# Boards - Admin auth
+PreCreateBoardHook: TypeAlias = Hook[BoardCreateRequest, AdminAuthContext]
+PostCreateBoardHook: TypeAlias = Hook[BoardCreateRequest, AdminAuthContext]
+
+# Scores - Client auth (score submissions are client-facing)
+PreCreateScoreHook: TypeAlias = Hook[ScoreClientCreateRequest, ClientAuthContext]
+PostCreateScoreHook: TypeAlias = Hook[ScoreClientCreateRequest, ClientAuthContext]
+
+# Board templates - Admin auth
+PreCreateBoardTemplateHook: TypeAlias = Hook[BoardTemplateCreateRequest, AdminAuthContext]
+PreUpdateBoardTemplateHook: TypeAlias = UpdateHook[BoardTemplateUpdateRequest, AdminAuthContext]
+
+# Rate limiting (uses raw Request, not schema)
 RateLimitHook = Callable[[Request], Awaitable[None]]
 
 
 # --- No-op implementations ---
 
 
-async def noop_pre_create_game(account_id: AccountID, auth: AdminAuthContext) -> None:
+async def noop_pre_create_game(
+    request: GameCreateRequest, auth: AdminAuthContext, background_tasks: BackgroundTasks
+) -> None:
     """No-op pre-create game hook."""
 
 
 async def noop_post_create_game(
-    account_id: AccountID, auth: AdminAuthContext, background_tasks: BackgroundTasks
+    request: GameCreateRequest, auth: AdminAuthContext, background_tasks: BackgroundTasks
 ) -> None:
     """No-op post-create game hook."""
 
 
 async def noop_pre_create_board(
-    account_id: AccountID, game_id: GameID, auth: AdminAuthContext
+    request: BoardCreateRequest, auth: AdminAuthContext, background_tasks: BackgroundTasks
 ) -> None:
     """No-op pre-create board hook."""
 
 
 async def noop_post_create_board(
-    account_id: AccountID,
-    game_id: GameID,
-    auth: AdminAuthContext,
-    background_tasks: BackgroundTasks,
+    request: BoardCreateRequest, auth: AdminAuthContext, background_tasks: BackgroundTasks
 ) -> None:
     """No-op post-create board hook."""
 
 
-async def noop_pre_create_score(account_id: AccountID, auth: ClientAuthContext) -> None:
+async def noop_pre_create_score(
+    request: ScoreClientCreateRequest, auth: ClientAuthContext, background_tasks: BackgroundTasks
+) -> None:
     """No-op pre-create score hook."""
 
 
 async def noop_post_create_score(
-    account_id: AccountID, auth: ClientAuthContext, background_tasks: BackgroundTasks
+    request: ScoreClientCreateRequest, auth: ClientAuthContext, background_tasks: BackgroundTasks
 ) -> None:
     """No-op post-create score hook."""
 
 
 async def noop_rate_limit_check(request: Request) -> None:
     """No-op rate limit hook."""
+
+
+async def noop_pre_create_board_template(
+    request: BoardTemplateCreateRequest, auth: AdminAuthContext, background_tasks: BackgroundTasks
+) -> None:
+    """No-op pre-create board template hook."""
+
+
+async def noop_pre_update_board_template(
+    account_id: AccountID,
+    request: BoardTemplateUpdateRequest,
+    auth: AdminAuthContext,
+    background_tasks: BackgroundTasks,
+) -> None:
+    """No-op pre-update board template hook."""
 
 
 # --- Dependency factories (for override targets) ---
@@ -105,6 +171,16 @@ def get_rate_limit_hook() -> RateLimitHook:
     return noop_rate_limit_check
 
 
+def get_pre_create_board_template_hook() -> PreCreateBoardTemplateHook:
+    """Get the pre-create board template hook. Override in cloud."""
+    return noop_pre_create_board_template
+
+
+def get_pre_update_board_template_hook() -> PreUpdateBoardTemplateHook:
+    """Get the pre-update board template hook. Override in cloud."""
+    return noop_pre_update_board_template
+
+
 # --- Injectable dependencies ---
 
 PreCreateGameHookDep = Annotated[PreCreateGameHook, Depends(get_pre_create_game_hook)]
@@ -113,6 +189,12 @@ PreCreateBoardHookDep = Annotated[PreCreateBoardHook, Depends(get_pre_create_boa
 PostCreateBoardHookDep = Annotated[PostCreateBoardHook, Depends(get_post_create_board_hook)]
 PreCreateScoreHookDep = Annotated[PreCreateScoreHook, Depends(get_pre_create_score_hook)]
 PostCreateScoreHookDep = Annotated[PostCreateScoreHook, Depends(get_post_create_score_hook)]
+PreCreateBoardTemplateHookDep = Annotated[
+    PreCreateBoardTemplateHook, Depends(get_pre_create_board_template_hook)
+]
+PreUpdateBoardTemplateHookDep = Annotated[
+    PreUpdateBoardTemplateHook, Depends(get_pre_update_board_template_hook)
+]
 
 
 # --- Router-level rate limit dependency ---

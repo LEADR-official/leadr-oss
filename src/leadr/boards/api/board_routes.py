@@ -64,7 +64,7 @@ async def create_board(
         404: Game or account not found.
         400: Game doesn't belong to the specified account.
     """
-    await pre_create_hook(request.account_id, request.game_id, auth)
+    await pre_create_hook(request, auth, background_tasks)
 
     try:
         board = await service.create_board(
@@ -92,7 +92,7 @@ async def create_board(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
-    await post_create_hook(request.account_id, request.game_id, auth, background_tasks)
+    await post_create_hook(request, auth, background_tasks)
     return BoardResponse.from_domain(board)
 
 

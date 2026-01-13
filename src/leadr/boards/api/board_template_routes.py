@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import AdminAuthContextDep
@@ -12,6 +12,10 @@ from leadr.boards.api.board_template_schemas import (
     BoardTemplateUpdateRequest,
 )
 from leadr.boards.services.dependencies import BoardTemplateServiceDep
+from leadr.common.api.hooks import (
+    PreCreateBoardTemplateHookDep,
+    PreUpdateBoardTemplateHookDep,
+)
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
@@ -25,7 +29,11 @@ router = APIRouter()
     response_model=BoardTemplateResponse,
 )
 async def create_board_template(
-    request: BoardTemplateCreateRequest, service: BoardTemplateServiceDep, auth: AdminAuthContextDep
+    request: BoardTemplateCreateRequest,
+    service: BoardTemplateServiceDep,
+    auth: AdminAuthContextDep,
+    background_tasks: BackgroundTasks,
+    pre_hook: PreCreateBoardTemplateHookDep,
 ) -> BoardTemplateResponse:
     """Create a new board template.
 
@@ -39,15 +47,19 @@ async def create_board_template(
         request: Template creation details including repeat_interval and configuration.
         service: Injected board template service dependency.
         auth: Authentication context with user info.
+        pre_hook: Pre-create hook for entitlement checks.
 
     Returns:
         BoardTemplateResponse with the created template including auto-generated ID.
 
     Raises:
-        403: User does not have access to the specified account.
+        403: User does not have access to the specified account, or repeat_interval not allowed.
         404: Game or account not found.
         400: Game doesn't belong to the specified account.
     """
+    # Run pre-create hook (entitlement checks, validation, etc.)
+    await pre_hook(request, auth, background_tasks)
+
     try:
         template = await service.create_board_template(
             account_id=request.account_id,
@@ -178,6 +190,8 @@ async def update_board_template(
     request: BoardTemplateUpdateRequest,
     service: BoardTemplateServiceDep,
     auth: AdminAuthContextDep,
+    background_tasks: BackgroundTasks,
+    pre_hook: PreUpdateBoardTemplateHookDep,
 ) -> BoardTemplateResponse:
     """Update a board template.
 
@@ -188,12 +202,13 @@ async def update_board_template(
         request: Template update details (all fields optional).
         service: Injected board template service dependency.
         auth: Authentication context with user info.
+        pre_hook: Pre-update hook for entitlement checks.
 
     Returns:
         BoardTemplateResponse with the updated template details.
 
     Raises:
-        403: User does not have access to this template's account.
+        403: User does not have access to this template's account, or repeat_interval not allowed.
         404: Template not found.
     """
     # Fetch template to check authorization
@@ -205,6 +220,9 @@ async def update_board_template(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this template's account",
         )
+
+    # Run pre-update hook (entitlement checks, validation, etc.)
+    await pre_hook(template.account_id, request, auth, background_tasks)
 
     # Handle soft delete first
     if request.deleted is True:

@@ -137,7 +137,7 @@ async def create_score_client(
     game_id = auth.device.game_id
     device_id = auth.device.id
 
-    await pre_create_hook(account_id, auth)
+    await pre_create_hook(score_request, auth, background_tasks)
 
     try:
         score, _ = await service.create_score(
@@ -162,7 +162,7 @@ async def create_score_client(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
-    await post_create_hook(account_id, auth, background_tasks)
+    await post_create_hook(score_request, auth, background_tasks)
     return ScoreClientResponse.from_domain(score)
 
 
