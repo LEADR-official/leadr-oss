@@ -6,6 +6,7 @@ import pytest
 from fastapi import BackgroundTasks, Request
 
 from leadr.auth.dependencies import AdminAuthContext, ClientAuthContext
+from leadr.boards.api.board_schemas import BoardCreateRequest
 from leadr.common.api.hooks import (
     PostCreateBoardHookDep,
     PostCreateGameHookDep,
@@ -29,7 +30,8 @@ from leadr.common.api.hooks import (
     noop_rate_limit_check,
     require_rate_limit_check,
 )
-from leadr.common.domain.ids import AccountID, GameID
+from leadr.games.api.game_schemas import GameCreateRequest
+from leadr.scores.api.score_schemas import ScoreClientCreateRequest
 
 
 class TestNoopHooks:
@@ -38,61 +40,62 @@ class TestNoopHooks:
     @pytest.mark.asyncio
     async def test_noop_pre_create_game(self) -> None:
         """Test noop_pre_create_game executes without error."""
-        account_id = AccountID()
+        request = MagicMock(spec=GameCreateRequest)
         auth = MagicMock(spec=AdminAuthContext)
+        background_tasks = MagicMock(spec=BackgroundTasks)
 
         # Should not raise
-        await noop_pre_create_game(account_id, auth)
+        await noop_pre_create_game(request, auth, background_tasks)
 
     @pytest.mark.asyncio
     async def test_noop_post_create_game(self) -> None:
         """Test noop_post_create_game executes without error."""
-        account_id = AccountID()
+        request = MagicMock(spec=GameCreateRequest)
         auth = MagicMock(spec=AdminAuthContext)
         background_tasks = MagicMock(spec=BackgroundTasks)
 
         # Should not raise
-        await noop_post_create_game(account_id, auth, background_tasks)
+        await noop_post_create_game(request, auth, background_tasks)
 
     @pytest.mark.asyncio
     async def test_noop_pre_create_board(self) -> None:
         """Test noop_pre_create_board executes without error."""
-        account_id = AccountID()
-        game_id = GameID()
+        request = MagicMock(spec=BoardCreateRequest)
         auth = MagicMock(spec=AdminAuthContext)
+        background_tasks = MagicMock(spec=BackgroundTasks)
 
         # Should not raise
-        await noop_pre_create_board(account_id, game_id, auth)
+        await noop_pre_create_board(request, auth, background_tasks)
 
     @pytest.mark.asyncio
     async def test_noop_post_create_board(self) -> None:
         """Test noop_post_create_board executes without error."""
-        account_id = AccountID()
-        game_id = GameID()
+        request = MagicMock(spec=BoardCreateRequest)
         auth = MagicMock(spec=AdminAuthContext)
         background_tasks = MagicMock(spec=BackgroundTasks)
 
         # Should not raise
-        await noop_post_create_board(account_id, game_id, auth, background_tasks)
+        await noop_post_create_board(request, auth, background_tasks)
 
     @pytest.mark.asyncio
     async def test_noop_pre_create_score(self) -> None:
         """Test noop_pre_create_score executes without error."""
-        account_id = AccountID()
-        auth = MagicMock(spec=ClientAuthContext)
-
-        # Should not raise
-        await noop_pre_create_score(account_id, auth)
-
-    @pytest.mark.asyncio
-    async def test_noop_post_create_score(self) -> None:
-        """Test noop_post_create_score executes without error."""
-        account_id = AccountID()
+        request = MagicMock(spec=ScoreClientCreateRequest)
         auth = MagicMock(spec=ClientAuthContext)
         background_tasks = MagicMock(spec=BackgroundTasks)
 
         # Should not raise
-        await noop_post_create_score(account_id, auth, background_tasks)
+        await noop_pre_create_score(request, auth, background_tasks)
+
+    @pytest.mark.asyncio
+    async def test_noop_post_create_score(self) -> None:
+        """Test noop_post_create_score executes without error."""
+        request = MagicMock(spec=ScoreClientCreateRequest)
+        auth = MagicMock(spec=ClientAuthContext)
+        background_tasks = MagicMock(spec=BackgroundTasks)
+
+        # Should not raise
+        await noop_post_create_score(request, auth, background_tasks)
 
     @pytest.mark.asyncio
     async def test_noop_rate_limit_check(self) -> None:
