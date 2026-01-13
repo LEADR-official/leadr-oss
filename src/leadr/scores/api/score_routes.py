@@ -397,6 +397,44 @@ async def list_scores_admin(
     )
 
 
+@client_router.get("/scores/{score_id}", response_model=ScoreClientResponse)
+async def get_score_client(
+    score_id: ScoreID,
+    service: ScoreServiceDep,
+    auth: ClientAuthContextDep,
+) -> ScoreClientResponse:
+    """Get a score by ID (Client API).
+
+    Returns the score with its computed rank based on the board's sort direction.
+    The rank represents the score's position in the leaderboard (1 = first place).
+
+    Clients can only access scores from boards belonging to the same game
+    as their authenticated device.
+
+    Args:
+        score_id: Score identifier to retrieve.
+        service: Injected score service dependency.
+        auth: Client authentication context with device info.
+
+    Returns:
+        ScoreClientResponse with the score details including rank.
+
+    Raises:
+        403: Client does not have access to this score's game.
+        404: Score not found or soft-deleted.
+    """
+    score = await service.get_score_with_rank(score_id)
+
+    # Check client has access to this score's game
+    if score.game_id != auth.device.game_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this score",
+        )
+
+    return ScoreClientResponse.from_domain(score)
+
+
 @client_router.get("/scores")
 async def list_scores_client(
     auth: ClientAuthContextDep,
