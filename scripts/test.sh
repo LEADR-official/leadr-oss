@@ -3,7 +3,6 @@
 PYTHONDONTWRITEBYTECODE=1 ENV=TEST uv run pytest \
 	--cov=src \
 	--cov-report html \
-	tests \
 	-n auto -p no:pastebin -p no:nose -p no:doctest \
 	$@
 
