@@ -95,7 +95,7 @@ This is the initial authentication step when the client starts.
 Client                                    LEADR Server
   |                                           |
   |  POST /v1/client/sessions                |
-  |  { game_id, device_id }                  |
+  |  { game_id, client_fingerprint)          |
   | ----------------------------------------> |
   |                                           |
   |                  Creates device record    |
@@ -103,7 +103,7 @@ Client                                    LEADR Server
   |                  Generates tokens         |
   |                                           |
   |  { access_token, refresh_token,          |
-  |    expires_in, device_id }               |
+  |    expires_in, id }                       |
   | <---------------------------------------- |
   |                                           |
   | Store tokens securely                     |
@@ -135,7 +135,7 @@ content-type: application/json
 
 {
   "game_id": "550e8400-e29b-41d4-a716-446655440000",
-  "device_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+  "client_fingerprint": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
 }
 ```
 
@@ -145,10 +145,10 @@ Server creates session and returns tokens:
 
 ```json
 {
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
   "access_token": "eyJhbGciOiJIUzI1NiIs...",
   "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
-  "expires_in": 900,
-  "device_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+  "expires_in": 900
 }
 ```
 
@@ -172,10 +172,10 @@ authorization: bearer eyJhbGciOiJIUzI1NiIs...
 
 ### Common Errors
 
-| Status | Error            | Meaning                             | Solution                                           |
-| ------ | ---------------- | ----------------------------------- | -------------------------------------------------- |
-| 404    | "Game not found" | The game_id doesn't exist in LEADR  | Double-check your game_id from the admin dashboard |
-| 422    | Validation error | Missing or invalid device_id format | Ensure device_id is a valid UUID string            |
+| Status | Error            | Meaning                                        | Solution                                                                         |
+| ------ | ---------------- | ---------------------------------------------- | -------------------------------------------------------------------------------- |
+| 404    | "Game not found" | The game_id doesn't exist in LEADR             | Double-check your game_id from the admin dashboard                               |
+| 422    | Validation error | Missing or invalid `client_fingerprint` format | Ensure `client_fingerprint` is a lowercase hexadecimal string 64 characters long |
 
 ______________________________________________________________________
 
