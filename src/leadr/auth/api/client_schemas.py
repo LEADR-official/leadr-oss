@@ -25,6 +25,10 @@ class StartSessionRequest(BaseModel):
     metadata: dict[str, Any] | None = Field(
         default=None, description="Optional device metadata (e.g., OS version, device model)"
     )
+    test_mode: bool = Field(
+        default=False,
+        description="If true, session is in test mode and scores will be marked as test",
+    )
 
 
 class StartSessionResponse(BaseModel):
@@ -49,10 +53,16 @@ class StartSessionResponse(BaseModel):
     expires_in: int = Field(description="Access token expiration time in seconds")
     first_seen_at: datetime = Field(description="Timestamp when device was first seen (UTC)")
     last_seen_at: datetime = Field(description="Timestamp when device was last seen (UTC)")
+    test_mode: bool = Field(description="Whether session is in test mode")
 
     @classmethod
     def from_domain(
-        cls, device: Device, access_token: str, refresh_token: str, expires_in: int
+        cls,
+        device: Device,
+        access_token: str,
+        refresh_token: str,
+        expires_in: int,
+        test_mode: bool = False,
     ) -> "StartSessionResponse":
         """Convert domain entity to response model with tokens.
 
@@ -61,6 +71,7 @@ class StartSessionResponse(BaseModel):
             access_token: The plain JWT access token
             refresh_token: The plain JWT refresh token
             expires_in: Access token expiration time in seconds
+            test_mode: Whether session is in test mode
 
         Returns:
             StartSessionResponse with all fields populated
@@ -78,6 +89,7 @@ class StartSessionResponse(BaseModel):
             expires_in=expires_in,
             first_seen_at=device.first_seen_at,
             last_seen_at=device.last_seen_at,
+            test_mode=test_mode,
         )
 
 

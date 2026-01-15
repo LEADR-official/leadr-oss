@@ -565,3 +565,40 @@ class TestScore:
         new_metadata = {"updated": "data", "extra": 123}
         score.metadata = new_metadata
         assert score.metadata == new_metadata
+
+    def test_create_score_with_is_test_defaults_to_false(self):
+        """Test that is_test defaults to False."""
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
+
+        score = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+        )
+
+        assert score.is_test is False
+
+    def test_create_score_with_is_test_true(self):
+        """Test creating a score with is_test=True."""
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
+
+        score = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="TestPlayer",
+            value=100.0,
+            is_test=True,
+        )
+
+        assert score.is_test is True

@@ -48,6 +48,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             city=orm.filter_city,
             metadata=orm.score_metadata,
             rank=rank,
+            is_test=orm.is_test,
             created_at=orm.created_at,
             updated_at=orm.updated_at,
             deleted_at=orm.deleted_at,
@@ -68,6 +69,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             filter_country=entity.country,
             filter_city=entity.city,
             score_metadata=entity.metadata,
+            is_test=entity.is_test,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,
@@ -125,6 +127,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         board_id: BoardID | None = None,
         game_id: GameID | None = None,
         device_id: DeviceID | None = None,
+        is_test: bool | None = None,
         *,
         pagination: PaginationParams,
         around_score: Score | None = None,
@@ -140,6 +143,8 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             board_id: Optional board ID to filter by
             game_id: Optional game ID to filter by
             device_id: Optional device ID to filter by
+            is_test: Optional filter for test scores. True returns only test scores,
+                False returns only production scores, None returns all scores.
             pagination: Pagination parameters (required)
             around_score: Optional target score to center results around. When provided,
                 returns a window of scores centered on this score (mutually exclusive
@@ -180,6 +185,10 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             query = query.where(ScoreORM.device_id == device_uuid)
             filters_dict["device_id"] = str(device_id)
 
+        if is_test is not None:
+            query = query.where(ScoreORM.is_test == is_test)
+            filters_dict["is_test"] = str(is_test)
+
         # Validate sort fields
         for sort_field in pagination.sort_spec:
             if sort_field.name not in self.SORTABLE_FIELDS:
@@ -206,6 +215,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
                 board=around_value_board,
                 sort_fields=pagination.sort_spec,
                 limit=pagination.limit,
+                is_test=is_test,
             )
 
         # Handle cursor if present
@@ -374,6 +384,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         board: "Board",
         sort_fields: list[SortField],
         limit: int,
+        is_test: bool | None = None,
     ) -> PaginatedResult[Score]:
         """Execute a query that returns scores centered around a hypothetical value.
 
@@ -387,6 +398,8 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             board: The board entity (for deriving account_id, game_id)
             sort_fields: List of sort fields defining the ranking order
             limit: Total number of scores to return (including placeholder)
+            is_test: Optional filter for test scores. True for test pool ranking,
+                False for production pool, None for all scores.
 
         Returns:
             PaginatedResult with scores (including placeholder) centered around value
@@ -402,6 +415,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             player_name="",  # Empty for placeholder
             value=value,
             is_placeholder=True,
+            is_test=is_test if is_test is not None else False,
             created_at=now,
             updated_at=now,
         )
@@ -409,8 +423,8 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         # Extract placeholder position values for sort field comparison
         target_values = self._extract_target_values(placeholder, sort_fields)
 
-        # Compute placeholder's hypothetical rank
-        placeholder_rank = await self._get_value_rank(value, board.id, sort_fields)
+        # Compute placeholder's hypothetical rank (within test/production pool if specified)
+        placeholder_rank = await self._get_value_rank(value, board.id, sort_fields, is_test)
 
         # Calculate window sizes (ideal split)
         ideal_above_count = limit // 2
@@ -577,6 +591,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         value: float,
         board_id: BoardID,
         sort_fields: list[SortField],
+        is_test: bool | None = None,
     ) -> int:
         """Compute hypothetical rank for a value using COUNT approach.
 
@@ -585,10 +600,15 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         are counted as "below" since the placeholder would be at the top
         of any same-value group.
 
+        Note: Ranks are computed separately for test vs production scores
+        when is_test is specified.
+
         Args:
             value: The score value to compute rank for
             board_id: Board ID to filter by
             sort_fields: Sort fields defining the ranking order
+            is_test: Optional filter for test scores. True computes rank within
+                test pool, False within production pool, None within all scores.
 
         Returns:
             Rank (1-indexed, where 1 is the best)
@@ -604,7 +624,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         else:
             better_condition = value_column < value
 
-        # Count scores that rank better
+        # Count scores that rank better (within test/production pool if specified)
         count_query = (
             select(func.count())
             .select_from(ScoreORM)
@@ -612,6 +632,9 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             .where(ScoreORM.board_id == self._extract_uuid(board_id))
             .where(better_condition)
         )
+
+        if is_test is not None:
+            count_query = count_query.where(ScoreORM.is_test == is_test)
 
         result = await self.session.execute(count_query)
         better_count = result.scalar_one()
@@ -944,6 +967,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         orm.filter_country = row.filter_country
         orm.filter_city = row.filter_city
         orm.score_metadata = row.score_metadata
+        orm.is_test = row.is_test
         orm.created_at = row.created_at
         orm.updated_at = row.updated_at
         orm.deleted_at = row.deleted_at
@@ -1012,6 +1036,9 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         Counts how many scores rank better than the given score using the
         same multi-field comparison logic used for sorting.
 
+        Note: Ranks are computed separately for test vs production scores.
+        A test score's rank is within the test score pool only.
+
         Args:
             score: Score to compute rank for
             sort_fields: Sort fields defining the ranking order
@@ -1029,12 +1056,13 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             before_target=True,  # Scores that come BEFORE target = better ranked
         )
 
-        # Count scores that rank better
+        # Count scores that rank better (within same test/production pool)
         count_query = (
             select(func.count())
             .select_from(ScoreORM)
             .where(ScoreORM.deleted_at.is_(None))
             .where(ScoreORM.board_id == score.board_id.uuid)
+            .where(ScoreORM.is_test == score.is_test)
             .where(better_condition)
         )
 

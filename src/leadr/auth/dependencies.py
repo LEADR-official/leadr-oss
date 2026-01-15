@@ -16,6 +16,7 @@ from leadr.auth.services.dependencies import (
     DeviceServiceDep,
     NonceServiceDep,
 )
+from leadr.auth.services.device_token_crypto import validate_access_token
 from leadr.common.domain.ids import AccountID
 from leadr.config import settings
 
@@ -155,6 +156,7 @@ class ClientAuthContext(AuthContext):
         device: The authenticated device (guaranteed non-None).
         user: Always None for client auth.
         api_key: Always None for client auth.
+        test_mode: Whether this session is in test mode.
     """
 
     def __init__(
@@ -163,6 +165,7 @@ class ClientAuthContext(AuthContext):
         device: Device,
         user: None = None,
         api_key: None = None,
+        test_mode: bool = False,
     ):
         """Create client auth context with guaranteed non-None device."""
         # Use private attributes to avoid property override conflicts
@@ -170,6 +173,7 @@ class ClientAuthContext(AuthContext):
         object.__setattr__(self, "_user", user)
         object.__setattr__(self, "_api_key", api_key)
         object.__setattr__(self, "_device", device)
+        object.__setattr__(self, "_test_mode", test_mode)
 
     @property  # type: ignore[override]
     def account_id(self) -> AccountID:  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -190,6 +194,11 @@ class ClientAuthContext(AuthContext):
     def device(self) -> Device:  # pyright: ignore[reportIncompatibleVariableOverride]
         """Get device (guaranteed non-None for client auth)."""
         return self._device  # type: ignore[attr-defined]
+
+    @property
+    def test_mode(self) -> bool:
+        """Get test_mode flag (whether session is in test mode)."""
+        return self._test_mode  # type: ignore[attr-defined]
 
 
 class AuthContextDependency:
@@ -459,6 +468,10 @@ class AuthContextDependency:
                 detail="Invalid or expired device token",
             )
 
+        # Extract test_mode from token claims (default False for backwards compatibility)
+        claims = validate_access_token(token, settings.JWT_SECRET)
+        test_mode = claims.get("test_mode", False) if claims else False
+
         # Validate nonce if required (for mutations)
         if self.require_nonce:
             if leadr_client_nonce is None:
@@ -496,6 +509,7 @@ class AuthContextDependency:
             user=None,
             api_key=None,
             device=validated_device,
+            test_mode=test_mode,
         )
 
 

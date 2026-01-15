@@ -51,6 +51,7 @@ async def start_session(
             client_fingerprint=request.client_fingerprint,
             platform=request.platform,
             metadata=request.metadata,
+            test_mode=request.test_mode,
         )
     except EntityNotFoundError as e:
         raise HTTPException(
@@ -58,7 +59,9 @@ async def start_session(
             detail=str(e),
         ) from None
 
-    return StartSessionResponse.from_domain(device, access_token, refresh_token, expires_in)
+    return StartSessionResponse.from_domain(
+        device, access_token, refresh_token, expires_in, test_mode=request.test_mode
+    )
 
 
 @protected_router.post(

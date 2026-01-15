@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSON, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -55,6 +55,7 @@ class ScoreORM(Base):
     score_metadata: Mapped[Any | None] = mapped_column(
         "score_metadata", JSON, nullable=True, default=None
     )
+    is_test: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # Relationships
     account: Mapped["AccountORM"] = relationship("AccountORM")  # type: ignore[name-defined]

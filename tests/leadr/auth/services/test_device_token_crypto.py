@@ -603,6 +603,180 @@ class TestValidateRefreshToken:
         assert "jti" in claims
 
 
+class TestTestModeInTokens:
+    """Tests for test_mode claim in tokens."""
+
+    def test_access_token_contains_test_mode_true(self):
+        """Test that access token with test_mode=True includes it in claims."""
+        device_id = str(uuid4())
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        expires_delta = timedelta(hours=1)
+        secret = "test-secret"
+
+        token, _ = generate_access_token(
+            client_fingerprint=device_id,
+            game_id=game_id,
+            account_id=account_id,
+            expires_delta=expires_delta,
+            secret=secret,
+            test_mode=True,
+        )
+
+        decoded = jwt.decode(token, options={"verify_signature": False})
+        assert decoded["test_mode"] is True
+
+    def test_access_token_contains_test_mode_false_by_default(self):
+        """Test that access token without test_mode has test_mode=False in claims."""
+        device_id = str(uuid4())
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        expires_delta = timedelta(hours=1)
+        secret = "test-secret"
+
+        token, _ = generate_access_token(
+            client_fingerprint=device_id,
+            game_id=game_id,
+            account_id=account_id,
+            expires_delta=expires_delta,
+            secret=secret,
+        )
+
+        decoded = jwt.decode(token, options={"verify_signature": False})
+        assert decoded["test_mode"] is False
+
+    def test_validate_access_token_returns_test_mode(self):
+        """Test that validated access token includes test_mode claim."""
+        device_id = str(uuid4())
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        expires_delta = timedelta(hours=1)
+        secret = "test-secret"
+
+        token, _ = generate_access_token(
+            device_id, game_id, account_id, expires_delta, secret, test_mode=True
+        )
+
+        claims = validate_access_token(token, secret)
+        assert claims is not None
+        assert claims["test_mode"] is True
+
+    def test_refresh_token_contains_test_mode_true(self):
+        """Test that refresh token with test_mode=True includes it in claims."""
+        device_id = str(uuid4())
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        token_version = 1
+        expires_delta = timedelta(days=30)
+        secret = "test-secret"
+
+        token, _ = generate_refresh_token(
+            client_fingerprint=device_id,
+            game_id=game_id,
+            account_id=account_id,
+            token_version=token_version,
+            expires_delta=expires_delta,
+            secret=secret,
+            test_mode=True,
+        )
+
+        decoded = jwt.decode(token, options={"verify_signature": False})
+        assert decoded["test_mode"] is True
+
+    def test_refresh_token_contains_test_mode_false_by_default(self):
+        """Test that refresh token without test_mode has test_mode=False in claims."""
+        device_id = str(uuid4())
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        token_version = 1
+        expires_delta = timedelta(days=30)
+        secret = "test-secret"
+
+        token, _ = generate_refresh_token(
+            client_fingerprint=device_id,
+            game_id=game_id,
+            account_id=account_id,
+            token_version=token_version,
+            expires_delta=expires_delta,
+            secret=secret,
+        )
+
+        decoded = jwt.decode(token, options={"verify_signature": False})
+        assert decoded["test_mode"] is False
+
+    def test_validate_refresh_token_returns_test_mode(self):
+        """Test that validated refresh token includes test_mode claim."""
+        device_id = str(uuid4())
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        token_version = 1
+        expires_delta = timedelta(days=30)
+        secret = "test-secret"
+
+        token, _ = generate_refresh_token(
+            device_id, game_id, account_id, token_version, expires_delta, secret, test_mode=True
+        )
+
+        claims = validate_refresh_token(token, secret)
+        assert claims is not None
+        assert claims["test_mode"] is True
+
+    def test_legacy_access_token_without_test_mode_still_validates(self):
+        """Test that access tokens without test_mode claim still validate (backwards compat)."""
+        device_id = str(uuid4())
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        secret = "test-secret"
+
+        # Manually create a token without test_mode (simulating legacy token)
+        now = datetime.now(UTC)
+        exp = now + timedelta(hours=1)
+        payload = {
+            "sub": device_id,
+            "game_id": str(game_id.uuid),
+            "account_id": str(account_id.uuid),
+            "exp": int(exp.timestamp()),
+            "iat": int(now.timestamp()),
+            "jti": str(uuid4()),
+        }
+        legacy_token = jwt.encode(payload, secret, algorithm="HS256")
+
+        # Should still validate
+        claims = validate_access_token(legacy_token, secret)
+        assert claims is not None
+        assert claims["sub"] == device_id
+        # test_mode should not be present (or handled gracefully)
+        assert claims.get("test_mode") is None
+
+    def test_legacy_refresh_token_without_test_mode_still_validates(self):
+        """Test that refresh tokens without test_mode claim still validate (backwards compat)."""
+        device_id = str(uuid4())
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        secret = "test-secret"
+
+        # Manually create a token without test_mode (simulating legacy token)
+        now = datetime.now(UTC)
+        exp = now + timedelta(days=30)
+        payload = {
+            "sub": device_id,
+            "game_id": str(game_id.uuid),
+            "account_id": str(account_id.uuid),
+            "token_version": 1,
+            "exp": int(exp.timestamp()),
+            "iat": int(now.timestamp()),
+            "jti": str(uuid4()),
+        }
+        legacy_token = jwt.encode(payload, secret, algorithm="HS256")
+
+        # Should still validate
+        claims = validate_refresh_token(legacy_token, secret)
+        assert claims is not None
+        assert claims["sub"] == device_id
+        # test_mode should not be present (or handled gracefully)
+        assert claims.get("test_mode") is None
+
+
 class TestTokenGenerationAndValidation:
     """Integration tests for token generation and validation."""
 

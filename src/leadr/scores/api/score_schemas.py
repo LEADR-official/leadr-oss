@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime
+from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
@@ -9,6 +10,14 @@ from pydantic import BaseModel, Field, field_validator
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.config import settings
 from leadr.scores.domain.score import Score
+
+
+class IsTestFilter(str, Enum):
+    """Filter options for is_test query parameter in admin score listing."""
+
+    TRUE = "true"
+    FALSE = "false"
+    ALL = "all"
 
 
 class ScoreCreateRequestBase(BaseModel):
@@ -147,6 +156,10 @@ class ScoreResponse(BaseModel):
         default=False,
         description="True if this is a synthetic placeholder score (from around_score_value query)",
     )
+    is_test: bool = Field(
+        default=False,
+        description="True if this score was submitted in test mode",
+    )
     created_at: datetime = Field(description="Timestamp when the score was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -175,6 +188,7 @@ class ScoreResponse(BaseModel):
             metadata=score.metadata,
             rank=score.rank,
             is_placeholder=score.is_placeholder,
+            is_test=score.is_test,
             created_at=score.created_at,
             updated_at=score.updated_at,
         )
@@ -198,6 +212,10 @@ class ScoreClientResponse(BaseModel):
     is_placeholder: bool = Field(
         default=False,
         description="True if this is a synthetic placeholder score (from around_score_value query)",
+    )
+    is_test: bool = Field(
+        default=False,
+        description="True if this score was submitted in test mode",
     )
     created_at: datetime = Field(description="Timestamp when the score was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
@@ -223,6 +241,7 @@ class ScoreClientResponse(BaseModel):
             metadata=score.metadata,
             rank=score.rank,
             is_placeholder=score.is_placeholder,
+            is_test=score.is_test,
             created_at=score.created_at,
             updated_at=score.updated_at,
         )

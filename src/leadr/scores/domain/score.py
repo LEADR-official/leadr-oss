@@ -63,6 +63,10 @@ class Score(Entity):
         default=False,
         description="True if this is a synthetic placeholder score (from around_score_value query)",
     )
+    is_test: bool = Field(
+        default=False,
+        description="True if score was submitted in test mode",
+    )
 
     @field_validator("player_name")
     @classmethod

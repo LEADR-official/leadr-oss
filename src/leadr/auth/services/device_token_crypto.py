@@ -17,6 +17,7 @@ def generate_access_token(
     account_id: AccountID,
     expires_delta: timedelta,
     secret: str,
+    test_mode: bool = False,
 ) -> tuple[str, str]:
     """Generate JWT access token for device authentication.
 
@@ -52,6 +53,7 @@ def generate_access_token(
         "sub": client_fingerprint,  # Subject: client fingerprint
         "game_id": str(game_id.uuid),
         "account_id": str(account_id.uuid),
+        "test_mode": test_mode,
         "exp": int(exp.timestamp()),
         "iat": int(now.timestamp()),
         "jti": str(uuid4()),  # Unique token ID
@@ -102,6 +104,7 @@ def generate_refresh_token(
     token_version: int,
     expires_delta: timedelta,
     secret: str,
+    test_mode: bool = False,
 ) -> tuple[str, str]:
     """Generate JWT refresh token for device authentication.
 
@@ -142,6 +145,7 @@ def generate_refresh_token(
         "game_id": str(game_id.uuid),
         "account_id": str(account_id.uuid),
         "token_version": token_version,  # For token rotation
+        "test_mode": test_mode,
         "exp": int(exp.timestamp()),
         "iat": int(now.timestamp()),
         "jti": str(uuid4()),  # Unique token ID

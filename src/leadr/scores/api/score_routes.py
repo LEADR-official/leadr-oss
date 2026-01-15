@@ -16,6 +16,7 @@ from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.scores.api.score_schemas import (
+    IsTestFilter,
     ScoreClientCreateRequest,
     ScoreClientResponse,
     ScoreCreateRequest,
@@ -152,6 +153,7 @@ async def create_score_client(
             country=country,
             city=city,
             metadata=score_request.metadata,
+            is_test=auth.test_mode,
             background_tasks=background_tasks,
         )
     except IntegrityError:
@@ -209,6 +211,7 @@ async def handle_list_scores(
     board_id: BoardID | None,
     game_id: GameID | None,
     device_id: DeviceID | None,
+    is_test: bool | None = None,
     around_score_id: ScoreID | None = None,
     around_score_value: float | None = None,
 ) -> PaginatedResponse[ScoreResponse] | PaginatedResponse[ScoreClientResponse]:
@@ -227,6 +230,8 @@ async def handle_list_scores(
         board_id: Optional board ID filter.
         game_id: Optional game ID filter.
         device_id: Optional device ID filter.
+        is_test: Optional filter for test scores. True returns only test scores,
+            False returns only production scores, None returns all scores.
         around_score_id: Optional score ID to center results around.
         around_score_value: Optional score value to center results around (with placeholder).
 
@@ -280,6 +285,7 @@ async def handle_list_scores(
             board_id=board_id,
             game_id=game_id,
             device_id=device_id,
+            is_test=is_test,
             pagination=pagination,
             around_score_id=around_score_id,
             around_score_value=around_score_value,
@@ -296,6 +302,8 @@ async def handle_list_scores(
         filters_dict["game_id"] = str(game_id)
     if device_id is not None:
         filters_dict["device_id"] = str(device_id)
+    if is_test is not None:
+        filters_dict["is_test"] = str(is_test)
 
     if auth.auth_type == "admin":
         return PaginatedResponse.from_paginated_result(
@@ -322,6 +330,13 @@ async def list_scores_admin(
     board_id: BoardID | None = None,
     game_id: GameID | None = None,
     device_id: DeviceID | None = None,
+    is_test: Annotated[
+        IsTestFilter,
+        Query(
+            description="Filter for test scores. 'false' (default) returns production only, "
+            "'true' returns test only, 'all' returns both test and production"
+        ),
+    ] = IsTestFilter.FALSE,
     around_score_id: Annotated[
         ScoreID | None, Query(description="Center results around this score ID")
     ] = None,
@@ -384,6 +399,15 @@ async def list_scores_admin(
     # Superadmin with account_id = that specific account
     # Regular user = always their account_id (ignores query param)
     effective_account_id = account_id if auth.is_superadmin else auth.account_id
+
+    # Convert IsTestFilter enum to bool | None for service layer
+    is_test_filter: bool | None = None
+    if is_test is IsTestFilter.TRUE:
+        is_test_filter = True
+    elif is_test is IsTestFilter.FALSE:
+        is_test_filter = False
+    # IsTestFilter.ALL remains None (no filter)
+
     return await handle_list_scores(  # type: ignore[return-value]
         auth,
         service,
@@ -392,6 +416,7 @@ async def list_scores_admin(
         board_id,
         game_id,
         device_id,
+        is_test_filter,
         around_score_id,
         around_score_value,
     )
@@ -502,6 +527,7 @@ async def list_scores_client(
         board_id,
         auth.device.game_id,
         device_id,
+        auth.test_mode,
         around_score_id,
         around_score_value,
     )

@@ -53,6 +53,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         ip_address: str | None = None,
         user_agent: str | None = None,
         metadata: dict[str, Any] | None = None,
+        test_mode: bool = False,
     ) -> tuple[Device, str, str, int]:
         """Start a new device session.
 
@@ -67,6 +68,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             ip_address: Client IP address
             user_agent: Client user agent string
             metadata: Additional device metadata
+            test_mode: If True, session is in test mode and scores will be marked as test
 
         Returns:
             tuple[Device, str, str, int]: (device, access_token_plain, refresh_token_plain,
@@ -115,6 +117,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             account_id=account_id,
             expires_delta=access_expires_delta,
             secret=settings.JWT_SECRET,
+            test_mode=test_mode,
         )
 
         # Generate refresh token
@@ -126,6 +129,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             token_version=1,  # Initial version
             expires_delta=refresh_expires_delta,
             secret=settings.JWT_SECRET,
+            test_mode=test_mode,
         )
 
         # Create session with both access and refresh tokens
@@ -234,6 +238,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         client_fingerprint = claims["sub"]
         game_id = GameID(UUID(claims["game_id"]))
         account_id = AccountID(UUID(claims["account_id"]))
+        test_mode = claims.get("test_mode", False)
 
         # Generate new access token
         access_expires_delta = timedelta(hours=settings.ACCESS_TOKEN_EXPIRY_HOURS)
@@ -243,6 +248,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             account_id=account_id,
             expires_delta=access_expires_delta,
             secret=settings.JWT_SECRET,
+            test_mode=test_mode,
         )
 
         # Generate new refresh token with incremented version
@@ -254,6 +260,7 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             token_version=session.token_version + 1,
             expires_delta=refresh_expires_delta,
             secret=settings.JWT_SECRET,
+            test_mode=test_mode,
         )
 
         # Update session with new tokens and incremented version

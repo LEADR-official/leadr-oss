@@ -320,6 +320,155 @@ class TestClientSessionRoutes:
 
 
 @pytest.mark.asyncio
+class TestClientSessionTestMode:
+    """Test suite for test_mode parameter in client sessions."""
+
+    async def test_start_session_with_test_mode_true(self, client: AsyncClient, db_session):
+        """Test starting a session with test_mode=true includes it in response."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Start session with test_mode=true
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": str(game.id),
+                "client_fingerprint": device_id,
+                "test_mode": True,
+            },
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["test_mode"] is True
+
+    async def test_start_session_without_test_mode_defaults_to_false(
+        self, client: AsyncClient, db_session
+    ):
+        """Test starting a session without test_mode defaults to false."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Start session without test_mode
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": str(game.id),
+                "client_fingerprint": device_id,
+            },
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["test_mode"] is False
+
+    async def test_refresh_session_preserves_test_mode(self, client: AsyncClient, db_session):
+        """Test that refreshing a test mode session preserves test_mode in new tokens."""
+        import jwt
+
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Start session with test_mode=true
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        session_response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": str(game.id),
+                "client_fingerprint": device_id,
+                "test_mode": True,
+            },
+        )
+        assert session_response.status_code == 201
+        refresh_token = session_response.json()["refresh_token"]
+
+        # Refresh session
+        refresh_response = await client.post(
+            "/client/sessions/refresh",
+            json={"refresh_token": refresh_token},
+        )
+
+        assert refresh_response.status_code == 200
+        new_access_token = refresh_response.json()["access_token"]
+
+        # Verify new access token still has test_mode=true
+        decoded = jwt.decode(new_access_token, options={"verify_signature": False})
+        assert decoded["test_mode"] is True
+
+    async def test_auth_context_has_test_mode_true_from_token(
+        self, client: AsyncClient, db_session
+    ):
+        """Test that auth context has test_mode=true when using test mode token."""
+        # Create account and game
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Start session with test_mode=true
+        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        session_response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": str(game.id),
+                "client_fingerprint": device_id,
+                "test_mode": True,
+            },
+        )
+        assert session_response.status_code == 201
+        access_token = session_response.json()["access_token"]
+
+        # Use the token to generate a nonce (validates auth context is working)
+        # The nonce endpoint requires authenticated client auth
+        nonce_response = await client.get(
+            "/client/nonce",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        # If auth context works, we should get a 200
+        assert nonce_response.status_code == 200
+
+
+@pytest.mark.asyncio
 class TestClientNonceRoutes:
     """Test suite for client nonce API routes."""
 

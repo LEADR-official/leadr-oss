@@ -94,6 +94,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         country: str | None = None,
         city: str | None = None,
         metadata: Any | None = None,
+        is_test: bool = False,
         trust_tier: TrustTier = TrustTier.B,
         background_tasks: BackgroundTasks | None = None,
     ) -> tuple[Score, AntiCheatResult | None]:
@@ -111,6 +112,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             country: Optional country filter for categorization.
             city: Optional city filter for categorization.
             metadata: Optional JSON metadata for game-specific data.
+            is_test: If True, marks this score as a test score.
             trust_tier: Trust tier of the device (defaults to B/medium trust).
 
         Returns:
@@ -192,6 +194,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             country=country,
             city=city,
             metadata=metadata,
+            is_test=is_test,
         )
 
         # Anti-cheat checking (if enabled and device_id provided)
@@ -348,6 +351,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         board_id: BoardID | None = None,
         game_id: GameID | None = None,
         device_id: DeviceID | None = None,
+        is_test: bool | None = None,
         *,
         pagination: PaginationParams,
         around_score_id: ScoreID | None = None,
@@ -361,6 +365,8 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             board_id: Optional board ID to filter by.
             game_id: Optional game ID to filter by.
             device_id: Optional device ID to filter by.
+            is_test: Optional filter for test scores. True returns only test scores,
+                False returns only production scores, None returns all scores.
             pagination: Pagination parameters (required).
             around_score_id: Optional score ID to center results around. When provided,
                 returns a window of scores centered on this score. Mutually exclusive
@@ -424,6 +430,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
                 board_id=board_id,
                 game_id=game_id,
                 device_id=device_id,
+                is_test=is_test,
                 pagination=pagination,
                 around_score_value=around_score_value,
                 around_value_board=board,
@@ -451,6 +458,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             board_id=board_id,
             game_id=game_id,
             device_id=device_id,
+            is_test=is_test,
             pagination=pagination,
             around_score=around_score,
         )
