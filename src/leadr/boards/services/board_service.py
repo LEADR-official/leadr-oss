@@ -1,7 +1,7 @@
 """Board service for managing board operations."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -308,42 +308,16 @@ class BoardService(BaseService[Board, BoardRepository]):
             pagination=pagination,
         )
 
-    async def update_board(
-        self,
-        board_id: BoardID,
-        name: str | None = None,
-        icon: str | None = None,
-        short_code: str | None = None,
-        unit: str | None = None,
-        is_active: bool | None = None,
-        is_published: bool | None = None,
-        sort_direction: SortDirection | None = None,
-        keep_strategy: KeepStrategy | None = None,
-        created_from_template_id: BoardTemplateID | None = None,
-        template_name: str | None = None,
-        starts_at: datetime | None = None,
-        ends_at: datetime | None = None,
-        tags: list[str] | None = None,
-        description: str | None = None,
-    ) -> Board:
+    async def update_board(self, board_id: BoardID, **updates: Any) -> Board:
         """Update board fields.
+
+        Accepts any fields to update as keyword arguments. Only fields
+        explicitly provided will be updated, allowing null values to
+        clear optional fields.
 
         Args:
             board_id: The ID of the board to update
-            name: New board name, if provided
-            icon: New icon, if provided
-            short_code: New short_code, if provided
-            unit: New unit, if provided
-            is_active: New is_active status, if provided
-            is_published: New is_published status, if provided
-            sort_direction: New sort_direction, if provided
-            keep_strategy: New keep_strategy, if provided
-            created_from_template_id: New created_from_template_id, if provided
-            template_name: New template_name, if provided
-            starts_at: New starts_at, if provided
-            ends_at: New ends_at, if provided
-            tags: New tags list, if provided
-            description: New description, if provided
+            **updates: Field names and values to update
 
         Returns:
             The updated Board domain entity
@@ -353,33 +327,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         """
         board = await self.get_by_id_or_raise(board_id)
 
-        if name is not None:
-            board.name = name
-        if icon is not None:
-            board.icon = icon
-        if short_code is not None:
-            board.short_code = short_code
-        if unit is not None:
-            board.unit = unit
-        if is_active is not None:
-            board.is_active = is_active
-        if is_published is not None:
-            board.is_published = is_published
-        if sort_direction is not None:
-            board.sort_direction = sort_direction
-        if keep_strategy is not None:
-            board.keep_strategy = keep_strategy
-        if created_from_template_id is not None:
-            board.created_from_template_id = created_from_template_id
-        if template_name is not None:
-            board.template_name = template_name
-        if starts_at is not None:
-            board.starts_at = starts_at
-        if ends_at is not None:
-            board.ends_at = ends_at
-        if tags is not None:
-            board.tags = tags
-        if description is not None:
-            board.description = description
+        for field, value in updates.items():
+            setattr(board, field, value)
 
         return await self.repository.update(board)

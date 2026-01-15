@@ -1,6 +1,7 @@
 """Score flag service for managing flag operations."""
 
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -122,18 +123,19 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
 
         return await self.repository.update(flag)
 
-    async def update_flag(
-        self,
-        flag_id: ScoreFlagID,
-        status: ScoreFlagStatus | None = None,
-        reviewer_decision: str | None = None,
-    ) -> ScoreFlag:
+    async def update_flag(self, flag_id: ScoreFlagID, **updates: Any) -> ScoreFlag:
         """Update a flag's status and/or reviewer decision.
+
+        Accepts any fields to update as keyword arguments. Only fields
+        explicitly provided will be updated, allowing null values to
+        clear optional fields.
+
+        Note: When status is updated, reviewed_at is automatically set
+        to the current time.
 
         Args:
             flag_id: The ID of the flag to update
-            status: Optional new status
-            reviewer_decision: Optional new reviewer decision
+            **updates: Field names and values to update
 
         Returns:
             The updated flag
@@ -149,12 +151,11 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         """
         flag = await self.get_by_id_or_raise(flag_id)
 
-        # Update fields if provided
-        if status is not None:
-            flag.status = status
+        # Special handling: when status is updated, also set reviewed_at
+        if "status" in updates:
             flag.reviewed_at = datetime.now(UTC)
 
-        if reviewer_decision is not None:
-            flag.reviewer_decision = reviewer_decision
+        for field, value in updates.items():
+            setattr(flag, field, value)
 
         return await self.repository.update(flag)

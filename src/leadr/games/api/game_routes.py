@@ -225,16 +225,12 @@ async def update_game(
         game = await service.soft_delete(game_id)
         return GameResponse.from_domain(game)
 
-    # Handle field updates using service method
-    game = await service.update_game(
-        game_id=game_id,
-        name=request.name,
-        steam_app_id=request.steam_app_id,
-        default_board_id=request.default_board_id,
-        anti_cheat_enabled=request.anti_cheat_enabled,
-        description=request.description,
-        tags=request.tags,
-        page_url=request.page_url,
-    )
+    # Get only fields explicitly provided in request (exclude_unset=True)
+    # This allows null values to clear fields vs omitted fields staying unchanged
+    update_data = request.model_dump(exclude_unset=True)
+    update_data.pop("deleted", None)  # Handled separately above
+
+    if update_data:
+        game = await service.update_game(game_id, **update_data)
 
     return GameResponse.from_domain(game)

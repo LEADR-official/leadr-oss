@@ -224,12 +224,13 @@ async def update_account(
     elif request.status == AccountStatus.ACTIVE:
         account = await service.activate_account(account_id)
 
-    # Handle field updates using service method
-    if request.name is not None or request.slug is not None:
-        account = await service.update_account(
-            account_id,
-            name=request.name,
-            slug=request.slug,
-        )
+    # Get only fields explicitly provided in request (exclude_unset=True)
+    # This allows null values to clear fields vs omitted fields staying unchanged
+    update_data = request.model_dump(exclude_unset=True)
+    update_data.pop("deleted", None)  # Handled separately above
+    update_data.pop("status", None)  # Handled separately above
+
+    if update_data:
+        account = await service.update_account(account_id, **update_data)
 
     return AccountResponse.from_domain(account)

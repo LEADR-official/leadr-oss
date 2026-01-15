@@ -463,28 +463,16 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             around_score=around_score,
         )
 
-    async def update_score(
-        self,
-        score_id: ScoreID,
-        player_name: str | None = None,
-        value: float | None = None,
-        value_display: str | None = None,
-        timezone: str | None = None,
-        country: str | None = None,
-        city: str | None = None,
-        metadata: Any | None = None,
-    ) -> Score:
+    async def update_score(self, score_id: ScoreID, **updates: Any) -> Score:
         """Update a score's mutable fields.
+
+        Accepts any fields to update as keyword arguments. Only fields
+        explicitly provided will be updated, allowing null values to
+        clear optional fields.
 
         Args:
             score_id: The ID of the score to update.
-            player_name: Optional new player name.
-            value: Optional new value.
-            value_display: Optional new value display string.
-            timezone: Optional new timezone.
-            country: Optional new country.
-            city: Optional new city.
-            metadata: Optional new metadata.
+            **updates: Field names and values to update
 
         Returns:
             The updated Score entity.
@@ -494,19 +482,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         """
         score = await self.get_by_id_or_raise(score_id)
 
-        if player_name is not None:
-            score.player_name = player_name
-        if value is not None:
-            score.value = value
-        if value_display is not None:
-            score.value_display = value_display
-        if timezone is not None:
-            score.timezone = timezone
-        if country is not None:
-            score.country = country
-        if city is not None:
-            score.city = city
-        if metadata is not None:
-            score.metadata = metadata
+        for field, value in updates.items():
+            setattr(score, field, value)
 
         return await self.repository.update(score)

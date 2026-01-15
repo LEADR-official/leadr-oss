@@ -573,15 +573,12 @@ async def update_score(
         score = await service.soft_delete(score_id)
         return ScoreResponse.from_domain(score)
 
-    # Update other fields
-    score = await service.update_score(
-        score_id=score_id,
-        player_name=request.player_name,
-        value=request.value,
-        value_display=request.value_display,
-        timezone=request.timezone,
-        country=request.country,
-        city=request.city,
-        metadata=request.metadata,
-    )
+    # Get only fields explicitly provided in request (exclude_unset=True)
+    # This allows null values to clear fields vs omitted fields staying unchanged
+    update_data = request.model_dump(exclude_unset=True)
+    update_data.pop("deleted", None)  # Handled separately above
+
+    if update_data:
+        score = await service.update_score(score_id, **update_data)
+
     return ScoreResponse.from_domain(score)

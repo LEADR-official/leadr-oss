@@ -1,5 +1,7 @@
 """Game service for managing game operations."""
 
+from typing import Any
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.common.api.pagination import PaginationParams
@@ -138,28 +140,16 @@ class GameService(BaseService[Game, GameRepository]):
         """
         return await self.repository.filter(account_id, pagination=pagination)
 
-    async def update_game(
-        self,
-        game_id: GameID,
-        name: str | None = None,
-        steam_app_id: str | None = None,
-        default_board_id: BoardID | None = None,
-        anti_cheat_enabled: bool | None = None,
-        description: str | None = None,
-        tags: list[str] | None = None,
-        page_url: str | None = None,
-    ) -> Game:
+    async def update_game(self, game_id: GameID, **updates: Any) -> Game:
         """Update game fields.
+
+        Accepts any fields to update as keyword arguments. Only fields
+        explicitly provided will be updated, allowing null values to
+        clear optional fields.
 
         Args:
             game_id: The ID of the game to update
-            name: New game name, if provided
-            steam_app_id: New Steam app ID, if provided
-            default_board_id: New default board ID, if provided
-            anti_cheat_enabled: Whether anti-cheat is enabled, if provided
-            description: New game description, if provided
-            tags: New list of tags, if provided
-            page_url: New page URL, if provided
+            **updates: Field names and values to update
 
         Returns:
             The updated Game domain entity
@@ -169,19 +159,7 @@ class GameService(BaseService[Game, GameRepository]):
         """
         game = await self.get_by_id_or_raise(game_id)
 
-        if name is not None:
-            game.name = name
-        if steam_app_id is not None:
-            game.steam_app_id = steam_app_id
-        if default_board_id is not None:
-            game.default_board_id = default_board_id
-        if anti_cheat_enabled is not None:
-            game.anti_cheat_enabled = anti_cheat_enabled
-        if description is not None:
-            game.description = description
-        if tags is not None:
-            game.tags = tags
-        if page_url is not None:
-            game.page_url = page_url
+        for field, value in updates.items():
+            setattr(game, field, value)
 
         return await self.repository.update(game)

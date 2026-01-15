@@ -229,25 +229,12 @@ async def update_board_template(
         template = await service.soft_delete(template_id)
         return BoardTemplateResponse.from_domain(template)
 
-    # Handle field updates
-    template = await service.update_board_template(
-        template_id=template_id,
-        name=request.name,
-        slug=request.slug,
-        name_template=request.name_template,
-        series=request.series,
-        icon=request.icon,
-        unit=request.unit,
-        sort_direction=request.sort_direction,
-        keep_strategy=request.keep_strategy,
-        starts_at=request.starts_at,
-        ends_at=request.ends_at,
-        tags=request.tags,
-        repeat_interval=request.repeat_interval,
-        config=request.config,
-        next_run_at=request.next_run_at,
-        is_active=request.is_active,
-        is_published=request.is_published,
-    )
+    # Get only fields explicitly provided in request (exclude_unset=True)
+    # This allows null values to clear fields vs omitted fields staying unchanged
+    update_data = request.model_dump(exclude_unset=True)
+    update_data.pop("deleted", None)  # Handled separately above
+
+    if update_data:
+        template = await service.update_board_template(template_id, **update_data)
 
     return BoardTemplateResponse.from_domain(template)

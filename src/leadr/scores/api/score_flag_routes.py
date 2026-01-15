@@ -176,15 +176,25 @@ async def update_score_flag(
         flag = await service.soft_delete(flag_id)
         return ScoreFlagResponse.from_domain(flag)
 
-    # Handle review/update
-    if request.status is not None:
+    # Get only fields explicitly provided in request (exclude_unset=True)
+    update_data = request.model_dump(exclude_unset=True)
+    update_data.pop("deleted", None)  # Handled separately above
+
+    if not update_data:
+        raise HTTPException(
+            status_code=400,
+            detail="Must provide either status, reviewer_decision, or deleted=true",
+        )
+
+    # Handle review/update - if status is provided, validate and use review_flag
+    if "status" in update_data:
         try:
-            status_enum = ScoreFlagStatus(request.status)
+            status_enum = ScoreFlagStatus(update_data["status"])
         except ValueError:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"Invalid status: {request.status}. "
+                    f"Invalid status: {update_data['status']}. "
                     "Must be one of: pending, confirmed_cheat, false_positive, dismissed"
                 ),
             ) from None
@@ -193,18 +203,11 @@ async def update_score_flag(
         flag = await service.review_flag(
             flag_id=flag_id,
             status=status_enum,
-            reviewer_decision=request.reviewer_decision,
+            reviewer_decision=update_data.get("reviewer_decision"),
             reviewer_id=auth.user.id,
         )
-    elif request.reviewer_decision is not None:
-        flag = await service.update_flag(
-            flag_id=flag_id,
-            reviewer_decision=request.reviewer_decision,
-        )
     else:
-        raise HTTPException(
-            status_code=400,
-            detail="Must provide either status, reviewer_decision, or deleted=true",
-        )
+        # No status - use generic update_flag for other fields
+        flag = await service.update_flag(flag_id, **update_data)
 
     return ScoreFlagResponse.from_domain(flag)

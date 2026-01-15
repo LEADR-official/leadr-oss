@@ -477,23 +477,12 @@ async def update_board(
         board = await service.soft_delete(board_id)
         return BoardResponse.from_domain(board)
 
-    # Handle field updates using service method
-    board = await service.update_board(
-        board_id=board_id,
-        name=request.name,
-        icon=request.icon,
-        short_code=request.short_code,
-        unit=request.unit,
-        is_active=request.is_active,
-        is_published=request.is_published,
-        sort_direction=request.sort_direction,
-        keep_strategy=request.keep_strategy,
-        created_from_template_id=request.created_from_template_id,
-        template_name=request.template_name,
-        starts_at=request.starts_at,
-        ends_at=request.ends_at,
-        tags=request.tags,
-        description=request.description,
-    )
+    # Get only fields explicitly provided in request (exclude_unset=True)
+    # This allows null values to clear fields vs omitted fields staying unchanged
+    update_data = request.model_dump(exclude_unset=True)
+    update_data.pop("deleted", None)  # Handled separately above
+
+    if update_data:
+        board = await service.update_board(board_id, **update_data)
 
     return BoardResponse.from_domain(board)

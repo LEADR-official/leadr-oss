@@ -1,5 +1,7 @@
 """Account service for managing account operations."""
 
+from typing import Any
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
@@ -153,18 +155,16 @@ class AccountService(BaseService[Account, AccountRepository]):
         account.activate()
         return await self.repository.update(account)
 
-    async def update_account(
-        self,
-        account_id: AccountID,
-        name: str | None = None,
-        slug: str | None = None,
-    ) -> Account:
+    async def update_account(self, account_id: AccountID, **updates: Any) -> Account:
         """Update account fields.
+
+        Accepts any fields to update as keyword arguments. Only fields
+        explicitly provided will be updated, allowing null values to
+        clear optional fields.
 
         Args:
             account_id: The ID of the account to update
-            name: New account name, if provided
-            slug: New account slug, if provided
+            **updates: Field names and values to update
 
         Returns:
             The updated Account domain entity
@@ -174,10 +174,8 @@ class AccountService(BaseService[Account, AccountRepository]):
         """
         account = await self.get_by_id_or_raise(account_id)
 
-        if name is not None:
-            account.name = name
-        if slug is not None:
-            account.slug = slug
+        for field, value in updates.items():
+            setattr(account, field, value)
 
         return await self.repository.update(account)
 

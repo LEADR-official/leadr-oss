@@ -1,5 +1,7 @@
 """User service for managing user operations."""
 
+from typing import Any
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.user import User
@@ -102,20 +104,16 @@ class UserService(BaseService[User, UserRepository]):
         """
         return await self.repository.filter(account_id, pagination=pagination)
 
-    async def update_user(
-        self,
-        user_id: UserID,
-        email: str | None = None,
-        display_name: str | None = None,
-        super_admin: bool | None = None,
-    ) -> User:
+    async def update_user(self, user_id: UserID, **updates: Any) -> User:
         """Update a user's information.
+
+        Accepts any fields to update as keyword arguments. Only fields
+        explicitly provided will be updated, allowing null values to
+        clear optional fields.
 
         Args:
             user_id: The ID of the user to update.
-            email: Optional new email address.
-            display_name: Optional new display name.
-            super_admin: Optional superadmin flag.
+            **updates: Field names and values to update
 
         Returns:
             The updated User domain entity.
@@ -125,13 +123,8 @@ class UserService(BaseService[User, UserRepository]):
         """
         user = await self.get_by_id_or_raise(user_id)
 
-        # Update fields if provided
-        if email is not None:
-            user.email = email
-        if display_name is not None:
-            user.display_name = display_name
-        if super_admin is not None:
-            user.super_admin = super_admin
+        for field, value in updates.items():
+            setattr(user, field, value)
 
         return await self.repository.update(user)
 

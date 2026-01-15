@@ -209,37 +209,17 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         return await self.repository.filter(account_id, game_id=game_id, pagination=pagination)
 
     async def update_board_template(
-        self,
-        template_id: BoardTemplateID,
-        name: str | None = None,
-        slug: str | None = None,
-        name_template: str | None = None,
-        series: str | None = None,
-        icon: str | None = None,
-        unit: str | None = None,
-        sort_direction: SortDirection | None = None,
-        keep_strategy: KeepStrategy | None = None,
-        starts_at: datetime | None = None,
-        ends_at: datetime | None = None,
-        tags: list[str] | None = None,
-        repeat_interval: str | None = None,
-        config: dict[str, Any] | None = None,
-        next_run_at: datetime | None = None,
-        is_active: bool | None = None,
-        is_published: bool | None = None,
+        self, template_id: BoardTemplateID, **updates: Any
     ) -> BoardTemplate:
         """Update board template fields.
 
+        Accepts any fields to update as keyword arguments. Only fields
+        explicitly provided will be updated, allowing null values to
+        clear optional fields.
+
         Args:
             template_id: The ID of the template to update.
-            name: New template name, if provided.
-            name_template: New name template, if provided.
-            series: New series identifier, if provided.
-            repeat_interval: New repeat interval, if provided.
-            config: New config, if provided.
-            config_template: New config template, if provided.
-            next_run_at: New next_run_at, if provided.
-            is_active: New is_active status, if provided.
+            **updates: Field names and values to update
 
         Returns:
             The updated BoardTemplate domain entity.
@@ -251,41 +231,11 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         template = await self.get_by_id_or_raise(template_id)
 
         # Validate name_template if provided
-        if name_template is not None:
-            self._validate_name_template(name_template)
+        if "name_template" in updates:
+            self._validate_name_template(updates["name_template"])
 
-        if name is not None:
-            template.name = name
-        if slug is not None:
-            template.slug = slug
-        if name_template is not None:
-            template.name_template = name_template
-        if series is not None:
-            template.series = series
-        if icon is not None:
-            template.icon = icon
-        if unit is not None:
-            template.unit = unit
-        if sort_direction is not None:
-            template.sort_direction = sort_direction
-        if keep_strategy is not None:
-            template.keep_strategy = keep_strategy
-        if starts_at is not None:
-            template.starts_at = starts_at
-        if ends_at is not None:
-            template.ends_at = ends_at
-        if tags is not None:
-            template.tags = tags
-        if repeat_interval is not None:
-            template.repeat_interval = repeat_interval
-        if config is not None:
-            template.config = config
-        if next_run_at is not None:
-            template.next_run_at = next_run_at
-        if is_active is not None:
-            template.is_active = is_active
-        if is_published is not None:
-            template.is_published = is_published
+        for field, value in updates.items():
+            setattr(template, field, value)
 
         return await self.repository.update(template)
 
