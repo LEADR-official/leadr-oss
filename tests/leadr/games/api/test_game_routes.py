@@ -47,9 +47,9 @@ class TestGameRoutesPartialUpdate:
 
         # This assertion will FAIL with current implementation
         # because null is treated the same as "not provided"
-        assert (
-            data["description"] is None
-        ), f"Expected description to be cleared to null, but got: {data['description']!r}"
+        assert data["description"] is None, (
+            f"Expected description to be cleared to null, but got: {data['description']!r}"
+        )
 
     async def test_patch_omitted_field_remains_unchanged(
         self, authenticated_client: AsyncClient, db_session

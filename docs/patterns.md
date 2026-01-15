@@ -5,12 +5,12 @@ This document describes the architectural patterns and conventions used througho
 ## Table of Contents
 
 1. [Domain-Driven Design Structure](#domain-driven-design-structure)
-2. [Repository Pattern](#repository-pattern)
-3. [Service Layer Pattern](#service-layer-pattern)
-4. [Error Handling](#error-handling)
-5. [API Schema Conversion](#api-schema-conversion)
-6. [Route Organization](#route-organization)
-7. [Soft Delete Pattern](#soft-delete-pattern)
+1. [Repository Pattern](#repository-pattern)
+1. [Service Layer Pattern](#service-layer-pattern)
+1. [Error Handling](#error-handling)
+1. [API Schema Conversion](#api-schema-conversion)
+1. [Route Organization](#route-organization)
+1. [Soft Delete Pattern](#soft-delete-pattern)
 
 ## Domain-Driven Design Structure
 
@@ -76,6 +76,7 @@ class AccountRepository(GetByFieldMixin[Account, AccountORM], BaseRepository[Acc
 ```
 
 Available mixins:
+
 - `GetByFieldMixin`: Provides `_get_by_field(field, value)` helper
 - `ListByAccountMixin`: Provides `_list_by_account(account_id)` helper
 - `CountByStatusMixin`: Provides `_count_where(conditions)` helper
@@ -122,9 +123,9 @@ The service automatically creates the repository instance accessible via `self.r
 ### Service Responsibilities
 
 1. **Business Logic**: Implement domain-specific operations
-2. **Orchestration**: Coordinate multiple repositories or entities
-3. **Validation**: Validate business rules before persistence
-4. **Error Handling**: Raise appropriate domain exceptions
+1. **Orchestration**: Coordinate multiple repositories or entities
+1. **Validation**: Validate business rules before persistence
+1. **Error Handling**: Raise appropriate domain exceptions
 
 ### Service Method Examples
 

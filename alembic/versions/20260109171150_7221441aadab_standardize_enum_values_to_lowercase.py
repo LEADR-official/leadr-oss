@@ -40,8 +40,7 @@ def upgrade() -> None:
 
     # Step 5: Alter column to use new enum type
     op.execute(
-        "ALTER TABLE users ALTER COLUMN status TYPE user_status_new "
-        "USING status::user_status_new"
+        "ALTER TABLE users ALTER COLUMN status TYPE user_status_new USING status::user_status_new"
     )
 
     # Step 6: Drop old enum type and rename new one
@@ -97,8 +96,7 @@ def downgrade() -> None:
     op.execute("ALTER TABLE users ALTER COLUMN status TYPE text USING status::text")
     op.execute("UPDATE users SET status = UPPER(status)")
     op.execute(
-        "ALTER TABLE users ALTER COLUMN status TYPE user_status_new "
-        "USING status::user_status_new"
+        "ALTER TABLE users ALTER COLUMN status TYPE user_status_new USING status::user_status_new"
     )
     op.execute("DROP TYPE user_status")
     op.execute("ALTER TYPE user_status_new RENAME TO user_status")

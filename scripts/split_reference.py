@@ -52,11 +52,9 @@ def parse_modules(content: str) -> tuple[str, list[tuple[str, str, str]]]:
         if h3_match:
             # Save previous module
             if current_module and current_content:
-                modules.append((
-                    current_module_name,
-                    slugify(current_module),
-                    "\n".join(current_content)
-                ))
+                modules.append(
+                    (current_module_name, slugify(current_module), "\n".join(current_content))
+                )
 
             # Start new module (this is a top-level submodule like leadr.accounts)
             current_module = extract_module_name(h3_match.group(1))
@@ -71,19 +69,13 @@ def parse_modules(content: str) -> tuple[str, list[tuple[str, str, str]]]:
 
     # Save last module
     if current_module and current_content:
-        modules.append((
-            current_module_name,
-            slugify(current_module),
-            "\n".join(current_content)
-        ))
+        modules.append((current_module_name, slugify(current_module), "\n".join(current_content)))
 
     intro = "\n".join(intro_lines)
     return intro, modules
 
 
-def build_anchor_map(
-    modules: list[tuple[str, str, str]]
-) -> dict[str, tuple[str, str]]:
+def build_anchor_map(modules: list[tuple[str, str, str]]) -> dict[str, tuple[str, str]]:
     """Build a map of anchor IDs to (filename, anchor) for link rewriting.
 
     Returns:
@@ -117,6 +109,7 @@ def rewrite_links(content: str, anchor_map: dict[str, tuple[str, str]]) -> str:
 
     Converts links like [text](#leadr.module.Class) to [text](./module.md#leadr.module.Class)
     """
+
     def replace_link(match):
         link_text = match.group(1)
         link_target = match.group(2)
@@ -145,10 +138,7 @@ def rewrite_links(content: str, anchor_map: dict[str, tuple[str, str]]) -> str:
     return re.sub(r"\[([^\]]+)\]\(([^)]+)\)", replace_link, content)
 
 
-def generate_index(
-    intro: str,
-    modules: list[tuple[str, str, str]]
-) -> str:
+def generate_index(intro: str, modules: list[tuple[str, str, str]]) -> str:
     """Generate an index.md file with links to all modules."""
     # Extract just the title from front matter if present
     title_match = re.search(r"^---\ntitle:\s*(.+)\n---\n", intro, re.MULTILINE)
@@ -161,7 +151,9 @@ def generate_index(
 
     # Add a brief introduction
     index_content += "# Python API Reference\n\n"
-    index_content += "Auto-generated reference documentation for all Python modules in the LEADR codebase.\n\n"
+    index_content += (
+        "Auto-generated reference documentation for all Python modules in the LEADR codebase.\n\n"
+    )
 
     # Add module links
     index_content += "## Modules\n\n"

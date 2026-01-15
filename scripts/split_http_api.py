@@ -53,11 +53,9 @@ def parse_sections(content: str) -> tuple[str, list[tuple[str, str, str]]]:
             else:
                 # Save previous section
                 if current_section:
-                    sections.append((
-                        current_section,
-                        slugify(current_section),
-                        "\n".join(current_content)
-                    ))
+                    sections.append(
+                        (current_section, slugify(current_section), "\n".join(current_content))
+                    )
 
                 # Start new section (this is a tag like "Accounts", "Users")
                 current_section = h1_match.group(1)
@@ -71,19 +69,13 @@ def parse_sections(content: str) -> tuple[str, list[tuple[str, str, str]]]:
 
     # Save last section
     if current_section:
-        sections.append((
-            current_section,
-            slugify(current_section),
-            "\n".join(current_content)
-        ))
+        sections.append((current_section, slugify(current_section), "\n".join(current_content)))
 
     intro = "\n".join(intro_lines)
     return intro, sections
 
 
-def build_anchor_map(
-    sections: list[tuple[str, str, str]]
-) -> dict[str, tuple[str, str]]:
+def build_anchor_map(sections: list[tuple[str, str, str]]) -> dict[str, tuple[str, str]]:
     """Build a map of anchor IDs to (filename, anchor) for link rewriting.
 
     Returns:
@@ -126,6 +118,7 @@ def rewrite_links(content: str, anchor_map: dict[str, tuple[str, str]]) -> str:
 
     Converts links like [text](#anchor) to [text](./file.md#anchor)
     """
+
     def replace_link(match):
         link_text = match.group(1)
         anchor = match.group(2)
@@ -152,10 +145,7 @@ def rewrite_links(content: str, anchor_map: dict[str, tuple[str, str]]) -> str:
     return re.sub(r"\[([^\]]+)\]\(([^)]+)\)", replace_link, content)
 
 
-def generate_index(
-    intro: str,
-    sections: list[tuple[str, str, str]]
-) -> str:
+def generate_index(intro: str, sections: list[tuple[str, str, str]]) -> str:
     """Generate an index.md file with links to all sections."""
     # Extract just the title from front matter if present
     title_match = re.search(r"^---\ntitle:\s*(.+)\n---\n", intro, re.MULTILINE)

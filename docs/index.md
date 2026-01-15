@@ -5,12 +5,15 @@ Welcome to the LEADR API documentation.
 ## Documentation Sections
 
 ### [Python API Reference](reference/index.md)
+
 Complete reference for all Python modules, classes, and functions in the LEADR codebase. Auto-generated from docstrings using griffe2md and organized by module.
 
 ### [Architecture Patterns](patterns.md)
+
 Comprehensive guide to the Domain-Driven Design patterns and best practices used throughout the LEADR codebase.
 
 ### [HTTP API Reference](http-api/index.md)
+
 Complete REST API documentation for all HTTP endpoints. Auto-generated from the FastAPI application's OpenAPI specification and organized by resource.
 
 ## Quick Links
@@ -40,6 +43,6 @@ For information about contributing to LEADR, setting up your development environ
 - `patterns.md` for architectural patterns
 - Python API Reference (this documentation) for code details
 
----
+______________________________________________________________________
 
 *Last updated: Auto-generated on release*
