@@ -46,8 +46,12 @@ def _get_connect_args() -> dict[str, Any]:
     """Get asyncpg connection arguments.
 
     Configures SSL for production connections to Neon.
+    Disables prepared statement cache to handle schema changes gracefully
+    (prevents InvalidCachedStatementError during/after migrations).
     """
-    args: dict[str, Any] = {}
+    args: dict[str, Any] = {
+        "prepared_statement_cache_size": 0,
+    }
     ssl_ctx = _get_ssl_context()
     if ssl_ctx:
         args["ssl"] = ssl_ctx
