@@ -325,6 +325,11 @@ class CommonSettings(BaseSettings):
         default=None,
         description="Override IP address for development/testing (bypasses localhost detection)",
     )
+    GEOIP_DOWNLOAD_ENABLED: bool = Field(
+        default=True,
+        description="Enable GeoIP database downloads on startup. Set to False when downloads "
+        "are handled by init container.",
+    )
 
     # Score Configuration
     SCORE_METADATA_MAX_SIZE_BYTES: int = Field(

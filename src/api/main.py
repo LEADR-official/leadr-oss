@@ -82,6 +82,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             country_db_url=settings.MAXMIND_COUNTRY_DB_URL,
             database_path=settings.GEOIP_DATABASE_PATH,
             refresh_days=settings.GEOIP_REFRESH_DAYS,
+            download_enabled=settings.GEOIP_DOWNLOAD_ENABLED,
         )
         await geoip_service.initialize()
         app.state.geoip_service = geoip_service

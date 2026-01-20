@@ -56,6 +56,7 @@ class GeoIPService:
         country_db_url: str,
         database_path: Path,
         refresh_days: int = 7,
+        download_enabled: bool = True,
     ):
         """Initialize GeoIP service with configuration.
 
@@ -66,6 +67,8 @@ class GeoIPService:
             country_db_url: URL to download GeoLite2 Country database (tar.gz)
             database_path: Directory path to store database files
             refresh_days: Number of days before refreshing databases (default: 7)
+            download_enabled: Enable database downloads. Set to False when downloads
+                are handled externally (e.g., init container). Default: True.
         """
         self.account_id = account_id
         self.license_key = license_key
@@ -73,6 +76,7 @@ class GeoIPService:
         self.country_db_url = country_db_url
         self.database_path = database_path
         self.refresh_days = refresh_days
+        self.download_enabled = download_enabled
 
         # Database readers (initialized in initialize())
         self._city_reader: maxminddb.Reader | None = None
@@ -123,6 +127,16 @@ class GeoIPService:
 
         if not city_needs_download and not country_needs_download:
             logger.debug("GeoIP databases are fresh, skipping download")
+            return
+
+        # Skip download if disabled (e.g., when handled by init container)
+        if not self.download_enabled:
+            logger.info(
+                "GeoIP download disabled. Expecting databases to be provided externally. "
+                "City exists: %s, Country exists: %s",
+                city_db_path.exists(),
+                country_db_path.exists(),
+            )
             return
 
         # Download databases with basic auth

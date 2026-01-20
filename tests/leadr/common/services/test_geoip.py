@@ -106,6 +106,58 @@ class TestGeoIPService:
             mock_client_class.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_initialize_skips_download_when_disabled(self, geoip_config):
+        """Test that initialize skips download when download_enabled=False."""
+        with (
+            patch("leadr.common.geoip.httpx.AsyncClient") as mock_client_class,
+            patch("leadr.common.geoip.maxminddb.open_database") as mock_open_db,
+        ):
+            # Mock database reader
+            mock_reader = Mock()
+            mock_open_db.return_value = mock_reader
+
+            # Create service with download_enabled=False
+            service = GeoIPService(**geoip_config, download_enabled=False)
+            await service.initialize()
+
+            # Verify no downloads occurred even though databases don't exist
+            mock_client_class.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_initialize_loads_existing_databases_when_download_disabled(self, geoip_config):
+        """Test that initialize loads existing databases even when download_enabled=False."""
+        with (
+            patch("leadr.common.geoip.httpx.AsyncClient") as mock_client_class,
+            patch("leadr.common.geoip.maxminddb.open_database") as mock_open_db,
+        ):
+            # Create fake database files
+            city_db_path = geoip_config["database_path"] / "GeoLite2-City.mmdb"
+            country_db_path = geoip_config["database_path"] / "GeoLite2-Country.mmdb"
+            city_db_path.write_bytes(b"existing_db")
+            country_db_path.write_bytes(b"existing_db")
+
+            # Mock database reader
+            mock_reader = Mock()
+            mock_reader.get.return_value = {
+                "city": {"names": {"en": "New York"}},
+                "country": {"iso_code": "US"},
+                "location": {"time_zone": "America/New_York"},
+            }
+            mock_open_db.return_value = mock_reader
+
+            # Create service with download_enabled=False
+            service = GeoIPService(**geoip_config, download_enabled=False)
+            await service.initialize()
+
+            # Verify no downloads occurred
+            mock_client_class.assert_not_called()
+
+            # Verify databases were loaded and can be used
+            geo_info = service.get_geo_info("8.8.8.8")
+            assert geo_info is not None
+            assert geo_info.country == "US"
+
+    @pytest.mark.asyncio
     async def test_initialize_refreshes_stale_databases(self, geoip_config):
         """Test that initialize refreshes databases older than refresh_days."""
         with (
