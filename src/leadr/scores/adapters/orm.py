@@ -56,6 +56,7 @@ class ScoreORM(Base):
         "score_metadata", JSON, nullable=True, default=None
     )
     is_test: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="active", index=True)
 
     # Relationships
     account: Mapped["AccountORM"] = relationship("AccountORM")  # type: ignore[name-defined]
@@ -66,13 +67,16 @@ class ScoreORM(Base):
     # Indexes
     __table_args__ = (
         # Create composite index for efficient score ranking queries.
+        # Excludes deleted, rejected, and provisional scores from the index.
         Index(
             "ix_scores_ranking",
             "board_id",
             "value",
             "created_at",
             "id",
-            postgresql_where=text("deleted_at IS NULL"),
+            postgresql_where=text(
+                "deleted_at IS NULL AND status NOT IN ('rejected', 'provisional')"
+            ),
         ),
     )
 

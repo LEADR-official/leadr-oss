@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.config import settings
+from leadr.scores.domain.anti_cheat.enums import ScoreStatus
 from leadr.scores.domain.score import Score
 
 
@@ -113,6 +114,10 @@ class ScoreUpdateRequest(BaseModel):
     country: str | None = Field(default=None, description="Updated country")
     city: str | None = Field(default=None, description="Updated city")
     metadata: Any | None = Field(default=None, description="Updated metadata")
+    status: ScoreStatus | None = Field(
+        default=None,
+        description="Updated status (admin only: active, under_review, rejected)",
+    )
     deleted: bool | None = Field(default=None, description="Set to true to soft delete the score")
 
     @field_validator("metadata")
@@ -160,6 +165,9 @@ class ScoreResponse(BaseModel):
         default=False,
         description="True if this score was submitted in test mode",
     )
+    status: ScoreStatus = Field(
+        description="Score lifecycle status (active, under_review, rejected)",
+    )
     created_at: datetime = Field(description="Timestamp when the score was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -189,6 +197,7 @@ class ScoreResponse(BaseModel):
             rank=score.rank,
             is_placeholder=score.is_placeholder,
             is_test=score.is_test,
+            status=score.status,
             created_at=score.created_at,
             updated_at=score.updated_at,
         )
@@ -217,6 +226,9 @@ class ScoreClientResponse(BaseModel):
         default=False,
         description="True if this score was submitted in test mode",
     )
+    status: ScoreStatus = Field(
+        description="Score lifecycle status (active, under_review, rejected)",
+    )
     created_at: datetime = Field(description="Timestamp when the score was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -242,6 +254,7 @@ class ScoreClientResponse(BaseModel):
             rank=score.rank,
             is_placeholder=score.is_placeholder,
             is_test=score.is_test,
+            status=score.status,
             created_at=score.created_at,
             updated_at=score.updated_at,
         )

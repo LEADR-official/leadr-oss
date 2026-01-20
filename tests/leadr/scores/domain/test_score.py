@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
+from leadr.scores.domain.anti_cheat.enums import ScoreStatus
 from leadr.scores.domain.score import Score
 
 
@@ -602,3 +603,117 @@ class TestScore:
         )
 
         assert score.is_test is True
+
+    def test_score_default_status_is_provisional(self):
+        """Score should be PROVISIONAL by default on instantiation."""
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
+
+        score = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+        )
+
+        assert score.status == ScoreStatus.PROVISIONAL
+
+    def test_score_activate_transitions_to_active(self):
+        """activate() should change status to ACTIVE."""
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
+
+        score = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+        )
+
+        assert score.status == ScoreStatus.PROVISIONAL
+        score.activate()
+        assert score.status == ScoreStatus.ACTIVE
+
+    def test_score_flag_for_review_transitions_to_under_review(self):
+        """flag_for_review() should change status to UNDER_REVIEW."""
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
+
+        score = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+        )
+
+        score.flag_for_review()
+        assert score.status == ScoreStatus.UNDER_REVIEW
+
+    def test_score_reject_transitions_to_rejected(self):
+        """reject() should change status to REJECTED."""
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
+
+        score = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+        )
+
+        score.reject()
+        assert score.status == ScoreStatus.REJECTED
+
+    def test_score_status_is_mutable(self):
+        """Test that status can be modified directly."""
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
+
+        score = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+        )
+
+        score.status = ScoreStatus.ACTIVE
+        assert score.status == ScoreStatus.ACTIVE
+
+    def test_score_can_be_created_with_explicit_status(self):
+        """Test creating a score with explicit status."""
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+        device_id = DeviceID(uuid4())
+
+        score = Score(
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            device_id=device_id,
+            player_name="SpeedRunner99",
+            value=123.45,
+            status=ScoreStatus.ACTIVE,
+        )
+
+        assert score.status == ScoreStatus.ACTIVE

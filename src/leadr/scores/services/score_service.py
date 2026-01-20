@@ -15,7 +15,7 @@ from leadr.common.domain.pagination import SortDirection, SortField
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.games.services.game_service import GameService
-from leadr.scores.domain.anti_cheat.enums import FlagAction, TrustTier
+from leadr.scores.domain.anti_cheat.enums import FlagAction, ScoreStatus, TrustTier
 from leadr.scores.domain.anti_cheat.models import AntiCheatResult, ScoreFlag, ScoreSubmissionMeta
 from leadr.scores.domain.score import Score
 from leadr.scores.services.anti_cheat_repositories import (
@@ -262,6 +262,18 @@ class ScoreService(BaseService[Score, ScoreRepository]):
                     raise ValueError(
                         f"Score submission rejected by anti-cheat: {anti_cheat_result.reason}"
                     )
+
+                # Set status based on anti-cheat result
+                if anti_cheat_result.action == FlagAction.FLAG:
+                    score.flag_for_review()  # status = UNDER_REVIEW
+                else:
+                    score.activate()  # status = ACTIVE
+            else:
+                # No anti-cheat - activate immediately
+                score.activate()
+        else:
+            # No device_id (shouldn't happen in practice) - activate
+            score.activate()
 
         # Save score to database
         saved_score = await self.repository.create(score)
@@ -518,4 +530,24 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         for field, value in updates.items():
             setattr(score, field, value)
 
+        return await self.repository.update(score)
+
+    async def update_score_status(self, score_id: ScoreID, status: ScoreStatus) -> Score:
+        """Update a score's status.
+
+        Used by ScoreFlagService when admin reviews a flag to sync the
+        score's status with the flag decision.
+
+        Args:
+            score_id: The ID of the score to update.
+            status: New status for the score.
+
+        Returns:
+            The updated Score entity.
+
+        Raises:
+            EntityNotFoundError: If the score doesn't exist.
+        """
+        score = await self.get_by_id_or_raise(score_id)
+        score.status = status
         return await self.repository.update(score)

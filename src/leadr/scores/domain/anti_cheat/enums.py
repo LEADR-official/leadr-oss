@@ -106,3 +106,23 @@ class ScoreFlagStatus(str, Enum):
 
     DISMISSED = "dismissed"
     """Admin dismissed the flag without a specific determination."""
+
+
+class ScoreStatus(str, Enum):
+    """Lifecycle status of a score in the anti-cheat workflow.
+
+    Tracks the score from submission through review, determining visibility
+    on leaderboards.
+    """
+
+    PROVISIONAL = "provisional"
+    """Initial transient state before anti-cheat check completes."""
+
+    ACTIVE = "active"
+    """Score passed anti-cheat checks and is visible on leaderboards."""
+
+    UNDER_REVIEW = "under_review"
+    """Score was flagged by anti-cheat, pending admin review. Still visible."""
+
+    REJECTED = "rejected"
+    """Admin confirmed cheating - hidden from leaderboards."""

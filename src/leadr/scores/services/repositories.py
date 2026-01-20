@@ -12,6 +12,7 @@ from leadr.common.domain.pagination import SortDirection, SortField
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 from leadr.scores.adapters.orm import ScoreORM
+from leadr.scores.domain.anti_cheat.enums import ScoreStatus
 from leadr.scores.domain.score import Score
 
 if TYPE_CHECKING:
@@ -49,6 +50,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             metadata=orm.score_metadata,
             rank=rank,
             is_test=orm.is_test,
+            status=ScoreStatus(orm.status),
             created_at=orm.created_at,
             updated_at=orm.updated_at,
             deleted_at=orm.deleted_at,
@@ -70,6 +72,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             filter_city=entity.city,
             score_metadata=entity.metadata,
             is_test=entity.is_test,
+            status=entity.status.value,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,
@@ -84,6 +87,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         account_id: AccountID,
         device_id: DeviceID,
         board_id: BoardID,
+        include_all_statuses: bool = False,
     ) -> Score | None:
         """Get the active score for a specific device on a board.
 
@@ -93,6 +97,8 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             account_id: Account ID to filter by (multi-tenant safety).
             device_id: Device ID to search for.
             board_id: Board ID to search for.
+            include_all_statuses: If True, includes all statuses. Default excludes
+                REJECTED and PROVISIONAL scores.
 
         Returns:
             The first matching Score or None if no score exists.
@@ -103,8 +109,12 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             .where(ScoreORM.account_id == self._extract_uuid(account_id))
             .where(ScoreORM.device_id == self._extract_uuid(device_id))
             .where(ScoreORM.board_id == self._extract_uuid(board_id))
-            .limit(1)
         )
+
+        if not include_all_statuses:
+            query = query.where(ScoreORM.status.notin_(self.EXCLUDED_STATUSES))
+
+        query = query.limit(1)
         result = await self.session.execute(query)
         orm = result.scalars().first()
         return self._to_domain(orm) if orm else None
@@ -121,6 +131,9 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         "updated_at",
     }
 
+    # Excluded statuses for default queries (rejected and provisional scores hidden)
+    EXCLUDED_STATUSES = [ScoreStatus.REJECTED.value, ScoreStatus.PROVISIONAL.value]
+
     async def filter(
         self,
         account_id: AccountID | None = None,
@@ -128,6 +141,8 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         game_id: GameID | None = None,
         device_id: DeviceID | None = None,
         is_test: bool | None = None,
+        status: ScoreStatus | None = None,
+        include_all_statuses: bool = False,
         *,
         pagination: PaginationParams,
         around_score: Score | None = None,
@@ -145,6 +160,10 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             device_id: Optional device ID to filter by
             is_test: Optional filter for test scores. True returns only test scores,
                 False returns only production scores, None returns all scores.
+            status: Optional filter for specific score status. If None, excludes
+                REJECTED and PROVISIONAL scores by default.
+            include_all_statuses: If True, includes all statuses (admin use case).
+                Overrides the default exclusion of REJECTED and PROVISIONAL.
             pagination: Pagination parameters (required)
             around_score: Optional target score to center results around. When provided,
                 returns a window of scores centered on this score (mutually exclusive
@@ -161,8 +180,16 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             ValueError: If sort field is not in SORTABLE_FIELDS
             CursorValidationError: If cursor is invalid or state doesn't match
         """
-        # Build base query
+        # Build base query - exclude deleted and (by default) rejected/provisional scores
         query = select(ScoreORM).where(ScoreORM.deleted_at.is_(None))
+
+        # Apply status filtering
+        if status is not None:
+            # Filter for specific status
+            query = query.where(ScoreORM.status == status.value)
+        elif not include_all_statuses:
+            # Default: exclude REJECTED and PROVISIONAL
+            query = query.where(ScoreORM.status.notin_(self.EXCLUDED_STATUSES))
 
         if account_id is not None:
             account_uuid = self._extract_uuid(account_id)
@@ -602,6 +629,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
 
         Note: Ranks are computed separately for test vs production scores
         when is_test is specified.
+        Rejected and provisional scores are excluded from rank calculations.
 
         Args:
             value: The score value to compute rank for
@@ -625,10 +653,12 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             better_condition = value_column < value
 
         # Count scores that rank better (within test/production pool if specified)
+        # Exclude rejected and provisional scores from rank calculation
         count_query = (
             select(func.count())
             .select_from(ScoreORM)
             .where(ScoreORM.deleted_at.is_(None))
+            .where(ScoreORM.status.notin_(self.EXCLUDED_STATUSES))
             .where(ScoreORM.board_id == self._extract_uuid(board_id))
             .where(better_condition)
         )
@@ -968,6 +998,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         orm.filter_city = row.filter_city
         orm.score_metadata = row.score_metadata
         orm.is_test = row.is_test
+        orm.status = row.status
         orm.created_at = row.created_at
         orm.updated_at = row.updated_at
         orm.deleted_at = row.deleted_at
@@ -1038,6 +1069,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
 
         Note: Ranks are computed separately for test vs production scores.
         A test score's rank is within the test score pool only.
+        Rejected and provisional scores are excluded from rank calculations.
 
         Args:
             score: Score to compute rank for
@@ -1057,10 +1089,12 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
         )
 
         # Count scores that rank better (within same test/production pool)
+        # Exclude rejected and provisional scores from rank calculation
         count_query = (
             select(func.count())
             .select_from(ScoreORM)
             .where(ScoreORM.deleted_at.is_(None))
+            .where(ScoreORM.status.notin_(self.EXCLUDED_STATUSES))
             .where(ScoreORM.board_id == score.board_id.uuid)
             .where(ScoreORM.is_test == score.is_test)
             .where(better_condition)

@@ -15,6 +15,7 @@ from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
+from leadr.scores.domain.anti_cheat.enums import ScoreStatus
 from leadr.scores.domain.score import Score
 from leadr.scores.services.repositories import ScoreRepository
 
@@ -108,6 +109,7 @@ class TestScoreRepository:
             timezone="America/New_York",
             country="USA",
             city="New York",
+            status=ScoreStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -203,6 +205,7 @@ class TestScoreRepository:
             device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
+            status=ScoreStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -302,6 +305,7 @@ class TestScoreRepository:
             device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
+            status=ScoreStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -447,6 +451,7 @@ class TestScoreRepository:
             device_id=device1_id,
             player_name="Player1Score",
             value=100.0,
+            status=ScoreStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -460,6 +465,7 @@ class TestScoreRepository:
             device_id=device2_id,
             player_name="Player2Score",
             value=200.0,
+            status=ScoreStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -583,6 +589,7 @@ class TestScoreRepository:
             device_id=device1_id,
             player_name="Score1",
             value=100.0,
+            status=ScoreStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -596,6 +603,7 @@ class TestScoreRepository:
             device_id=device2_id,
             player_name="Score2",
             value=200.0,
+            status=ScoreStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -609,6 +617,7 @@ class TestScoreRepository:
             device_id=device1_id,
             player_name="Score3",
             value=300.0,
+            status=ScoreStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -716,6 +725,7 @@ class TestScoreRepository:
             device_id=device_id,
             player_name="Score1",
             value=100.0,
+            status=ScoreStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -729,6 +739,7 @@ class TestScoreRepository:
             device_id=device_id,
             player_name="Score2",
             value=200.0,
+            status=ScoreStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -822,6 +833,7 @@ class TestScoreRepository:
             device_id=device_id,
             player_name="SpeedRunner99",
             value=123.45,
+            status=ScoreStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -917,6 +929,7 @@ class TestScoreRepository:
             player_name="SpeedRunner99",
             value=123.45,
             metadata=metadata,
+            status=ScoreStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -1015,6 +1028,7 @@ class TestScoreRepository:
             player_name="SpeedRunner99",
             value=123.45,
             metadata=initial_metadata,
+            status=ScoreStatus.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -1109,6 +1123,7 @@ class TestScoreRepository:
                 device_id=device_id,
                 player_name=f"Player{value}",
                 value=float(value),
+                status=ScoreStatus.ACTIVE,
                 created_at=now,
                 updated_at=now,
             )
@@ -1217,6 +1232,7 @@ class TestScoreRepository:
                 device_id=device_id,
                 player_name=f"Player{value}",
                 value=float(value),
+                status=ScoreStatus.ACTIVE,
                 created_at=now,
                 updated_at=now,
             )
@@ -1325,6 +1341,7 @@ class TestScoreRepository:
                 device_id=device_id,
                 player_name=f"Player{value}",
                 value=float(value),
+                status=ScoreStatus.ACTIVE,
                 created_at=now,
                 updated_at=now,
             )
@@ -1432,6 +1449,7 @@ class TestScoreRepository:
                 device_id=device_id,
                 player_name=f"Player{value}",
                 value=float(value),
+                status=ScoreStatus.ACTIVE,
                 created_at=now,
                 updated_at=now,
             )

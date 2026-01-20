@@ -8,6 +8,7 @@ from pydantic import Field, field_validator, model_validator
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
 from leadr.common.domain.models import Entity
 from leadr.config import settings
+from leadr.scores.domain.anti_cheat.enums import ScoreStatus
 
 
 class Score(Entity):
@@ -67,6 +68,10 @@ class Score(Entity):
         default=False,
         description="True if score was submitted in test mode",
     )
+    status: ScoreStatus = Field(
+        default=ScoreStatus.PROVISIONAL,
+        description="Lifecycle status (provisional, active, under_review, rejected)",
+    )
 
     @field_validator("player_name")
     @classmethod
@@ -124,3 +129,15 @@ class Score(Entity):
             )
 
         return v
+
+    def activate(self) -> None:
+        """Mark score as active (passed anti-cheat)."""
+        self.status = ScoreStatus.ACTIVE
+
+    def flag_for_review(self) -> None:
+        """Mark score as under review (flagged by anti-cheat)."""
+        self.status = ScoreStatus.UNDER_REVIEW
+
+    def reject(self) -> None:
+        """Mark score as rejected (confirmed cheating)."""
+        self.status = ScoreStatus.REJECTED
