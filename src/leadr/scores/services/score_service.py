@@ -81,6 +81,43 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             # Higher is better for descending (e.g., points/kills)
             return new_value > existing_value
 
+    def _build_leaderboard_sort_fields(
+        self, board_sort_direction: BoardSortDirection
+    ) -> list[SortField]:
+        """Build sort fields for leaderboard ranking based on board's sort direction.
+
+        Args:
+            board_sort_direction: The board's sort direction (ASCENDING or DESCENDING).
+
+        Returns:
+            List of SortField objects for ranking computation.
+        """
+        value_direction = (
+            SortDirection.ASC
+            if board_sort_direction == BoardSortDirection.ASCENDING
+            else SortDirection.DESC
+        )
+        return [
+            SortField(name="value", direction=value_direction),
+            SortField(name="created_at", direction=SortDirection.DESC),
+            SortField(name="id", direction=SortDirection.ASC),
+        ]
+
+    async def _compute_score_rank(
+        self, score: Score, board_sort_direction: BoardSortDirection
+    ) -> int:
+        """Compute and set the rank for a score based on board's sort direction.
+
+        Args:
+            score: The score to compute rank for.
+            board_sort_direction: The board's sort direction.
+
+        Returns:
+            The computed rank.
+        """
+        sort_fields = self._build_leaderboard_sort_fields(board_sort_direction)
+        return await self.repository.get_score_rank(score, sort_fields)
+
     async def create_score(
         self,
         account_id: AccountID,
@@ -154,7 +191,10 @@ class ScoreService(BaseService[Score, ScoreRepository]):
                 board_id=board_id,
             )
             if existing_score is not None:
-                # Return existing first score, don't create new one
+                # Return existing first score with rank, don't create new one
+                existing_score.rank = await self._compute_score_rank(
+                    existing_score, board.sort_direction
+                )
                 return existing_score, None
         elif board.keep_strategy == KeepStrategy.LATEST_ONLY:
             existing_score = await self._get_active_score_for_device(
@@ -175,7 +215,10 @@ class ScoreService(BaseService[Score, ScoreRepository]):
                 # Check if new score is better
                 is_better = self._is_better_score(value, existing_score.value, board.sort_direction)
                 if not is_better:
-                    # New score is worse or equal, return existing better score
+                    # New score is worse or equal, return existing better score with rank
+                    existing_score.rank = await self._compute_score_rank(
+                        existing_score, board.sort_direction
+                    )
                     return existing_score, None
                 else:
                     # New score is better, soft-delete old one before creating new
@@ -222,6 +265,9 @@ class ScoreService(BaseService[Score, ScoreRepository]):
 
         # Save score to database
         saved_score = await self.repository.create(score)
+
+        # Compute rank for the newly created score
+        saved_score.rank = await self._compute_score_rank(saved_score, board.sort_direction)
 
         # Schedule metadata update as background task (non-blocking)
         if background_tasks is not None:
@@ -328,21 +374,8 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         board_service = BoardService(self.repository.session)
         board = await board_service.get_by_id_or_raise(score.board_id)
 
-        # Build sort fields based on board direction
-        value_direction = (
-            SortDirection.ASC
-            if board.sort_direction == BoardSortDirection.ASCENDING
-            else SortDirection.DESC
-        )
-        sort_fields = [
-            SortField(name="value", direction=value_direction),
-            SortField(name="created_at", direction=SortDirection.DESC),
-            SortField(name="id", direction=SortDirection.ASC),
-        ]
-
-        # Compute rank
-        rank = await self.repository.get_score_rank(score, sort_fields)
-        score.rank = rank
+        # Compute rank using helper
+        score.rank = await self._compute_score_rank(score, board.sort_direction)
         return score
 
     async def list_scores(

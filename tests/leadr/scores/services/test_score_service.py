@@ -76,6 +76,267 @@ class TestScoreService:
         assert score.player_name == "SpeedRunner99"
         assert score.value == 123.45
 
+    async def test_create_score_returns_rank(self, db_session: AsyncSession):
+        """Test that create_score returns score with rank populated."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Rank Test Account",
+            slug="rank-test",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Rank Test Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Rank Test Board",
+            icon="trophy",
+            short_code="RANK1",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        score_service = ScoreService(db_session)
+
+        # Create first score - should be rank 1
+        score1, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="Player1",
+            value=100.0,
+        )
+        assert score1.rank == 1
+
+        # Create second score with higher value - should be rank 1 (DESC sort)
+        score2, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="Player2",
+            value=200.0,
+        )
+        assert score2.rank == 1
+
+        # Create third score with lower value - should be rank 3
+        score3, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="Player3",
+            value=50.0,
+        )
+        assert score3.rank == 3
+
+    async def test_create_score_returns_rank_ascending_board(self, db_session: AsyncSession):
+        """Test that create_score returns correct rank for ascending board (lower is better)."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Rank ASC Account",
+            slug="rank-asc",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Rank ASC Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Time Trial Board",
+            icon="clock",
+            short_code="TIME1",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,  # Lower is better
+            keep_strategy=KeepStrategy.ALL,
+        )
+
+        score_service = ScoreService(db_session)
+
+        # Create first score (100 seconds) - should be rank 1
+        score1, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="Player1",
+            value=100.0,
+        )
+        assert score1.rank == 1
+
+        # Create score with lower time (50 seconds) - should be rank 1 (ASC sort, lower is better)
+        score2, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="Player2",
+            value=50.0,
+        )
+        assert score2.rank == 1
+
+        # Create score with higher time (150 seconds) - should be rank 3
+        score3, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="Player3",
+            value=150.0,
+        )
+        assert score3.rank == 3
+
+    async def test_create_score_first_only_returns_existing_with_rank(
+        self, db_session: AsyncSession
+    ):
+        """Test that FIRST_ONLY strategy returns existing score with rank populated."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="First Only Rank Account",
+            slug="first-rank",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="First Only Rank Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="First Only Board",
+            icon="medal",
+            short_code="FIRST-RANK",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.FIRST_ONLY,
+        )
+
+        score_service = ScoreService(db_session)
+
+        # Create first score
+        first_score, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="Player1",
+            value=100.0,
+        )
+        assert first_score.rank == 1
+
+        # Try to create second score - should return existing score with rank
+        returned_score, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="Player1",
+            value=200.0,
+        )
+
+        assert returned_score.id == first_score.id
+        assert returned_score.rank is not None
+        assert returned_score.rank == 1
+
+    async def test_create_score_best_only_returns_existing_with_rank_when_worse(
+        self, db_session: AsyncSession
+    ):
+        """Test that BEST_ONLY returns existing score with rank when new score is worse."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Best Only Rank Account",
+            slug="best-rank",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Best Only Rank Game",
+        )
+
+        device_service = DeviceService(db_session)
+        device, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Best Only Board",
+            icon="trophy",
+            short_code="BEST-RANK",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,  # Higher is better
+            keep_strategy=KeepStrategy.BEST_ONLY,
+        )
+
+        score_service = ScoreService(db_session)
+
+        # Create first score with high value
+        best_score, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="Player1",
+            value=200.0,
+        )
+        assert best_score.rank == 1
+
+        # Submit worse score - should return existing score with rank
+        returned_score, _ = await score_service.create_score(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            device_id=device.id,
+            player_name="Player1",
+            value=50.0,  # Worse than 200
+        )
+
+        assert returned_score.id == best_score.id
+        assert returned_score.rank is not None
+        assert returned_score.rank == 1
+
     async def test_create_score_with_optional_fields(self, db_session: AsyncSession):
         """Test creating a score with optional fields."""
         # Create account
