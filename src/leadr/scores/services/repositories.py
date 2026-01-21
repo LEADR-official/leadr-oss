@@ -11,7 +11,7 @@ from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreI
 from leadr.common.domain.pagination import SortDirection, SortField
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
-from leadr.scores.adapters.orm import ScoreORM
+from leadr.scores.adapters.orm import ScoreORM, ScoreStatusEnum
 from leadr.scores.domain.anti_cheat.enums import ScoreStatus
 from leadr.scores.domain.score import Score
 
@@ -50,7 +50,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             metadata=orm.score_metadata,
             rank=rank,
             is_test=orm.is_test,
-            status=ScoreStatus(orm.status),
+            status=ScoreStatus(orm.status.value),
             created_at=orm.created_at,
             updated_at=orm.updated_at,
             deleted_at=orm.deleted_at,
@@ -72,7 +72,7 @@ class ScoreRepository(BaseRepository[Score, ScoreORM]):
             filter_city=entity.city,
             score_metadata=entity.metadata,
             is_test=entity.is_test,
-            status=entity.status.value,
+            status=ScoreStatusEnum(entity.status.value),
             created_at=entity.created_at,
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,

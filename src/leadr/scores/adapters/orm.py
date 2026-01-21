@@ -1,21 +1,37 @@
 """Score ORM models."""
 
+import enum
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, text
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSON, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from leadr.common.domain.ids import BoardID, DeviceID, ScoreID, UserID
+from leadr.common.domain.ids import BoardID, DeviceID, ScoreFlagID, ScoreID, UserID
 from leadr.common.orm import Base
+from leadr.scores.domain.anti_cheat.enums import (
+    FlagConfidence,
+    FlagType,
+    ScoreFlagStatus,
+)
+from leadr.scores.domain.anti_cheat.models import ScoreFlag
 
 if TYPE_CHECKING:
     from leadr.accounts.adapters.orm import AccountORM
     from leadr.boards.adapters.orm import BoardORM
     from leadr.games.adapters.orm import GameORM
     from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
+
+
+class ScoreStatusEnum(str, enum.Enum):
+    """Score status enum for database."""
+
+    PROVISIONAL = "provisional"
+    ACTIVE = "active"
+    UNDER_REVIEW = "under_review"
+    REJECTED = "rejected"
 
 
 class ScoreORM(Base):
@@ -56,7 +72,18 @@ class ScoreORM(Base):
         "score_metadata", JSON, nullable=True, default=None
     )
     is_test: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    status: Mapped[str] = mapped_column(String, nullable=False, default="active", index=True)
+    status: Mapped[ScoreStatusEnum] = mapped_column(
+        Enum(
+            ScoreStatusEnum,
+            name="score_status",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=ScoreStatusEnum.PROVISIONAL,
+        server_default="provisional",
+        index=True,
+    )
 
     # Relationships
     account: Mapped["AccountORM"] = relationship("AccountORM")  # type: ignore[name-defined]
@@ -164,13 +191,6 @@ class ScoreFlagORM(Base):
 
     def to_domain(self) -> "ScoreFlag":
         """Convert ORM model to domain entity."""
-        from leadr.common.domain.ids import ScoreFlagID
-        from leadr.scores.domain.anti_cheat.enums import (
-            FlagConfidence,
-            FlagType,
-            ScoreFlagStatus,
-        )
-        from leadr.scores.domain.anti_cheat.models import ScoreFlag
 
         return ScoreFlag(
             id=ScoreFlagID(self.id),
