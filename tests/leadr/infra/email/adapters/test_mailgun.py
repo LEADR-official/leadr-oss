@@ -165,9 +165,10 @@ class TestMailgunEmailProvider:
     @patch("leadr.infra.email.adapters.mailgun.Client")
     @patch("leadr.infra.email.adapters.mailgun.settings")
     def test_send_without_from_email_uses_default(self, mock_settings, mock_client):
-        """Test that send uses default from email when not provided."""
+        """Test that send uses settings.default_from_email when not provided."""
         mock_settings.MAILGUN_API_KEY = "test-api-key"
         mock_settings.MAILGUN_DOMAIN = "test.mailgun.org"
+        mock_settings.default_from_email = "noreply@test.mailgun.org"
 
         provider = MailgunEmailProvider()
 
@@ -186,6 +187,32 @@ class TestMailgunEmailProvider:
         call_args = provider.client.messages.create.call_args
         message_data = call_args.kwargs["data"]
         assert message_data["from"] == "noreply@test.mailgun.org"
+
+    @patch("leadr.infra.email.adapters.mailgun.Client")
+    @patch("leadr.infra.email.adapters.mailgun.settings")
+    def test_send_without_from_email_uses_custom_config(self, mock_settings, mock_client):
+        """Test that send uses custom FROM_EMAIL from settings."""
+        mock_settings.MAILGUN_API_KEY = "test-api-key"
+        mock_settings.MAILGUN_DOMAIN = "mail.example.com"
+        mock_settings.default_from_email = "support@mail.example.com"
+
+        provider = MailgunEmailProvider()
+
+        mock_response = Mock()
+        mock_response.json.return_value = {"id": "msg-custom"}
+        provider.client.messages.create = Mock(return_value=mock_response)
+
+        email = Email.create(
+            to="user@example.com",
+            subject="Test",
+            body="Body",
+        )
+
+        provider.send(email)
+
+        call_args = provider.client.messages.create.call_args
+        message_data = call_args.kwargs["data"]
+        assert message_data["from"] == "support@mail.example.com"
 
     @patch("leadr.infra.email.adapters.mailgun.Client")
     @patch("leadr.infra.email.adapters.mailgun.settings")

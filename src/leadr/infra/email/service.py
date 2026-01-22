@@ -80,9 +80,12 @@ class EmailService:
         ):
             to = settings.TESTING_EMAIL
 
-        if from_email is not None:
-            logger.warning("From email cannot be customised")
-        from_email = f"noreply@{settings.MAILGUN_DOMAIN}"
+        # Use default if not provided, validate domain if provided
+        if from_email is None:
+            from_email = settings.default_from_email
+        elif settings.MAILGUN_DOMAIN not in from_email:
+            raise ValueError(f"from_email must be an address on {settings.MAILGUN_DOMAIN}")
+
         reply_to = from_email
 
         # Create email domain object
@@ -220,8 +223,7 @@ class EmailService:
 
     def get_default_from_email(self) -> str:
         """Get default from email address."""
-        # This could be configurable or derived from provider settings
-        return "noreply@leadr.gg"
+        return settings.default_from_email
 
     def validate_provider_config(self) -> bool:
         """Validate the email provider configuration."""

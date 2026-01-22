@@ -42,7 +42,7 @@ class MailgunEmailProvider(EmailProvider):
         """Build message data for Mailgun API request."""
         message_data = {
             "to": email.to,
-            "from": email.from_email or f"noreply@{self.domain}",
+            "from": email.from_email or settings.default_from_email,
             "subject": email.subject,
             "text": email.body,
         }

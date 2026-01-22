@@ -75,6 +75,7 @@ class TestEmailServiceSendEmail:
         mock_settings.ENV = "PROD"
         mock_settings.TESTING_EMAIL = "test@leadr.gg"
         mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
 
         mock_provider = Mock()
         mock_provider.send.return_value = {"id": "msg-123", "message": "Queued"}
@@ -103,6 +104,7 @@ class TestEmailServiceSendEmail:
         mock_settings.ENV = "DEV"
         mock_settings.TESTING_EMAIL = "dev-test@leadr.gg"
         mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
 
         mock_provider = Mock()
         mock_provider.send.return_value = {"id": "msg-456"}
@@ -127,6 +129,7 @@ class TestEmailServiceSendEmail:
         mock_settings.ENV = "TEST"
         mock_settings.TESTING_EMAIL = "test@leadr.gg"
         mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
 
         mock_provider = Mock()
         mock_provider.send.return_value = {"id": "msg-test"}
@@ -147,11 +150,14 @@ class TestEmailServiceSendEmail:
         assert email_arg.to == "test@leadr.gg"
 
     @patch("leadr.infra.email.service.settings")
-    async def test_send_email_overrides_from_email(self, mock_settings, db_session: AsyncSession):
-        """Test that from_email is always overridden."""
+    async def test_send_email_uses_default_from_email_when_not_provided(
+        self, mock_settings, db_session: AsyncSession
+    ):
+        """Test that send_email uses default_from_email when from_email not provided."""
         mock_settings.ENV = "PROD"
         mock_settings.TESTING_EMAIL = "test@leadr.gg"
         mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
 
         mock_provider = Mock()
         mock_provider.send.return_value = {"id": "msg-789"}
@@ -162,12 +168,58 @@ class TestEmailServiceSendEmail:
             to="user@example.com",
             subject="Test",
             body="Body",
-            from_email="custom@example.com",  # This should be ignored
         )
 
         email_arg = mock_provider.send.call_args[0][0]
-        # from_email should be overridden with noreply
         assert email_arg.from_email == "noreply@mg.leadr.gg"
+
+    @patch("leadr.infra.email.service.settings")
+    async def test_send_email_accepts_valid_override_on_correct_domain(
+        self, mock_settings, db_session: AsyncSession
+    ):
+        """Test that send_email accepts valid from_email override on MAILGUN_DOMAIN."""
+        mock_settings.ENV = "PROD"
+        mock_settings.TESTING_EMAIL = "test@leadr.gg"
+        mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
+
+        mock_provider = Mock()
+        mock_provider.send.return_value = {"id": "msg-custom"}
+
+        service = EmailService(provider=mock_provider, db=db_session)
+
+        await service.send_email(
+            to="user@example.com",
+            subject="Test",
+            body="Body",
+            from_email="support@mg.leadr.gg",  # Valid override on MAILGUN_DOMAIN
+        )
+
+        email_arg = mock_provider.send.call_args[0][0]
+        assert email_arg.from_email == "support@mg.leadr.gg"
+
+    @patch("leadr.infra.email.service.settings")
+    async def test_send_email_raises_error_for_invalid_domain_override(
+        self, mock_settings, db_session: AsyncSession
+    ):
+        """Test that send_email raises ValueError for from_email on wrong domain."""
+        mock_settings.ENV = "PROD"
+        mock_settings.TESTING_EMAIL = "test@leadr.gg"
+        mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
+
+        mock_provider = Mock()
+        mock_provider.send.return_value = {"id": "msg-invalid"}
+
+        service = EmailService(provider=mock_provider, db=db_session)
+
+        with pytest.raises(ValueError, match="from_email must be an address on mg.leadr.gg"):
+            await service.send_email(
+                to="user@example.com",
+                subject="Test",
+                body="Body",
+                from_email="custom@otherdomain.com",  # Invalid domain
+            )
 
     @patch("leadr.infra.email.service.settings")
     async def test_send_email_with_all_fields(self, mock_settings, db_session: AsyncSession):
@@ -175,6 +227,7 @@ class TestEmailServiceSendEmail:
         mock_settings.ENV = "PROD"
         mock_settings.TESTING_EMAIL = "test@leadr.gg"
         mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
 
         mock_provider = Mock()
         mock_provider.send.return_value = {"id": "msg-all"}
@@ -206,6 +259,7 @@ class TestEmailServiceSendEmail:
         mock_settings.ENV = "PROD"
         mock_settings.TESTING_EMAIL = "test@leadr.gg"
         mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
 
         mock_provider = Mock()
         mock_provider.send.return_value = {"message_id": "msg-success"}
@@ -232,6 +286,7 @@ class TestEmailServiceSendEmail:
         mock_settings.ENV = "PROD"
         mock_settings.TESTING_EMAIL = "test@leadr.gg"
         mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
 
         mock_provider = Mock()
         mock_provider.send.side_effect = EmailSendError("Send failed", {"error": "Invalid"})
@@ -257,6 +312,7 @@ class TestEmailServiceSendEmail:
         mock_settings.ENV = "PROD"
         mock_settings.TESTING_EMAIL = "test@leadr.gg"
         mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
 
         mock_provider = Mock()
         mock_provider.send.return_value = {"id": "msg-no-db"}
@@ -279,6 +335,7 @@ class TestEmailServiceConvenienceMethods:
         mock_settings.ENV = "TEST"
         mock_settings.TESTING_EMAIL = "test@leadr.gg"
         mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
 
         mock_provider = Mock()
         mock_provider.send.return_value = {"id": "msg-verification"}
@@ -314,6 +371,7 @@ class TestEmailServiceConvenienceMethods:
         mock_settings.ENV = "TEST"
         mock_settings.TESTING_EMAIL = "test@leadr.gg"
         mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
 
         mock_provider = Mock()
         mock_provider.send.return_value = {"id": "msg-welcome"}
@@ -346,6 +404,7 @@ class TestEmailServiceConvenienceMethods:
         mock_settings.ENV = "TEST"
         mock_settings.TESTING_EMAIL = "test@leadr.gg"
         mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
 
         mock_provider = Mock()
         mock_provider.send.return_value = {"id": "msg-notification"}
@@ -375,12 +434,25 @@ class TestEmailServiceConvenienceMethods:
 class TestEmailServiceUtilityMethods:
     """Test EmailService utility methods."""
 
-    def test_get_default_from_email(self):
-        """Test get_default_from_email method."""
+    @patch("leadr.infra.email.service.settings")
+    def test_get_default_from_email_returns_config_value(self, mock_settings):
+        """Test get_default_from_email returns settings.default_from_email."""
+        mock_settings.default_from_email = "support@mail.example.com"
+
         mock_provider = Mock()
         service = EmailService(provider=mock_provider)
 
-        assert service.get_default_from_email() == "noreply@leadr.gg"
+        assert service.get_default_from_email() == "support@mail.example.com"
+
+    @patch("leadr.infra.email.service.settings")
+    def test_get_default_from_email_uses_noreply_by_default(self, mock_settings):
+        """Test get_default_from_email uses noreply when FROM_EMAIL is default."""
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
+
+        mock_provider = Mock()
+        service = EmailService(provider=mock_provider)
+
+        assert service.get_default_from_email() == "noreply@mg.leadr.gg"
 
     def test_validate_provider_config(self):
         """Test validate_provider_config method."""

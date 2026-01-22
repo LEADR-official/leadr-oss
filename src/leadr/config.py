@@ -207,6 +207,16 @@ class CommonSettings(BaseSettings):
         default="example.mailgun.org",
         description="Mailgun domain for email sending",
     )
+    FROM_EMAIL: str = Field(
+        default="noreply",
+        description="Local part of sender email address (before @). "
+        "Combined with MAILGUN_DOMAIN to form full address (see `default_from_email`).",
+    )
+
+    @property
+    def default_from_email(self) -> str:
+        """Get the full default from email address ({FROM_EMAIL}@{MAILGUN_DOMAIN})."""
+        return f"{self.FROM_EMAIL}@{self.MAILGUN_DOMAIN}"
 
     # Registration Configuration
     VERIFICATION_CODE_EXPIRY_SECONDS: int = Field(

@@ -36,7 +36,7 @@ class SMTPEmailProvider(EmailProvider):
         try:
             # Create MIME message
             msg = MIMEMultipart()
-            msg["From"] = email.from_email or "noreply@leadr.gg"
+            msg["From"] = email.from_email or settings.default_from_email
             msg["To"] = email.to
             msg["Subject"] = email.subject
 
