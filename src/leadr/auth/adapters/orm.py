@@ -146,10 +146,6 @@ class DeviceORM(Base):
         back_populates="device",
         cascade="all, delete-orphan",
     )
-    nonces: Mapped[list["NonceORM"]] = relationship(
-        "NonceORM",
-        cascade="all, delete-orphan",
-    )
 
     # Indexes
     __table_args__ = (
@@ -341,6 +337,10 @@ class IdentityORM(Base):
         back_populates="identity",
         cascade="all, delete-orphan",
     )
+    nonces: Mapped[list["NonceORM"]] = relationship(
+        "NonceORM",
+        cascade="all, delete-orphan",
+    )
 
     # Indexes
     __table_args__ = (
@@ -494,15 +494,15 @@ class NonceORM(Base):
     """Nonce ORM model.
 
     Represents a single-use nonce for replay protection in the database.
-    Maps to the nonces table with foreign key to devices.
+    Maps to the nonces table with foreign key to identities.
     Nonces are short-lived tokens (typically 60 seconds) that must be
     obtained before making mutating requests.
     """
 
     __tablename__ = "nonces"
 
-    device_id: Mapped[UUID] = mapped_column(
-        ForeignKey("devices.id", ondelete="CASCADE"),
+    identity_id: Mapped[UUID] = mapped_column(
+        ForeignKey("identities.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -534,7 +534,7 @@ class NonceORM(Base):
     )
 
     # Relationships
-    device: Mapped["DeviceORM"] = relationship("DeviceORM", overlaps="nonces")
+    identity: Mapped["IdentityORM"] = relationship("IdentityORM", overlaps="nonces")
 
     @classmethod
     def from_domain(cls, nonce: Nonce) -> "NonceORM":
@@ -544,7 +544,7 @@ class NonceORM(Base):
             created_at=nonce.created_at,
             updated_at=nonce.updated_at,
             deleted_at=nonce.deleted_at,
-            device_id=nonce.device_id.uuid,
+            identity_id=nonce.identity_id.uuid,
             nonce_value=nonce.nonce_value,
             expires_at=nonce.expires_at,
             used_at=nonce.used_at,
@@ -562,7 +562,7 @@ class NonceORM(Base):
             created_at=self.created_at,
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
-            device_id=DeviceID(self.device_id),
+            identity_id=IdentityID(self.identity_id),
             nonce_value=self.nonce_value,
             expires_at=self.expires_at,
             used_at=self.used_at,

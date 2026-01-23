@@ -794,11 +794,14 @@ class TestScoreRoutes:
             name="Test Game",
         )
 
-        device_service = DeviceService(db_session)
-        device, access_token, _, nonce_value = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+        # Start session via HTTP API
+        fingerprint = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+        session_response = await client.post(
+            "/client/sessions",
+            json={"game_id": str(game.id), "client_fingerprint": fingerprint},
         )
+        assert session_response.status_code == 201
+        access_token = session_response.json()["access_token"]
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(
@@ -921,11 +924,19 @@ class TestScoreRoutes:
             name="Test Game",
         )
 
-        device_service = DeviceService(db_session)
-        device, access_token, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+        # Start session via HTTP API
+        fingerprint = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+        session_response = await client.post(
+            "/client/sessions",
+            json={"game_id": str(game.id), "client_fingerprint": fingerprint},
         )
+        assert session_response.status_code == 201
+        access_token = session_response.json()["access_token"]
+
+        # Get device for score creation
+        device_service = DeviceService(db_session)
+        device = await device_service.repository.get_by_game_and_fingerprint(game.id, fingerprint)
+        assert device is not None
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(
@@ -1096,16 +1107,29 @@ class TestScoreRoutes:
             name="Test Game",
         )
 
+        # Create two sessions for two devices via HTTP API
+        fingerprint1 = "aaa93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfa0"
+        fingerprint2 = "bbb93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
+
+        session1_response = await client.post(
+            "/client/sessions",
+            json={"game_id": str(game.id), "client_fingerprint": fingerprint1},
+        )
+        assert session1_response.status_code == 201
+        access_token1 = session1_response.json()["access_token"]
+
+        session2_response = await client.post(
+            "/client/sessions",
+            json={"game_id": str(game.id), "client_fingerprint": fingerprint2},
+        )
+        assert session2_response.status_code == 201
+
+        # Get devices for score creation
         device_service = DeviceService(db_session)
-        # Create two devices for the same game
-        device1, access_token1, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="aaa93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfa0",
-        )
-        device2, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="bbb93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
-        )
+        device1 = await device_service.repository.get_by_game_and_fingerprint(game.id, fingerprint1)
+        device2 = await device_service.repository.get_by_game_and_fingerprint(game.id, fingerprint2)
+        assert device1 is not None
+        assert device2 is not None
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(
@@ -1167,16 +1191,28 @@ class TestScoreRoutes:
             name="Test Game",
         )
 
+        # Create two sessions for two devices via HTTP API
+        fingerprint1 = "ccc93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfc0"
+        fingerprint2 = "ddd93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfd0"
+
+        session1_response = await client.post(
+            "/client/sessions",
+            json={"game_id": str(game.id), "client_fingerprint": fingerprint1},
+        )
+        assert session1_response.status_code == 201
+        access_token1 = session1_response.json()["access_token"]
+
+        await client.post(
+            "/client/sessions",
+            json={"game_id": str(game.id), "client_fingerprint": fingerprint2},
+        )
+
+        # Get devices for score creation
         device_service = DeviceService(db_session)
-        # Create two devices for the same game
-        device1, access_token1, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="ccc93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfc0",
-        )
-        device2, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="ddd93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfd0",
-        )
+        device1 = await device_service.repository.get_by_game_and_fingerprint(game.id, fingerprint1)
+        device2 = await device_service.repository.get_by_game_and_fingerprint(game.id, fingerprint2)
+        assert device1 is not None
+        assert device2 is not None
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(

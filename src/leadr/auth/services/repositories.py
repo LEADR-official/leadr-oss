@@ -443,16 +443,16 @@ class NonceRepository(BaseRepository[Nonce, NonceORM]):
     async def filter(  # type: ignore[override] - intentionally unpaginated (nonces are short-lived)
         self,
         account_id: AccountID | None = None,
-        device_id: DeviceID | None = None,
+        identity_id: IdentityID | None = None,
         **kwargs: Any,
     ) -> list[Nonce]:
         """Filter nonces by account and optional criteria.
 
-        Note: account_id is used for multi-tenant safety via JOIN with devices table.
+        Note: account_id is used for multi-tenant safety via JOIN with identities table.
 
         Args:
             account_id: REQUIRED - Account ID to filter by (multi-tenant safety)
-            device_id: Optional device ID to filter by
+            identity_id: Optional identity ID to filter by
 
         Returns:
             List of nonces matching the filter criteria
@@ -463,19 +463,19 @@ class NonceRepository(BaseRepository[Nonce, NonceORM]):
         if account_id is None:
             raise ValueError("account_id is required for filtering nonces")
         account_uuid = self._extract_uuid(account_id)
-        # Join with devices table to filter by account_id
+        # Join with identities table to filter by account_id
         query = (
             select(NonceORM)
-            .join(DeviceORM, NonceORM.device_id == DeviceORM.id)
+            .join(IdentityORM, NonceORM.identity_id == IdentityORM.id)
             .where(
-                DeviceORM.account_id == account_uuid,
+                IdentityORM.account_id == account_uuid,
                 NonceORM.deleted_at.is_(None),
             )
         )
 
-        if device_id is not None:
-            device_uuid = self._extract_uuid(device_id)
-            query = query.where(NonceORM.device_id == device_uuid)
+        if identity_id is not None:
+            identity_uuid = self._extract_uuid(identity_id)
+            query = query.where(NonceORM.identity_id == identity_uuid)
 
         result = await self.session.execute(query)
         orms = result.scalars().all()

@@ -10,14 +10,14 @@ from fastapi import Depends, Header, HTTPException, Query, Request
 from leadr.accounts.domain.user import User
 from leadr.accounts.services.dependencies import UserServiceDep
 from leadr.auth.domain.api_key import APIKey
-from leadr.auth.domain.device import Device
+from leadr.auth.domain.identity import Identity
 from leadr.auth.services.dependencies import (
     APIKeyServiceDep,
-    DeviceServiceDep,
+    IdentityServiceDep,
     NonceServiceDep,
 )
 from leadr.auth.services.device_token_crypto import validate_access_token
-from leadr.common.domain.ids import AccountID
+from leadr.common.domain.ids import AccountID, GameID
 from leadr.config import settings
 
 logger = logging.getLogger(__name__)
@@ -28,34 +28,34 @@ class AuthContext:
     """Unified authentication context for both admin and client auth.
 
     This context provides a unified interface for both API key (admin) and
-    device token (client) authentication. It includes helper methods for
+    identity token (client) authentication. It includes helper methods for
     authorization checks that work transparently across both auth types.
 
     Attributes:
         account_id: The account ID associated with this auth context.
         user: The user entity (present for admin auth only).
         api_key: The API key entity (present for admin auth only).
-        device: The device entity (present for client auth only).
+        identity: The identity entity (present for client auth only).
     """
 
     account_id: AccountID
     user: User | None = None
     api_key: APIKey | None = None
-    device: Device | None = None
+    identity: Identity | None = None
 
     @property
     def auth_type(self) -> Literal["admin", "client"]:
         """Return the authentication type.
 
         Returns:
-            "admin" if authenticated via API key, "client" if via device token.
+            "admin" if authenticated via API key, "client" if via identity token.
         """
         if self.api_key is not None:
             return "admin"
-        elif self.device is not None:
+        elif self.identity is not None:
             return "client"
         else:
-            raise ValueError("Neither api_key nor device set for AuthContext")
+            raise ValueError("Neither api_key nor identity set for AuthContext")
 
     @property
     def is_superadmin(self) -> bool:
@@ -76,7 +76,7 @@ class AuthContext:
             - Regular users only have access to their own account
 
         For client auth:
-            - Devices only have access to their game's account
+            - Identities only have access to their game's account
 
         Args:
             account_id: The account ID to check access for.
@@ -104,7 +104,7 @@ class AdminAuthContext(AuthContext):
             account for superadmins).
         user: The authenticated user (guaranteed non-None).
         api_key: The authenticated API key (guaranteed non-None).
-        device: Always None for admin auth.
+        identity: Always None for admin auth.
     """
 
     def __init__(
@@ -112,14 +112,14 @@ class AdminAuthContext(AuthContext):
         account_id: AccountID,
         user: User,
         api_key: APIKey,
-        device: None = None,
+        identity: None = None,
     ):
         """Create admin auth context with guaranteed non-None user and api_key."""
         # Use private attributes to avoid property override conflicts
         object.__setattr__(self, "_account_id", account_id)
         object.__setattr__(self, "_user", user)
         object.__setattr__(self, "_api_key", api_key)
-        object.__setattr__(self, "_device", device)
+        object.__setattr__(self, "_identity", identity)
 
     @property  # type: ignore[override]
     def account_id(self) -> AccountID:  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -137,23 +137,23 @@ class AdminAuthContext(AuthContext):
         return self._api_key  # type: ignore[attr-defined]
 
     @property  # type: ignore[override]
-    def device(self) -> None:  # pyright: ignore[reportIncompatibleVariableOverride]
-        """Get device (always None for admin auth)."""
-        return self._device  # type: ignore[attr-defined]
+    def identity(self) -> None:  # pyright: ignore[reportIncompatibleVariableOverride]
+        """Get identity (always None for admin auth)."""
+        return self._identity  # type: ignore[attr-defined]
 
 
 class ClientAuthContext(AuthContext):
-    """Client authentication context with guaranteed device field.
+    """Client authentication context with guaranteed identity field.
 
     This subclass is returned by client-only authentication dependencies,
-    providing type-safe access to device without None checks.
+    providing type-safe access to identity without None checks.
 
     Note: This class does not use @dataclass to avoid conflicts between
     frozen dataclass fields and property overrides.
 
     Attributes:
-        account_id: The account ID from the device's game.
-        device: The authenticated device (guaranteed non-None).
+        account_id: The account ID from the identity's game.
+        identity: The player identity (guaranteed non-None).
         user: Always None for client auth.
         api_key: Always None for client auth.
         test_mode: Whether this session is in test mode.
@@ -162,17 +162,17 @@ class ClientAuthContext(AuthContext):
     def __init__(
         self,
         account_id: AccountID,
-        device: Device,
+        identity: Identity,
         user: None = None,
         api_key: None = None,
         test_mode: bool = False,
     ):
-        """Create client auth context with guaranteed non-None device."""
+        """Create client auth context with guaranteed non-None identity."""
         # Use private attributes to avoid property override conflicts
         object.__setattr__(self, "_account_id", account_id)
         object.__setattr__(self, "_user", user)
         object.__setattr__(self, "_api_key", api_key)
-        object.__setattr__(self, "_device", device)
+        object.__setattr__(self, "_identity", identity)
         object.__setattr__(self, "_test_mode", test_mode)
 
     @property  # type: ignore[override]
@@ -191,9 +191,14 @@ class ClientAuthContext(AuthContext):
         return self._api_key  # type: ignore[attr-defined]
 
     @property  # type: ignore[override]
-    def device(self) -> Device:  # pyright: ignore[reportIncompatibleVariableOverride]
-        """Get device (guaranteed non-None for client auth)."""
-        return self._device  # type: ignore[attr-defined]
+    def identity(self) -> Identity:  # pyright: ignore[reportIncompatibleVariableOverride]
+        """Get identity (guaranteed non-None for client auth)."""
+        return self._identity  # type: ignore[attr-defined]
+
+    @property
+    def game_id(self) -> GameID:
+        """Get game ID from identity (convenience property)."""
+        return self._identity.game_id  # type: ignore[attr-defined]
 
     @property
     def test_mode(self) -> bool:
@@ -260,7 +265,7 @@ class AuthContextDependency:
         request: Request,
         api_key_service: APIKeyServiceDep,
         user_service: UserServiceDep,
-        device_service: DeviceServiceDep,
+        identity_service: IdentityServiceDep,
         nonce_service: NonceServiceDep,
         query_account_id: Annotated[AccountID | None, Query(alias="account_id")] = None,
         api_key: Annotated[str | None, Header(alias="leadr-api-key")] = None,
@@ -277,7 +282,7 @@ class AuthContextDependency:
             request: The FastAPI request object.
             api_key_service: API key service dependency.
             user_service: User service dependency.
-            device_service: Device service dependency.
+            identity_service: Identity service dependency.
             nonce_service: Nonce service dependency.
             query_account_id: Optional account_id from query parameters.
             api_key: The API key from 'leadr-api-key' header.
@@ -366,7 +371,7 @@ class AuthContextDependency:
                 )
             return await self._validate_client_auth(
                 authorization=authorization,
-                device_service=device_service,
+                identity_service=identity_service,
                 nonce_service=nonce_service,
                 leadr_client_nonce=leadr_client_nonce,
             )
@@ -419,28 +424,29 @@ class AuthContextDependency:
             account_id=validated_key.account_id,
             user=user,
             api_key=validated_key,
-            device=None,
+            identity=None,
         )
 
     async def _validate_client_auth(
         self,
         authorization: str,
-        device_service: DeviceServiceDep,
+        identity_service: IdentityServiceDep,
         nonce_service: NonceServiceDep,
         leadr_client_nonce: str | None,
     ) -> ClientAuthContext:
-        """Validate client device token authentication.
+        """Validate client identity token authentication.
 
-        Validates the bearer token and optionally validates nonce for mutations.
+        Validates the bearer token, resolves the identity, and optionally validates
+        nonce for mutations.
 
         Args:
             authorization: The Authorization header value.
-            device_service: Device service for token validation.
+            identity_service: Identity service for token validation.
             nonce_service: Nonce service for nonce validation.
             leadr_client_nonce: The nonce header value (required if require_nonce=True).
 
         Returns:
-            ClientAuthContext with guaranteed device field.
+            ClientAuthContext with guaranteed identity field.
 
         Raises:
             HTTPException: 401 if token is invalid or malformed.
@@ -459,16 +465,16 @@ class AuthContextDependency:
 
         token = parts[1]
 
-        # Validate device token
-        validated_device = await device_service.validate_device_token(token)
+        # Validate identity token via IdentityService
+        identity = await identity_service.validate_identity_token(token)
 
-        if validated_device is None:
+        if identity is None:
             raise HTTPException(
                 status_code=401,
-                detail="Invalid or expired device token",
+                detail="Invalid or expired token",
             )
 
-        # Extract test_mode from token claims (default False for backwards compatibility)
+        # Extract test_mode from JWT claims
         claims = validate_access_token(token, settings.JWT_SECRET)
         test_mode = claims.get("test_mode", False) if claims else False
 
@@ -483,7 +489,7 @@ class AuthContextDependency:
             try:
                 await nonce_service.validate_and_consume_nonce(
                     nonce_value=leadr_client_nonce,
-                    device_id=validated_device.id,
+                    identity_id=identity.id,
                 )
             except ValueError as e:
                 error_msg = str(e).lower()
@@ -491,7 +497,7 @@ class AuthContextDependency:
                 if "not found" in error_msg:
                     detail = "Invalid nonce"
                 elif "does not belong" in error_msg:
-                    detail = "Nonce does not belong to this device"
+                    detail = "Nonce does not belong to this identity"
                 elif "already used" in error_msg:
                     detail = "Nonce already used"
                 elif "expired" in error_msg:
@@ -505,10 +511,8 @@ class AuthContextDependency:
                 ) from None
 
         return ClientAuthContext(
-            account_id=validated_device.account_id,
-            user=None,
-            api_key=None,
-            device=validated_device,
+            account_id=identity.account_id,
+            identity=identity,
             test_mode=test_mode,
         )
 

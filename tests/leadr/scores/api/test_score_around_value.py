@@ -586,11 +586,19 @@ class TestScoreAroundValueClientEndpoint:
             name="Test Game",
         )
 
-        device_service = DeviceService(db_session)
-        device, access_token, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9",
+        # Start session via HTTP API (creates both device and identity)
+        fingerprint = "b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9"
+        session_response = await client.post(
+            "/client/sessions",
+            json={"game_id": str(game.id), "client_fingerprint": fingerprint},
         )
+        assert session_response.status_code == 201
+        access_token = session_response.json()["access_token"]
+
+        # Get device for score creation
+        device_service = DeviceService(db_session)
+        device = await device_service.repository.get_by_game_and_fingerprint(game.id, fingerprint)
+        assert device is not None
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(
@@ -653,11 +661,14 @@ class TestScoreAroundValueClientEndpoint:
             name="Test Game",
         )
 
-        device_service = DeviceService(db_session)
-        _, access_token, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0",
+        # Start session via HTTP API
+        fingerprint = "c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0"
+        session_response = await client.post(
+            "/client/sessions",
+            json={"game_id": str(game.id), "client_fingerprint": fingerprint},
         )
+        assert session_response.status_code == 201
+        access_token = session_response.json()["access_token"]
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(

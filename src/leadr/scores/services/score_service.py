@@ -1,5 +1,6 @@
 """Score service for managing score operations."""
 
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import BackgroundTasks
@@ -17,10 +18,15 @@ from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, Identi
 from leadr.common.domain.pagination import SortDirection, SortField
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
-from leadr.scores.domain.anti_cheat.enums import ScoreStatus, TrustTier
-from leadr.scores.domain.anti_cheat.models import AntiCheatResult
+from leadr.scores.domain.anti_cheat.enums import FlagAction, ScoreStatus, TrustTier
+from leadr.scores.domain.anti_cheat.models import AntiCheatResult, ScoreFlag, ScoreSubmissionMeta
 from leadr.scores.domain.score import Score
 from leadr.scores.domain.score_event import ScoreEvent
+from leadr.scores.services.anti_cheat_repositories import (
+    ScoreFlagRepository,
+    ScoreSubmissionMetaRepository,
+)
+from leadr.scores.services.anti_cheat_service import AntiCheatService
 from leadr.scores.services.repositories import ScoreRepository
 from leadr.scores.services.score_event_service import ScoreEventService
 
@@ -305,11 +311,13 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         country: str | None = None,
         city: str | None = None,
         is_test: bool = False,
+        trust_tier: TrustTier = TrustTier.B,
     ) -> tuple[ScoreEvent, BoardState | RunEntry | None, AntiCheatResult | None]:
         """Submit a score using the new event-sourcing architecture.
 
-        This method creates a ScoreEvent and then updates the appropriate
-        materialized view (BoardState or RunEntry) based on the board type.
+        This method creates a ScoreEvent, runs anti-cheat checks, and then
+        updates the appropriate materialized view (BoardState or RunEntry)
+        based on the board type and anti-cheat result.
 
         Args:
             board_id: The board to submit to.
@@ -321,11 +329,13 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             country: Optional country code from GeoIP.
             city: Optional city name from GeoIP.
             is_test: Whether this is a test submission.
+            trust_tier: Trust tier for anti-cheat thresholds (defaults to B).
 
         Returns:
             Tuple of (ScoreEvent, ranking_entry, anti_cheat_result).
             ranking_entry is BoardState for RUN_IDENTITY/COUNTER boards,
-            RunEntry for RUN_RUNS boards, or None if no ranking update.
+            RunEntry for RUN_RUNS boards, or None if no ranking update
+            (e.g., if anti-cheat REJECTs).
 
         Raises:
             ValueError: If validation fails (missing required fields, invalid board type).
@@ -341,7 +351,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
         # Build event payload
         event_payload = self._build_event_payload(board, value, delta)
 
-        # Create score event (always, regardless of board type)
+        # Create score event (always, regardless of anti-cheat result - immutable audit log)
         event_service = ScoreEventService(self.repository.session)
         event = await event_service.create_score_event(
             account_id=board.account_id,
@@ -355,10 +365,32 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             city=city,
         )
 
-        # TODO: Anti-cheat integration will be added in Phase 8
-        anti_cheat_result: AntiCheatResult | None = None
+        # Run anti-cheat checks
+        anti_cheat_service = AntiCheatService(self.repository.session)
+        anti_cheat_result = await anti_cheat_service.check_submission_for_event(
+            score_event=event,
+            trust_tier=trust_tier,
+            identity_id=identity_id,
+            board_id=board_id,
+        )
 
-        # Handle based on board type
+        # Update submission metadata for future anti-cheat checks
+        await self._update_submission_metadata(
+            event=event,
+            identity_id=identity_id,
+            board_id=board_id,
+            value=value,
+        )
+
+        # Create flag if anti-cheat FLAGs the submission
+        if anti_cheat_result.action == FlagAction.FLAG:
+            await self._create_score_flag(event=event, result=anti_cheat_result)
+
+        # Skip ranking update if anti-cheat REJECTs the submission
+        if anti_cheat_result.action == FlagAction.REJECT:
+            return event, None, anti_cheat_result
+
+        # Handle based on board type (ACCEPT or FLAG both update rankings)
         ranking_entry: BoardState | RunEntry | None = None
         if board.board_type == BoardType.RUN_IDENTITY:
             ranking_entry = await self._handle_run_identity(
@@ -621,6 +653,72 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             primary_value=new_value,
             aux=aux,
         )
+
+    async def _update_submission_metadata(
+        self,
+        event: ScoreEvent,
+        identity_id: IdentityID,
+        board_id: BoardID,
+        value: float | None,
+    ) -> None:
+        """Update submission metadata for future anti-cheat checks.
+
+        Creates or updates the ScoreSubmissionMeta record for this identity/board
+        combination to track submission patterns.
+
+        Args:
+            event: The created ScoreEvent.
+            identity_id: The identity submitting.
+            board_id: The board being submitted to.
+            value: The score value (for duplicate detection).
+        """
+        meta_repo = ScoreSubmissionMetaRepository(self.repository.session)
+        existing_meta = await meta_repo.get_by_identity_and_board(identity_id, board_id)
+
+        now = datetime.now(UTC)
+
+        if existing_meta is None:
+            # First submission - create new metadata
+            meta = ScoreSubmissionMeta(
+                score_event_id=event.id,
+                identity_id=identity_id,
+                board_id=board_id,
+                submission_count=1,
+                last_submission_at=now,
+                last_score_value=value,
+            )
+            await meta_repo.create(meta)
+        else:
+            # Update existing metadata
+            existing_meta.score_event_id = event.id
+            existing_meta.submission_count += 1
+            existing_meta.last_submission_at = now
+            existing_meta.last_score_value = value
+            await meta_repo.update(existing_meta)
+
+    async def _create_score_flag(
+        self,
+        event: ScoreEvent,
+        result: AntiCheatResult,
+    ) -> ScoreFlag:
+        """Create a score flag for admin review.
+
+        Args:
+            event: The flagged ScoreEvent.
+            result: The anti-cheat result with flag details.
+
+        Returns:
+            The created ScoreFlag.
+        """
+        flag_repo = ScoreFlagRepository(self.repository.session)
+
+        flag = ScoreFlag(
+            score_event_id=event.id,
+            flag_type=result.flag_type,  # type: ignore[arg-type]
+            confidence=result.confidence,  # type: ignore[arg-type]
+            metadata=result.metadata or {},
+        )
+        return await flag_repo.create(flag)
 
     async def get_score(self, score_id: ScoreID) -> Score | None:
         """Get a score by its ID.

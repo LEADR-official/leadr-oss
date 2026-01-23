@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.auth.domain.nonce import Nonce, NonceStatus
 from leadr.auth.services.repositories import NonceRepository
-from leadr.common.domain.ids import DeviceID
+from leadr.common.domain.ids import IdentityID
 from leadr.common.services import BaseService
 
 
@@ -29,27 +29,27 @@ class NonceService(BaseService[Nonce, NonceRepository]):
 
     async def generate_nonce(
         self,
-        device_id: DeviceID,
+        identity_id: IdentityID,
         ttl_seconds: int = 60,
     ) -> tuple[str, datetime]:
-        """Generate a fresh nonce for a device.
+        """Generate a fresh nonce for an identity.
 
         Args:
-            device_id: Device ID to associate nonce with
+            identity_id: Identity ID to associate nonce with
             ttl_seconds: Time-to-live in seconds (default 60)
 
         Returns:
             tuple[str, datetime]: (nonce_value, expires_at)
 
         Example:
-            >>> nonce_value, expires_at = await service.generate_nonce(device_id)
+            >>> nonce_value, expires_at = await service.generate_nonce(identity_id)
             >>> # Client includes nonce_value in leadr-client-nonce header
         """
         nonce_value = str(uuid4())
         expires_at = datetime.now(UTC) + timedelta(seconds=ttl_seconds)
 
         nonce = Nonce(
-            device_id=device_id,
+            identity_id=identity_id,
             nonce_value=nonce_value,
             expires_at=expires_at,
             status=NonceStatus.PENDING,
@@ -62,23 +62,23 @@ class NonceService(BaseService[Nonce, NonceRepository]):
     async def validate_and_consume_nonce(
         self,
         nonce_value: str,
-        device_id: DeviceID,
+        identity_id: IdentityID,
     ) -> bool:
         """Validate nonce and mark as used (atomic operation).
 
         Args:
             nonce_value: The nonce value to validate
-            device_id: Expected device ID (must match nonce owner)
+            identity_id: Expected identity ID (must match nonce owner)
 
         Returns:
             True if nonce was valid and consumed
 
         Raises:
-            ValueError: If nonce is invalid (expired, already used, wrong device, or not found)
+            ValueError: If nonce is invalid (expired, already used, wrong identity, or not found)
 
         Example:
             >>> try:
-            ...     await service.validate_and_consume_nonce(nonce_value, device.id)
+            ...     await service.validate_and_consume_nonce(nonce_value, identity.id)
             ... except ValueError as e:
             ...     # Handle invalid nonce (return 412 error to client)
             ...     raise HTTPException(status_code=412, detail=str(e))
@@ -88,8 +88,8 @@ class NonceService(BaseService[Nonce, NonceRepository]):
         if nonce is None:
             raise ValueError("Nonce not found")
 
-        if nonce.device_id != device_id:
-            raise ValueError("Nonce does not belong to this device")
+        if nonce.identity_id != identity_id:
+            raise ValueError("Nonce does not belong to this identity")
 
         if nonce.is_used():
             raise ValueError("Nonce already used")

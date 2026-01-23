@@ -45,6 +45,63 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         """Get entity name for error messages."""
         return "Device"
 
+    async def get_or_create_device(
+        self,
+        game_id: GameID,
+        client_fingerprint: str,
+        platform: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Device:
+        """Get or create a device record.
+
+        This is used as an internal lookup table to map fingerprints to games/accounts.
+        Does NOT create sessions - use IdentityService.start_session() for that.
+
+        Args:
+            game_id: Game UUID
+            client_fingerprint: Client-generated SHA256 device fingerprint
+            platform: Device platform (ios, android, etc.)
+            metadata: Additional device metadata
+
+        Returns:
+            Device: The device record (new or existing)
+
+        Raises:
+            EntityNotFoundError: If game doesn't exist
+        """
+        # Verify game exists and get account_id
+        game_uuid = game_id.uuid if hasattr(game_id, "uuid") else game_id
+        game_orm = await self.session.get(GameORM, game_uuid)
+        if not game_orm:
+            raise EntityNotFoundError("Game", str(game_id))
+
+        account_id = AccountID(game_orm.account_id)
+
+        # Get or create device
+        device = await self.repository.get_by_game_and_fingerprint(game_id, client_fingerprint)
+
+        if device:
+            # Update existing device
+            device.update_last_seen()
+            if platform and not device.platform:
+                device.platform = platform
+            device = await self.repository.update(device)
+        else:
+            # Create new device
+            now = datetime.now(UTC)
+            device = Device(
+                game_id=game_id,
+                client_fingerprint=client_fingerprint,
+                account_id=account_id,
+                platform=platform,
+                first_seen_at=now,
+                last_seen_at=now,
+                metadata=metadata or {},
+            )
+            device = await self.repository.create(device)
+
+        return device
+
     async def start_session(
         self,
         game_id: GameID,
@@ -56,6 +113,10 @@ class DeviceService(BaseService[Device, DeviceRepository]):
         test_mode: bool = False,
     ) -> tuple[Device, str, str, int]:
         """Start a new device session.
+
+        DEPRECATED: Use IdentityService.start_session() instead.
+        This method creates DeviceSession records which are being phased out
+        in favor of IdentitySession.
 
         Creates or updates device, generates JWT access and refresh tokens,
         and creates session record. This is idempotent - calling multiple times

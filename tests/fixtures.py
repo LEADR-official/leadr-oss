@@ -272,11 +272,11 @@ async def api_key_orm(
 
 
 @pytest_asyncio.fixture
-async def nonce_orm(db_session: AsyncSession, device_orm: DeviceORM) -> NonceORM:
-    """Create and persist a test NonceORM linked to device.
+async def nonce_orm(db_session: AsyncSession, identity_orm: IdentityORM) -> NonceORM:
+    """Create and persist a test NonceORM linked to identity.
 
     Args:
-        device_orm: Parent device (auto-injected fixture).
+        identity_orm: Parent identity (auto-injected fixture).
 
     Returns:
         NonceORM instance with auto-generated id.
@@ -286,7 +286,7 @@ async def nonce_orm(db_session: AsyncSession, device_orm: DeviceORM) -> NonceORM
 
     now = datetime.now(UTC)
     nonce = NonceORM(
-        device_id=device_orm.id,  # Raw UUID
+        identity_id=identity_orm.id,  # Raw UUID
         nonce_value=str(uuid4()),
         status=NonceStatusEnum.PENDING,
         expires_at=now + timedelta(seconds=60),

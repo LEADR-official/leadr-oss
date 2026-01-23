@@ -1,6 +1,6 @@
-"""API routes for client device authentication."""
+"""API routes for client authentication using Identity."""
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 
 from leadr.auth.api.client_schemas import (
     NonceResponse,
@@ -10,11 +10,25 @@ from leadr.auth.api.client_schemas import (
     StartSessionResponse,
 )
 from leadr.auth.dependencies import ClientAuthContextDep
-from leadr.auth.services.dependencies import DeviceServiceDep, NonceServiceDep
+from leadr.auth.domain.identity import IdentityKind
+from leadr.auth.services.dependencies import DeviceServiceDep, IdentityServiceDep, NonceServiceDep
 from leadr.common.domain.exceptions import EntityNotFoundError
 
 public_router = APIRouter(prefix="/client")
 protected_router = APIRouter()
+
+
+def _get_client_ip(request: Request) -> str | None:
+    """Extract client IP from request headers."""
+    # Check common headers for real IP when behind proxy
+    for header in ["x-real-ip", "x-forwarded-for", "cf-connecting-ip"]:
+        if value := request.headers.get(header):
+            # x-forwarded-for can be comma-separated, take first
+            return value.split(",")[0].strip()
+    # Fall back to direct client
+    if request.client:
+        return request.client.host
+    return None
 
 
 @public_router.post(
@@ -23,35 +37,55 @@ protected_router = APIRouter()
     status_code=status.HTTP_201_CREATED,
 )
 async def start_session(
-    request: StartSessionRequest,
-    service: DeviceServiceDep,
+    request: Request,
+    session_request: StartSessionRequest,
+    device_service: DeviceServiceDep,
+    identity_service: IdentityServiceDep,
 ) -> StartSessionResponse:
-    """Start a new device session for a game client.
+    """Start a new identity session for a game client.
 
     This endpoint authenticates game clients and provides JWT access tokens.
-    It is idempotent - calling multiple times for the same device updates last_seen_at
-    and generates a new access token.
+    It is idempotent - calling multiple times for the same fingerprint updates
+    the device record and creates a new identity session.
 
     No authentication is required to call this endpoint (it IS the authentication).
 
     Args:
-        request: Session start request with game_id and device_id
-        service: DeviceService dependency
+        request: FastAPI request object
+        session_request: Session start request with game_id and fingerprint
+        device_service: DeviceService dependency (for device lookup)
+        identity_service: IdentityService dependency (for session creation)
 
     Returns:
-        StartSessionResponse with device info and access token
+        StartSessionResponse with identity info and access tokens
 
     Raises:
         404: Game not found
         422: Invalid request (missing required fields, invalid UUID format)
     """
     try:
-        device, access_token, refresh_token, expires_in = await service.start_session(
-            game_id=request.game_id,
-            client_fingerprint=request.client_fingerprint,
-            platform=request.platform,
-            metadata=request.metadata,
-            test_mode=request.test_mode,
+        # 1. Get or create device (internal lookup only)
+        device = await device_service.get_or_create_device(
+            game_id=session_request.game_id,
+            client_fingerprint=session_request.client_fingerprint,
+            platform=session_request.platform,
+            metadata=session_request.metadata,
+        )
+
+        # 2. Get or create identity from device
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=device.account_id,
+            game_id=device.game_id,
+            kind=IdentityKind.DEVICE,
+            external_key=device.client_fingerprint,
+        )
+
+        # 3. Start identity session (creates tokens with identity_id)
+        access_token, refresh_token, expires_in = await identity_service.start_session(
+            identity=identity,
+            ip_address=_get_client_ip(request),
+            user_agent=request.headers.get("user-agent"),
+            test_mode=session_request.test_mode,
         )
     except EntityNotFoundError as e:
         raise HTTPException(
@@ -60,18 +94,18 @@ async def start_session(
         ) from None
 
     return StartSessionResponse.from_domain(
-        device, access_token, refresh_token, expires_in, test_mode=request.test_mode
+        identity, access_token, refresh_token, expires_in, test_mode=session_request.test_mode
     )
 
 
-@protected_router.post(
+@public_router.post(
     "/sessions/refresh",
     response_model=RefreshTokenResponse,
     status_code=status.HTTP_200_OK,
 )
 async def refresh_session(
     request: RefreshTokenRequest,
-    service: DeviceServiceDep,
+    identity_service: IdentityServiceDep,
 ) -> RefreshTokenResponse:
     """Refresh an expired access token using a valid refresh token.
 
@@ -84,7 +118,7 @@ async def refresh_session(
 
     Args:
         request: Refresh token request
-        service: DeviceService dependency
+        identity_service: IdentityService dependency
 
     Returns:
         RefreshTokenResponse with new tokens
@@ -93,7 +127,7 @@ async def refresh_session(
         401: Invalid or expired refresh token
         422: Invalid request (missing refresh_token)
     """
-    result = await service.refresh_access_token(request.refresh_token)
+    result = await identity_service.refresh_access_token(request.refresh_token)
 
     if result is None:
         raise HTTPException(
@@ -125,17 +159,17 @@ async def generate_nonce(
     obtain before making mutating requests (POST, PATCH, DELETE). This prevents
     replay attacks by ensuring each request is fresh and authorized.
 
-    Requires device authentication via access token.
+    Requires identity authentication via access token.
 
     Args:
-        auth: Authenticated client auth context (device guaranteed non-None)
+        auth: Authenticated client auth context (identity guaranteed non-None)
         service: NonceService dependency
 
     Returns:
         NonceResponse with nonce_value and expires_at
 
     Raises:
-        401: Invalid or missing device token
+        401: Invalid or missing access token
 
     Example:
         1. Client calls GET /client/nonce with Authorization header
@@ -143,8 +177,8 @@ async def generate_nonce(
         3. Client includes nonce in leadr-client-nonce header for mutations
         4. Server validates and consumes nonce (single-use)
     """
-    # Access device from auth context (guaranteed non-None by ClientAuthContext)
-    nonce_value, expires_at = await service.generate_nonce(device_id=auth.device.id)
+    # Access identity from auth context (guaranteed non-None by ClientAuthContext)
+    nonce_value, expires_at = await service.generate_nonce(identity_id=auth.identity.id)
 
     return NonceResponse(
         nonce_value=nonce_value,

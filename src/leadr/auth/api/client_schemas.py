@@ -5,8 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from leadr.auth.domain.device import Device, DeviceStatus
-from leadr.common.domain.ids import AccountID, DeviceID, GameID
+from leadr.auth.domain.identity import Identity, IdentityKind
+from leadr.common.domain.ids import AccountID, GameID, IdentityID
 
 
 class StartSessionRequest(BaseModel):
@@ -32,33 +32,27 @@ class StartSessionRequest(BaseModel):
 
 
 class StartSessionResponse(BaseModel):
-    """Response schema for starting a device session.
+    """Response schema for starting an identity session.
 
     Includes both access and refresh tokens which must be saved by the client.
     - Access token: Short-lived, used for API requests in Authorization header
     - Refresh token: Long-lived, used to obtain new access tokens when expired
     """
 
-    id: DeviceID = Field(description="Unique identifier for the device")
+    identity_id: IdentityID = Field(description="Unique identifier for the player identity")
     game_id: GameID = Field(description="ID of the game")
-    client_fingerprint: str = Field(
-        description="Client-generated SHA256 device fingerprint (64 hex characters)"
-    )
     account_id: AccountID = Field(description="ID of the account that owns the game")
-    platform: str | None = Field(default=None, description="Device platform")
-    status: DeviceStatus = Field(description="Device status (active, suspended, banned)")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Device metadata")
+    kind: IdentityKind = Field(description="Identity type (DEVICE, STEAM, CUSTOM)")
+    display_name: str | None = Field(default=None, description="Player display name")
     access_token: str = Field(description="JWT access token for authenticating API requests")
     refresh_token: str = Field(description="JWT refresh token for obtaining new access tokens")
     expires_in: int = Field(description="Access token expiration time in seconds")
-    first_seen_at: datetime = Field(description="Timestamp when device was first seen (UTC)")
-    last_seen_at: datetime = Field(description="Timestamp when device was last seen (UTC)")
     test_mode: bool = Field(description="Whether session is in test mode")
 
     @classmethod
     def from_domain(
         cls,
-        device: Device,
+        identity: Identity,
         access_token: str,
         refresh_token: str,
         expires_in: int,
@@ -67,7 +61,7 @@ class StartSessionResponse(BaseModel):
         """Convert domain entity to response model with tokens.
 
         Args:
-            device: The domain Device entity
+            identity: The domain Identity entity
             access_token: The plain JWT access token
             refresh_token: The plain JWT refresh token
             expires_in: Access token expiration time in seconds
@@ -77,18 +71,14 @@ class StartSessionResponse(BaseModel):
             StartSessionResponse with all fields populated
         """
         return cls(
-            id=device.id,
-            game_id=device.game_id,
-            client_fingerprint=device.client_fingerprint,
-            account_id=device.account_id,
-            platform=device.platform,
-            status=device.status,
-            metadata=device.metadata,
+            identity_id=identity.id,
+            game_id=identity.game_id,
+            account_id=identity.account_id,
+            kind=identity.kind,
+            display_name=identity.display_name,
             access_token=access_token,
             refresh_token=refresh_token,
             expires_in=expires_in,
-            first_seen_at=device.first_seen_at,
-            last_seen_at=device.last_seen_at,
             test_mode=test_mode,
         )
 

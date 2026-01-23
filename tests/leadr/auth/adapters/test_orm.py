@@ -9,10 +9,23 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.adapters.orm import AccountORM
-from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM, DeviceStatusEnum, NonceORM
+from leadr.auth.adapters.orm import (
+    DeviceORM,
+    DeviceSessionORM,
+    DeviceStatusEnum,
+    IdentityORM,
+    NonceORM,
+)
 from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
 from leadr.auth.domain.nonce import Nonce, NonceStatus
-from leadr.common.domain.ids import AccountID, DeviceID, DeviceSessionID, GameID, NonceID
+from leadr.common.domain.ids import (
+    AccountID,
+    DeviceID,
+    DeviceSessionID,
+    GameID,
+    IdentityID,
+    NonceID,
+)
 from leadr.games.adapters.orm import GameORM
 
 
@@ -381,7 +394,7 @@ class TestDeviceSessionORM:
 class TestNonceORM:
     """Test suite for Nonce ORM model."""
 
-    async def test_create_nonce(self, db_session: AsyncSession, device_orm: DeviceORM):
+    async def test_create_nonce(self, db_session: AsyncSession, identity_orm: IdentityORM):
         """Test creating a nonce in the database."""
         # Create nonce
         nonce_id = uuid4()
@@ -390,7 +403,7 @@ class TestNonceORM:
 
         nonce = NonceORM(
             id=nonce_id,
-            device_id=device_orm.id,
+            identity_id=identity_orm.id,
             nonce_value=nonce_value,
             expires_at=expires_at,
             status="pending",
@@ -401,7 +414,7 @@ class TestNonceORM:
         await db_session.refresh(nonce)
 
         assert nonce.id == nonce_id
-        assert nonce.device_id == device_orm.id
+        assert nonce.identity_id == identity_orm.id
         assert nonce.nonce_value == nonce_value
         assert nonce.expires_at == expires_at
         assert nonce.status == "pending"
@@ -419,7 +432,7 @@ class TestNonceORM:
         """Test that nonce_value must be unique."""
         # Try to create second nonce with same nonce_value
         nonce2 = NonceORM(
-            device_id=nonce_orm.device_id,
+            identity_id=nonce_orm.identity_id,
             nonce_value=nonce_orm.nonce_value,  # Duplicate
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
         )
@@ -428,14 +441,14 @@ class TestNonceORM:
         with pytest.raises(IntegrityError):
             await db_session.commit()
 
-    async def test_nonce_cascades_on_device_delete(
-        self, db_session: AsyncSession, device_orm: DeviceORM, nonce_orm: NonceORM
+    async def test_nonce_cascades_on_identity_delete(
+        self, db_session: AsyncSession, identity_orm: IdentityORM, nonce_orm: NonceORM
     ):
-        """Test that nonces are deleted when their device is deleted."""
+        """Test that nonces are deleted when their identity is deleted."""
         nonce_id = nonce_orm.id
 
-        # Delete device
-        await db_session.delete(device_orm)
+        # Delete identity
+        await db_session.delete(identity_orm)
         await db_session.commit()
 
         # Nonce should be gone
@@ -448,12 +461,12 @@ class TestNonceORM:
         expires_at = now + timedelta(seconds=60)
         used_at = now + timedelta(seconds=30)
         nonce_id = uuid4()
-        device_id = uuid4()
+        identity_id = uuid4()
         nonce_value = str(uuid4())
 
         nonce_orm = NonceORM(
             id=nonce_id,
-            device_id=device_id,
+            identity_id=identity_id,
             nonce_value=nonce_value,
             expires_at=expires_at,
             used_at=used_at,
@@ -467,7 +480,7 @@ class TestNonceORM:
 
         assert isinstance(nonce_domain, Nonce)
         assert nonce_domain.id == nonce_id
-        assert nonce_domain.device_id == device_id
+        assert nonce_domain.identity_id == identity_id
         assert nonce_domain.nonce_value == nonce_value
         assert nonce_domain.expires_at == expires_at
         assert nonce_domain.used_at == used_at
@@ -478,12 +491,12 @@ class TestNonceORM:
         now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=60)
         nonce_id = NonceID(uuid4())
-        device_id = DeviceID(uuid4())
+        identity_id = IdentityID(uuid4())
         nonce_value = str(uuid4())
 
         nonce_domain = Nonce(
             id=nonce_id,
-            device_id=device_id,
+            identity_id=identity_id,
             nonce_value=nonce_value,
             expires_at=expires_at,
             status=NonceStatus.PENDING,
@@ -495,7 +508,7 @@ class TestNonceORM:
         nonce_orm = NonceORM.from_domain(nonce_domain)
 
         assert nonce_orm.id == nonce_id.uuid
-        assert nonce_orm.device_id == device_id.uuid
+        assert nonce_orm.identity_id == identity_id.uuid
         assert nonce_orm.nonce_value == nonce_value
         assert nonce_orm.expires_at == expires_at
         assert nonce_orm.status == "pending"

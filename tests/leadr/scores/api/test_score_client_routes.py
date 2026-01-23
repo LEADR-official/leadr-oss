@@ -7,8 +7,8 @@ import pytest
 from httpx import AsyncClient
 
 from leadr.accounts.services.account_service import AccountService
+from leadr.auth.services.device_service import DeviceService
 from leadr.boards.services.board_service import BoardService
-from leadr.common.domain.ids import DeviceID
 from leadr.games.services.game_service import GameService
 from leadr.scores.services.score_service import ScoreService
 
@@ -51,7 +51,13 @@ class TestGetScoreClient:
         )
         assert session_response.status_code == 201
         access_token = session_response.json()["access_token"]
-        device_id = session_response.json()["id"]
+
+        # Look up device via DeviceService (device_id no longer in session response)
+        device_service = DeviceService(db_session)
+        device = await device_service.repository.get_by_game_and_fingerprint(
+            game.id, device_fingerprint
+        )
+        assert device is not None
 
         # Create a score for this device/board
         score_service = ScoreService(db_session)
@@ -59,7 +65,7 @@ class TestGetScoreClient:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=DeviceID(device_id),
+            device_id=device.id,
             player_name="TestPlayer",
             value=1000.0,
         )
@@ -128,7 +134,7 @@ class TestGetScoreClient:
 
         # Create device for game2 to create score
         device2_fingerprint = hashlib.sha256(str(uuid4()).encode()).hexdigest()
-        session2_response = await client.post(
+        await client.post(
             "/client/sessions",
             json={
                 "game_id": str(game2.id),
@@ -136,7 +142,13 @@ class TestGetScoreClient:
                 "platform": "android",
             },
         )
-        device2_id = session2_response.json()["id"]
+
+        # Look up device via DeviceService
+        device_service = DeviceService(db_session)
+        device2 = await device_service.repository.get_by_game_and_fingerprint(
+            game2.id, device2_fingerprint
+        )
+        assert device2 is not None
 
         # Create a score for game2
         score_service = ScoreService(db_session)
@@ -144,7 +156,7 @@ class TestGetScoreClient:
             account_id=account.id,
             game_id=game2.id,
             board_id=board2.id,
-            device_id=DeviceID(device2_id),
+            device_id=device2.id,
             player_name="Game2Player",
             value=2000.0,
         )

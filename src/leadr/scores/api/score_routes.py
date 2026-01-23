@@ -11,6 +11,10 @@ from leadr.auth.dependencies import (
     ClientAuthContextDep,
     ClientAuthContextWithNonceDep,
 )
+from leadr.boards.domain.board import BoardType
+from leadr.boards.domain.board_state import BoardState
+from leadr.boards.domain.run_entry import RunEntry
+from leadr.boards.services.dependencies import BoardServiceDep
 from leadr.common.api.hooks import PostCreateScoreHookDep, PreCreateScoreHookDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
@@ -23,6 +27,7 @@ from leadr.scores.api.score_schemas import (
     ScoreResponse,
     ScoreUpdateRequest,
 )
+from leadr.scores.domain.anti_cheat.enums import FlagAction, ScoreStatus
 from leadr.scores.services.dependencies import ScoreServiceDep
 from leadr.scores.services.score_service import ScoreService
 
@@ -101,6 +106,7 @@ async def create_score_client(
     score_request: ScoreClientCreateRequest,
     request: Request,
     service: ScoreServiceDep,
+    board_service: BoardServiceDep,
     background_tasks: BackgroundTasks,
     auth: ClientAuthContextWithNonceDep,
     pre_create_hook: PreCreateScoreHookDep,
@@ -108,15 +114,16 @@ async def create_score_client(
 ) -> ScoreClientResponse:
     """Create a new score (Client API).
 
-    Creates a new score submission for a board. All IDs (account_id, game_id, device_id)
-    are automatically derived from the authenticated device session.
+    Creates a new score submission for a board. All IDs (account_id, game_id, identity_id)
+    are automatically derived from the authenticated session.
 
     Args:
         score_request: Score creation details including board_id, player_name, and value.
         request: FastAPI request object for accessing geo data.
         service: Injected score service dependency.
+        board_service: Injected board service for board lookup.
         background_tasks: FastAPI background tasks for async metadata updates.
-        auth: Client authentication context with device info.
+        auth: Client authentication context with device and identity info.
         pre_create_hook: Hook called before score creation (for quota checks).
         post_create_hook: Hook called after successful score creation.
 
@@ -127,34 +134,53 @@ async def create_score_client(
         404: Board not found.
         400: Validation failed (board doesn't belong to account, or game doesn't
             match board's game).
+        403: Score rejected by anti-cheat (rate limit exceeded).
     """
     # Get geo data populated by GeoIP middleware
     timezone = getattr(request.state, "geo_timezone", None)
     country = getattr(request.state, "geo_country", None)
     city = getattr(request.state, "geo_city", None)
 
-    # All IDs derived from authenticated device
-    account_id = auth.account_id
-    game_id = auth.device.game_id
-    device_id = auth.device.id
+    # Identity derived from authenticated session
+    identity = auth.identity
+
+    # Update identity display name if provided in request
+    if score_request.player_name and identity.display_name != score_request.player_name:
+        identity.display_name = score_request.player_name
 
     await pre_create_hook(score_request, auth, background_tasks)
 
+    # Get board to determine type
+    board = await board_service.get_by_id(score_request.board_id)
+    if board is None:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+    # Validate board belongs to the game
+    if board.game_id != auth.game_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Board does not belong to this game",
+        )
+
     try:
-        score, _ = await service.create_score(
-            account_id=account_id,
-            game_id=game_id,
+        # Determine value/delta based on board type
+        value: float | None = None
+        delta: float | None = None
+        if board.board_type == BoardType.COUNTER:
+            delta = score_request.value  # Use value as delta for COUNTER boards
+        else:
+            value = score_request.value
+
+        event, ranking_entry, anti_cheat_result = await service.submit_score(
             board_id=score_request.board_id,
-            device_id=device_id,
+            identity_id=identity.id,
+            value=value,
+            delta=delta,
             player_name=score_request.player_name,
-            value=score_request.value,
-            value_display=score_request.value_display,
             timezone=timezone,
             country=country,
             city=city,
-            metadata=score_request.metadata,
             is_test=auth.test_mode,
-            background_tasks=background_tasks,
         )
     except IntegrityError:
         raise HTTPException(
@@ -164,8 +190,77 @@ async def create_score_client(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
+    # Handle anti-cheat REJECT
+    if anti_cheat_result and anti_cheat_result.action == FlagAction.REJECT:
+        raise HTTPException(
+            status_code=429,
+            detail=anti_cheat_result.reason or "Rate limit exceeded",
+        )
+
     await post_create_hook(score_request, auth, background_tasks)
-    return ScoreClientResponse.from_domain(score)
+
+    # Build response from event and ranking entry
+    return _build_score_client_response(
+        event=event,
+        ranking_entry=ranking_entry,
+        identity=identity,
+        board_type=board.board_type,
+    )
+
+
+def _build_score_client_response(
+    event,
+    ranking_entry: BoardState | RunEntry | None,
+    identity,
+    board_type: BoardType,
+) -> ScoreClientResponse:
+    """Build ScoreClientResponse from event-sourced data.
+
+    Args:
+        event: The ScoreEvent created.
+        ranking_entry: BoardState or RunEntry if ranking was updated.
+        identity: The submitting identity.
+        board_type: The board type for response building.
+
+    Returns:
+        ScoreClientResponse with appropriate data.
+    """
+    if isinstance(ranking_entry, BoardState):
+        return ScoreClientResponse.from_board_state(
+            state=ranking_entry,
+            identity=identity,
+            score_event=event,
+            rank=0,  # Rank not computed for creation response
+        )
+    elif isinstance(ranking_entry, RunEntry):
+        return ScoreClientResponse.from_run_entry(
+            entry=ranking_entry,
+            identity=identity,
+            score_event=event,
+            rank=0,  # Rank not computed for creation response
+        )
+    else:
+        # Fallback for cases with no ranking entry (shouldn't happen for normal flow)
+        # This could happen if board type is RATIO or something went wrong
+        from leadr.common.domain.ids import ScoreID
+
+        return ScoreClientResponse(
+            id=ScoreID(event.id.uuid),  # Mask event ID as score ID
+            account_id=event.account_id,
+            game_id=event.game_id,
+            board_id=event.board_id,
+            identity_id=identity.id,
+            player_name=identity.display_name or "",
+            value=event.event_payload.get("value", event.event_payload.get("delta", 0.0)),
+            value_display=None,
+            metadata=None,
+            rank=None,
+            is_placeholder=False,
+            is_test=event.is_test,
+            status=ScoreStatus.ACTIVE,
+            created_at=event.created_at,
+            updated_at=event.created_at,  # For new events, updated_at = created_at
+        )
 
 
 @router.get("/scores/{score_id}", response_model=ScoreResponse)
@@ -451,7 +546,7 @@ async def get_score_client(
     score = await service.get_score_with_rank(score_id)
 
     # Check client has access to this score's game
-    if score.game_id != auth.device.game_id:
+    if score.game_id != auth.game_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this score",
@@ -525,7 +620,7 @@ async def list_scores_client(
         pagination,
         auth.account_id,
         board_id,
-        auth.device.game_id,
+        auth.game_id,
         device_id,
         auth.test_mode,
         around_score_id,

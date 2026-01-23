@@ -247,14 +247,16 @@ class TestScoreRankClient:
         test_device: Device,
     ) -> None:
         """Test that client endpoint also returns ranks when board_id provided."""
-        from leadr.auth.services.device_service import DeviceService
-
-        # Start a device session to get access token (use same fingerprint as test_device)
-        device_service = DeviceService(db_session)
-        _, access_token, _, _ = await device_service.start_session(
-            game_id=run_runs_board.game_id,
-            client_fingerprint=test_device.client_fingerprint,
+        # Start a session via HTTP API (use same fingerprint as test_device)
+        session_response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": str(run_runs_board.game_id),
+                "client_fingerprint": test_device.client_fingerprint,
+            },
         )
+        assert session_response.status_code == 201
+        access_token = session_response.json()["access_token"]
 
         # Create scores
         score_service = ScoreService(db_session)
@@ -301,14 +303,16 @@ class TestScoreRankClient:
         test_device: Device,
     ) -> None:
         """Test that client endpoint returns null rank without board_id."""
-        from leadr.auth.services.device_service import DeviceService
-
-        # Start a device session (use same fingerprint as test_device)
-        device_service = DeviceService(db_session)
-        _, access_token, _, _ = await device_service.start_session(
-            game_id=run_runs_board.game_id,
-            client_fingerprint=test_device.client_fingerprint,
+        # Start a session via HTTP API (use same fingerprint as test_device)
+        session_response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": str(run_runs_board.game_id),
+                "client_fingerprint": test_device.client_fingerprint,
+            },
         )
+        assert session_response.status_code == 201
+        access_token = session_response.json()["access_token"]
 
         # Create a score
         score_service = ScoreService(db_session)
