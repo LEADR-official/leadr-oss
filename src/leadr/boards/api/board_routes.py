@@ -17,8 +17,9 @@ from leadr.boards.api.board_schemas import (
     BoardResponse,
     BoardUpdateRequest,
 )
+from leadr.boards.domain.board import BoardType
 from leadr.boards.services.board_service import BoardService
-from leadr.boards.services.dependencies import BoardServiceDep
+from leadr.boards.services.dependencies import BoardRatioConfigServiceDep, BoardServiceDep
 from leadr.common.api.hooks import PostCreateBoardHookDep, PreCreateBoardHookDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
@@ -36,6 +37,7 @@ client_router = APIRouter()
 async def create_board(
     request: BoardCreateRequest,
     service: BoardServiceDep,
+    ratio_config_service: BoardRatioConfigServiceDep,
     auth: AdminAuthContextDep,
     background_tasks: BackgroundTasks,
     pre_create_hook: PreCreateBoardHookDep,
@@ -49,9 +51,13 @@ async def create_board(
     For regular users, account_id must match their API key's account.
     For superadmins, any account_id is accepted.
 
+    For RATIO boards, ratio_config is required and specifies the numerator and
+    denominator boards used to calculate the ratio.
+
     Args:
         request: Board creation details including account_id, game_id, name, and settings.
         service: Injected board service dependency.
+        ratio_config_service: Injected ratio config service dependency.
         auth: Authentication context with user info.
         pre_create_hook: Hook called before board creation (for quota checks).
         post_create_hook: Hook called after successful board creation.
@@ -62,8 +68,15 @@ async def create_board(
     Raises:
         403: User does not have access to the specified account.
         404: Game or account not found.
-        400: Game doesn't belong to the specified account.
+        400: Game doesn't belong to the specified account, or RATIO board missing config.
     """
+    # Validate ratio_config requirement for RATIO boards
+    if request.board_type == BoardType.RATIO and request.ratio_config is None:
+        raise HTTPException(
+            status_code=400,
+            detail="ratio_config is required for RATIO board type",
+        )
+
     await pre_create_hook(request, auth, background_tasks)
 
     try:
@@ -93,23 +106,51 @@ async def create_board(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
+    # Create ratio config if this is a RATIO board
+    ratio_config = None
+    if request.board_type == BoardType.RATIO and request.ratio_config is not None:
+        try:
+            ratio_config = await ratio_config_service.create_ratio_config(
+                board_id=board.id,
+                numerator_board_id=request.ratio_config.numerator_board_id,
+                denominator_board_id=request.ratio_config.denominator_board_id,
+                zero_denominator_policy=request.ratio_config.zero_denominator_policy,
+                min_denominator=request.ratio_config.min_denominator,
+                min_numerator=request.ratio_config.min_numerator,
+                scale=request.ratio_config.scale,
+                display=request.ratio_config.display,
+                decimals=request.ratio_config.decimals,
+                tie_breaker=request.ratio_config.tie_breaker,
+            )
+        except IntegrityError:
+            # Clean up the board if ratio config creation fails
+            await service.soft_delete(board.id)
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid numerator_board_id or denominator_board_id",
+            ) from None
+
     await post_create_hook(request, auth, background_tasks)
-    return BoardResponse.from_domain(board)
+    return BoardResponse.from_domain(board, ratio_config)
 
 
 @router.get("/boards/{board_id}", response_model=BoardResponse)
 async def get_board(
-    board_id: BoardID, service: BoardServiceDep, auth: AdminAuthContextDep
+    board_id: BoardID,
+    service: BoardServiceDep,
+    ratio_config_service: BoardRatioConfigServiceDep,
+    auth: AdminAuthContextDep,
 ) -> BoardResponse:
     """Get a board by ID.
 
     Args:
         board_id: Unique identifier for the board.
         service: Injected board service dependency.
+        ratio_config_service: Injected ratio config service dependency.
         auth: Authentication context with user info.
 
     Returns:
-        BoardResponse with full board details.
+        BoardResponse with full board details (including ratio_config for RATIO boards).
 
     Raises:
         403: User does not have access to this board's account.
@@ -124,7 +165,12 @@ async def get_board(
             detail="You do not have access to this board's account",
         )
 
-    return BoardResponse.from_domain(board)
+    # Load ratio config for RATIO boards
+    ratio_config = None
+    if board.board_type == BoardType.RATIO:
+        ratio_config = await ratio_config_service.get_by_board_id(board.id)
+
+    return BoardResponse.from_domain(board, ratio_config)
 
 
 async def handle_list_boards(
@@ -444,16 +490,19 @@ async def update_board(
     board_id: BoardID,
     request: BoardUpdateRequest,
     service: BoardServiceDep,
+    ratio_config_service: BoardRatioConfigServiceDep,
     auth: AdminAuthContextDep,
 ) -> BoardResponse:
     """Update a board.
 
     Supports updating any board field or soft-deleting the board.
+    For RATIO boards, ratio_config can be updated to change calculation settings.
 
     Args:
         board_id: Unique identifier for the board.
         request: Board update details (all fields optional).
         service: Injected board service dependency.
+        ratio_config_service: Injected ratio config service dependency.
         auth: Authentication context with user info.
 
     Returns:
@@ -482,8 +531,29 @@ async def update_board(
     # This allows null values to clear fields vs omitted fields staying unchanged
     update_data = request.model_dump(exclude_unset=True)
     update_data.pop("deleted", None)  # Handled separately above
+    update_data.pop("ratio_config", None)  # Handled separately below
 
     if update_data:
         board = await service.update_board(board_id, **update_data)
 
-    return BoardResponse.from_domain(board)
+    # Handle ratio config update for RATIO boards
+    ratio_config = None
+    if board.board_type == BoardType.RATIO:
+        existing_config = await ratio_config_service.get_by_board_id(board.id)
+
+        if request.ratio_config is not None and existing_config is not None:
+            # Update existing ratio config
+            ratio_config = await ratio_config_service.update_ratio_config(
+                config_id=existing_config.id,
+                zero_denominator_policy=request.ratio_config.zero_denominator_policy,
+                min_denominator=request.ratio_config.min_denominator,
+                min_numerator=request.ratio_config.min_numerator,
+                scale=request.ratio_config.scale,
+                display=request.ratio_config.display,
+                decimals=request.ratio_config.decimals,
+                tie_breaker=request.ratio_config.tie_breaker,
+            )
+        else:
+            ratio_config = existing_config
+
+    return BoardResponse.from_domain(board, ratio_config)

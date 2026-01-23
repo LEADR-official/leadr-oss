@@ -1,0 +1,58 @@
+"""BoardState domain model for materialized ranking state."""
+
+from typing import Any
+
+from pydantic import Field
+
+from leadr.common.domain.ids import BoardID, BoardStateID, IdentityID
+from leadr.common.domain.models import Entity
+
+
+class BoardState(Entity):
+    """Materialized ranking state for a single identity on a single board.
+
+    BoardState represents the current ranking state of an identity on a board.
+    It is computed from score events and used for leaderboard queries.
+
+    For RUN_IDENTITY boards: Contains the selected score based on keep_strategy.
+    For RUN_RUNS boards: Not used (run_entries table is used instead).
+    For COUNTER boards: Contains the accumulated total.
+    For RATIO boards: Contains the computed ratio value.
+
+    The aux field contains board-type-specific auxiliary data:
+    - RUN_IDENTITY: {"selected_event_id": str, "event_count": int}
+    - COUNTER: {"event_count": int, "last_event_id": str}
+    - RATIO: {"numerator_value": float, "denominator_value": float}
+
+    Attributes:
+        id: Unique identifier for this board state.
+        board_id: The board this state belongs to (immutable).
+        identity_id: The identity this state is for (immutable).
+        primary_value: The rankable value (NULL = not rankable).
+        aux: Board-type-specific auxiliary data.
+        created_at: Timestamp when the state was created (UTC).
+        updated_at: Timestamp when the state was last updated (UTC).
+        deleted_at: Timestamp when the state was soft-deleted, or None.
+    """
+
+    id: BoardStateID = Field(
+        frozen=True,
+        default_factory=BoardStateID,
+        description="Unique identifier for this board state",
+    )
+    board_id: BoardID = Field(
+        frozen=True,
+        description="Board this state belongs to (immutable)",
+    )
+    identity_id: IdentityID = Field(
+        frozen=True,
+        description="Identity this state is for (immutable)",
+    )
+    primary_value: float | None = Field(
+        default=None,
+        description="Rankable value (NULL = not rankable)",
+    )
+    aux: dict[str, Any] | None = Field(
+        default=None,
+        description="Board-type-specific auxiliary data",
+    )

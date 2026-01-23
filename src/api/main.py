@@ -29,7 +29,9 @@ from leadr.auth.dependencies import require_admin_auth
 from leadr.auth.services.nonce_tasks import cleanup_expired_nonces
 from leadr.boards.api.board_routes import client_router as board_client_router
 from leadr.boards.api.board_routes import router as board_router
+from leadr.boards.api.board_state_routes import router as board_state_router
 from leadr.boards.api.board_template_routes import router as board_template_router
+from leadr.boards.api.run_entry_routes import router as run_entry_router
 from leadr.boards.services.board_tasks import expire_boards, process_due_templates
 from leadr.common.api.exceptions import (
     catchall_exception_handler,
@@ -212,7 +214,9 @@ def create_app(
     admin_router.include_router(api_key_router, tags=["API Keys"])
     admin_router.include_router(game_router, tags=["Games"])
     admin_router.include_router(board_router, tags=["Boards"])
+    admin_router.include_router(board_state_router, tags=["Board States"])
     admin_router.include_router(board_template_router, tags=["Board Templates"])
+    admin_router.include_router(run_entry_router, tags=["Run Entries"])
     admin_router.include_router(score_router, tags=["Scores"])
     admin_router.include_router(score_event_router, tags=["Score Events"])
     admin_router.include_router(score_flag_router, tags=["Score Flags"])

@@ -260,3 +260,9 @@ class RunEntryID(PrefixedID):
     """Run entry entity identifier."""
 
     prefix = "run"
+
+
+class BoardRatioConfigID(PrefixedID):
+    """Board ratio config entity identifier."""
+
+    prefix = "brc"

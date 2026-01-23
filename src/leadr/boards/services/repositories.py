@@ -5,11 +5,40 @@ from typing import Any
 
 from sqlalchemy import func, select
 
-from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM, BoardTypeEnum, KeepStrategyEnum
+from leadr.boards.adapters.orm import (
+    BoardORM,
+    BoardRatioConfigORM,
+    BoardStateORM,
+    BoardTemplateORM,
+    BoardTypeEnum,
+    KeepStrategyEnum,
+    RatioDisplayEnum,
+    RunEntryORM,
+    TieBreakerEnum,
+    ZeroDenominatorPolicyEnum,
+)
 from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
+from leadr.boards.domain.board_ratio_config import (
+    BoardRatioConfig,
+    RatioDisplay,
+    TieBreaker,
+    ZeroDenominatorPolicy,
+)
+from leadr.boards.domain.board_state import BoardState
 from leadr.boards.domain.board_template import BoardTemplate
+from leadr.boards.domain.run_entry import RunEntry
 from leadr.common.api.pagination import PaginationParams
-from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
+from leadr.common.domain.ids import (
+    AccountID,
+    BoardID,
+    BoardRatioConfigID,
+    BoardStateID,
+    BoardTemplateID,
+    GameID,
+    IdentityID,
+    RunEntryID,
+    ScoreEventID,
+)
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
 
@@ -286,6 +315,399 @@ class BoardTemplateRepository(BaseRepository[BoardTemplate, BoardTemplateORM]):
             game_uuid = self._extract_uuid(game_id)
             query = query.where(BoardTemplateORM.game_id == game_uuid)
             filters_dict["game_id"] = str(game_id)
+
+        # Validate sort fields
+        for sort_field in pagination.sort_spec:
+            if sort_field.name not in self.SORTABLE_FIELDS:
+                raise ValueError(
+                    f"Unknown sort field: {sort_field.name}. "
+                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
+                )
+
+        # Handle cursor if present
+        cursor = None
+        if pagination.has_cursor():
+            cursor = pagination.decode_cursor()
+            if cursor is not None:
+                cursor.validate_state(pagination.sort_spec, filters_dict)
+
+        # Execute paginated query
+        return await self._execute_paginated_query(
+            query=query,
+            sort_fields=pagination.sort_spec,
+            cursor=cursor,
+            limit=pagination.limit,
+        )
+
+
+class BoardStateRepository(BaseRepository[BoardState, BoardStateORM]):
+    """BoardState repository for managing board state persistence.
+
+    Board states represent the materialized ranking state for identities on boards.
+    Each identity has at most one state per board.
+    """
+
+    # Valid sortable fields for board states
+    SORTABLE_FIELDS = {
+        "id",
+        "primary_value",
+        "created_at",
+        "updated_at",
+    }
+
+    def _to_domain(self, orm: BoardStateORM) -> BoardState:
+        """Convert ORM model to domain entity."""
+        return BoardState(
+            id=BoardStateID(orm.id),
+            board_id=BoardID(orm.board_id),
+            identity_id=IdentityID(orm.identity_id),
+            primary_value=orm.primary_value,
+            aux=orm.aux,
+            created_at=orm.created_at,
+            updated_at=orm.updated_at,
+            deleted_at=orm.deleted_at,
+        )
+
+    def _to_orm(self, entity: BoardState) -> BoardStateORM:
+        """Convert domain entity to ORM model."""
+        return BoardStateORM(
+            id=entity.id.uuid,
+            board_id=entity.board_id.uuid,
+            identity_id=entity.identity_id.uuid,
+            primary_value=entity.primary_value,
+            aux=entity.aux,
+            created_at=entity.created_at,
+            updated_at=entity.updated_at,
+            deleted_at=entity.deleted_at,
+        )
+
+    def _get_orm_class(self) -> type[BoardStateORM]:
+        """Get the ORM model class."""
+        return BoardStateORM
+
+    async def get_by_board_and_identity(
+        self,
+        board_id: BoardID,
+        identity_id: IdentityID,
+    ) -> BoardState | None:
+        """Get a board state by board and identity.
+
+        Args:
+            board_id: The board ID to search for.
+            identity_id: The identity ID to search for.
+
+        Returns:
+            BoardState entity if found, None otherwise.
+        """
+        query = select(BoardStateORM).where(
+            BoardStateORM.board_id == board_id.uuid,
+            BoardStateORM.identity_id == identity_id.uuid,
+            BoardStateORM.deleted_at.is_(None),
+        )
+        result = await self.session.execute(query)
+        orm = result.scalar_one_or_none()
+        if orm is None:
+            return None
+        return self._to_domain(orm)
+
+    async def filter(  # type: ignore[override] - board states filter by board_id, not account_id
+        self,
+        board_id: BoardID | None = None,
+        identity_id: IdentityID | None = None,
+        *,
+        pagination: PaginationParams,
+        **kwargs: Any,
+    ) -> PaginatedResult[BoardState]:
+        """Filter board states with optional criteria and pagination.
+
+        Args:
+            board_id: Optional board ID to filter by.
+            identity_id: Optional identity ID to filter by.
+            pagination: Pagination parameters (required).
+
+        Returns:
+            PaginatedResult containing board states matching the filter criteria.
+
+        Raises:
+            ValueError: If sort field is not in SORTABLE_FIELDS.
+            CursorValidationError: If cursor is invalid or state doesn't match.
+        """
+        query = select(BoardStateORM).where(BoardStateORM.deleted_at.is_(None))
+
+        # Build filters dict for cursor validation
+        filters_dict: dict[str, str] = {}
+
+        if board_id is not None:
+            board_uuid = self._extract_uuid(board_id)
+            query = query.where(BoardStateORM.board_id == board_uuid)
+            filters_dict["board_id"] = str(board_id)
+
+        if identity_id is not None:
+            identity_uuid = self._extract_uuid(identity_id)
+            query = query.where(BoardStateORM.identity_id == identity_uuid)
+            filters_dict["identity_id"] = str(identity_id)
+
+        # Validate sort fields
+        for sort_field in pagination.sort_spec:
+            if sort_field.name not in self.SORTABLE_FIELDS:
+                raise ValueError(
+                    f"Unknown sort field: {sort_field.name}. "
+                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
+                )
+
+        # Handle cursor if present
+        cursor = None
+        if pagination.has_cursor():
+            cursor = pagination.decode_cursor()
+            if cursor is not None:
+                cursor.validate_state(pagination.sort_spec, filters_dict)
+
+        # Execute paginated query
+        return await self._execute_paginated_query(
+            query=query,
+            sort_fields=pagination.sort_spec,
+            cursor=cursor,
+            limit=pagination.limit,
+        )
+
+
+class RunEntryRepository(BaseRepository[RunEntry, RunEntryORM]):
+    """RunEntry repository for managing run entry persistence.
+
+    Run entries represent individual scored submissions for RUN_RUNS boards
+    where every submission is ranked.
+    """
+
+    # Valid sortable fields for run entries
+    SORTABLE_FIELDS = {
+        "id",
+        "primary_value",
+        "created_at",
+        "updated_at",
+    }
+
+    def _to_domain(self, orm: RunEntryORM) -> RunEntry:
+        """Convert ORM model to domain entity."""
+        return RunEntry(
+            id=RunEntryID(orm.id),
+            board_id=BoardID(orm.board_id),
+            identity_id=IdentityID(orm.identity_id),
+            score_event_id=ScoreEventID(orm.score_event_id),
+            primary_value=orm.primary_value,
+            created_at=orm.created_at,
+            updated_at=orm.updated_at,
+            deleted_at=orm.deleted_at,
+        )
+
+    def _to_orm(self, entity: RunEntry) -> RunEntryORM:
+        """Convert domain entity to ORM model."""
+        return RunEntryORM(
+            id=entity.id.uuid,
+            board_id=entity.board_id.uuid,
+            identity_id=entity.identity_id.uuid,
+            score_event_id=entity.score_event_id.uuid,
+            primary_value=entity.primary_value,
+            created_at=entity.created_at,
+            updated_at=entity.updated_at,
+            deleted_at=entity.deleted_at,
+        )
+
+    def _get_orm_class(self) -> type[RunEntryORM]:
+        """Get the ORM model class."""
+        return RunEntryORM
+
+    async def get_by_board_and_score_event(
+        self,
+        board_id: BoardID,
+        score_event_id: ScoreEventID,
+    ) -> RunEntry | None:
+        """Get a run entry by board and score event.
+
+        Args:
+            board_id: The board ID to search for.
+            score_event_id: The score event ID to search for.
+
+        Returns:
+            RunEntry entity if found, None otherwise.
+        """
+        query = select(RunEntryORM).where(
+            RunEntryORM.board_id == board_id.uuid,
+            RunEntryORM.score_event_id == score_event_id.uuid,
+            RunEntryORM.deleted_at.is_(None),
+        )
+        result = await self.session.execute(query)
+        orm = result.scalar_one_or_none()
+        if orm is None:
+            return None
+        return self._to_domain(orm)
+
+    async def filter(  # type: ignore[override] - run entries filter by board_id, not account_id
+        self,
+        board_id: BoardID | None = None,
+        identity_id: IdentityID | None = None,
+        *,
+        pagination: PaginationParams,
+        **kwargs: Any,
+    ) -> PaginatedResult[RunEntry]:
+        """Filter run entries with optional criteria and pagination.
+
+        Args:
+            board_id: Optional board ID to filter by.
+            identity_id: Optional identity ID to filter by.
+            pagination: Pagination parameters (required).
+
+        Returns:
+            PaginatedResult containing run entries matching the filter criteria.
+
+        Raises:
+            ValueError: If sort field is not in SORTABLE_FIELDS.
+            CursorValidationError: If cursor is invalid or state doesn't match.
+        """
+        query = select(RunEntryORM).where(RunEntryORM.deleted_at.is_(None))
+
+        # Build filters dict for cursor validation
+        filters_dict: dict[str, str] = {}
+
+        if board_id is not None:
+            board_uuid = self._extract_uuid(board_id)
+            query = query.where(RunEntryORM.board_id == board_uuid)
+            filters_dict["board_id"] = str(board_id)
+
+        if identity_id is not None:
+            identity_uuid = self._extract_uuid(identity_id)
+            query = query.where(RunEntryORM.identity_id == identity_uuid)
+            filters_dict["identity_id"] = str(identity_id)
+
+        # Validate sort fields
+        for sort_field in pagination.sort_spec:
+            if sort_field.name not in self.SORTABLE_FIELDS:
+                raise ValueError(
+                    f"Unknown sort field: {sort_field.name}. "
+                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
+                )
+
+        # Handle cursor if present
+        cursor = None
+        if pagination.has_cursor():
+            cursor = pagination.decode_cursor()
+            if cursor is not None:
+                cursor.validate_state(pagination.sort_spec, filters_dict)
+
+        # Execute paginated query
+        return await self._execute_paginated_query(
+            query=query,
+            sort_fields=pagination.sort_spec,
+            cursor=cursor,
+            limit=pagination.limit,
+        )
+
+
+class BoardRatioConfigRepository(BaseRepository[BoardRatioConfig, BoardRatioConfigORM]):
+    """Repository for BoardRatioConfig persistence."""
+
+    SORTABLE_FIELDS = {"id", "created_at", "updated_at"}
+
+    def _to_domain(self, orm: BoardRatioConfigORM) -> BoardRatioConfig:
+        """Convert ORM model to domain entity."""
+        # Handle enum values (may be str when ORM created directly, or enum when from DB)
+        zero_policy = (
+            orm.zero_denominator_policy
+            if isinstance(orm.zero_denominator_policy, str)
+            else orm.zero_denominator_policy.value
+        )
+        display = orm.display if isinstance(orm.display, str) else orm.display.value
+        tie_breaker = (
+            orm.tie_breaker if isinstance(orm.tie_breaker, str) else orm.tie_breaker.value
+        )
+
+        return BoardRatioConfig(
+            id=BoardRatioConfigID(orm.id),
+            board_id=BoardID(orm.board_id),
+            numerator_board_id=BoardID(orm.numerator_board_id),
+            denominator_board_id=BoardID(orm.denominator_board_id),
+            zero_denominator_policy=ZeroDenominatorPolicy(zero_policy),
+            min_denominator=orm.min_denominator,
+            min_numerator=orm.min_numerator,
+            scale=orm.scale,
+            display=RatioDisplay(display),
+            decimals=orm.decimals,
+            tie_breaker=TieBreaker(tie_breaker),
+            created_at=orm.created_at,
+            updated_at=orm.updated_at,
+            deleted_at=orm.deleted_at,
+        )
+
+    def _to_orm(self, entity: BoardRatioConfig) -> BoardRatioConfigORM:
+        """Convert domain entity to ORM model."""
+        return BoardRatioConfigORM(
+            id=entity.id.uuid,
+            board_id=entity.board_id.uuid,
+            numerator_board_id=entity.numerator_board_id.uuid,
+            denominator_board_id=entity.denominator_board_id.uuid,
+            zero_denominator_policy=ZeroDenominatorPolicyEnum(entity.zero_denominator_policy.value),
+            min_denominator=entity.min_denominator,
+            min_numerator=entity.min_numerator,
+            scale=entity.scale,
+            display=RatioDisplayEnum(entity.display.value),
+            decimals=entity.decimals,
+            tie_breaker=TieBreakerEnum(entity.tie_breaker.value),
+            created_at=entity.created_at,
+            updated_at=entity.updated_at,
+            deleted_at=entity.deleted_at,
+        )
+
+    def _get_orm_class(self) -> type[BoardRatioConfigORM]:
+        """Return the ORM class for this repository."""
+        return BoardRatioConfigORM
+
+    async def get_by_board_id(self, board_id: BoardID) -> BoardRatioConfig | None:
+        """Get the ratio config for a specific board.
+
+        Args:
+            board_id: The ID of the ratio board.
+
+        Returns:
+            BoardRatioConfig if found, None otherwise.
+        """
+        query = select(BoardRatioConfigORM).where(
+            BoardRatioConfigORM.board_id == board_id.uuid,
+            BoardRatioConfigORM.deleted_at.is_(None),
+        )
+        result = await self.session.execute(query)
+        orm = result.scalar_one_or_none()
+        if orm is None:
+            return None
+        return self._to_domain(orm)
+
+    async def filter(  # type: ignore[override] - ratio configs filter by board_id, not account_id
+        self,
+        board_id: BoardID | None = None,
+        *,
+        pagination: PaginationParams,
+        **kwargs: Any,
+    ) -> PaginatedResult[BoardRatioConfig]:
+        """Filter ratio configs with optional criteria and pagination.
+
+        Args:
+            board_id: Optional board ID to filter by.
+            pagination: Pagination parameters (required).
+
+        Returns:
+            PaginatedResult containing ratio configs matching the filter criteria.
+
+        Raises:
+            ValueError: If sort field is not in SORTABLE_FIELDS.
+            CursorValidationError: If cursor is invalid or state doesn't match.
+        """
+        query = select(BoardRatioConfigORM).where(BoardRatioConfigORM.deleted_at.is_(None))
+
+        # Build filters dict for cursor validation
+        filters_dict: dict[str, str] = {}
+
+        if board_id is not None:
+            board_uuid = self._extract_uuid(board_id)
+            query = query.where(BoardRatioConfigORM.board_id == board_uuid)
+            filters_dict["board_id"] = str(board_id)
 
         # Validate sort fields
         for sort_field in pagination.sort_spec:

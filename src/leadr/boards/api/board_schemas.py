@@ -5,8 +5,86 @@ from datetime import datetime
 from pydantic import BaseModel, Field, computed_field
 
 from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
-from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
+from leadr.boards.domain.board_ratio_config import (
+    BoardRatioConfig,
+    RatioDisplay,
+    TieBreaker,
+    ZeroDenominatorPolicy,
+)
+from leadr.common.domain.ids import AccountID, BoardID, BoardRatioConfigID, BoardTemplateID, GameID
 from leadr.config import settings
+
+
+class BoardRatioConfigRequest(BaseModel):
+    """Request model for ratio config when creating/updating a RATIO board."""
+
+    numerator_board_id: BoardID = Field(description="ID of the numerator board")
+    denominator_board_id: BoardID = Field(description="ID of the denominator board")
+    zero_denominator_policy: ZeroDenominatorPolicy = Field(
+        default=ZeroDenominatorPolicy.NULL,
+        description="How to handle zero denominators",
+    )
+    min_denominator: float = Field(
+        default=0,
+        description="Minimum denominator value for ranking eligibility",
+    )
+    min_numerator: float = Field(
+        default=0,
+        description="Minimum numerator value for ranking eligibility",
+    )
+    scale: int = Field(
+        default=1_000_000,
+        description="Scaling factor for ratio storage precision",
+    )
+    display: RatioDisplay = Field(
+        default=RatioDisplay.RAW,
+        description="Display format for ratio values",
+    )
+    decimals: int = Field(
+        default=2,
+        description="Number of decimal places for display",
+    )
+    tie_breaker: TieBreaker = Field(
+        default=TieBreaker.NUMERATOR_DESC_DENOMINATOR_ASC,
+        description="Strategy for breaking ties",
+    )
+
+
+class BoardRatioConfigResponse(BaseModel):
+    """Response model for ratio config."""
+
+    id: BoardRatioConfigID = Field(description="Unique identifier for the ratio config")
+    numerator_board_id: BoardID = Field(description="ID of the numerator board")
+    denominator_board_id: BoardID = Field(description="ID of the denominator board")
+    zero_denominator_policy: ZeroDenominatorPolicy = Field(
+        description="How zero denominators are handled"
+    )
+    min_denominator: float = Field(description="Minimum denominator for ranking eligibility")
+    min_numerator: float = Field(description="Minimum numerator for ranking eligibility")
+    scale: int = Field(description="Scaling factor for ratio storage")
+    display: RatioDisplay = Field(description="Display format for ratio values")
+    decimals: int = Field(description="Number of decimal places for display")
+    tie_breaker: TieBreaker = Field(description="Strategy for breaking ties")
+    created_at: datetime = Field(description="Timestamp when the config was created (UTC)")
+    updated_at: datetime = Field(description="Timestamp of last update (UTC)")
+
+    @classmethod
+    def from_domain(cls, config: BoardRatioConfig) -> "BoardRatioConfigResponse":
+        """Convert domain entity to response model."""
+        return cls(
+            id=config.id,
+            numerator_board_id=config.numerator_board_id,
+            denominator_board_id=config.denominator_board_id,
+            zero_denominator_policy=config.zero_denominator_policy,
+            min_denominator=config.min_denominator,
+            min_numerator=config.min_numerator,
+            scale=config.scale,
+            display=config.display,
+            decimals=config.decimals,
+            tie_breaker=config.tie_breaker,
+            created_at=config.created_at,
+            updated_at=config.updated_at,
+        )
 
 
 class BoardCreateRequest(BaseModel):
@@ -63,6 +141,10 @@ class BoardCreateRequest(BaseModel):
     description: str | None = Field(
         default=None, description="Optional short description of the board"
     )
+    ratio_config: BoardRatioConfigRequest | None = Field(
+        default=None,
+        description="Ratio config (required when board_type is RATIO)",
+    )
 
 
 class BoardUpdateRequest(BaseModel):
@@ -86,6 +168,10 @@ class BoardUpdateRequest(BaseModel):
     tags: list[str] | None = Field(default=None, description="Updated tags list")
     description: str | None = Field(default=None, description="Updated board description")
     deleted: bool | None = Field(default=None, description="Set to true to soft delete the board")
+    ratio_config: BoardRatioConfigRequest | None = Field(
+        default=None,
+        description="Updated ratio config (for RATIO boards only)",
+    )
 
 
 class BoardResponse(BaseModel):
@@ -122,6 +208,10 @@ class BoardResponse(BaseModel):
     )
     tags: list[str] = Field(default_factory=list, description="List of tags for categorization")
     description: str | None = Field(default=None, description="Short description of the board")
+    ratio_config: BoardRatioConfigResponse | None = Field(
+        default=None,
+        description="Ratio config (present only for RATIO boards)",
+    )
     created_at: datetime = Field(description="Timestamp when the board was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -138,11 +228,16 @@ class BoardResponse(BaseModel):
         return f"{settings.BOARDS_UI_DOMAIN}/b/{self.short_code}"
 
     @classmethod
-    def from_domain(cls, board: Board) -> "BoardResponse":
+    def from_domain(
+        cls,
+        board: Board,
+        ratio_config: BoardRatioConfig | None = None,
+    ) -> "BoardResponse":
         """Convert domain entity to response model.
 
         Args:
             board: The domain Board entity to convert.
+            ratio_config: Optional ratio config for RATIO boards.
 
         Returns:
             BoardResponse with all fields populated from the domain entity.
@@ -167,6 +262,9 @@ class BoardResponse(BaseModel):
             ends_at=board.ends_at,
             tags=board.tags,
             description=board.description,
+            ratio_config=BoardRatioConfigResponse.from_domain(ratio_config)
+            if ratio_config
+            else None,
             created_at=board.created_at,
             updated_at=board.updated_at,
         )

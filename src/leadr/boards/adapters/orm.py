@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy import ARRAY, Boolean, DateTime, Enum, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import ARRAY, Boolean, DateTime, Enum, Float, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,10 +31,33 @@ class KeepStrategyEnum(str, enum.Enum):
     NA = "NA"
 
 
+class ZeroDenominatorPolicyEnum(str, enum.Enum):
+    """Zero denominator policy enum for database."""
+
+    NULL = "NULL"
+    ZERO = "ZERO"
+    INFINITY = "INFINITY"
+
+
+class RatioDisplayEnum(str, enum.Enum):
+    """Ratio display enum for database."""
+
+    RAW = "RAW"
+    PERCENT = "PERCENT"
+
+
+class TieBreakerEnum(str, enum.Enum):
+    """Tie breaker enum for database."""
+
+    NUMERATOR_DESC_DENOMINATOR_ASC = "NUMERATOR_DESC_DENOMINATOR_ASC"
+
+
 if TYPE_CHECKING:
     from leadr.accounts.adapters.orm import AccountORM
+    from leadr.auth.adapters.orm import IdentityORM
     from leadr.boards.domain.board_template import BoardTemplate
     from leadr.games.adapters.orm import GameORM
+    from leadr.scores.adapters.orm import ScoreEventORM
 
 
 class BoardORM(Base):
@@ -279,3 +302,172 @@ class BoardTemplateORM(Base):
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,
         )
+
+
+class BoardStateORM(Base):
+    """Board state ORM model.
+
+    Represents the materialized ranking state for a single identity on a single board.
+    Maps to the board_states table with foreign keys to boards and identities.
+    The primary_value can be NULL for non-rankable entries.
+    """
+
+    __tablename__ = "board_states"
+    __table_args__ = (
+        # Unique constraint: one state per board per identity
+        UniqueConstraint("board_id", "identity_id", name="uq_board_state_board_identity"),
+        # Index for efficient ranking queries (ordered by value, then by updated_at for ties)
+        Index(
+            "ix_board_states_ranking",
+            "board_id",
+            "primary_value",
+            "updated_at",
+            "id",
+            postgresql_where="deleted_at IS NULL AND primary_value IS NOT NULL",
+        ),
+    )
+
+    board_id: Mapped[UUID] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    identity_id: Mapped[UUID] = mapped_column(
+        ForeignKey("identities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    primary_value: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    aux: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True, default=None)
+
+    # Relationships
+    board: Mapped["BoardORM"] = relationship("BoardORM")  # type: ignore[name-defined]
+    identity: Mapped["IdentityORM"] = relationship("IdentityORM")  # type: ignore[name-defined]
+
+
+class RunEntryORM(Base):
+    """Run entry ORM model.
+
+    Represents a single scored run entry for RUN_RUNS boards where every
+    submission is ranked. Maps to the run_entries table with foreign keys
+    to boards, identities, and score_events.
+    """
+
+    __tablename__ = "run_entries"
+    __table_args__ = (
+        # Unique constraint: one entry per board per score event
+        UniqueConstraint("board_id", "score_event_id", name="uq_run_entry_board_score_event"),
+        # Index for efficient ranking queries (ordered by value, then by created_at for ties)
+        Index(
+            "ix_run_entries_ranking",
+            "board_id",
+            "primary_value",
+            "created_at",
+            "id",
+            postgresql_where="deleted_at IS NULL",
+        ),
+    )
+
+    board_id: Mapped[UUID] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    identity_id: Mapped[UUID] = mapped_column(
+        ForeignKey("identities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    score_event_id: Mapped[UUID] = mapped_column(
+        ForeignKey("score_events.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    primary_value: Mapped[float] = mapped_column(Float, nullable=False)
+
+    # Relationships
+    board: Mapped["BoardORM"] = relationship("BoardORM")  # type: ignore[name-defined]
+    identity: Mapped["IdentityORM"] = relationship("IdentityORM")  # type: ignore[name-defined]
+    score_event: Mapped["ScoreEventORM"] = relationship("ScoreEventORM")  # type: ignore[name-defined]
+
+
+class BoardRatioConfigORM(Base):
+    """Board ratio config ORM model.
+
+    Stores configuration for RATIO board types that derive their ranking
+    from two other boards (numerator and denominator). Maps to the
+    board_ratio_configs table with foreign keys to boards.
+    """
+
+    __tablename__ = "board_ratio_configs"
+    __table_args__ = (
+        # Only one ratio config per board
+        UniqueConstraint("board_id", name="uq_board_ratio_config_board"),
+    )
+
+    board_id: Mapped[UUID] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    numerator_board_id: Mapped[UUID] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    denominator_board_id: Mapped[UUID] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    zero_denominator_policy: Mapped[ZeroDenominatorPolicyEnum] = mapped_column(
+        Enum(
+            ZeroDenominatorPolicyEnum,
+            name="zero_denominator_policy",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+            create_constraint=False,
+        ),
+        nullable=False,
+        default=ZeroDenominatorPolicyEnum.NULL,
+        server_default="NULL",
+    )
+    min_denominator: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    min_numerator: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    scale: Mapped[int] = mapped_column(Integer, nullable=False, default=1_000_000)
+    display: Mapped[RatioDisplayEnum] = mapped_column(
+        Enum(
+            RatioDisplayEnum,
+            name="ratio_display",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+            create_constraint=False,
+        ),
+        nullable=False,
+        default=RatioDisplayEnum.RAW,
+        server_default="RAW",
+    )
+    decimals: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    tie_breaker: Mapped[TieBreakerEnum] = mapped_column(
+        Enum(
+            TieBreakerEnum,
+            name="tie_breaker",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+            create_constraint=False,
+        ),
+        nullable=False,
+        default=TieBreakerEnum.NUMERATOR_DESC_DENOMINATOR_ASC,
+        server_default="NUMERATOR_DESC_DENOMINATOR_ASC",
+    )
+
+    # Relationships
+    board: Mapped["BoardORM"] = relationship(
+        "BoardORM", foreign_keys=[board_id]
+    )  # type: ignore[name-defined]
+    numerator_board: Mapped["BoardORM"] = relationship(
+        "BoardORM", foreign_keys=[numerator_board_id]
+    )  # type: ignore[name-defined]
+    denominator_board: Mapped["BoardORM"] = relationship(
+        "BoardORM", foreign_keys=[denominator_board_id]
+    )  # type: ignore[name-defined]

@@ -1,0 +1,144 @@
+"""Run entry service for managing run entries."""
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from leadr.boards.domain.run_entry import RunEntry
+from leadr.boards.services.repositories import RunEntryRepository
+from leadr.common.api.pagination import PaginationParams
+from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import BoardID, IdentityID, RunEntryID, ScoreEventID
+from leadr.common.domain.pagination_result import PaginatedResult
+
+
+class RunEntryService:
+    """Service for managing run entries.
+
+    Run entries represent individual scored submissions for RUN_RUNS boards
+    where every submission is ranked.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize the run entry service.
+
+        Args:
+            session: Database session for persistence operations.
+        """
+        self.session = session
+        self.repository = RunEntryRepository(session)
+
+    async def create_run_entry(
+        self,
+        *,
+        board_id: BoardID,
+        identity_id: IdentityID,
+        score_event_id: ScoreEventID,
+        primary_value: float,
+    ) -> RunEntry:
+        """Create a new run entry.
+
+        Args:
+            board_id: The board this entry belongs to.
+            identity_id: The identity that submitted this entry.
+            score_event_id: The score event that created this entry.
+            primary_value: The rankable value for this submission.
+
+        Returns:
+            The created run entry.
+        """
+        entry = RunEntry(
+            board_id=board_id,
+            identity_id=identity_id,
+            score_event_id=score_event_id,
+            primary_value=primary_value,
+        )
+        return await self.repository.create(entry)
+
+    async def get_run_entry(self, entry_id: RunEntryID) -> RunEntry | None:
+        """Get a run entry by ID.
+
+        Args:
+            entry_id: The run entry ID to look up.
+
+        Returns:
+            The run entry if found, None otherwise.
+        """
+        return await self.repository.get_by_id(entry_id)
+
+    async def get_by_id_or_raise(self, entry_id: RunEntryID) -> RunEntry:
+        """Get a run entry by ID or raise if not found.
+
+        Args:
+            entry_id: The run entry ID to look up.
+
+        Returns:
+            The run entry.
+
+        Raises:
+            EntityNotFoundError: If the run entry does not exist.
+        """
+        entry = await self.repository.get_by_id(entry_id)
+        if entry is None:
+            raise EntityNotFoundError(entity_type="RunEntry", entity_id=str(entry_id))
+        return entry
+
+    async def get_by_board_and_score_event(
+        self,
+        board_id: BoardID,
+        score_event_id: ScoreEventID,
+    ) -> RunEntry | None:
+        """Get a run entry by board and score event.
+
+        Args:
+            board_id: The board ID to search for.
+            score_event_id: The score event ID to search for.
+
+        Returns:
+            The run entry if found, None otherwise.
+        """
+        return await self.repository.get_by_board_and_score_event(board_id, score_event_id)
+
+    async def list_run_entries(
+        self,
+        *,
+        board_id: BoardID | None = None,
+        identity_id: IdentityID | None = None,
+        limit: int = 50,
+        cursor: str | None = None,
+        sort: str | None = None,
+    ) -> PaginatedResult[RunEntry]:
+        """List run entries with optional filtering.
+
+        Args:
+            board_id: Optional board ID to filter by.
+            identity_id: Optional identity ID to filter by.
+            limit: Maximum number of entries to return.
+            cursor: Optional cursor for pagination.
+            sort: Optional sort specification.
+
+        Returns:
+            Paginated list of run entries.
+        """
+        pagination = PaginationParams(limit=limit, cursor=cursor, sort=sort)
+        return await self.repository.filter(
+            board_id=board_id,
+            identity_id=identity_id,
+            pagination=pagination,
+        )
+
+    async def soft_delete(self, entry_id: RunEntryID) -> RunEntry:
+        """Soft delete a run entry.
+
+        Args:
+            entry_id: The run entry ID to delete.
+
+        Returns:
+            The deleted run entry.
+
+        Raises:
+            EntityNotFoundError: If the run entry does not exist.
+        """
+        entry = await self.repository.get_by_id(entry_id)
+        if entry is None:
+            raise EntityNotFoundError(entity_type="RunEntry", entity_id=str(entry_id))
+        entry.soft_delete()
+        return await self.repository.update(entry)
