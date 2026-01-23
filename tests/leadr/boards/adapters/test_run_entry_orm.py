@@ -87,9 +87,7 @@ class TestRunEntryORM:
         db_session.add(entry)
         await db_session.flush()
 
-        result = await db_session.execute(
-            select(RunEntryORM).where(RunEntryORM.id == entry.id)
-        )
+        result = await db_session.execute(select(RunEntryORM).where(RunEntryORM.id == entry.id))
         saved = result.scalar_one()
 
         assert saved.board_id == board_id
@@ -166,9 +164,7 @@ class TestRunEntryORM:
         await db_session.flush()
 
         # Run entry should be deleted
-        result = await db_session.execute(
-            select(RunEntryORM).where(RunEntryORM.id == entry_id)
-        )
+        result = await db_session.execute(select(RunEntryORM).where(RunEntryORM.id == entry_id))
         assert result.scalar_one_or_none() is None
 
     async def test_run_entry_unique_constraint_board_score_event(self, db_session) -> None:

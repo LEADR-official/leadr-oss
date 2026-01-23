@@ -79,9 +79,7 @@ class BoardRatioConfigService(BaseService[BoardRatioConfig, BoardRatioConfigRepo
         )
         return await self.repository.create(config)
 
-    async def get_ratio_config(
-        self, config_id: BoardRatioConfigID
-    ) -> BoardRatioConfig | None:
+    async def get_ratio_config(self, config_id: BoardRatioConfigID) -> BoardRatioConfig | None:
         """Get a ratio config by ID.
 
         Args:

@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 import pytest
 
 from leadr.common.domain.ids import IdentityID
-from leadr.scores.adapters.orm import ScoreEventORM, ScoreFlagORM, ScoreSubmissionMetaORM
+from leadr.scores.adapters.orm import ScoreFlagORM, ScoreSubmissionMetaORM
 from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
 

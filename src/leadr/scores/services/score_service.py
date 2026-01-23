@@ -1,6 +1,5 @@
 """Score service for managing score operations."""
 
-from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import BackgroundTasks
@@ -18,16 +17,10 @@ from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, Identi
 from leadr.common.domain.pagination import SortDirection, SortField
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
-from leadr.games.services.game_service import GameService
-from leadr.scores.domain.anti_cheat.enums import FlagAction, ScoreStatus, TrustTier
-from leadr.scores.domain.anti_cheat.models import AntiCheatResult, ScoreFlag, ScoreSubmissionMeta
+from leadr.scores.domain.anti_cheat.enums import ScoreStatus, TrustTier
+from leadr.scores.domain.anti_cheat.models import AntiCheatResult
 from leadr.scores.domain.score import Score
 from leadr.scores.domain.score_event import ScoreEvent
-from leadr.scores.services.anti_cheat_repositories import (
-    ScoreFlagRepository,
-    ScoreSubmissionMetaRepository,
-)
-from leadr.scores.services.anti_cheat_service import AntiCheatService
 from leadr.scores.services.repositories import ScoreRepository
 from leadr.scores.services.score_event_service import ScoreEventService
 

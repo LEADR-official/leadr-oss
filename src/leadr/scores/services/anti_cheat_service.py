@@ -129,7 +129,7 @@ class AntiCheatService:
                 action=FlagAction.REJECT,
                 flag_type=FlagType.RATE_LIMIT,
                 confidence=FlagConfidence.HIGH,
-                reason=f"Identity exceeded rate limit of {limit} submissions per hour for this board",
+                reason=f"Identity exceeded rate limit of {limit} submissions/hour for this board",
                 metadata={
                     "limit": limit,
                     "submissions_count": submission_meta.submission_count,

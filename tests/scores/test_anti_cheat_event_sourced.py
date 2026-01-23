@@ -5,14 +5,15 @@ These tests verify that the anti-cheat system works correctly with:
 - IdentityID instead of DeviceID
 """
 
-import pytest
 from datetime import UTC, datetime
+
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.services.account_service import AccountService
 from leadr.auth.domain.identity import IdentityKind
 from leadr.auth.services.identity_service import IdentityService
-from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
+from leadr.boards.domain.board import BoardType, KeepStrategy
 from leadr.boards.services.board_service import BoardService
 from leadr.common.domain.ids import IdentityID, ScoreEventID
 from leadr.games.services.game_service import GameService
@@ -23,7 +24,6 @@ from leadr.scores.domain.anti_cheat.enums import (
     ScoreFlagStatus,
 )
 from leadr.scores.domain.anti_cheat.models import (
-    AntiCheatResult,
     ScoreFlag,
     ScoreSubmissionMeta,
 )

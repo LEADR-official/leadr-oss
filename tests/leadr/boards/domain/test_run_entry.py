@@ -1,8 +1,6 @@
 """Tests for RunEntry domain model."""
 
 from datetime import UTC, datetime
-from typing import Any
-from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError

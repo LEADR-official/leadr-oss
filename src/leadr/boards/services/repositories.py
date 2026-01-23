@@ -616,9 +616,7 @@ class BoardRatioConfigRepository(BaseRepository[BoardRatioConfig, BoardRatioConf
             else orm.zero_denominator_policy.value
         )
         display = orm.display if isinstance(orm.display, str) else orm.display.value
-        tie_breaker = (
-            orm.tie_breaker if isinstance(orm.tie_breaker, str) else orm.tie_breaker.value
-        )
+        tie_breaker = orm.tie_breaker if isinstance(orm.tie_breaker, str) else orm.tie_breaker.value
 
         return BoardRatioConfig(
             id=BoardRatioConfigID(orm.id),

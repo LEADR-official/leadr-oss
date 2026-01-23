@@ -7,7 +7,7 @@ from httpx import AsyncClient
 
 from leadr.accounts.services.account_service import AccountService
 from leadr.auth.services.device_service import DeviceService
-from leadr.boards.domain.board import KeepStrategy, SortDirection
+from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
 from leadr.games.services.game_service import GameService
 from leadr.scores.services.score_service import ScoreService
@@ -55,7 +55,8 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create 6 scores: 100, 200, 300, 500, 600, 700 (gap at 400)
@@ -129,7 +130,8 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create 5 scores: 100, 200, 300, 400, 500
@@ -198,7 +200,8 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create 5 scores: 100, 200, 300, 400, 500
@@ -267,7 +270,8 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create scores with same value=300
@@ -335,7 +339,8 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create one score
@@ -406,7 +411,8 @@ class TestScoreAroundValueEndpoint:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,  # Lower is better (like time)
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create scores: 10, 20, 30, 50, 60 (gap at 40)
@@ -467,7 +473,8 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Try to use both cursor and around_score_value
@@ -513,7 +520,8 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create a score
@@ -594,7 +602,8 @@ class TestScoreAroundValueClientEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create 6 scores
@@ -660,7 +669,8 @@ class TestScoreAroundValueClientEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Query with around_score_value on empty board

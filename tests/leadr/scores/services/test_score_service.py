@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.services.account_service import AccountService
 from leadr.auth.services.device_service import DeviceService
-from leadr.boards.domain.board import KeepStrategy, SortDirection
+from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
@@ -107,7 +107,8 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,  # Use RUN_RUNS to keep all scores
+            keep_strategy=KeepStrategy.NA,
         )
 
         score_service = ScoreService(db_session)
@@ -175,7 +176,8 @@ class TestScoreService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,  # Lower is better
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,  # Use RUN_RUNS to keep all scores
+            keep_strategy=KeepStrategy.NA,
         )
 
         score_service = ScoreService(db_session)
@@ -646,10 +648,11 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,  # Use ALL to keep both scores
+            board_type=BoardType.RUN_RUNS,  # Use RUN_RUNS to keep all scores
+            keep_strategy=KeepStrategy.NA,
         )
 
-        # Create multiple scores
+        # Create multiple scores - RUN_RUNS keeps all entries
         score_service = ScoreService(db_session)
         await score_service.create_score(
             account_id=account.id,
@@ -918,12 +921,23 @@ class TestScoreService:
         )
 
         # Verify no submission metadata was created
+        # Get the identity for this device (created during start_session)
+        from leadr.auth.domain.identity import IdentityKind
+        from leadr.auth.services.identity_service import IdentityService
         from leadr.scores.services.anti_cheat_repositories import (
             ScoreSubmissionMetaRepository,
         )
 
+        identity_service = IdentityService(db_session)
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key=str(device.id),
+        )
+
         meta_repo = ScoreSubmissionMetaRepository(db_session)
-        meta = await meta_repo.get_by_device_and_board(device.id, board.id)
+        meta = await meta_repo.get_by_identity_and_board(identity.id, board.id)
         assert meta is None
 
     async def test_create_score_with_metadata(self, db_session: AsyncSession):
@@ -1042,8 +1056,8 @@ class TestScoreService:
         assert updated.metadata == new_metadata
         assert updated.metadata["level"] == 10  # type: ignore[index]
 
-    async def test_keep_strategy_all_keeps_all_scores(self, db_session: AsyncSession):
-        """Test that ALL strategy keeps all scores from the same device."""
+    async def test_run_runs_board_keeps_all_scores(self, db_session: AsyncSession):
+        """Test that RUN_RUNS board type keeps all scores from the same device."""
         # Create supporting entities
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -1063,7 +1077,7 @@ class TestScoreService:
             client_fingerprint="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
         )
 
-        # Create board with ALL strategy
+        # Create board with RUN_RUNS type (keeps all submissions)
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
@@ -1074,7 +1088,8 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create multiple scores from the same device
@@ -1744,7 +1759,8 @@ class TestScoreServiceAroundScoreId:
             client_fingerprint="f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7",
         )
 
-        # Create board with DESCENDING sort (higher is better)
+        # Create RUN_RUNS board with DESCENDING sort (higher is better)
+        # RUN_RUNS keeps all submissions for around_score testing
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
@@ -1755,7 +1771,8 @@ class TestScoreServiceAroundScoreId:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create 7 scores with different values

@@ -100,9 +100,7 @@ class TestBoardRatioConfigRepository:
 class TestBoardRatioConfigRepositoryCRUD:
     """CRUD tests for BoardRatioConfigRepository."""
 
-    async def test_create_board_ratio_config(
-        self, db_session, account_orm, game_orm
-    ) -> None:
+    async def test_create_board_ratio_config(self, db_session, account_orm, game_orm) -> None:
         """Creating a board ratio config succeeds."""
         repository = BoardRatioConfigRepository(db_session)
 

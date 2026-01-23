@@ -83,9 +83,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         """
         return await self.get_by_id(flag_id)
 
-    async def _sync_ranking_status(
-        self, flag: ScoreFlag, new_flag_status: ScoreFlagStatus
-    ) -> None:
+    async def _sync_ranking_status(self, flag: ScoreFlag, new_flag_status: ScoreFlagStatus) -> None:
         """Sync ranking status based on flag status change.
 
         When a flag is reviewed, the ranking should be updated:

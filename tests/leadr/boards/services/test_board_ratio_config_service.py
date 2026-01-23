@@ -6,7 +6,6 @@ import pytest
 
 from leadr.boards.adapters.orm import BoardORM
 from leadr.boards.domain.board_ratio_config import (
-    BoardRatioConfig,
     RatioDisplay,
     ZeroDenominatorPolicy,
 )
@@ -181,9 +180,7 @@ class TestBoardRatioConfigService:
 
         assert result is None
 
-    async def test_get_by_id_or_raise_success(
-        self, db_session, account_orm, game_orm
-    ) -> None:
+    async def test_get_by_id_or_raise_success(self, db_session, account_orm, game_orm) -> None:
         """get_by_id_or_raise returns config when found."""
         service = BoardRatioConfigService(db_session)
 

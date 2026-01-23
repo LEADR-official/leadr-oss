@@ -109,9 +109,7 @@ async def get_submission_meta(
     meta = await service.get_by_id_or_raise(meta_id)
 
     # Get the associated score event to check account access
-    score_event_orm = await service.repository.session.get(
-        ScoreEventORM, meta.score_event_id.uuid
-    )
+    score_event_orm = await service.repository.session.get(ScoreEventORM, meta.score_event_id.uuid)
     if not score_event_orm:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

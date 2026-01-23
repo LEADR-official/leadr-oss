@@ -7,10 +7,14 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
+from leadr.auth.domain.identity import Identity
+from leadr.boards.domain.board_state import BoardState
+from leadr.boards.domain.run_entry import RunEntry
+from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, IdentityID, ScoreID
 from leadr.config import settings
 from leadr.scores.domain.anti_cheat.enums import ScoreStatus
 from leadr.scores.domain.score import Score
+from leadr.scores.domain.score_event import ScoreEvent
 
 
 class IsTestFilter(str, Enum):
@@ -145,7 +149,10 @@ class ScoreResponse(BaseModel):
     account_id: AccountID = Field(description="ID of the account this score belongs to")
     game_id: GameID = Field(description="ID of the game this score belongs to")
     board_id: BoardID = Field(description="ID of the board this score belongs to")
-    device_id: DeviceID = Field(description="ID of the device that submitted this score")
+    identity_id: IdentityID = Field(description="ID of the identity that submitted this score")
+    device_id: DeviceID | None = Field(
+        default=None, description="ID of the device (deprecated, use identity_id)"
+    )
     player_name: str = Field(description="Display name of the player")
     value: float = Field(description="Numeric value of the score")
     value_display: str | None = Field(default=None, description="Formatted display string, or null")
@@ -181,11 +188,18 @@ class ScoreResponse(BaseModel):
         Returns:
             ScoreResponse with all fields populated from the domain entity.
         """
+        # Handle legacy Score entities that may not have identity_id
+        identity_id = getattr(score, "identity_id", None)
+        if identity_id is None:
+            # For legacy scores, create an IdentityID from device_id UUID
+            identity_id = IdentityID(score.device_id.uuid)
+
         return cls(
             id=score.id,
             account_id=score.account_id,
             game_id=score.game_id,
             board_id=score.board_id,
+            identity_id=identity_id,
             device_id=score.device_id,
             player_name=score.player_name,
             value=score.value,
@@ -202,6 +216,94 @@ class ScoreResponse(BaseModel):
             updated_at=score.updated_at,
         )
 
+    @classmethod
+    def from_board_state(
+        cls,
+        state: BoardState,
+        identity: Identity,
+        score_event: ScoreEvent,
+        rank: int,
+    ) -> "ScoreResponse":
+        """Convert BoardState to ScoreResponse with masked ID.
+
+        Args:
+            state: The BoardState entity representing materialized ranking.
+            identity: The Identity entity for player info.
+            score_event: The ScoreEvent for metadata (geo, is_test, etc.).
+            rank: The computed rank position (1-indexed).
+
+        Returns:
+            ScoreResponse with ID masked from bst_ to scr_ prefix.
+        """
+        # Mask BoardStateID to ScoreID (same UUID, different prefix)
+        masked_id = ScoreID(state.id.uuid)
+
+        return cls(
+            id=masked_id,
+            account_id=score_event.account_id,
+            game_id=score_event.game_id,
+            board_id=state.board_id,
+            identity_id=identity.id,
+            device_id=None,  # Not available from new event-sourced data
+            player_name=identity.display_name or "",
+            value=state.primary_value or 0.0,
+            value_display=None,  # Not stored in board_state
+            timezone=score_event.timezone,
+            country=score_event.country,
+            city=score_event.city,
+            metadata=None,  # Not stored in board_state
+            rank=rank,
+            is_placeholder=False,
+            is_test=score_event.is_test,
+            status=ScoreStatus.ACTIVE,  # Board states are always active
+            created_at=score_event.created_at,
+            updated_at=state.updated_at,
+        )
+
+    @classmethod
+    def from_run_entry(
+        cls,
+        entry: RunEntry,
+        identity: Identity,
+        score_event: ScoreEvent,
+        rank: int,
+    ) -> "ScoreResponse":
+        """Convert RunEntry to ScoreResponse with masked ID.
+
+        Args:
+            entry: The RunEntry entity representing a single run.
+            identity: The Identity entity for player info.
+            score_event: The ScoreEvent for metadata (geo, is_test, etc.).
+            rank: The computed rank position (1-indexed).
+
+        Returns:
+            ScoreResponse with ID masked from run_ to scr_ prefix.
+        """
+        # Mask RunEntryID to ScoreID (same UUID, different prefix)
+        masked_id = ScoreID(entry.id.uuid)
+
+        return cls(
+            id=masked_id,
+            account_id=score_event.account_id,
+            game_id=score_event.game_id,
+            board_id=entry.board_id,
+            identity_id=identity.id,
+            device_id=None,  # Not available from new event-sourced data
+            player_name=identity.display_name or "",
+            value=entry.primary_value,
+            value_display=None,  # Not stored in run_entry
+            timezone=score_event.timezone,
+            country=score_event.country,
+            city=score_event.city,
+            metadata=None,  # Not stored in run_entry
+            rank=rank,
+            is_placeholder=False,
+            is_test=score_event.is_test,
+            status=ScoreStatus.ACTIVE,  # Run entries are always active
+            created_at=score_event.created_at,
+            updated_at=entry.updated_at,
+        )
+
 
 class ScoreClientResponse(BaseModel):
     """Response model for a score (client API - excludes device_id and geo fields)."""
@@ -210,6 +312,7 @@ class ScoreClientResponse(BaseModel):
     account_id: AccountID = Field(description="ID of the account this score belongs to")
     game_id: GameID = Field(description="ID of the game this score belongs to")
     board_id: BoardID = Field(description="ID of the board this score belongs to")
+    identity_id: IdentityID = Field(description="ID of the identity that submitted this score")
     player_name: str = Field(description="Display name of the player")
     value: float = Field(description="Numeric value of the score")
     value_display: str | None = Field(default=None, description="Formatted display string, or null")
@@ -242,11 +345,18 @@ class ScoreClientResponse(BaseModel):
         Returns:
             ScoreClientResponse with all fields except device_id, timezone, country, and city.
         """
+        # Handle legacy Score entities that may not have identity_id
+        identity_id = getattr(score, "identity_id", None)
+        if identity_id is None:
+            # For legacy scores, create an IdentityID from device_id UUID
+            identity_id = IdentityID(score.device_id.uuid)
+
         return cls(
             id=score.id,
             account_id=score.account_id,
             game_id=score.game_id,
             board_id=score.board_id,
+            identity_id=identity_id,
             player_name=score.player_name,
             value=score.value,
             value_display=score.value_display,
@@ -257,4 +367,82 @@ class ScoreClientResponse(BaseModel):
             status=score.status,
             created_at=score.created_at,
             updated_at=score.updated_at,
+        )
+
+    @classmethod
+    def from_board_state(
+        cls,
+        state: BoardState,
+        identity: Identity,
+        score_event: ScoreEvent,
+        rank: int,
+    ) -> "ScoreClientResponse":
+        """Convert BoardState to ScoreClientResponse with masked ID.
+
+        Args:
+            state: The BoardState entity representing materialized ranking.
+            identity: The Identity entity for player info.
+            score_event: The ScoreEvent for metadata (is_test, etc.).
+            rank: The computed rank position (1-indexed).
+
+        Returns:
+            ScoreClientResponse with ID masked from bst_ to scr_ prefix.
+        """
+        masked_id = ScoreID(state.id.uuid)
+
+        return cls(
+            id=masked_id,
+            account_id=score_event.account_id,
+            game_id=score_event.game_id,
+            board_id=state.board_id,
+            identity_id=identity.id,
+            player_name=identity.display_name or "",
+            value=state.primary_value or 0.0,
+            value_display=None,
+            metadata=None,
+            rank=rank,
+            is_placeholder=False,
+            is_test=score_event.is_test,
+            status=ScoreStatus.ACTIVE,
+            created_at=score_event.created_at,
+            updated_at=state.updated_at,
+        )
+
+    @classmethod
+    def from_run_entry(
+        cls,
+        entry: RunEntry,
+        identity: Identity,
+        score_event: ScoreEvent,
+        rank: int,
+    ) -> "ScoreClientResponse":
+        """Convert RunEntry to ScoreClientResponse with masked ID.
+
+        Args:
+            entry: The RunEntry entity representing a single run.
+            identity: The Identity entity for player info.
+            score_event: The ScoreEvent for metadata (is_test, etc.).
+            rank: The computed rank position (1-indexed).
+
+        Returns:
+            ScoreClientResponse with ID masked from run_ to scr_ prefix.
+        """
+        masked_id = ScoreID(entry.id.uuid)
+
+        return cls(
+            id=masked_id,
+            account_id=score_event.account_id,
+            game_id=score_event.game_id,
+            board_id=entry.board_id,
+            identity_id=identity.id,
+            player_name=identity.display_name or "",
+            value=entry.primary_value,
+            value_display=None,
+            metadata=None,
+            rank=rank,
+            is_placeholder=False,
+            is_test=score_event.is_test,
+            status=ScoreStatus.ACTIVE,
+            created_at=score_event.created_at,
+            updated_at=entry.updated_at,
         )

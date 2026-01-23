@@ -7,7 +7,7 @@ from httpx import AsyncClient
 
 from leadr.accounts.services.account_service import AccountService
 from leadr.auth.services.device_service import DeviceService
-from leadr.boards.domain.board import KeepStrategy, SortDirection
+from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
 from leadr.games.services.game_service import GameService
 from leadr.scores.services.score_service import ScoreService
@@ -50,7 +50,8 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create 7 scores with different values
@@ -121,7 +122,8 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create 5 scores
@@ -184,7 +186,8 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Use non-existent score ID
@@ -230,7 +233,8 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create a score
@@ -287,7 +291,8 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create a score
@@ -343,7 +348,8 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
         board2 = await board_service.create_board(
             account_id=account.id,
@@ -354,7 +360,8 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create score on board1
@@ -415,7 +422,8 @@ class TestScoreAroundClientEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create 7 scores

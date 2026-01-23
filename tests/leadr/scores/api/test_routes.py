@@ -5,7 +5,7 @@ from httpx import AsyncClient
 
 from leadr.accounts.services.account_service import AccountService
 from leadr.auth.services.device_service import DeviceService
-from leadr.boards.domain.board import KeepStrategy, SortDirection
+from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
 from leadr.games.services.game_service import GameService
 from leadr.scores.services.score_service import ScoreService
@@ -682,10 +682,11 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,  # Use RUN_RUNS to keep both scores
+            keep_strategy=KeepStrategy.NA,
         )
 
-        # Create two scores
+        # Create two scores - RUN_RUNS keeps all
         score_service = ScoreService(db_session)
         score1, _ = await score_service.create_score(
             account_id=account.id,

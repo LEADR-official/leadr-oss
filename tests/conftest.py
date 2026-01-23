@@ -30,7 +30,7 @@ from leadr.auth.domain.device import Device
 from leadr.auth.services.dependencies import get_api_key_service
 from leadr.auth.services.repositories import DeviceRepository
 from leadr.boards.adapters.orm import BoardORM  # noqa: F401
-from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
 from leadr.boards.services.repositories import BoardRepository
 from leadr.common.database import get_db
 from leadr.common.domain.ids import (
@@ -396,6 +396,39 @@ async def test_board(db_session: AsyncSession, test_account: Account, test_game)
         is_active=True,
         sort_direction=SortDirection.DESCENDING,
         keep_strategy=KeepStrategy.BEST,  # Use ALL to keep all scores for testing
+        created_at=now,
+        updated_at=now,
+    )
+    return await board_repo.create(board)
+
+
+@pytest_asyncio.fixture
+async def run_runs_board(db_session: AsyncSession, test_account: Account, test_game):
+    """Create a RUN_RUNS board that keeps all score submissions.
+
+    Use this fixture for tests that need to create multiple scores from the same
+    device/identity and have all of them stored (pagination tests, around tests).
+
+    Returns:
+        The created Board domain entity.
+    """
+    board_repo = BoardRepository(db_session)
+    board_id = BoardID()
+    now = datetime.now(UTC)
+
+    board = Board(
+        id=board_id,
+        account_id=test_account.id,
+        game_id=test_game.id,
+        name="Test Board (RUN_RUNS)",
+        slug="test-board-run-runs",
+        icon="trophy",
+        short_code=f"RUNS{str(board_id.uuid)[:6]}".upper(),
+        unit="points",
+        is_active=True,
+        sort_direction=SortDirection.DESCENDING,
+        board_type=BoardType.RUN_RUNS,
+        keep_strategy=KeepStrategy.NA,
         created_at=now,
         updated_at=now,
     )

@@ -6,7 +6,18 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy import ARRAY, Boolean, DateTime, Enum, Float, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    ARRAY,
+    Boolean,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -462,9 +473,7 @@ class BoardRatioConfigORM(Base):
     )
 
     # Relationships
-    board: Mapped["BoardORM"] = relationship(
-        "BoardORM", foreign_keys=[board_id]
-    )  # type: ignore[name-defined]
+    board: Mapped["BoardORM"] = relationship("BoardORM", foreign_keys=[board_id])  # type: ignore[name-defined]
     numerator_board: Mapped["BoardORM"] = relationship(
         "BoardORM", foreign_keys=[numerator_board_id]
     )  # type: ignore[name-defined]

@@ -5,7 +5,7 @@ from httpx import AsyncClient
 
 from leadr.accounts.domain.account import Account
 from leadr.auth.domain.device import Device
-from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
 from leadr.scores.services.score_service import ScoreService
 
@@ -19,7 +19,7 @@ class TestScoreRankAdmin:
         authenticated_client: AsyncClient,
         db_session,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test that scores include rank when board_id is provided."""
@@ -29,8 +29,8 @@ class TestScoreRankAdmin:
         for i, value in enumerate(values):
             await score_service.create_score(
                 account_id=test_account.id,
-                game_id=test_board.game_id,
-                board_id=test_board.id,
+                game_id=run_runs_board.game_id,
+                board_id=run_runs_board.id,
                 device_id=test_device.id,
                 player_name=f"Player{i}",
                 value=float(value),
@@ -38,7 +38,7 @@ class TestScoreRankAdmin:
 
         # Get scores with board_id filter (board has DESCENDING sort)
         response = await authenticated_client.get(
-            f"/scores?account_id={test_account.id}&board_id={test_board.id}"
+            f"/scores?account_id={test_account.id}&board_id={run_runs_board.id}"
         )
 
         assert response.status_code == 200
@@ -62,7 +62,7 @@ class TestScoreRankAdmin:
         authenticated_client: AsyncClient,
         db_session,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test that rank is null when board_id is not provided."""
@@ -70,8 +70,8 @@ class TestScoreRankAdmin:
         score_service = ScoreService(db_session)
         await score_service.create_score(
             account_id=test_account.id,
-            game_id=test_board.game_id,
-            board_id=test_board.id,
+            game_id=run_runs_board.game_id,
+            board_id=run_runs_board.id,
             device_id=test_device.id,
             player_name="Player1",
             value=100.0,
@@ -108,7 +108,8 @@ class TestScoreRankAdmin:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
         # Create scores (lower is better)
@@ -148,7 +149,7 @@ class TestScoreRankAdmin:
         authenticated_client: AsyncClient,
         db_session,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test rank handles tied values by created_at (later submission wins for DESC boards)."""
@@ -159,8 +160,8 @@ class TestScoreRankAdmin:
         # Create first score
         await score_service.create_score(
             account_id=test_account.id,
-            game_id=test_board.game_id,
-            board_id=test_board.id,
+            game_id=run_runs_board.game_id,
+            board_id=run_runs_board.id,
             device_id=test_device.id,
             player_name="First",
             value=100.0,
@@ -172,8 +173,8 @@ class TestScoreRankAdmin:
         # Create second score with same value
         await score_service.create_score(
             account_id=test_account.id,
-            game_id=test_board.game_id,
-            board_id=test_board.id,
+            game_id=run_runs_board.game_id,
+            board_id=run_runs_board.id,
             device_id=test_device.id,
             player_name="Second",
             value=100.0,
@@ -181,7 +182,7 @@ class TestScoreRankAdmin:
 
         # Get scores
         response = await authenticated_client.get(
-            f"/scores?account_id={test_account.id}&board_id={test_board.id}"
+            f"/scores?account_id={test_account.id}&board_id={run_runs_board.id}"
         )
 
         assert response.status_code == 200
@@ -205,7 +206,7 @@ class TestScoreRankAdmin:
         authenticated_client: AsyncClient,
         db_session,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test that GET /scores/{id} returns rank using score's board_id."""
@@ -215,8 +216,8 @@ class TestScoreRankAdmin:
         for value in [100, 300, 200]:
             score, _ = await score_service.create_score(
                 account_id=test_account.id,
-                game_id=test_board.game_id,
-                board_id=test_board.id,
+                game_id=run_runs_board.game_id,
+                board_id=run_runs_board.id,
                 device_id=test_device.id,
                 player_name=f"Player{value}",
                 value=float(value),
@@ -242,7 +243,7 @@ class TestScoreRankClient:
         client: AsyncClient,
         db_session,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test that client endpoint also returns ranks when board_id provided."""
@@ -251,7 +252,7 @@ class TestScoreRankClient:
         # Start a device session to get access token (use same fingerprint as test_device)
         device_service = DeviceService(db_session)
         _, access_token, _, _ = await device_service.start_session(
-            game_id=test_board.game_id,
+            game_id=run_runs_board.game_id,
             client_fingerprint=test_device.client_fingerprint,
         )
 
@@ -260,8 +261,8 @@ class TestScoreRankClient:
         for value in [100, 300, 200]:
             await score_service.create_score(
                 account_id=test_account.id,
-                game_id=test_board.game_id,
-                board_id=test_board.id,
+                game_id=run_runs_board.game_id,
+                board_id=run_runs_board.id,
                 device_id=test_device.id,
                 player_name=f"Player{value}",
                 value=float(value),
@@ -269,7 +270,7 @@ class TestScoreRankClient:
 
         # Get scores via client endpoint with board_id
         response = await client.get(
-            f"/client/scores?board_id={test_board.id}",
+            f"/client/scores?board_id={run_runs_board.id}",
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
@@ -296,7 +297,7 @@ class TestScoreRankClient:
         client: AsyncClient,
         db_session,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test that client endpoint returns null rank without board_id."""
@@ -305,7 +306,7 @@ class TestScoreRankClient:
         # Start a device session (use same fingerprint as test_device)
         device_service = DeviceService(db_session)
         _, access_token, _, _ = await device_service.start_session(
-            game_id=test_board.game_id,
+            game_id=run_runs_board.game_id,
             client_fingerprint=test_device.client_fingerprint,
         )
 
@@ -313,8 +314,8 @@ class TestScoreRankClient:
         score_service = ScoreService(db_session)
         await score_service.create_score(
             account_id=test_account.id,
-            game_id=test_board.game_id,
-            board_id=test_board.id,
+            game_id=run_runs_board.game_id,
+            board_id=run_runs_board.id,
             device_id=test_device.id,
             player_name="Player1",
             value=100.0,
@@ -344,7 +345,7 @@ class TestScoreRankPagination:
         authenticated_client: AsyncClient,
         db_session,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test ranks are continuous across pages (page 2 starts at 11, not 1)."""
@@ -353,8 +354,8 @@ class TestScoreRankPagination:
         for i in range(25):
             await score_service.create_score(
                 account_id=test_account.id,
-                game_id=test_board.game_id,
-                board_id=test_board.id,
+                game_id=run_runs_board.game_id,
+                board_id=run_runs_board.id,
                 device_id=test_device.id,
                 player_name=f"Player{i}",
                 value=float(1000 - i),  # DESCENDING: 1000, 999, 998, ...
@@ -362,7 +363,7 @@ class TestScoreRankPagination:
 
         # Get first page (limit=10)
         response = await authenticated_client.get(
-            f"/scores?account_id={test_account.id}&board_id={test_board.id}&limit=10"
+            f"/scores?account_id={test_account.id}&board_id={run_runs_board.id}&limit=10"
         )
         assert response.status_code == 200
         page1 = response.json()
@@ -375,7 +376,7 @@ class TestScoreRankPagination:
         # Get second page
         cursor = page1["pagination"]["next_cursor"]
         response = await authenticated_client.get(
-            f"/scores?account_id={test_account.id}&board_id={test_board.id}&limit=10&cursor={cursor}"
+            f"/scores?account_id={test_account.id}&board_id={run_runs_board.id}&limit=10&cursor={cursor}"
         )
         assert response.status_code == 200
         page2 = response.json()
@@ -390,7 +391,7 @@ class TestScoreRankPagination:
         authenticated_client: AsyncClient,
         db_session,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test around_score_id returns correct global ranks."""
@@ -400,8 +401,8 @@ class TestScoreRankPagination:
         for i in range(11):
             score, _ = await score_service.create_score(
                 account_id=test_account.id,
-                game_id=test_board.game_id,
-                board_id=test_board.id,
+                game_id=run_runs_board.game_id,
+                board_id=run_runs_board.id,
                 device_id=test_device.id,
                 player_name=f"Player{i}",
                 value=float(1000 - (i * 100)),  # 1000, 900, 800, ..., 0
@@ -413,7 +414,7 @@ class TestScoreRankPagination:
 
         # Get scores around the middle score with limit=5
         response = await authenticated_client.get(
-            f"/scores?account_id={test_account.id}&board_id={test_board.id}"
+            f"/scores?account_id={test_account.id}&board_id={run_runs_board.id}"
             f"&around_score_id={middle_score.id}&limit=5"
         )
         assert response.status_code == 200
@@ -444,7 +445,7 @@ class TestScoreRankExcludesDeleted:
         authenticated_client: AsyncClient,
         db_session,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test soft-deleted scores are excluded from rank calculation."""
@@ -455,8 +456,8 @@ class TestScoreRankExcludesDeleted:
         for value in [300, 200, 100]:
             score, _ = await score_service.create_score(
                 account_id=test_account.id,
-                game_id=test_board.game_id,
-                board_id=test_board.id,
+                game_id=run_runs_board.game_id,
+                board_id=run_runs_board.id,
                 device_id=test_device.id,
                 player_name=f"Player{value}",
                 value=float(value),
@@ -469,7 +470,7 @@ class TestScoreRankExcludesDeleted:
 
         # Get scores
         response = await authenticated_client.get(
-            f"/scores?account_id={test_account.id}&board_id={test_board.id}"
+            f"/scores?account_id={test_account.id}&board_id={run_runs_board.id}"
         )
 
         assert response.status_code == 200

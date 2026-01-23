@@ -61,9 +61,7 @@ class ScoreSubmissionMeta(Entity):
         default_factory=ScoreSubmissionMetaID,
         description="Unique submission metadata identifier",
     )
-    score_event_id: ScoreEventID = Field(
-        description="ID of the most recent score event submission"
-    )
+    score_event_id: ScoreEventID = Field(description="ID of the most recent score event submission")
     identity_id: IdentityID = Field(description="ID of the identity submitting scores")
     board_id: BoardID = Field(description="ID of the board being submitted to")
     submission_count: int = Field(

@@ -67,9 +67,7 @@ class TestSubmitScoreValidation:
                 # Missing value
             )
 
-    async def test_submit_score_requires_value_for_run_runs_board(
-        self, db_session: AsyncSession
-    ):
+    async def test_submit_score_requires_value_for_run_runs_board(self, db_session: AsyncSession):
         """RUN_RUNS boards require value in payload."""
         # Create account
         account_service = AccountService(db_session)
@@ -114,9 +112,7 @@ class TestSubmitScoreValidation:
                 # Missing value
             )
 
-    async def test_submit_score_requires_delta_for_counter_board(
-        self, db_session: AsyncSession
-    ):
+    async def test_submit_score_requires_delta_for_counter_board(self, db_session: AsyncSession):
         """COUNTER boards require delta in payload."""
         # Create account
         account_service = AccountService(db_session)

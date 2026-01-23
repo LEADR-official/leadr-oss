@@ -16,12 +16,12 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test that GET /scores returns paginated response format."""
         response = await authenticated_client.get(
-            f"/scores?account_id={test_account.id}&board_id={test_board.id}"
+            f"/scores?account_id={test_account.id}&board_id={run_runs_board.id}"
         )
         assert response.status_code == 200
         data = response.json()
@@ -43,18 +43,18 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test that default page size is 20."""
-        # Create 25 scores
+        # Create 25 scores - using RUN_RUNS board to keep all
         for i in range(25):
             await authenticated_client.post(
                 "/scores",
                 json={
                     "account_id": str(test_account.id),
-                    "game_id": str(test_board.game_id),
-                    "board_id": str(test_board.id),
+                    "game_id": str(run_runs_board.game_id),
+                    "board_id": str(run_runs_board.id),
                     "device_id": str(test_device.id),
                     "player_name": f"Player{i}",
                     "value": float(100 + i),
@@ -63,7 +63,7 @@ class TestScorePagination:
 
         # Get first page
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}"
         )
         assert response.status_code == 200
         data = response.json()
@@ -79,7 +79,7 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test custom page size."""
@@ -89,8 +89,8 @@ class TestScorePagination:
                 "/scores",
                 json={
                     "account_id": str(test_account.id),
-                    "game_id": str(test_board.game_id),
-                    "board_id": str(test_board.id),
+                    "game_id": str(run_runs_board.game_id),
+                    "board_id": str(run_runs_board.id),
                     "device_id": str(test_device.id),
                     "player_name": f"Player{i}",
                     "value": float(100 + i),
@@ -99,7 +99,7 @@ class TestScorePagination:
 
         # Get with limit=5
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&limit=5"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&limit=5"
         )
         assert response.status_code == 200
         data = response.json()
@@ -112,7 +112,7 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test forward pagination using next_cursor."""
@@ -122,8 +122,8 @@ class TestScorePagination:
                 "/scores",
                 json={
                     "account_id": str(test_account.id),
-                    "game_id": str(test_board.game_id),
-                    "board_id": str(test_board.id),
+                    "game_id": str(run_runs_board.game_id),
+                    "board_id": str(run_runs_board.id),
                     "device_id": str(test_device.id),
                     "player_name": f"Player{i}",
                     "value": float(1000 - i),  # Descending values
@@ -132,7 +132,7 @@ class TestScorePagination:
 
         # Get first page
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&limit=10"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&limit=10"
         )
         assert response.status_code == 200
         page1 = response.json()
@@ -142,7 +142,7 @@ class TestScorePagination:
         # Get second page using cursor
         next_cursor = page1["pagination"]["next_cursor"]
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&limit=10&cursor={next_cursor}"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&limit=10&cursor={next_cursor}"
         )
         assert response.status_code == 200
         page2 = response.json()
@@ -158,7 +158,7 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test backward pagination using prev_cursor."""
@@ -168,8 +168,8 @@ class TestScorePagination:
                 "/scores",
                 json={
                     "account_id": str(test_account.id),
-                    "game_id": str(test_board.game_id),
-                    "board_id": str(test_board.id),
+                    "game_id": str(run_runs_board.game_id),
+                    "board_id": str(run_runs_board.id),
                     "device_id": str(test_device.id),
                     "player_name": f"Player{i}",
                     "value": float(1000 - i),
@@ -178,14 +178,14 @@ class TestScorePagination:
 
         # Get first page
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&limit=10"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&limit=10"
         )
         page1 = response.json()
 
         # Get second page
         next_cursor = page1["pagination"]["next_cursor"]
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&limit=10&cursor={next_cursor}"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&limit=10&cursor={next_cursor}"
         )
         page2 = response.json()
         assert page2["pagination"]["has_prev"] is True
@@ -193,7 +193,7 @@ class TestScorePagination:
         # Go back to first page using prev_cursor
         prev_cursor = page2["pagination"]["prev_cursor"]
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&limit=10&cursor={prev_cursor}"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&limit=10&cursor={prev_cursor}"
         )
         assert response.status_code == 200
         page_back = response.json()
@@ -208,7 +208,7 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test pagination with custom sort (value descending)."""
@@ -219,8 +219,8 @@ class TestScorePagination:
                 "/scores",
                 json={
                     "account_id": str(test_account.id),
-                    "game_id": str(test_board.game_id),
-                    "board_id": str(test_board.id),
+                    "game_id": str(run_runs_board.game_id),
+                    "board_id": str(run_runs_board.id),
                     "device_id": str(test_device.id),
                     "player_name": f"Player{i}",
                     "value": float(value),
@@ -229,7 +229,7 @@ class TestScorePagination:
 
         # Get sorted by value descending
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&sort=value:desc"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&sort=value:desc"
         )
         assert response.status_code == 200
         data = response.json()
@@ -247,12 +247,12 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test that invalid sort field returns 400 error."""
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&sort=invalid_field:desc"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&sort=invalid_field:desc"
         )
         assert response.status_code == 400
         assert "Unknown sort field" in response.json()["error"]
@@ -261,12 +261,12 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test that invalid cursor returns 400 error."""
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&cursor=invalid-cursor"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&cursor=invalid-cursor"
         )
         assert response.status_code == 400
         assert "Invalid pagination cursor" in response.json()["error"]
@@ -275,7 +275,7 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test that cursor state mismatch returns 400 error."""
@@ -285,8 +285,8 @@ class TestScorePagination:
                 "/scores",
                 json={
                     "account_id": str(test_account.id),
-                    "game_id": str(test_board.game_id),
-                    "board_id": str(test_board.id),
+                    "game_id": str(run_runs_board.game_id),
+                    "board_id": str(run_runs_board.id),
                     "device_id": str(test_device.id),
                     "player_name": f"Player{i}",
                     "value": float(100 + i),
@@ -295,14 +295,14 @@ class TestScorePagination:
 
         # Get first page with one sort (use limit=10 to ensure pagination)
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&sort=value:desc&limit=10"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&sort=value:desc&limit=10"
         )
         page1 = response.json()
         cursor = page1["pagination"]["next_cursor"]
 
         # Try to use cursor with different sort
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&sort=created_at:asc&limit=10&cursor={cursor}"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&sort=created_at:asc&limit=10&cursor={cursor}"
         )
         assert response.status_code == 400
         assert "Query parameters don't match cursor state" in response.json()["error"]
@@ -311,12 +311,12 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test pagination with no results."""
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}"
         )
         assert response.status_code == 200
         data = response.json()
@@ -332,7 +332,7 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test pagination with single result."""
@@ -341,8 +341,8 @@ class TestScorePagination:
             "/scores",
             json={
                 "account_id": str(test_account.id),
-                "game_id": str(test_board.game_id),
-                "board_id": str(test_board.id),
+                "game_id": str(run_runs_board.game_id),
+                "board_id": str(run_runs_board.id),
                 "device_id": str(test_device.id),
                 "player_name": "SinglePlayer",
                 "value": 100.0,
@@ -350,7 +350,7 @@ class TestScorePagination:
         )
 
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}"
         )
         assert response.status_code == 200
         data = response.json()
@@ -364,7 +364,7 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test that last page has has_next=False and no next_cursor."""
@@ -374,8 +374,8 @@ class TestScorePagination:
                 "/scores",
                 json={
                     "account_id": str(test_account.id),
-                    "game_id": str(test_board.game_id),
-                    "board_id": str(test_board.id),
+                    "game_id": str(run_runs_board.game_id),
+                    "board_id": str(run_runs_board.id),
                     "device_id": str(test_device.id),
                     "player_name": f"Player{i}",
                     "value": float(100 + i),
@@ -384,7 +384,7 @@ class TestScorePagination:
 
         # Get first page (20 items)
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&limit=20"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&limit=20"
         )
         page1 = response.json()
         assert page1["pagination"]["has_next"] is True
@@ -392,7 +392,7 @@ class TestScorePagination:
         # Get second page (should be last page with 5 items)
         cursor = page1["pagination"]["next_cursor"]
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&limit=20&cursor={cursor}"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&limit=20&cursor={cursor}"
         )
         page2 = response.json()
 
@@ -405,7 +405,7 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test pagination works correctly with filters."""
@@ -418,8 +418,8 @@ class TestScorePagination:
                 "/scores",
                 json={
                     "account_id": str(test_account.id),
-                    "game_id": str(test_board.game_id),
-                    "board_id": str(test_board.id),
+                    "game_id": str(run_runs_board.game_id),
+                    "board_id": str(run_runs_board.id),
                     "device_id": device1,
                     "player_name": f"Player{i}",
                     "value": float(100 + i),
@@ -432,8 +432,8 @@ class TestScorePagination:
                 "/scores",
                 json={
                     "account_id": str(test_account.id),
-                    "game_id": str(test_board.game_id),
-                    "board_id": str(test_board.id),
+                    "game_id": str(run_runs_board.game_id),
+                    "board_id": str(run_runs_board.id),
                     "device_id": device2,
                     "player_name": f"Player{i}",
                     "value": float(200 + i),
@@ -442,7 +442,7 @@ class TestScorePagination:
 
         # Get scores filtered by device1
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&device_id={device1}"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&device_id={device1}"
         )
         assert response.status_code == 200
         data = response.json()
@@ -456,7 +456,7 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test that default sort uses board.sort_direction (DESCENDING - high scores first)."""
@@ -467,8 +467,8 @@ class TestScorePagination:
                 "/scores",
                 json={
                     "account_id": str(test_account.id),
-                    "game_id": str(test_board.game_id),
-                    "board_id": str(test_board.id),
+                    "game_id": str(run_runs_board.game_id),
+                    "board_id": str(run_runs_board.id),
                     "device_id": str(test_device.id),
                     "player_name": f"Player{i}",
                     "value": float(value),
@@ -477,7 +477,7 @@ class TestScorePagination:
 
         # Get scores without explicit sort - should use board's sort_direction
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}"
         )
         assert response.status_code == 200
         data = response.json()
@@ -492,7 +492,7 @@ class TestScorePagination:
         self,
         authenticated_client: AsyncClient,
         test_account: Account,
-        test_board: Board,
+        run_runs_board: Board,
         test_device: Device,
     ) -> None:
         """Test that explicit sort param overrides board's default sort_direction."""
@@ -503,8 +503,8 @@ class TestScorePagination:
                 "/scores",
                 json={
                     "account_id": str(test_account.id),
-                    "game_id": str(test_board.game_id),
-                    "board_id": str(test_board.id),
+                    "game_id": str(run_runs_board.game_id),
+                    "board_id": str(run_runs_board.id),
                     "device_id": str(test_device.id),
                     "player_name": f"Player{i}",
                     "value": float(value),
@@ -513,7 +513,7 @@ class TestScorePagination:
 
         # Get scores with explicit ascending sort (even though board is DESCENDING)
         response = await authenticated_client.get(
-            f"/scores?account_id={str(test_account.id)}&board_id={str(test_board.id)}&sort=value:asc"
+            f"/scores?account_id={str(test_account.id)}&board_id={str(run_runs_board.id)}&sort=value:asc"
         )
         assert response.status_code == 200
         data = response.json()

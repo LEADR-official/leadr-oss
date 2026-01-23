@@ -533,7 +533,7 @@ async def list_scores_client(
     )
 
 
-@router.patch("/scores/{score_id}", response_model=ScoreResponse)
+@router.patch("/scores/{score_id}", response_model=ScoreResponse, deprecated=True)
 async def update_score(
     score_id: ScoreID,
     request: ScoreUpdateRequest,
@@ -541,6 +541,9 @@ async def update_score(
     auth: AdminAuthContextDep,
 ) -> ScoreResponse:
     """Update a score.
+
+    DEPRECATED: This endpoint is deprecated and will be removed in a future version.
+    Scores are now immutable events. Use score flags for moderation instead.
 
     Supports partial updates of score fields. Any field not provided will
     remain unchanged. Set deleted: true to soft delete the score.
