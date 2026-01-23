@@ -46,7 +46,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score
@@ -107,7 +107,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score with optional fields (geo fields auto-populated by middleware)
@@ -217,7 +217,7 @@ class TestScoreRoutes:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Try to create score for account1 with account2's board
@@ -277,7 +277,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Try to create score with game2 (mismatched)
@@ -328,7 +328,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score
@@ -378,9 +378,13 @@ class TestScoreRoutes:
         )
 
         device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        device1, _, _, _ = await device_service.start_session(
             game_id=game.id,
             client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+        )
+        device2, _, _, _ = await device_service.start_session(
+            game_id=game.id,
+            client_fingerprint="adf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb1",
         )
 
         board_service = BoardService(db_session)
@@ -393,16 +397,16 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create multiple scores
+        # Create multiple scores from different devices
         score_service = ScoreService(db_session)
         await score_service.create_score(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
+            device_id=device1.id,
             player_name="Player1",
             value=100.0,
         )
@@ -410,7 +414,7 @@ class TestScoreRoutes:
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
+            device_id=device2.id,
             player_name="Player2",
             value=200.0,
         )
@@ -463,7 +467,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
         board2 = await board_service.create_board(
             account_id=account.id,
@@ -474,7 +478,7 @@ class TestScoreRoutes:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create scores for both boards
@@ -540,7 +544,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score
@@ -610,7 +614,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score
@@ -678,7 +682,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create two scores
@@ -749,7 +753,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score with admin auth
@@ -805,7 +809,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Generate a fresh nonce for the mutation (nonces are single-use)
@@ -869,7 +873,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create a score
@@ -932,7 +936,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create a score
@@ -1031,7 +1035,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
         board2 = await board_service.create_board(
             account_id=account2.id,
@@ -1042,7 +1046,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         score_service = ScoreService(db_session)
@@ -1112,7 +1116,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create scores from both devices
@@ -1183,7 +1187,7 @@ class TestScoreRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create scores from both devices

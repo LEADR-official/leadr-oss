@@ -41,3 +41,19 @@ class Base(DeclarativeBase):
     created_at: Mapped[timestamp]
     updated_at: Mapped[timestamp] = mapped_column(onupdate=func.now())
     deleted_at: Mapped[nullable_timestamp]
+
+
+class ImmutableBase(DeclarativeBase):
+    """Base class for immutable database models (append-only, no updates/deletes).
+
+    Used for event-sourcing entities like ScoreEvent that:
+    - Have no updated_at (immutable after creation)
+    - Have no deleted_at (append-only, never soft-deleted)
+    """
+
+    # Share metadata with Base so all tables are in same registry
+    metadata = Base.metadata
+    registry = Base.registry
+
+    id: Mapped[uuid_pk]
+    created_at: Mapped[timestamp]

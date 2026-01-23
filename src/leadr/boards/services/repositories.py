@@ -5,8 +5,8 @@ from typing import Any
 
 from sqlalchemy import func, select
 
-from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM
-from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM, BoardTypeEnum, KeepStrategyEnum
+from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
@@ -41,7 +41,8 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             is_active=orm.is_active,
             is_published=orm.is_published,
             sort_direction=SortDirection(orm.sort_direction),
-            keep_strategy=KeepStrategy(orm.keep_strategy),
+            board_type=BoardType(orm.board_type.value),
+            keep_strategy=KeepStrategy(orm.keep_strategy.value),
             created_from_template_id=BoardTemplateID(orm.created_from_template_id)
             if orm.created_from_template_id
             else None,
@@ -69,7 +70,8 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             is_active=entity.is_active,
             is_published=entity.is_published,
             sort_direction=entity.sort_direction.value,
-            keep_strategy=entity.keep_strategy.value,
+            board_type=BoardTypeEnum(entity.board_type.value),
+            keep_strategy=KeepStrategyEnum(entity.keep_strategy.value),
             created_from_template_id=entity.created_from_template_id.uuid
             if entity.created_from_template_id
             else None,

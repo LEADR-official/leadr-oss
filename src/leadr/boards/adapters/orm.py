@@ -1,15 +1,35 @@
 """Board ORM model."""
 
+import enum
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy import ARRAY, Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import ARRAY, Boolean, DateTime, Enum, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from leadr.common.orm import Base
+
+
+class BoardTypeEnum(str, enum.Enum):
+    """Board type enum for database."""
+
+    RUN_IDENTITY = "RUN_IDENTITY"
+    RUN_RUNS = "RUN_RUNS"
+    COUNTER = "COUNTER"
+    RATIO = "RATIO"
+
+
+class KeepStrategyEnum(str, enum.Enum):
+    """Keep strategy enum for database."""
+
+    FIRST = "FIRST"
+    BEST = "BEST"
+    LATEST = "LATEST"
+    NA = "NA"
+
 
 if TYPE_CHECKING:
     from leadr.accounts.adapters.orm import AccountORM
@@ -60,7 +80,30 @@ class BoardORM(Base):
         Boolean, nullable=False, default=True, server_default=sa.text("true")
     )
     sort_direction: Mapped[str] = mapped_column(String, nullable=False)
-    keep_strategy: Mapped[str] = mapped_column(String, nullable=False)
+    board_type: Mapped[BoardTypeEnum] = mapped_column(
+        Enum(
+            BoardTypeEnum,
+            name="board_type",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+            create_constraint=False,
+        ),
+        nullable=False,
+        default=BoardTypeEnum.RUN_IDENTITY,
+        server_default="RUN_IDENTITY",
+    )
+    keep_strategy: Mapped[KeepStrategyEnum] = mapped_column(
+        Enum(
+            KeepStrategyEnum,
+            name="keep_strategy",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+            create_constraint=False,
+        ),
+        nullable=False,
+        default=KeepStrategyEnum.BEST,
+        server_default="BEST",
+    )
     created_from_template_id: Mapped[UUID | None] = mapped_column(nullable=True, default=None)
     template_name: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     starts_at: Mapped[datetime | None] = mapped_column(
@@ -106,7 +149,30 @@ class BoardTemplateORM(Base):
     icon: Mapped[str | None] = mapped_column(String, nullable=True)
     unit: Mapped[str | None] = mapped_column(String, nullable=True)
     sort_direction: Mapped[str] = mapped_column(String, nullable=False)
-    keep_strategy: Mapped[str] = mapped_column(String, nullable=False)
+    board_type: Mapped[BoardTypeEnum] = mapped_column(
+        Enum(
+            BoardTypeEnum,
+            name="board_type",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+            create_constraint=False,
+        ),
+        nullable=False,
+        default=BoardTypeEnum.RUN_IDENTITY,
+        server_default="RUN_IDENTITY",
+    )
+    keep_strategy: Mapped[KeepStrategyEnum] = mapped_column(
+        Enum(
+            KeepStrategyEnum,
+            name="keep_strategy",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+            create_constraint=False,
+        ),
+        nullable=False,
+        default=KeepStrategyEnum.BEST,
+        server_default="BEST",
+    )
     starts_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
@@ -147,7 +213,7 @@ class BoardTemplateORM(Base):
         Returns:
             BoardTemplate domain entity with all fields populated from ORM model.
         """
-        from leadr.boards.domain.board import KeepStrategy, SortDirection
+        from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
         from leadr.boards.domain.board_template import BoardTemplate
         from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 
@@ -162,7 +228,8 @@ class BoardTemplateORM(Base):
             icon=self.icon,
             unit=self.unit,
             sort_direction=SortDirection(self.sort_direction),
-            keep_strategy=KeepStrategy(self.keep_strategy),
+            board_type=BoardType(self.board_type.value),
+            keep_strategy=KeepStrategy(self.keep_strategy.value),
             starts_at=self.starts_at,
             ends_at=self.ends_at,
             tags=self.tags,
@@ -198,7 +265,8 @@ class BoardTemplateORM(Base):
             icon=entity.icon,
             unit=entity.unit,
             sort_direction=entity.sort_direction.value,
-            keep_strategy=entity.keep_strategy.value,
+            board_type=BoardTypeEnum(entity.board_type.value),
+            keep_strategy=KeepStrategyEnum(entity.keep_strategy.value),
             starts_at=entity.starts_at,
             ends_at=entity.ends_at,
             tags=entity.tags,

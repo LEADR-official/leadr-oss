@@ -47,7 +47,7 @@ class TestProcessDueTemplates:
             icon="star",
             unit="points",
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             config={},
         )
 
@@ -274,7 +274,7 @@ class TestExpireBoards:
             unit="points",
             is_active=True,  # Should be set to False
             sort_direction=SortDirection.DESCENDING.value,
-            keep_strategy=KeepStrategy.BEST_ONLY.value,
+            keep_strategy=KeepStrategy.BEST.value,
             starts_at=past_time - timedelta(days=1),
             ends_at=past_time,  # Expired
         )
@@ -320,7 +320,7 @@ class TestExpireBoards:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING.value,
-            keep_strategy=KeepStrategy.BEST_ONLY.value,
+            keep_strategy=KeepStrategy.BEST.value,
             starts_at=datetime.now(UTC),
             ends_at=future_time,  # Not expired
         )
@@ -379,7 +379,7 @@ class TestExpireBoards:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING.value,
-            keep_strategy=KeepStrategy.BEST_ONLY.value,
+            keep_strategy=KeepStrategy.BEST.value,
             starts_at=past_time - timedelta(days=1),
             ends_at=past_time,
         )

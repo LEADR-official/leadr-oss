@@ -48,7 +48,7 @@ class TestScoreFlagService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         device_service = DeviceService(db_session)
@@ -119,7 +119,7 @@ class TestScoreFlagService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         device_service = DeviceService(db_session)
@@ -185,7 +185,7 @@ class TestScoreFlagService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         device_service = DeviceService(db_session)
@@ -251,7 +251,7 @@ class TestScoreFlagService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         device_service = DeviceService(db_session)

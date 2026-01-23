@@ -22,6 +22,8 @@ from leadr.auth.adapters.orm import (
     DeviceORM,
     DeviceSessionORM,
     DeviceStatusEnum,
+    IdentityKindEnum,
+    IdentityORM,
     NonceORM,
     NonceStatusEnum,
 )
@@ -146,7 +148,7 @@ async def board_orm(
         unit="points",
         is_active=True,
         sort_direction=SortDirection.DESCENDING.value,  # Use enum value (string)
-        keep_strategy=KeepStrategy.BEST_ONLY.value,  # Use enum value (string)
+        keep_strategy=KeepStrategy.BEST.value,  # Use enum value (string)
         created_from_template_id=None,
         tags=[],
     )
@@ -180,6 +182,33 @@ async def device_orm(
     db_session.add(device)
     await db_session.flush()
     return device
+
+
+@pytest_asyncio.fixture
+async def identity_orm(
+    db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
+) -> IdentityORM:
+    """Create and persist a test IdentityORM linked to account and game.
+
+    Args:
+        account_orm: Parent account (auto-injected fixture).
+        game_orm: Parent game (auto-injected fixture).
+
+    Returns:
+        IdentityORM instance with auto-generated id.
+    """
+    from uuid import uuid4
+
+    identity = IdentityORM(
+        account_id=account_orm.id,  # Raw UUID
+        game_id=game_orm.id,  # Raw UUID
+        kind=IdentityKindEnum.DEVICE,
+        external_key=f"dev_{uuid4()}",  # Device ID format
+        display_name="Test Player",
+    )
+    db_session.add(identity)
+    await db_session.flush()
+    return identity
 
 
 @pytest_asyncio.fixture

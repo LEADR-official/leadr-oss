@@ -36,7 +36,7 @@ class TestBoardORM:
             unit="seconds",
             is_active=True,
             sort_direction="ASCENDING",
-            keep_strategy="BEST_ONLY",
+            keep_strategy="BEST",
             created_from_template_id=template_id,
             template_name="Speed Run Template",
             starts_at=starts_at,
@@ -57,7 +57,7 @@ class TestBoardORM:
         assert board.unit == "seconds"  # type: ignore[comparison-overlap]
         assert board.is_active is True
         assert board.sort_direction == "ASCENDING"  # type: ignore[comparison-overlap]
-        assert board.keep_strategy == "BEST_ONLY"  # type: ignore[comparison-overlap]
+        assert board.keep_strategy == "BEST"  # type: ignore[comparison-overlap]
         assert board.created_from_template_id == template_id
         assert board.template_name == "Speed Run Template"  # type: ignore[comparison-overlap]
         assert board.starts_at == starts_at
@@ -81,7 +81,7 @@ class TestBoardORM:
             unit="points",
             is_active=True,
             sort_direction="DESCENDING",
-            keep_strategy="ALL",
+            keep_strategy="BEST",
         )
 
         db_session.add(board)
@@ -122,7 +122,7 @@ class TestBoardORM:
             unit="points",
             is_active=True,
             sort_direction="DESCENDING",
-            keep_strategy="ALL",
+            keep_strategy="BEST",
         )
         db_session.add(board1)
         await db_session.commit()
@@ -138,7 +138,7 @@ class TestBoardORM:
             unit="seconds",
             is_active=True,
             sort_direction="ASCENDING",
-            keep_strategy="BEST_ONLY",
+            keep_strategy="BEST",
         )
         db_session.add(board2)
         with pytest.raises(IntegrityError):
@@ -160,7 +160,7 @@ class TestBoardORM:
             unit="points",
             is_active=True,
             sort_direction="DESCENDING",
-            keep_strategy="ALL",
+            keep_strategy="BEST",
         )
 
         db_session.add(board)
@@ -182,7 +182,7 @@ class TestBoardORM:
             unit="points",
             is_active=True,
             sort_direction="DESCENDING",
-            keep_strategy="ALL",
+            keep_strategy="BEST",
         )
 
         db_session.add(board)
@@ -238,7 +238,7 @@ class TestBoardORM:
             unit="points",
             is_active=True,
             sort_direction="DESCENDING",
-            keep_strategy="ALL",
+            keep_strategy="BEST",
         )
 
         db_session.add(board)
@@ -270,7 +270,7 @@ class TestBoardORM:
             unit="points",
             is_active=True,
             sort_direction="DESCENDING",
-            keep_strategy="ALL",
+            keep_strategy="BEST",
         )
 
         db_session.add(board)
@@ -308,7 +308,7 @@ class TestBoardORM:
             unit="points",
             is_active=True,
             sort_direction="DESCENDING",
-            keep_strategy="ALL",
+            keep_strategy="BEST",
             tags=tags,
         )
 

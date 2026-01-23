@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import JSON, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from leadr.common.domain.ids import BoardID, DeviceID, ScoreFlagID, ScoreID, UserID
-from leadr.common.orm import Base
+from leadr.common.orm import Base, ImmutableBase
 from leadr.scores.domain.anti_cheat.enums import (
     FlagConfidence,
     FlagType,
@@ -20,6 +20,7 @@ from leadr.scores.domain.anti_cheat.models import ScoreFlag
 
 if TYPE_CHECKING:
     from leadr.accounts.adapters.orm import AccountORM
+    from leadr.auth.adapters.orm import IdentityORM
     from leadr.boards.adapters.orm import BoardORM
     from leadr.games.adapters.orm import GameORM
     from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
@@ -105,6 +106,60 @@ class ScoreORM(Base):
                 "deleted_at IS NULL AND status NOT IN ('rejected', 'provisional')"
             ),
         ),
+    )
+
+
+class ScoreEventORM(ImmutableBase):
+    """Score event ORM model for append-only event sourcing.
+
+    Represents an immutable fact about a score submission in the database.
+    ScoreEvents are never updated or deleted - they are append-only.
+    Maps to the score_events table with foreign keys to accounts, games, boards, and identities.
+    """
+
+    __tablename__ = "score_events"
+
+    account_id: Mapped[UUID] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    game_id: Mapped[UUID] = mapped_column(
+        ForeignKey("games.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    board_id: Mapped[UUID] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    identity_id: Mapped[UUID] = mapped_column(
+        ForeignKey("identities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    event_payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=dict,
+        server_default="{}",
+    )
+    is_test: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    timezone: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    country: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    city: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+
+    # Relationships
+    account: Mapped["AccountORM"] = relationship("AccountORM")  # type: ignore[name-defined]
+    game: Mapped["GameORM"] = relationship("GameORM")  # type: ignore[name-defined]
+    board: Mapped["BoardORM"] = relationship("BoardORM")  # type: ignore[name-defined]
+    identity: Mapped["IdentityORM"] = relationship("IdentityORM")  # type: ignore[name-defined]
+
+    # Indexes for efficient querying
+    __table_args__ = (
+        # Index for listing events by board and identity
+        Index("ix_score_events_board_identity", "board_id", "identity_id"),
     )
 
 

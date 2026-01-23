@@ -87,7 +87,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -187,7 +187,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -287,7 +287,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -416,7 +416,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -434,7 +434,7 @@ class TestScoreRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -554,7 +554,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -572,7 +572,7 @@ class TestScoreRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -708,7 +708,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -815,7 +815,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -909,7 +909,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -1008,7 +1008,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -1105,7 +1105,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -1214,7 +1214,7 @@ class TestScoreRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -1323,7 +1323,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -1431,7 +1431,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )

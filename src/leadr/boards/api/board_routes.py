@@ -78,6 +78,7 @@ async def create_board(
             is_active=request.is_active,
             is_published=request.is_published,
             sort_direction=request.sort_direction,
+            board_type=request.board_type,
             keep_strategy=request.keep_strategy,
             created_from_template_id=request.created_from_template_id,
             template_name=request.template_name,

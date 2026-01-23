@@ -86,7 +86,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         icon: str | None = "fa-crown",
         unit: str | None = None,
         sort_direction: SortDirection = SortDirection.DESCENDING,
-        keep_strategy: KeepStrategy = KeepStrategy.ALL,
+        keep_strategy: KeepStrategy = KeepStrategy.BEST,
         starts_at: datetime | None = None,
         ends_at: datetime | None = None,
         tags: list[str] | None = None,

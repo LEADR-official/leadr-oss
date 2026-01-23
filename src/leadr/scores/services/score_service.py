@@ -184,7 +184,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             raise ValueError(f"Game {game_id} does not match board's game {board.game_id}")
 
         # 4. Check keep_strategy before creating new score
-        if board.keep_strategy == KeepStrategy.FIRST_ONLY:
+        if board.keep_strategy == KeepStrategy.FIRST:
             existing_score = await self._get_active_score_for_device(
                 account_id=account_id,
                 device_id=device_id,
@@ -196,7 +196,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
                     existing_score, board.sort_direction
                 )
                 return existing_score, None
-        elif board.keep_strategy == KeepStrategy.LATEST_ONLY:
+        elif board.keep_strategy == KeepStrategy.LATEST:
             existing_score = await self._get_active_score_for_device(
                 account_id=account_id,
                 device_id=device_id,
@@ -205,7 +205,7 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             if existing_score is not None:
                 # Soft-delete the old score before creating new one
                 await self.soft_delete(existing_score.id)
-        elif board.keep_strategy == KeepStrategy.BEST_ONLY:
+        elif board.keep_strategy == KeepStrategy.BEST:
             existing_score = await self._get_active_score_for_device(
                 account_id=account_id,
                 device_id=device_id,

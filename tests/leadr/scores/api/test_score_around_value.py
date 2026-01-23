@@ -55,7 +55,7 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create 6 scores: 100, 200, 300, 500, 600, 700 (gap at 400)
@@ -129,7 +129,7 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create 5 scores: 100, 200, 300, 400, 500
@@ -198,7 +198,7 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create 5 scores: 100, 200, 300, 400, 500
@@ -267,7 +267,7 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create scores with same value=300
@@ -335,7 +335,7 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create one score
@@ -406,7 +406,7 @@ class TestScoreAroundValueEndpoint:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,  # Lower is better (like time)
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create scores: 10, 20, 30, 50, 60 (gap at 40)
@@ -467,7 +467,7 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Try to use both cursor and around_score_value
@@ -513,7 +513,7 @@ class TestScoreAroundValueEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create a score
@@ -594,7 +594,7 @@ class TestScoreAroundValueClientEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create 6 scores
@@ -660,7 +660,7 @@ class TestScoreAroundValueClientEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Query with around_score_value on empty board

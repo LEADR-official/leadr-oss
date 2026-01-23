@@ -13,7 +13,7 @@ from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.cursor import Cursor
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import AccountID, PrefixedID
-from leadr.common.domain.models import Entity
+from leadr.common.domain.models import Entity, ImmutableEntity
 from leadr.common.domain.pagination import (
     CursorPosition,
     PaginationDirection,
@@ -21,11 +21,15 @@ from leadr.common.domain.pagination import (
     SortField,
 )
 from leadr.common.domain.pagination_result import PaginatedResult
-from leadr.common.orm import Base
+from leadr.common.orm import Base, ImmutableBase
 
 # Type variables for generic repository
 DomainEntityT = TypeVar("DomainEntityT", bound=Entity)
 ORMModelT = TypeVar("ORMModelT", bound=Base)
+
+# Type variables for immutable (append-only) repository
+ImmutableEntityT = TypeVar("ImmutableEntityT", bound=ImmutableEntity)
+ImmutableORMT = TypeVar("ImmutableORMT", bound=ImmutableBase)
 
 
 class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
@@ -548,6 +552,314 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
             # For forward pagination (or no cursor)
             has_next = has_more
             has_prev = cursor is not None  # If we have a cursor, we can go back
+            next_position = (
+                self._extract_cursor_position(orms[-1], sort_fields) if orms and has_next else None
+            )
+            prev_position = (
+                self._extract_cursor_position(orms[0], sort_fields) if orms and has_prev else None
+            )
+
+        return PaginatedResult(
+            items=items,
+            has_next=has_next,
+            has_prev=has_prev,
+            next_position=next_position,
+            prev_position=prev_position,
+        )
+
+
+class ImmutableBaseRepository(ABC, Generic[ImmutableEntityT, ImmutableORMT]):
+    """Abstract base repository for immutable (append-only) entities.
+
+    Used for event-sourced entities that are never updated or deleted.
+    Provides only create, get, and filter operations.
+    """
+
+    def __init__(self, session: AsyncSession):
+        """Initialize repository with database session.
+
+        Args:
+            session: SQLAlchemy async session
+        """
+        self.session = session
+
+    @staticmethod
+    def _extract_uuid(id_value: UUID | PrefixedID | UUID4 | str) -> UUID:
+        """Extract UUID from various ID types.
+
+        Args:
+            id_value: ID value that can be UUID, PrefixedID, UUID4, or string
+
+        Returns:
+            UUID instance for database querying
+        """
+        if isinstance(id_value, PrefixedID):
+            return id_value.uuid
+        if isinstance(id_value, UUID):
+            return id_value
+        return UUID(str(id_value))
+
+    @abstractmethod
+    def _to_domain(self, orm: ImmutableORMT) -> ImmutableEntityT:
+        """Convert ORM model to domain entity.
+
+        Args:
+            orm: ORM model instance
+
+        Returns:
+            Domain entity instance
+        """
+
+    @abstractmethod
+    def _to_orm(self, entity: ImmutableEntityT) -> ImmutableORMT:
+        """Convert domain entity to ORM model.
+
+        Args:
+            entity: Domain entity instance
+
+        Returns:
+            ORM model instance
+        """
+
+    @abstractmethod
+    def _get_orm_class(self) -> type[ImmutableORMT]:
+        """Get the ORM model class for this repository.
+
+        Returns:
+            ORM model class
+        """
+
+    async def create(self, entity: ImmutableEntityT) -> ImmutableEntityT:
+        """Create a new immutable entity in the database.
+
+        Args:
+            entity: Domain entity to create
+
+        Returns:
+            Created domain entity with refreshed data
+        """
+        orm = self._to_orm(entity)
+        self.session.add(orm)
+        await self.session.commit()
+        await self.session.refresh(orm)
+        return self._to_domain(orm)
+
+    async def get_by_id(self, entity_id: UUID4 | PrefixedID) -> ImmutableEntityT | None:
+        """Get an immutable entity by its ID.
+
+        Args:
+            entity_id: Entity ID to retrieve
+
+        Returns:
+            Domain entity if found, None otherwise
+        """
+        orm_class = self._get_orm_class()
+        query = select(orm_class).where(orm_class.id == self._extract_uuid(entity_id))
+        result = await self.session.execute(query)
+        orm = result.scalar_one_or_none()
+        return self._to_domain(orm) if orm else None
+
+    @abstractmethod
+    async def filter(
+        self,
+        account_id: AccountID | None = None,
+        *,
+        pagination: PaginationParams,
+        **kwargs: Any,
+    ) -> PaginatedResult[ImmutableEntityT]:
+        """Filter immutable entities based on criteria with pagination.
+
+        Args:
+            account_id: Optional account ID for filtering.
+            pagination: Required pagination parameters (cursor, limit, sort).
+            **kwargs: Additional filter parameters specific to the entity type.
+
+        Returns:
+            PaginatedResult containing matching entities and pagination metadata.
+        """
+
+    async def _list_all_unfiltered(self) -> list[ImmutableEntityT]:
+        """List all immutable entities without filtering.
+
+        PRIVATE METHOD - Use filter() in application code.
+
+        Returns:
+            List of domain entities
+        """
+        orm_class = self._get_orm_class()
+        query = select(orm_class)
+        result = await self.session.execute(query)
+        orms = result.scalars().all()
+        return [self._to_domain(orm) for orm in orms]
+
+    # Pagination support methods
+
+    def _get_orm_column(self, field_name: str) -> Any:
+        """Get ORM column by field name.
+
+        Args:
+            field_name: Name of the field
+
+        Returns:
+            SQLAlchemy column object
+
+        Raises:
+            ValueError: If field doesn't exist on ORM model
+        """
+        orm_class = self._get_orm_class()
+        if not hasattr(orm_class, field_name):
+            raise ValueError(f"Unknown sort field: {field_name}")
+        return getattr(orm_class, field_name)
+
+    def _convert_cursor_value(self, value: Any, column: Any) -> Any:
+        """Convert cursor value to match ORM column type.
+
+        Args:
+            value: Cursor value (JSON primitive)
+            column: SQLAlchemy column object
+
+        Returns:
+            Value converted to match column's Python type
+        """
+        from sqlalchemy import DateTime, Uuid
+
+        column_type = column.type
+
+        if isinstance(column_type, DateTime) and isinstance(value, str):
+            return datetime.fromisoformat(value)
+        elif isinstance(column_type, Uuid) and isinstance(value, str):
+            return UUID(value)
+        else:
+            return value
+
+    def _build_cursor_where_clause(
+        self,
+        cursor: Cursor,
+        sort_fields: list[SortField],
+    ) -> Any:
+        """Build WHERE clause for cursor-based pagination.
+
+        Args:
+            cursor: Cursor containing position and sort information
+            sort_fields: List of sort fields
+
+        Returns:
+            SQLAlchemy WHERE clause condition
+        """
+        position_values = cursor.position.values
+        is_backward = cursor.direction == PaginationDirection.BACKWARD
+
+        or_conditions = []
+
+        for i, sort_field in enumerate(sort_fields):
+            if is_backward:
+                comp_op = "__gt__" if sort_field.direction == SortDirection.DESC else "__lt__"
+            else:
+                comp_op = "__lt__" if sort_field.direction == SortDirection.DESC else "__gt__"
+
+            equality_conditions = []
+            for j in range(i):
+                prev_field = sort_fields[j]
+                prev_column = self._get_orm_column(prev_field.name)
+                prev_value = self._convert_cursor_value(position_values[j], prev_column)
+                equality_conditions.append(prev_column == prev_value)
+
+            current_column = self._get_orm_column(sort_field.name)
+            current_value = self._convert_cursor_value(position_values[i], current_column)
+            comparison = getattr(current_column, comp_op)(current_value)
+
+            if equality_conditions:
+                or_conditions.append(and_(*equality_conditions, comparison))
+            else:
+                or_conditions.append(comparison)
+
+        return or_(*or_conditions)
+
+    def _apply_sort(self, query: Any, sort_fields: list[SortField]) -> Any:
+        """Apply sorting to a query.
+
+        Args:
+            query: SQLAlchemy query to sort
+            sort_fields: List of sort fields
+
+        Returns:
+            Query with sorting applied
+        """
+        for sort_field in sort_fields:
+            column = self._get_orm_column(sort_field.name)
+            if sort_field.direction == SortDirection.DESC:
+                query = query.order_by(column.desc())
+            else:
+                query = query.order_by(column.asc())
+        return query
+
+    def _extract_cursor_position(
+        self,
+        orm: ImmutableORMT,
+        sort_fields: list[SortField],
+    ) -> CursorPosition:
+        """Extract cursor position from an ORM model.
+
+        Args:
+            orm: ORM model instance
+            sort_fields: List of sort fields to extract values for
+
+        Returns:
+            CursorPosition with values for each sort field
+        """
+        values = []
+        for sort_field in sort_fields:
+            value = getattr(orm, sort_field.name)
+            values.append(value)
+
+        entity_id = str(orm.id)
+        return CursorPosition(values=tuple(values), entity_id=entity_id)
+
+    async def _execute_paginated_query(
+        self,
+        query: Any,
+        sort_fields: list[SortField],
+        cursor: Cursor | None,
+        limit: int,
+    ) -> PaginatedResult[ImmutableEntityT]:
+        """Execute a paginated query and return results with metadata.
+
+        Args:
+            query: Base SQLAlchemy query (with filters applied)
+            sort_fields: List of sort fields
+            cursor: Optional cursor for pagination
+            limit: Number of items to return
+
+        Returns:
+            PaginatedResult with items and pagination metadata
+        """
+        if cursor is not None:
+            cursor_where = self._build_cursor_where_clause(cursor, sort_fields)
+            query = query.where(cursor_where)
+
+        query = self._apply_sort(query, sort_fields)
+        query = query.limit(limit + 1)
+
+        result = await self.session.execute(query)
+        orms = list(result.scalars().all())
+
+        has_more = len(orms) > limit
+
+        if has_more:
+            orms = orms[:limit]
+
+        items = [self._to_domain(orm) for orm in orms]
+
+        if cursor is not None and cursor.direction == PaginationDirection.BACKWARD:
+            has_next = True
+            has_prev = has_more
+            next_position = self._extract_cursor_position(orms[-1], sort_fields) if orms else None
+            prev_position = (
+                self._extract_cursor_position(orms[0], sort_fields) if orms and has_prev else None
+            )
+        else:
+            has_next = has_more
+            has_prev = cursor is not None
             next_position = (
                 self._extract_cursor_position(orms[-1], sort_fields) if orms and has_next else None
             )

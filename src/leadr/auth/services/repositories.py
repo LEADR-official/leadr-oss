@@ -1,4 +1,4 @@
-"""API Key, Device, and Nonce repository services."""
+"""API Key, Device, Identity, and Nonce repository services."""
 
 from __future__ import annotations
 
@@ -13,10 +13,14 @@ from leadr.auth.adapters.orm import (
     DeviceORM,
     DeviceSessionORM,
     DeviceStatusEnum,
+    IdentityKindEnum,
+    IdentityORM,
+    IdentitySessionORM,
     NonceORM,
 )
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
 from leadr.auth.domain.device import Device, DeviceSession
+from leadr.auth.domain.identity import Identity, IdentityKind, IdentitySession
 from leadr.auth.domain.nonce import Nonce
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import (
@@ -24,6 +28,7 @@ from leadr.common.domain.ids import (
     APIKeyID,
     DeviceID,
     GameID,
+    IdentityID,
     UserID,
 )
 from leadr.common.domain.pagination_result import PaginatedResult
@@ -496,3 +501,249 @@ class NonceRepository(BaseRepository[Nonce, NonceORM]):
         await self.session.commit()
         # rowcount is available on CursorResult from DELETE statements
         return int(result.rowcount) if result.rowcount else 0  # type: ignore[attr-defined]
+
+
+class IdentityRepository(BaseRepository[Identity, IdentityORM]):
+    """Identity repository for managing identity persistence."""
+
+    # Valid sortable fields for identities
+    SORTABLE_FIELDS = {
+        "id",
+        "display_name",
+        "kind",
+        "created_at",
+        "updated_at",
+    }
+
+    def _to_domain(self, orm: IdentityORM) -> Identity:
+        """Convert ORM model to domain entity."""
+        return orm.to_domain()
+
+    def _to_orm(self, entity: Identity) -> IdentityORM:
+        """Convert domain entity to ORM model."""
+        return IdentityORM.from_domain(entity)
+
+    def _get_orm_class(self) -> type[IdentityORM]:
+        """Get the ORM model class."""
+        return IdentityORM
+
+    async def get_by_external_key(
+        self,
+        account_id: AccountID,
+        game_id: GameID,
+        kind: IdentityKind,
+        external_key: str,
+    ) -> Identity | None:
+        """Get identity by unique key combination.
+
+        Args:
+            account_id: The account ID
+            game_id: The game ID
+            kind: The identity kind (DEVICE, STEAM, CUSTOM)
+            external_key: The external identifier
+
+        Returns:
+            Identity if found and not deleted, None otherwise
+        """
+        account_uuid = self._extract_uuid(account_id)
+        game_uuid = self._extract_uuid(game_id)
+        query = select(IdentityORM).where(
+            IdentityORM.account_id == account_uuid,
+            IdentityORM.game_id == game_uuid,
+            IdentityORM.kind == IdentityKindEnum(kind.value),
+            IdentityORM.external_key == external_key,
+            IdentityORM.deleted_at.is_(None),
+        )
+        result = await self.session.execute(query)
+        orm = result.scalar_one_or_none()
+        return self._to_domain(orm) if orm else None
+
+    async def filter(
+        self,
+        account_id: AccountID | None = None,
+        *,
+        game_id: GameID | None = None,
+        kind: IdentityKind | None = None,
+        pagination: PaginationParams,
+        **kwargs: Any,
+    ) -> PaginatedResult[Identity]:
+        """Filter identities by account and optional criteria with pagination.
+
+        Args:
+            account_id: Optional account ID to filter by. If None, returns all identities
+                (superadmin use case). Regular users should always pass account_id.
+            game_id: Optional game ID to filter by
+            kind: Optional identity kind to filter by
+            pagination: Pagination parameters (required).
+            **kwargs: Additional filter parameters (reserved for future use)
+
+        Returns:
+            PaginatedResult containing identities.
+
+        Raises:
+            ValueError: If sort field is not in SORTABLE_FIELDS
+            CursorValidationError: If cursor is invalid or state doesn't match
+        """
+        query = select(IdentityORM).where(IdentityORM.deleted_at.is_(None))
+        if account_id is not None:
+            account_uuid = self._extract_uuid(account_id)
+            query = query.where(IdentityORM.account_id == account_uuid)
+
+        # Build filters dict for cursor validation
+        filters_dict: dict[str, str] = {}
+
+        if game_id is not None:
+            game_uuid = self._extract_uuid(game_id)
+            query = query.where(IdentityORM.game_id == game_uuid)
+            filters_dict["game_id"] = str(game_id)
+
+        if kind is not None:
+            query = query.where(IdentityORM.kind == IdentityKindEnum(kind.value))
+            filters_dict["kind"] = kind.value
+
+        # Validate sort fields
+        for sort_field in pagination.sort_spec:
+            if sort_field.name not in self.SORTABLE_FIELDS:
+                raise ValueError(
+                    f"Unknown sort field: {sort_field.name}. "
+                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
+                )
+
+        # Handle cursor if present
+        cursor = None
+        if pagination.has_cursor():
+            cursor = pagination.decode_cursor()
+            if cursor is not None:
+                cursor.validate_state(pagination.sort_spec, filters_dict)
+
+        # Execute paginated query
+        return await self._execute_paginated_query(
+            query=query,
+            sort_fields=pagination.sort_spec,
+            cursor=cursor,
+            limit=pagination.limit,
+        )
+
+
+class IdentitySessionRepository(BaseRepository[IdentitySession, IdentitySessionORM]):
+    """IdentitySession repository for managing identity session persistence."""
+
+    # Valid sortable fields for identity sessions
+    SORTABLE_FIELDS = {
+        "id",
+        "created_at",
+        "updated_at",
+    }
+
+    def _to_domain(self, orm: IdentitySessionORM) -> IdentitySession:
+        """Convert ORM model to domain entity."""
+        return orm.to_domain()
+
+    def _to_orm(self, entity: IdentitySession) -> IdentitySessionORM:
+        """Convert domain entity to ORM model."""
+        return IdentitySessionORM.from_domain(entity)
+
+    def _get_orm_class(self) -> type[IdentitySessionORM]:
+        """Get the ORM model class."""
+        return IdentitySessionORM
+
+    async def get_by_token_hash(self, token_hash: str) -> IdentitySession | None:
+        """Get session by access token hash, returns None if not found or soft-deleted.
+
+        Args:
+            token_hash: The hashed access token
+
+        Returns:
+            IdentitySession if found and not deleted, None otherwise
+        """
+        query = select(IdentitySessionORM).where(
+            IdentitySessionORM.access_token_hash == token_hash,
+            IdentitySessionORM.deleted_at.is_(None),
+        )
+        result = await self.session.execute(query)
+        orm = result.scalar_one_or_none()
+        return self._to_domain(orm) if orm else None
+
+    async def get_by_refresh_token_hash(self, refresh_token_hash: str) -> IdentitySession | None:
+        """Get session by refresh token hash, returns None if not found or soft-deleted.
+
+        Args:
+            refresh_token_hash: The hashed refresh token
+
+        Returns:
+            IdentitySession if found and not deleted, None otherwise
+        """
+        query = select(IdentitySessionORM).where(
+            IdentitySessionORM.refresh_token_hash == refresh_token_hash,
+            IdentitySessionORM.deleted_at.is_(None),
+        )
+        result = await self.session.execute(query)
+        orm = result.scalar_one_or_none()
+        return self._to_domain(orm) if orm else None
+
+    async def filter(
+        self,
+        account_id: AccountID | None = None,
+        *,
+        identity_id: IdentityID | None = None,
+        pagination: PaginationParams,
+        **kwargs: Any,
+    ) -> PaginatedResult[IdentitySession]:
+        """Filter sessions by account and optional criteria with pagination.
+
+        Note: account_id is used for multi-tenant safety via JOIN with identities table.
+
+        Args:
+            account_id: Optional account ID to filter by. If None, returns all sessions
+                (superadmin use case). Regular users should always pass account_id.
+            identity_id: Optional identity ID to filter by
+            pagination: Pagination parameters (required).
+            **kwargs: Additional filter parameters (reserved for future use)
+
+        Returns:
+            PaginatedResult containing identity sessions.
+
+        Raises:
+            ValueError: If sort field is not in SORTABLE_FIELDS
+            CursorValidationError: If cursor is invalid or state doesn't match
+        """
+        # Base query without account filter
+        query = select(IdentitySessionORM).where(IdentitySessionORM.deleted_at.is_(None))
+
+        # Join with identities table to filter by account_id if provided
+        if account_id is not None:
+            account_uuid = self._extract_uuid(account_id)
+            query = query.join(IdentityORM, IdentitySessionORM.identity_id == IdentityORM.id).where(
+                IdentityORM.account_id == account_uuid
+            )
+
+        # Build filters dict for cursor validation
+        filters_dict: dict[str, str] = {}
+
+        if identity_id is not None:
+            identity_uuid = self._extract_uuid(identity_id)
+            query = query.where(IdentitySessionORM.identity_id == identity_uuid)
+            filters_dict["identity_id"] = str(identity_id)
+
+        # Validate sort fields
+        for sort_field in pagination.sort_spec:
+            if sort_field.name not in self.SORTABLE_FIELDS:
+                raise ValueError(
+                    f"Unknown sort field: {sort_field.name}. "
+                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
+                )
+
+        # Handle cursor if present
+        cursor = None
+        if pagination.has_cursor():
+            cursor = pagination.decode_cursor()
+            if cursor is not None:
+                cursor.validate_state(pagination.sort_spec, filters_dict)
+
+        # Execute paginated query
+        return await self._execute_paginated_query(
+            query=query,
+            sort_fields=pagination.sort_spec,
+            cursor=cursor,
+            limit=pagination.limit,
+        )

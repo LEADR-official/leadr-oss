@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 from enum import Enum
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
 from leadr.common.domain.models import Entity
@@ -17,13 +17,22 @@ class SortDirection(str, Enum):
     DESCENDING = "DESCENDING"
 
 
-class KeepStrategy(str, Enum):
-    """Strategy for keeping scores from the same user."""
+class BoardType(str, Enum):
+    """Type of board determining score behavior."""
 
-    FIRST_ONLY = "FIRST_ONLY"
-    BEST_ONLY = "BEST_ONLY"
-    LATEST_ONLY = "LATEST_ONLY"
-    ALL = "ALL"
+    RUN_IDENTITY = "RUN_IDENTITY"  # One entry per identity, uses keep_strategy
+    RUN_RUNS = "RUN_RUNS"  # Every submission is ranked
+    COUNTER = "COUNTER"  # Accumulates delta values
+    RATIO = "RATIO"  # Derived from two other boards
+
+
+class KeepStrategy(str, Enum):
+    """Strategy for keeping scores from the same user (RUN_IDENTITY boards only)."""
+
+    FIRST = "FIRST"
+    BEST = "BEST"
+    LATEST = "LATEST"
+    NA = "NA"  # For non-RUN_IDENTITY boards
 
 
 class Board(Entity):
@@ -64,9 +73,13 @@ class Board(Entity):
         description="Direction to sort scores (ascending/descending)",
         default=SortDirection.DESCENDING,
     )
+    board_type: BoardType = Field(
+        description="Type of board determining score behavior",
+        default=BoardType.RUN_IDENTITY,
+    )
     keep_strategy: KeepStrategy = Field(
-        description="Strategy for keeping multiple scores from the same user",
-        default=KeepStrategy.ALL,
+        description="Strategy for keeping multiple scores from the same user (RUN_IDENTITY only)",
+        default=KeepStrategy.BEST,
     )
     created_from_template_id: BoardTemplateID | None = Field(
         default=None, description="Optional template ID this board was created from"
@@ -147,3 +160,26 @@ class Board(Entity):
         if not value or not value.strip():
             raise ValueError("Board short_code cannot be empty")
         return value.strip().upper()
+
+    @model_validator(mode="after")
+    def validate_board_type_keep_strategy(self) -> "Board":
+        """Validate board_type and keep_strategy combination.
+
+        - RUN_IDENTITY boards must have a non-NA keep_strategy (FIRST, BEST, LATEST)
+        - Non-RUN_IDENTITY boards (RUN_RUNS, COUNTER, RATIO) must have NA keep_strategy
+
+        Returns:
+            The validated Board instance.
+
+        Raises:
+            ValueError: If the board_type/keep_strategy combination is invalid.
+        """
+        if self.board_type == BoardType.RUN_IDENTITY:
+            if self.keep_strategy == KeepStrategy.NA:
+                raise ValueError(
+                    "RUN_IDENTITY boards must have a keep_strategy of FIRST, BEST, or LATEST"
+                )
+        else:
+            if self.keep_strategy != KeepStrategy.NA:
+                raise ValueError(f"{self.board_type.value} boards must have keep_strategy=NA")
+        return self

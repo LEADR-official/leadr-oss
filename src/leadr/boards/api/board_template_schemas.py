@@ -48,7 +48,7 @@ class BoardTemplateCreateRequest(BaseModel):
         description="Direction to sort scores (ascending/descending)",
     )
     keep_strategy: KeepStrategy = Field(
-        default=KeepStrategy.ALL,
+        default=KeepStrategy.BEST,
         description="Strategy for keeping multiple scores from the same user",
     )
     starts_at: datetime | None = Field(

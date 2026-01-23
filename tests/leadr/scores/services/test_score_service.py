@@ -54,7 +54,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score
@@ -107,7 +107,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         score_service = ScoreService(db_session)
@@ -175,7 +175,7 @@ class TestScoreService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,  # Lower is better
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         score_service = ScoreService(db_session)
@@ -245,7 +245,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.FIRST_ONLY,
+            keep_strategy=KeepStrategy.FIRST,
         )
 
         score_service = ScoreService(db_session)
@@ -307,7 +307,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,  # Higher is better
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         score_service = ScoreService(db_session)
@@ -371,7 +371,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score with optional fields
@@ -480,7 +480,7 @@ class TestScoreService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Try to create score for account1 with account2's board
@@ -536,7 +536,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Try to create score with mismatched game_id
@@ -585,7 +585,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score
@@ -646,7 +646,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,  # Use ALL to keep both scores
+            keep_strategy=KeepStrategy.BEST,  # Use ALL to keep both scores
         )
 
         # Create multiple scores
@@ -708,7 +708,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
         board2 = await board_service.create_board(
             account_id=account.id,
@@ -719,7 +719,7 @@ class TestScoreService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create scores for both boards
@@ -781,7 +781,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score
@@ -836,7 +836,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score
@@ -892,7 +892,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score
@@ -960,7 +960,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score with metadata
@@ -1014,7 +1014,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score with initial metadata
@@ -1074,7 +1074,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create multiple scores from the same device
@@ -1156,7 +1156,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.FIRST_ONLY,
+            keep_strategy=KeepStrategy.FIRST,
         )
 
         # Create first score
@@ -1238,7 +1238,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.FIRST_ONLY,
+            keep_strategy=KeepStrategy.FIRST,
         )
 
         # Create scores from different devices
@@ -1309,7 +1309,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.LATEST_ONLY,
+            keep_strategy=KeepStrategy.LATEST,
         )
 
         # Create first score
@@ -1414,7 +1414,7 @@ class TestScoreService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         score_service = ScoreService(db_session)
@@ -1537,7 +1537,7 @@ class TestScoreService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         score_service = ScoreService(db_session)
@@ -1642,7 +1642,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create a score
@@ -1703,7 +1703,7 @@ class TestScoreRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Don't create any score - just try to retrieve
@@ -1755,7 +1755,7 @@ class TestScoreServiceAroundScoreId:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create 7 scores with different values
@@ -1816,7 +1816,7 @@ class TestScoreServiceAroundScoreId:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         score_service = ScoreService(db_session)
@@ -1864,7 +1864,7 @@ class TestScoreServiceAroundScoreId:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
         board2 = await board_service.create_board(
             account_id=account.id,
@@ -1875,7 +1875,7 @@ class TestScoreServiceAroundScoreId:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score on board1

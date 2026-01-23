@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import jwt
 
-from leadr.common.domain.ids import AccountID, GameID
+from leadr.common.domain.ids import AccountID, GameID, IdentityID
 
 
 def generate_access_token(
@@ -18,6 +18,7 @@ def generate_access_token(
     expires_delta: timedelta,
     secret: str,
     test_mode: bool = False,
+    identity_id: IdentityID | None = None,
 ) -> tuple[str, str]:
     """Generate JWT access token for device authentication.
 
@@ -49,7 +50,7 @@ def generate_access_token(
     now = datetime.now(UTC)
     exp = now + expires_delta
 
-    payload = {
+    payload: dict[str, Any] = {
         "sub": client_fingerprint,  # Subject: client fingerprint
         "game_id": str(game_id.uuid),
         "account_id": str(account_id.uuid),
@@ -58,6 +59,10 @@ def generate_access_token(
         "iat": int(now.timestamp()),
         "jti": str(uuid4()),  # Unique token ID
     }
+
+    # Include identity_id if provided
+    if identity_id is not None:
+        payload["identity_id"] = str(identity_id.uuid)
 
     token = jwt.encode(payload, secret, algorithm="HS256")
     token_hash = hash_token(token, secret)
@@ -105,6 +110,7 @@ def generate_refresh_token(
     expires_delta: timedelta,
     secret: str,
     test_mode: bool = False,
+    identity_id: IdentityID | None = None,
 ) -> tuple[str, str]:
     """Generate JWT refresh token for device authentication.
 
@@ -140,7 +146,7 @@ def generate_refresh_token(
     now = datetime.now(UTC)
     exp = now + expires_delta
 
-    payload = {
+    payload: dict[str, Any] = {
         "sub": client_fingerprint,  # Subject: client fingerprint
         "game_id": str(game_id.uuid),
         "account_id": str(account_id.uuid),
@@ -150,6 +156,10 @@ def generate_refresh_token(
         "iat": int(now.timestamp()),
         "jti": str(uuid4()),  # Unique token ID
     }
+
+    # Include identity_id if provided
+    if identity_id is not None:
+        payload["identity_id"] = str(identity_id.uuid)
 
     token = jwt.encode(payload, secret, algorithm="HS256")
     token_hash = hash_token(token, secret)

@@ -50,7 +50,7 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create 7 scores with different values
@@ -121,7 +121,7 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create 5 scores
@@ -184,7 +184,7 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Use non-existent score ID
@@ -230,7 +230,7 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create a score
@@ -287,7 +287,7 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create a score
@@ -343,7 +343,7 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
         board2 = await board_service.create_board(
             account_id=account.id,
@@ -354,7 +354,7 @@ class TestScoreAroundEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create score on board1
@@ -415,7 +415,7 @@ class TestScoreAroundClientEndpoint:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create 7 scores

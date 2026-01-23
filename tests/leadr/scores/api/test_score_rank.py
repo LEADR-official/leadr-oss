@@ -108,7 +108,7 @@ class TestScoreRankAdmin:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create scores (lower is better)

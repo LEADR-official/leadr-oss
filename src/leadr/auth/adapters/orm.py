@@ -9,8 +9,17 @@ from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
+from leadr.auth.domain.identity import Identity, IdentityKind, IdentitySession
 from leadr.auth.domain.nonce import Nonce, NonceStatus
-from leadr.common.domain.ids import AccountID, DeviceID, DeviceSessionID, GameID, NonceID
+from leadr.common.domain.ids import (
+    AccountID,
+    DeviceID,
+    DeviceSessionID,
+    GameID,
+    IdentityID,
+    IdentitySessionID,
+    NonceID,
+)
 from leadr.common.orm import Base
 
 if TYPE_CHECKING:
@@ -268,6 +277,200 @@ class DeviceSessionORM(Base):
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
             device_id=DeviceID(self.device_id),
+            access_token_hash=self.access_token_hash,
+            refresh_token_hash=self.refresh_token_hash,
+            token_version=self.token_version,
+            expires_at=self.expires_at,
+            refresh_expires_at=self.refresh_expires_at,
+            ip_address=self.ip_address,
+            user_agent=self.user_agent,
+            revoked_at=self.revoked_at,
+        )
+
+
+class IdentityKindEnum(str, enum.Enum):
+    """Identity kind enum for database."""
+
+    DEVICE = "DEVICE"
+    STEAM = "STEAM"
+    CUSTOM = "CUSTOM"
+
+
+class IdentityORM(Base):
+    """Identity ORM model.
+
+    Represents a player identity within a game in the database.
+    Maps to the identities table with foreign keys to accounts and games.
+    Identities are the ranking key for leaderboards.
+    """
+
+    __tablename__ = "identities"
+
+    account_id: Mapped[UUID] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    game_id: Mapped[UUID] = mapped_column(
+        ForeignKey("games.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    kind: Mapped[IdentityKindEnum] = mapped_column(
+        Enum(
+            IdentityKindEnum,
+            name="identity_kind",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+    )
+    external_key: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+    display_name: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    # Relationships
+    game: Mapped["GameORM"] = relationship("GameORM")  # type: ignore[name-defined]
+    sessions: Mapped[list["IdentitySessionORM"]] = relationship(
+        "IdentitySessionORM",
+        back_populates="identity",
+        cascade="all, delete-orphan",
+    )
+
+    # Indexes
+    __table_args__ = (
+        # Composite unique index on (account_id, game_id, kind, external_key)
+        Index(
+            "ix_identities_unique",
+            "account_id",
+            "game_id",
+            "kind",
+            "external_key",
+            unique=True,
+        ),
+    )
+
+    @classmethod
+    def from_domain(cls, identity: Identity) -> "IdentityORM":
+        """Convert Identity domain entity to ORM model."""
+        return cls(
+            id=identity.id.uuid,
+            created_at=identity.created_at,
+            updated_at=identity.updated_at,
+            deleted_at=identity.deleted_at,
+            account_id=identity.account_id.uuid,
+            game_id=identity.game_id.uuid,
+            kind=IdentityKindEnum(identity.kind.value),
+            external_key=identity.external_key,
+            display_name=identity.display_name,
+        )
+
+    def to_domain(self) -> Identity:
+        """Convert ORM model to Identity domain entity."""
+        # Handle both string and enum kind values
+        kind_value = self.kind.value if isinstance(self.kind, IdentityKindEnum) else self.kind
+        return Identity(
+            id=IdentityID(self.id),
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+            deleted_at=self.deleted_at,
+            account_id=AccountID(self.account_id),
+            game_id=GameID(self.game_id),
+            kind=IdentityKind(kind_value),
+            external_key=self.external_key,
+            display_name=self.display_name,
+        )
+
+
+class IdentitySessionORM(Base):
+    """IdentitySession ORM model.
+
+    Represents an active authentication session for an identity in the database.
+    Maps to the identity_sessions table with foreign key to identities.
+    Sessions include both access and refresh tokens with token rotation support.
+    """
+
+    __tablename__ = "identity_sessions"
+
+    identity_id: Mapped[UUID] = mapped_column(
+        ForeignKey("identities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    access_token_hash: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        index=True,
+    )
+    refresh_token_hash: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        index=True,
+    )
+    token_version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    refresh_expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    ip_address: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+    user_agent: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    # Relationships
+    identity: Mapped["IdentityORM"] = relationship("IdentityORM", back_populates="sessions")
+
+    @classmethod
+    def from_domain(cls, session: IdentitySession) -> "IdentitySessionORM":
+        """Convert IdentitySession domain entity to ORM model."""
+        return cls(
+            id=session.id.uuid,
+            created_at=session.created_at,
+            updated_at=session.updated_at,
+            deleted_at=session.deleted_at,
+            identity_id=session.identity_id.uuid,
+            access_token_hash=session.access_token_hash,
+            refresh_token_hash=session.refresh_token_hash,
+            token_version=session.token_version,
+            expires_at=session.expires_at,
+            refresh_expires_at=session.refresh_expires_at,
+            ip_address=session.ip_address,
+            user_agent=session.user_agent,
+            revoked_at=session.revoked_at,
+        )
+
+    def to_domain(self) -> IdentitySession:
+        """Convert ORM model to IdentitySession domain entity."""
+        return IdentitySession(
+            id=IdentitySessionID(self.id),
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+            deleted_at=self.deleted_at,
+            identity_id=IdentityID(self.identity_id),
             access_token_hash=self.access_token_hash,
             refresh_token_hash=self.refresh_token_hash,
             token_version=self.token_version,

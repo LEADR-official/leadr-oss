@@ -39,7 +39,7 @@ class TestScoreSubmissionMetaRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create device and score submission
@@ -107,7 +107,7 @@ class TestScoreSubmissionMetaRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
         board2 = await board_service.create_board(
             account_id=account.id,
@@ -117,7 +117,7 @@ class TestScoreSubmissionMetaRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create device
@@ -195,7 +195,7 @@ class TestScoreSubmissionMetaRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create two devices
@@ -275,7 +275,7 @@ class TestScoreSubmissionMetaRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Create device and submit score
@@ -388,7 +388,7 @@ class TestScoreSubmissionMetaRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
         board2 = await board_service.create_board(
             account_id=account2.id,
@@ -399,7 +399,7 @@ class TestScoreSubmissionMetaRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         device_service = DeviceService(db_session)

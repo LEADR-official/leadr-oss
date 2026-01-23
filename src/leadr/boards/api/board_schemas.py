@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, computed_field
 
-from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
 from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
 from leadr.config import settings
 
@@ -37,9 +37,13 @@ class BoardCreateRequest(BaseModel):
     sort_direction: SortDirection = Field(
         default=SortDirection.DESCENDING, description="Direction to sort scores"
     )
+    board_type: BoardType = Field(
+        default=BoardType.RUN_IDENTITY,
+        description="Type of board determining score behavior",
+    )
     keep_strategy: KeepStrategy = Field(
-        default=KeepStrategy.ALL,
-        description="Strategy for keeping multiple scores from the same user",
+        default=KeepStrategy.BEST,
+        description="Strategy for keeping scores (RUN_IDENTITY boards only)",
     )
     created_from_template_id: BoardTemplateID | None = Field(
         default=None, description="Optional template ID this board was created from"
@@ -71,6 +75,7 @@ class BoardUpdateRequest(BaseModel):
     is_active: bool | None = Field(default=None, description="Updated active status")
     is_published: bool | None = Field(default=None, description="Updated published status")
     sort_direction: SortDirection | None = Field(default=None, description="Updated sort direction")
+    board_type: BoardType | None = Field(default=None, description="Updated board type")
     keep_strategy: KeepStrategy | None = Field(default=None, description="Updated keep strategy")
     created_from_template_id: BoardTemplateID | None = Field(
         default=None, description="Updated template ID"
@@ -99,7 +104,10 @@ class BoardResponse(BaseModel):
         description="Whether the board is published and visible on public web views"
     )
     sort_direction: SortDirection = Field(description="Direction to sort scores")
-    keep_strategy: KeepStrategy = Field(description="Strategy for keeping scores from same user")
+    board_type: BoardType = Field(description="Type of board determining score behavior")
+    keep_strategy: KeepStrategy = Field(
+        description="Strategy for keeping scores (RUN_IDENTITY only)"
+    )
     created_from_template_id: BoardTemplateID | None = Field(
         default=None, description="Template ID this board was created from, or null"
     )
@@ -151,6 +159,7 @@ class BoardResponse(BaseModel):
             is_active=board.is_active,
             is_published=board.is_published,
             sort_direction=board.sort_direction,
+            board_type=board.board_type,
             keep_strategy=board.keep_strategy,
             created_from_template_id=board.created_from_template_id,
             template_name=board.template_name,

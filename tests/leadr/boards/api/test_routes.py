@@ -42,7 +42,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -85,7 +85,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
                 "tags": ["speedrun", "no-damage"],
                 "template_name": "Speed Run Template",
             },
@@ -137,7 +137,7 @@ class TestBoardRoutes:
         assert data["unit"] is None  # Default unit (None)
         assert data["is_active"] is True  # Default active state
         assert data["sort_direction"] == "DESCENDING"  # Default sort direction
-        assert data["keep_strategy"] == "ALL"  # Default keep strategy
+        assert data["keep_strategy"] == "BEST"  # Default keep strategy
 
     async def test_create_board_with_game_not_found(
         self, client: AsyncClient, db_session, test_api_key
@@ -161,7 +161,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -203,7 +203,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -239,7 +239,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -289,7 +289,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -359,7 +359,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -374,7 +374,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -421,7 +421,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -436,7 +436,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -503,7 +503,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -518,7 +518,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -561,7 +561,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -620,7 +620,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -672,7 +672,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -689,7 +689,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -741,7 +741,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -780,7 +780,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -821,7 +821,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -860,7 +860,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -880,7 +880,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
