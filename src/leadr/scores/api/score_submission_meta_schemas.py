@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from leadr.common.domain.ids import BoardID, DeviceID, ScoreID, ScoreSubmissionMetaID
+from leadr.common.domain.ids import BoardID, IdentityID, ScoreEventID, ScoreSubmissionMetaID
 from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
 
 
@@ -12,8 +12,8 @@ class ScoreSubmissionMetaResponse(BaseModel):
     """Response model for score submission metadata."""
 
     id: ScoreSubmissionMetaID
-    score_id: ScoreID
-    device_id: DeviceID
+    score_event_id: ScoreEventID
+    identity_id: IdentityID
     board_id: BoardID
     submission_count: int
     last_submission_at: datetime
@@ -26,8 +26,8 @@ class ScoreSubmissionMetaResponse(BaseModel):
         """Convert domain entity to API response."""
         return cls(
             id=meta.id,
-            score_id=meta.score_id,
-            device_id=meta.device_id,
+            score_event_id=meta.score_event_id,
+            identity_id=meta.identity_id,
             board_id=meta.board_id,
             submission_count=meta.submission_count,
             last_submission_at=meta.last_submission_at,

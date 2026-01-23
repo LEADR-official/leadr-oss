@@ -112,15 +112,14 @@ async def get_score_flag(
     """
     flag = await service.get_by_id_or_raise(flag_id)
 
-    # Get the associated score to check account access
-    # We need to import ScoreService to look up the score
-    from leadr.scores.services.score_service import ScoreService
+    # Get the associated score event to check account access
+    from leadr.scores.services.score_event_service import ScoreEventService
 
-    score_service = ScoreService(service.repository.session)
-    score = await score_service.get_by_id_or_raise(flag.score_id)
+    score_event_service = ScoreEventService(service.repository.session)
+    score_event = await score_event_service.get_by_id_or_raise(flag.score_event_id)
 
     # Check authorization
-    if not auth.has_access_to_account(score.account_id):
+    if not auth.has_access_to_account(score_event.account_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this flag's account",
@@ -158,14 +157,14 @@ async def update_score_flag(
     # Get the flag to check account access
     flag = await service.get_by_id_or_raise(flag_id)
 
-    # Get the associated score to check account access
-    from leadr.scores.services.score_service import ScoreService
+    # Get the associated score event to check account access
+    from leadr.scores.services.score_event_service import ScoreEventService
 
-    score_service = ScoreService(service.repository.session)
-    score = await score_service.get_by_id_or_raise(flag.score_id)
+    score_event_service = ScoreEventService(service.repository.session)
+    score_event = await score_event_service.get_by_id_or_raise(flag.score_event_id)
 
     # Check authorization
-    if not auth.has_access_to_account(score.account_id):
+    if not auth.has_access_to_account(score_event.account_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this flag's account",

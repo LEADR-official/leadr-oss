@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from leadr.common.domain.ids import ScoreFlagID, ScoreID, UserID
+from leadr.common.domain.ids import ScoreEventID, ScoreFlagID, UserID
 from leadr.scores.domain.anti_cheat.models import ScoreFlag
 
 
@@ -27,7 +27,7 @@ class ScoreFlagResponse(BaseModel):
     """Response model for a score flag."""
 
     id: ScoreFlagID = Field(description="Unique identifier for the score flag")
-    score_id: ScoreID = Field(description="ID of the score that was flagged")
+    score_event_id: ScoreEventID = Field(description="ID of the score event that was flagged")
     flag_type: str = Field(description="Type of flag (e.g., velocity, duplicate, rate_limit)")
     confidence: str = Field(description="Confidence level of the flag (low, medium, high)")
     metadata: dict[str, Any] = Field(description="Additional metadata about the flag")
@@ -58,7 +58,7 @@ class ScoreFlagResponse(BaseModel):
         """
         return cls(
             id=flag.id,
-            score_id=flag.score_id,
+            score_event_id=flag.score_event_id,
             flag_type=flag.flag_type.value,
             confidence=flag.confidence.value,
             metadata=flag.metadata,

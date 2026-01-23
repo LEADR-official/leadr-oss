@@ -9,7 +9,14 @@ from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Index, Intege
 from sqlalchemy.dialects.postgresql import JSON, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from leadr.common.domain.ids import BoardID, DeviceID, ScoreFlagID, ScoreID, UserID
+from leadr.common.domain.ids import (
+    BoardID,
+    IdentityID,
+    ScoreEventID,
+    ScoreFlagID,
+    ScoreSubmissionMetaID,
+    UserID,
+)
 from leadr.common.orm import Base, ImmutableBase
 from leadr.scores.domain.anti_cheat.enums import (
     FlagConfidence,
@@ -166,32 +173,51 @@ class ScoreEventORM(ImmutableBase):
 class ScoreSubmissionMetaORM(Base):
     """Score submission metadata ORM model for anti-cheat tracking.
 
-    Tracks submission history per device/board combination to enable
+    Tracks submission history per identity/board combination to enable
     detection of suspicious patterns like rapid-fire submissions.
+    Uses identity_id as the tracking key instead of device_id, aligning with
+    the event-sourcing architecture where identity is the ranking key.
     """
 
     __tablename__ = "score_submission_metadata"
 
-    score_id: Mapped[UUID] = mapped_column(
-        ForeignKey("scores.id", ondelete="CASCADE"),
+    score_event_id: Mapped[UUID] = mapped_column(
+        ForeignKey("score_events.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    device_id: Mapped[UUID] = mapped_column(nullable=False, index=True)
-    board_id: Mapped[UUID] = mapped_column(nullable=False, index=True)
+    identity_id: Mapped[UUID] = mapped_column(
+        ForeignKey("identities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    board_id: Mapped[UUID] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     submission_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     last_submission_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_score_value: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
 
+    # Relationships
+    score_event: Mapped["ScoreEventORM"] = relationship("ScoreEventORM")
+    identity: Mapped["IdentityORM"] = relationship("IdentityORM")  # type: ignore[name-defined]
+    board: Mapped["BoardORM"] = relationship("BoardORM")  # type: ignore[name-defined]
+
+    # Unique constraint: one meta record per identity/board combination
+    __table_args__ = (
+        Index("ix_score_submission_meta_identity_board", "identity_id", "board_id", unique=True),
+    )
+
     def to_domain(self) -> "ScoreSubmissionMeta":
         """Convert ORM model to domain entity."""
-        from leadr.common.domain.ids import ScoreSubmissionMetaID
         from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
 
         return ScoreSubmissionMeta(
             id=ScoreSubmissionMetaID(self.id),
-            score_id=ScoreID(self.score_id),
-            device_id=DeviceID(self.device_id),
+            score_event_id=ScoreEventID(self.score_event_id),
+            identity_id=IdentityID(self.identity_id),
             board_id=BoardID(self.board_id),
             submission_count=self.submission_count,
             last_submission_at=self.last_submission_at,
@@ -206,8 +232,8 @@ class ScoreSubmissionMetaORM(Base):
         """Convert domain entity to ORM model."""
         return ScoreSubmissionMetaORM(
             id=entity.id.uuid,
-            score_id=entity.score_id.uuid,
-            device_id=entity.device_id.uuid,
+            score_event_id=entity.score_event_id.uuid,
+            identity_id=entity.identity_id.uuid,
             board_id=entity.board_id.uuid,
             submission_count=entity.submission_count,
             last_submission_at=entity.last_submission_at,
@@ -223,12 +249,14 @@ class ScoreFlagORM(Base):
 
     Records suspicious patterns detected by the anti-cheat system.
     Flags can be reviewed by admins to confirm or dismiss detections.
+    Uses score_event_id instead of score_id, linking to the immutable
+    ScoreEvent in the event-sourcing architecture.
     """
 
     __tablename__ = "score_flags"
 
-    score_id: Mapped[UUID] = mapped_column(
-        ForeignKey("scores.id", ondelete="CASCADE"),
+    score_event_id: Mapped[UUID] = mapped_column(
+        ForeignKey("score_events.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -244,12 +272,15 @@ class ScoreFlagORM(Base):
     reviewer_id: Mapped[UUID | None] = mapped_column(nullable=True, default=None)
     reviewer_decision: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
 
+    # Relationships
+    score_event: Mapped["ScoreEventORM"] = relationship("ScoreEventORM")
+
     def to_domain(self) -> "ScoreFlag":
         """Convert ORM model to domain entity."""
 
         return ScoreFlag(
             id=ScoreFlagID(self.id),
-            score_id=ScoreID(self.score_id),
+            score_event_id=ScoreEventID(self.score_event_id),
             flag_type=FlagType(self.flag_type),
             confidence=FlagConfidence(self.confidence),
             metadata=self.flag_metadata,
@@ -267,7 +298,7 @@ class ScoreFlagORM(Base):
         """Convert domain entity to ORM model."""
         return ScoreFlagORM(
             id=entity.id.uuid,
-            score_id=entity.score_id.uuid,
+            score_event_id=entity.score_event_id.uuid,
             flag_type=entity.flag_type.value,
             confidence=entity.confidence.value,
             flag_metadata=entity.metadata,

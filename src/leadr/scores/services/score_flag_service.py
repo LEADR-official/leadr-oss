@@ -9,7 +9,7 @@ from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, GameID, ScoreFlagID, UserID
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
-from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus, ScoreStatus
+from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag
 from leadr.scores.services.anti_cheat_repositories import ScoreFlagRepository
 
@@ -83,27 +83,30 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         """
         return await self.get_by_id(flag_id)
 
-    async def _sync_score_status(self, flag: ScoreFlag, new_flag_status: ScoreFlagStatus) -> None:
-        """Sync the associated Score's status based on flag status change.
+    async def _sync_ranking_status(
+        self, flag: ScoreFlag, new_flag_status: ScoreFlagStatus
+    ) -> None:
+        """Sync ranking status based on flag status change.
 
-        When a flag is reviewed, the associated score's status should be
-        updated to reflect the decision:
-        - CONFIRMED_CHEAT → Score.status = REJECTED
-        - FALSE_POSITIVE or DISMISSED → Score.status = ACTIVE
+        When a flag is reviewed, the ranking should be updated:
+        - CONFIRMED_CHEAT → Remove from ranking (soft-delete run_entry or clear board_state)
+        - FALSE_POSITIVE or DISMISSED → Restore to ranking if needed
+
+        Note: This method currently does not update rankings as part of the
+        event-sourcing migration. Full implementation will be added later.
 
         Args:
-            flag: The flag being reviewed
+            flag: The flag being reviewed (contains score_event_id)
             new_flag_status: The new status being set on the flag
         """
-        from leadr.scores.services.score_service import ScoreService
-
-        score_service = ScoreService(self.repository.session)
-
-        if new_flag_status == ScoreFlagStatus.CONFIRMED_CHEAT:
-            await score_service.update_score_status(flag.score_id, ScoreStatus.REJECTED)
-        elif new_flag_status in (ScoreFlagStatus.FALSE_POSITIVE, ScoreFlagStatus.DISMISSED):
-            await score_service.update_score_status(flag.score_id, ScoreStatus.ACTIVE)
-        # PENDING status doesn't change Score.status
+        # TODO: Implement ranking update for event-sourcing architecture
+        # When CONFIRMED_CHEAT:
+        #   - Find BoardState or RunEntry for the flagged score_event_id
+        #   - Soft-delete RunEntry or recompute BoardState
+        # When FALSE_POSITIVE/DISMISSED:
+        #   - Restore to ranking if it was previously removed
+        _ = flag.score_event_id  # Reference to silence unused warning
+        _ = new_flag_status
 
     async def review_flag(
         self,
@@ -114,9 +117,8 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
     ) -> ScoreFlag:
         """Review a flag and update its status.
 
-        IMPORTANT: This also updates the associated Score's status:
-        - CONFIRMED_CHEAT → Score.status = REJECTED
-        - FALSE_POSITIVE or DISMISSED → Score.status = ACTIVE
+        Note: Ranking updates for flag status changes are not yet implemented
+        in the event-sourcing architecture.
 
         Args:
             flag_id: The ID of the flag to review
@@ -140,7 +142,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         flag = await self.get_by_id_or_raise(flag_id)
 
         # Sync score status with flag decision
-        await self._sync_score_status(flag, status)
+        await self._sync_ranking_status(flag, status)
 
         # Update review fields
         flag.status = status
@@ -160,7 +162,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         clear optional fields.
 
         Note: When status is updated, reviewed_at is automatically set
-        to the current time, and the associated Score's status is synced.
+        to the current time.
 
         Args:
             flag_id: The ID of the flag to update
@@ -188,7 +190,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             new_status = updates["status"]
             if isinstance(new_status, str):
                 new_status = ScoreFlagStatus(new_status)
-            await self._sync_score_status(flag, new_status)
+            await self._sync_ranking_status(flag, new_status)
 
         for field, value in updates.items():
             setattr(flag, field, value)

@@ -4,11 +4,11 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.common.domain.ids import BoardID, DeviceID
+from leadr.common.domain.ids import BoardID, IdentityID
 from leadr.config import settings
 from leadr.scores.domain.anti_cheat.enums import FlagAction, FlagConfidence, FlagType, TrustTier
 from leadr.scores.domain.anti_cheat.models import AntiCheatResult, ScoreSubmissionMeta
-from leadr.scores.domain.score import Score
+from leadr.scores.domain.score_event import ScoreEvent
 from leadr.scores.services.anti_cheat_repositories import ScoreSubmissionMetaRepository
 
 
@@ -16,11 +16,14 @@ class AntiCheatService:
     """Service for anti-cheat detection and analysis.
 
     Implements various detection tactics to identify suspicious score submissions:
-    - Rate limiting: Prevents excessive submissions per device/board
+    - Rate limiting: Prevents excessive submissions per identity/board
     - Duplicate detection: Identifies repeated identical scores
     - Velocity detection: Detects rapid-fire submissions
     - Statistical outliers: Identifies anomalous scores
     - Pattern detection: Finds suspicious submission patterns
+
+    Uses identity_id as the tracking key instead of device_id, aligning with
+    the event-sourcing architecture where identity is the ranking key.
     """
 
     def __init__(self, session: AsyncSession):
@@ -32,26 +35,26 @@ class AntiCheatService:
         self.session = session
         self.meta_repo = ScoreSubmissionMetaRepository(session)
 
-    async def check_submission(
+    async def check_submission_for_event(
         self,
-        score: Score,
+        score_event: ScoreEvent,
         trust_tier: TrustTier,
-        device_id: DeviceID,
+        identity_id: IdentityID,
         board_id: BoardID,
     ) -> AntiCheatResult:
-        """Check a score submission for suspicious patterns.
+        """Check a score event submission for suspicious patterns.
 
         Args:
-            score: Score being submitted
-            trust_tier: Trust tier of the device (A/B/C)
-            device_id: ID of the device submitting the score
+            score_event: ScoreEvent being submitted
+            trust_tier: Trust tier of the identity (A/B/C)
+            identity_id: ID of the identity submitting the score
             board_id: ID of the board being submitted to
 
         Returns:
             AntiCheatResult indicating action to take (ACCEPT/FLAG/REJECT)
         """
         # Fetch submission metadata once for all checks
-        submission_meta = await self.meta_repo.get_by_device_and_board(device_id, board_id)
+        submission_meta = await self.meta_repo.get_by_identity_and_board(identity_id, board_id)
 
         # Check rate limiting
         rate_limit_result = await self._check_rate_limit(
@@ -62,14 +65,18 @@ class AntiCheatService:
         if rate_limit_result.action != FlagAction.ACCEPT:
             return rate_limit_result
 
-        # Check for duplicate scores
-        duplicate_result = await self._check_duplicate(
-            score=score,
-            submission_meta=submission_meta,
-        )
+        # Get score value from event payload
+        score_value = score_event.event_payload.get("value")
 
-        if duplicate_result.action != FlagAction.ACCEPT:
-            return duplicate_result
+        # Check for duplicate scores (only if value is present)
+        if score_value is not None:
+            duplicate_result = await self._check_duplicate(
+                score_value=score_value,
+                submission_meta=submission_meta,
+            )
+
+            if duplicate_result.action != FlagAction.ACCEPT:
+                return duplicate_result
 
         # Check for velocity (rapid-fire submissions)
         velocity_result = await self._check_velocity(
@@ -87,7 +94,7 @@ class AntiCheatService:
         submission_meta: ScoreSubmissionMeta | None,
         trust_tier: TrustTier,
     ) -> AntiCheatResult:
-        """Check if device exceeds rate limit for this board.
+        """Check if identity exceeds rate limit for this board.
 
         Args:
             submission_meta: Pre-fetched submission metadata (or None for first submission)
@@ -122,7 +129,7 @@ class AntiCheatService:
                 action=FlagAction.REJECT,
                 flag_type=FlagType.RATE_LIMIT,
                 confidence=FlagConfidence.HIGH,
-                reason=f"Device exceeded rate limit of {limit} submissions per hour for this board",
+                reason=f"Identity exceeded rate limit of {limit} submissions per hour for this board",
                 metadata={
                     "limit": limit,
                     "submissions_count": submission_meta.submission_count,
@@ -136,13 +143,13 @@ class AntiCheatService:
 
     async def _check_duplicate(
         self,
-        score: Score,
+        score_value: float,
         submission_meta: ScoreSubmissionMeta | None,
     ) -> AntiCheatResult:
         """Check if score is a duplicate of recently submitted score.
 
         Args:
-            score: Score being submitted
+            score_value: Score value being submitted
             submission_meta: Pre-fetched submission metadata (or None for first submission)
 
         Returns:
@@ -153,7 +160,7 @@ class AntiCheatService:
             return AntiCheatResult(action=FlagAction.ACCEPT)
 
         # Check if score value matches last submission
-        if score.value == submission_meta.last_score_value:
+        if score_value == submission_meta.last_score_value:
             # Check if within duplicate detection window
             now = datetime.now(UTC)
             window_seconds = settings.ANTICHEAT_DUPLICATE_WINDOW_SECONDS
@@ -166,11 +173,11 @@ class AntiCheatService:
                     flag_type=FlagType.DUPLICATE,
                     confidence=FlagConfidence.MEDIUM,
                     reason=(
-                        f"Duplicate score value ({score.value}) submitted "
+                        f"Duplicate score value ({score_value}) submitted "
                         f"within {window_seconds} seconds"
                     ),
                     metadata={
-                        "score_value": score.value,
+                        "score_value": score_value,
                         "previous_submission_at": submission_meta.last_submission_at.isoformat(),
                         "window_seconds": window_seconds,
                     },

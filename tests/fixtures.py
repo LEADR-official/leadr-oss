@@ -30,7 +30,12 @@ from leadr.auth.adapters.orm import (
 from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM
 from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.games.adapters.orm import GameORM
-from leadr.scores.adapters.orm import ScoreFlagORM, ScoreORM, ScoreSubmissionMetaORM
+from leadr.scores.adapters.orm import (
+    ScoreEventORM,
+    ScoreFlagORM,
+    ScoreORM,
+    ScoreSubmissionMetaORM,
+)
 
 
 @pytest_asyncio.fixture
@@ -328,11 +333,46 @@ async def score_orm(
 
 
 @pytest_asyncio.fixture
-async def score_flag_orm(db_session: AsyncSession, score_orm: ScoreORM) -> ScoreFlagORM:
-    """Create and persist a test ScoreFlagORM linked to score.
+async def score_event_orm(
+    db_session: AsyncSession,
+    account_orm: AccountORM,
+    game_orm: GameORM,
+    board_orm: BoardORM,
+    identity_orm: IdentityORM,
+) -> ScoreEventORM:
+    """Create and persist a test ScoreEventORM linked to account, game, board, and identity.
 
     Args:
-        score_orm: Parent score (auto-injected fixture).
+        account_orm: Parent account (auto-injected fixture).
+        game_orm: Parent game (auto-injected fixture).
+        board_orm: Parent board (auto-injected fixture).
+        identity_orm: Source identity (auto-injected fixture).
+
+    Returns:
+        ScoreEventORM instance with auto-generated id.
+    """
+    score_event = ScoreEventORM(
+        account_id=account_orm.id,  # Raw UUID
+        game_id=game_orm.id,  # Raw UUID
+        board_id=board_orm.id,  # Raw UUID
+        identity_id=identity_orm.id,  # Raw UUID
+        event_payload={"value": 1000.0},
+        is_test=False,
+        timezone=None,
+        country=None,
+        city=None,
+    )
+    db_session.add(score_event)
+    await db_session.flush()
+    return score_event
+
+
+@pytest_asyncio.fixture
+async def score_flag_orm(db_session: AsyncSession, score_event_orm: ScoreEventORM) -> ScoreFlagORM:
+    """Create and persist a test ScoreFlagORM linked to score event.
+
+    Args:
+        score_event_orm: Parent score event (auto-injected fixture).
 
     Returns:
         ScoreFlagORM instance with auto-generated id.
@@ -340,7 +380,7 @@ async def score_flag_orm(db_session: AsyncSession, score_orm: ScoreORM) -> Score
     from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 
     flag = ScoreFlagORM(
-        score_id=score_orm.id,  # Raw UUID
+        score_event_id=score_event_orm.id,  # Raw UUID
         flag_type=FlagType.VELOCITY.value,
         confidence=FlagConfidence.MEDIUM.value,
         flag_metadata={"reason": "test"},
@@ -357,15 +397,15 @@ async def score_flag_orm(db_session: AsyncSession, score_orm: ScoreORM) -> Score
 @pytest_asyncio.fixture
 async def score_submission_meta_orm(
     db_session: AsyncSession,
-    score_orm: ScoreORM,
-    device_orm: DeviceORM,
+    score_event_orm: ScoreEventORM,
+    identity_orm: IdentityORM,
     board_orm: BoardORM,
 ) -> ScoreSubmissionMetaORM:
     """Create and persist a test ScoreSubmissionMetaORM.
 
     Args:
-        score_orm: Related score (auto-injected fixture).
-        device_orm: Source device (auto-injected fixture).
+        score_event_orm: Related score event (auto-injected fixture).
+        identity_orm: Source identity (auto-injected fixture).
         board_orm: Target board (auto-injected fixture).
 
     Returns:
@@ -373,8 +413,8 @@ async def score_submission_meta_orm(
     """
     now = datetime.now(UTC)
     meta = ScoreSubmissionMetaORM(
-        score_id=score_orm.id,  # Raw UUID
-        device_id=device_orm.id,  # Raw UUID
+        score_event_id=score_event_orm.id,  # Raw UUID
+        identity_id=identity_orm.id,  # Raw UUID
         board_id=board_orm.id,  # Raw UUID
         submission_count=1,
         last_submission_at=now,

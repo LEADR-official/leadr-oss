@@ -104,20 +104,22 @@ async def get_submission_meta(
         403: User does not have access to this metadata's account.
         404: Submission metadata not found or soft-deleted.
     """
-    from leadr.scores.adapters.orm import ScoreORM
+    from leadr.scores.adapters.orm import ScoreEventORM
 
     meta = await service.get_by_id_or_raise(meta_id)
 
-    # Get the associated score to check account access
-    score_orm = await service.repository.session.get(ScoreORM, meta.score_id.uuid)
-    if not score_orm:
+    # Get the associated score event to check account access
+    score_event_orm = await service.repository.session.get(
+        ScoreEventORM, meta.score_event_id.uuid
+    )
+    if not score_event_orm:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Associated score not found",
+            detail="Associated score event not found",
         )
 
     # Check authorization
-    if not auth.has_access_to_account(AccountID(score_orm.account_id)):
+    if not auth.has_access_to_account(AccountID(score_event_orm.account_id)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this metadata's account",

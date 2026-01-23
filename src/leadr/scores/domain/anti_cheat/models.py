@@ -7,9 +7,9 @@ from pydantic import BaseModel, Field
 
 from leadr.common.domain.ids import (
     BoardID,
-    DeviceID,
+    IdentityID,
+    ScoreEventID,
     ScoreFlagID,
-    ScoreID,
     ScoreSubmissionMetaID,
     UserID,
 )
@@ -48,9 +48,12 @@ class AntiCheatResult(BaseModel):
 class ScoreSubmissionMeta(Entity):
     """Metadata tracking submission history for anti-cheat analysis.
 
-    Tracks the number and timing of score submissions per device/board combination
+    Tracks the number and timing of score submissions per identity/board combination
     to enable detection of suspicious patterns like rapid-fire submissions or
     excessive submission rates.
+
+    Uses identity_id as the tracking key instead of device_id, aligning with
+    the event-sourcing architecture where identity is the ranking key.
     """
 
     id: ScoreSubmissionMetaID = Field(
@@ -58,11 +61,13 @@ class ScoreSubmissionMeta(Entity):
         default_factory=ScoreSubmissionMetaID,
         description="Unique submission metadata identifier",
     )
-    score_id: ScoreID = Field(description="ID of the most recent score submission")
-    device_id: DeviceID = Field(description="ID of the device submitting scores")
+    score_event_id: ScoreEventID = Field(
+        description="ID of the most recent score event submission"
+    )
+    identity_id: IdentityID = Field(description="ID of the identity submitting scores")
     board_id: BoardID = Field(description="ID of the board being submitted to")
     submission_count: int = Field(
-        default=1, description="Total number of submissions by this device to this board"
+        default=1, description="Total number of submissions by this identity to this board"
     )
     last_submission_at: datetime = Field(description="Timestamp of the most recent submission")
     last_score_value: float | None = Field(
@@ -76,6 +81,9 @@ class ScoreFlag(Entity):
 
     Represents a suspicious pattern detected by the anti-cheat system.
     Flags can be reviewed by admins to confirm or dismiss the detection.
+
+    Uses score_event_id instead of score_id, linking to the immutable
+    ScoreEvent in the event-sourcing architecture.
     """
 
     id: ScoreFlagID = Field(
@@ -83,7 +91,7 @@ class ScoreFlag(Entity):
         default_factory=ScoreFlagID,
         description="Unique score flag identifier",
     )
-    score_id: ScoreID = Field(description="ID of the flagged score")
+    score_event_id: ScoreEventID = Field(description="ID of the flagged score event")
     flag_type: FlagType = Field(description="Type of suspicious behavior detected")
     confidence: FlagConfidence = Field(description="Confidence level of detection")
     metadata: dict[str, Any] = Field(

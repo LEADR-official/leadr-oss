@@ -6,11 +6,15 @@ from typing import Any
 from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.boards.domain.board import KeepStrategy
+from leadr.boards.domain.board import Board, BoardType, KeepStrategy
 from leadr.boards.domain.board import SortDirection as BoardSortDirection
+from leadr.boards.domain.board_state import BoardState
+from leadr.boards.domain.run_entry import RunEntry
 from leadr.boards.services.board_service import BoardService
+from leadr.boards.services.board_state_service import BoardStateService
+from leadr.boards.services.run_entry_service import RunEntryService
 from leadr.common.api.pagination import PaginationParams
-from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
+from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, IdentityID, ScoreID
 from leadr.common.domain.pagination import SortDirection, SortField
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
@@ -18,12 +22,14 @@ from leadr.games.services.game_service import GameService
 from leadr.scores.domain.anti_cheat.enums import FlagAction, ScoreStatus, TrustTier
 from leadr.scores.domain.anti_cheat.models import AntiCheatResult, ScoreFlag, ScoreSubmissionMeta
 from leadr.scores.domain.score import Score
+from leadr.scores.domain.score_event import ScoreEvent
 from leadr.scores.services.anti_cheat_repositories import (
     ScoreFlagRepository,
     ScoreSubmissionMetaRepository,
 )
 from leadr.scores.services.anti_cheat_service import AntiCheatService
 from leadr.scores.services.repositories import ScoreRepository
+from leadr.scores.services.score_event_service import ScoreEventService
 
 
 class ScoreService(BaseService[Score, ScoreRepository]):
@@ -240,40 +246,12 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             is_test=is_test,
         )
 
-        # Anti-cheat checking (if enabled and device_id provided)
+        # Anti-cheat checking is disabled in this deprecated Score-based flow.
+        # The new event-sourcing flow (submit_score) uses check_submission_for_event.
+        # This entire create_score method will be removed in Phase 10 cleanup.
+        # TODO: Remove this method in Phase 10
         anti_cheat_result = None
-        if device_id is not None:
-            # Fetch game to check if anti-cheat is enabled
-            game_service = GameService(self.repository.session)
-            game = await game_service.get_by_id_or_raise(game_id)
-
-            if game.anti_cheat_enabled:
-                # Run anti-cheat checks
-                anti_cheat_service = AntiCheatService(self.repository.session)
-                anti_cheat_result = await anti_cheat_service.check_submission(
-                    score=score,
-                    trust_tier=trust_tier,
-                    device_id=device_id,
-                    board_id=board_id,
-                )
-
-                # If rejected, don't create the score
-                if anti_cheat_result.action == FlagAction.REJECT:
-                    raise ValueError(
-                        f"Score submission rejected by anti-cheat: {anti_cheat_result.reason}"
-                    )
-
-                # Set status based on anti-cheat result
-                if anti_cheat_result.action == FlagAction.FLAG:
-                    score.flag_for_review()  # status = UNDER_REVIEW
-                else:
-                    score.activate()  # status = ACTIVE
-            else:
-                # No anti-cheat - activate immediately
-                score.activate()
-        else:
-            # No device_id (shouldn't happen in practice) - activate
-            score.activate()
+        score.activate()
 
         # Save score to database
         saved_score = await self.repository.create(score)
@@ -302,8 +280,10 @@ class ScoreService(BaseService[Score, ScoreRepository]):
     ) -> None:
         """Update submission metadata and create flags if needed.
 
-        This method is designed to be called as a background task after score creation
-        to avoid blocking the HTTP response.
+        DEPRECATED: This method is part of the old Score-based flow and is no longer
+        called since anti-cheat is disabled in create_score. It will be removed in
+        Phase 10 cleanup. The new event-sourcing flow handles metadata updates
+        differently.
 
         Args:
             saved_score: The score that was created
@@ -311,47 +291,343 @@ class ScoreService(BaseService[Score, ScoreRepository]):
             board_id: ID of the board the score was submitted to
             anti_cheat_result: Result from anti-cheat check (or None)
         """
+        # Always return early since anti_cheat_result is always None in the deprecated flow
         if anti_cheat_result is None:
             return
 
-        meta_repo = ScoreSubmissionMetaRepository(self.repository.session)
-        now = datetime.now(UTC)
+        # TODO: Remove this entire method in Phase 10 cleanup
+        # The code below is unreachable but kept for reference until cleanup
+        _ = saved_score
+        _ = device_id
+        _ = board_id
 
-        # Get or create submission metadata
-        meta = await meta_repo.get_by_device_and_board(device_id, board_id)
+    async def submit_score(
+        self,
+        board_id: BoardID,
+        identity_id: IdentityID,
+        value: float | None = None,
+        delta: float | None = None,
+        player_name: str | None = None,
+        timezone: str | None = None,
+        country: str | None = None,
+        city: str | None = None,
+        is_test: bool = False,
+    ) -> tuple[ScoreEvent, BoardState | RunEntry | None, AntiCheatResult | None]:
+        """Submit a score using the new event-sourcing architecture.
 
-        if meta is None:
-            # Create new metadata
-            meta = ScoreSubmissionMeta(
-                score_id=saved_score.id,
-                device_id=device_id,
-                board_id=board_id,
-                submission_count=1,
-                last_submission_at=now,
-                last_score_value=saved_score.value,
+        This method creates a ScoreEvent and then updates the appropriate
+        materialized view (BoardState or RunEntry) based on the board type.
+
+        Args:
+            board_id: The board to submit to.
+            identity_id: The identity submitting the score.
+            value: Score value for RUN_IDENTITY and RUN_RUNS boards.
+            delta: Delta value for COUNTER boards.
+            player_name: Optional display name for the player.
+            timezone: Optional timezone from GeoIP.
+            country: Optional country code from GeoIP.
+            city: Optional city name from GeoIP.
+            is_test: Whether this is a test submission.
+
+        Returns:
+            Tuple of (ScoreEvent, ranking_entry, anti_cheat_result).
+            ranking_entry is BoardState for RUN_IDENTITY/COUNTER boards,
+            RunEntry for RUN_RUNS boards, or None if no ranking update.
+
+        Raises:
+            ValueError: If validation fails (missing required fields, invalid board type).
+            EntityNotFoundError: If board or identity doesn't exist.
+        """
+        # Validate board exists
+        board_service = BoardService(self.repository.session)
+        board = await board_service.get_by_id_or_raise(board_id)
+
+        # Validate payload based on board type
+        self._validate_submission_payload(board, value, delta)
+
+        # Build event payload
+        event_payload = self._build_event_payload(board, value, delta)
+
+        # Create score event (always, regardless of board type)
+        event_service = ScoreEventService(self.repository.session)
+        event = await event_service.create_score_event(
+            account_id=board.account_id,
+            game_id=board.game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload=event_payload,
+            is_test=is_test,
+            timezone=timezone,
+            country=country,
+            city=city,
+        )
+
+        # TODO: Anti-cheat integration will be added in Phase 8
+        anti_cheat_result: AntiCheatResult | None = None
+
+        # Handle based on board type
+        ranking_entry: BoardState | RunEntry | None = None
+        if board.board_type == BoardType.RUN_IDENTITY:
+            ranking_entry = await self._handle_run_identity(
+                board=board,
+                identity_id=identity_id,
+                event=event,
+                value=value,  # type: ignore[arg-type]
             )
-            await meta_repo.create(meta)
+        elif board.board_type == BoardType.RUN_RUNS:
+            ranking_entry = await self._handle_run_runs(
+                board=board,
+                identity_id=identity_id,
+                event=event,
+                value=value,  # type: ignore[arg-type]
+            )
+        elif board.board_type == BoardType.COUNTER:
+            ranking_entry = await self._handle_counter(
+                board=board,
+                identity_id=identity_id,
+                event=event,
+                delta=delta,  # type: ignore[arg-type]
+            )
+        # RATIO boards have no direct handler - they are derived
+
+        return event, ranking_entry, anti_cheat_result
+
+    def _validate_submission_payload(
+        self,
+        board: Board,
+        value: float | None,
+        delta: float | None,
+    ) -> None:
+        """Validate submission payload based on board type.
+
+        Args:
+            board: The board being submitted to.
+            value: Score value (for RUN boards).
+            delta: Delta value (for COUNTER boards).
+
+        Raises:
+            ValueError: If payload doesn't match board type requirements.
+        """
+        if board.board_type == BoardType.RATIO:
+            raise ValueError("RATIO boards do not accept direct submissions")
+
+        if board.board_type in (BoardType.RUN_IDENTITY, BoardType.RUN_RUNS):
+            if value is None:
+                raise ValueError("value is required for RUN_IDENTITY and RUN_RUNS boards")
+
+        if board.board_type == BoardType.COUNTER:
+            if delta is None:
+                raise ValueError("delta is required for COUNTER boards")
+
+    def _build_event_payload(
+        self,
+        board: Board,
+        value: float | None,
+        delta: float | None,
+    ) -> dict[str, Any]:
+        """Build the event payload based on board type.
+
+        Args:
+            board: The board being submitted to.
+            value: Score value (for RUN boards).
+            delta: Delta value (for COUNTER boards).
+
+        Returns:
+            Event payload dictionary.
+        """
+        if board.board_type in (BoardType.RUN_IDENTITY, BoardType.RUN_RUNS):
+            return {"value": value}
+        elif board.board_type == BoardType.COUNTER:
+            return {"delta": delta}
         else:
-            # Update existing metadata
-            meta.score_id = saved_score.id
-            meta.submission_count += 1
-            meta.last_submission_at = now
-            meta.last_score_value = saved_score.value
-            await meta_repo.update(meta)
+            return {}
 
-        # Create flag if score was flagged
-        if anti_cheat_result.action == FlagAction.FLAG:
-            from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
+    async def _handle_run_identity(
+        self,
+        board: Board,
+        identity_id: IdentityID,
+        event: ScoreEvent,
+        value: float,
+    ) -> BoardState:
+        """Handle RUN_IDENTITY board submission.
 
-            flag_repo = ScoreFlagRepository(self.repository.session)
-            flag = ScoreFlag(
-                score_id=saved_score.id,
-                flag_type=anti_cheat_result.flag_type,  # type: ignore[arg-type]
-                confidence=anti_cheat_result.confidence,  # type: ignore[arg-type]
-                metadata=anti_cheat_result.metadata or {},
-                status=ScoreFlagStatus.PENDING,
+        Apply keep_strategy and upsert board_state.
+
+        Args:
+            board: The board.
+            identity_id: The identity.
+            event: The created score event.
+            value: The score value.
+
+        Returns:
+            Updated or existing BoardState.
+        """
+        board_state_service = BoardStateService(self.repository.session)
+
+        # Get existing state if any
+        existing_state = await board_state_service.get_by_board_and_identity(
+            board_id=board.id,
+            identity_id=identity_id,
+        )
+
+        if existing_state is None:
+            # First submission - create new state
+            aux = {
+                "selected_event_id": str(event.id),
+                "event_count": 1,
+            }
+            return await board_state_service.create_board_state(
+                board_id=board.id,
+                identity_id=identity_id,
+                primary_value=value,
+                aux=aux,
             )
-            await flag_repo.create(flag)
+
+        # Apply keep_strategy
+        event_count = (existing_state.aux or {}).get("event_count", 0) + 1
+
+        if board.keep_strategy == KeepStrategy.FIRST:
+            # Keep first score - only update event count
+            aux = {
+                "selected_event_id": (existing_state.aux or {}).get("selected_event_id"),
+                "event_count": event_count,
+            }
+            return await board_state_service.upsert_board_state(
+                board_id=board.id,
+                identity_id=identity_id,
+                primary_value=existing_state.primary_value,
+                aux=aux,
+            )
+
+        if board.keep_strategy == KeepStrategy.LATEST:
+            # Always use latest score
+            aux = {
+                "selected_event_id": str(event.id),
+                "event_count": event_count,
+            }
+            return await board_state_service.upsert_board_state(
+                board_id=board.id,
+                identity_id=identity_id,
+                primary_value=value,
+                aux=aux,
+            )
+
+        if board.keep_strategy == KeepStrategy.BEST:
+            # Keep better score based on sort direction
+            existing_value = existing_state.primary_value or 0.0
+            is_better = self._is_better_score(value, existing_value, board.sort_direction)
+
+            if is_better:
+                aux = {
+                    "selected_event_id": str(event.id),
+                    "event_count": event_count,
+                }
+                return await board_state_service.upsert_board_state(
+                    board_id=board.id,
+                    identity_id=identity_id,
+                    primary_value=value,
+                    aux=aux,
+                )
+            else:
+                # Keep existing better score, just update event count
+                aux = {
+                    "selected_event_id": (existing_state.aux or {}).get("selected_event_id"),
+                    "event_count": event_count,
+                }
+                return await board_state_service.upsert_board_state(
+                    board_id=board.id,
+                    identity_id=identity_id,
+                    primary_value=existing_state.primary_value,
+                    aux=aux,
+                )
+
+        # Fallback (shouldn't reach here with valid keep_strategy)
+        return existing_state
+
+    async def _handle_run_runs(
+        self,
+        board: Board,
+        identity_id: IdentityID,
+        event: ScoreEvent,
+        value: float,
+    ) -> RunEntry:
+        """Handle RUN_RUNS board submission.
+
+        Create a new run entry for each submission.
+
+        Args:
+            board: The board.
+            identity_id: The identity.
+            event: The created score event.
+            value: The score value.
+
+        Returns:
+            Created RunEntry.
+        """
+        run_entry_service = RunEntryService(self.repository.session)
+        return await run_entry_service.create_run_entry(
+            board_id=board.id,
+            identity_id=identity_id,
+            score_event_id=event.id,
+            primary_value=value,
+        )
+
+    async def _handle_counter(
+        self,
+        board: Board,
+        identity_id: IdentityID,
+        event: ScoreEvent,
+        delta: float,
+    ) -> BoardState:
+        """Handle COUNTER board submission.
+
+        Accumulate delta into board_state.
+
+        Args:
+            board: The board.
+            identity_id: The identity.
+            event: The created score event.
+            delta: The delta value to accumulate.
+
+        Returns:
+            Updated BoardState.
+        """
+        board_state_service = BoardStateService(self.repository.session)
+
+        # Get existing state if any
+        existing_state = await board_state_service.get_by_board_and_identity(
+            board_id=board.id,
+            identity_id=identity_id,
+        )
+
+        if existing_state is None:
+            # First submission
+            aux = {
+                "event_count": 1,
+                "last_event_id": str(event.id),
+            }
+            return await board_state_service.create_board_state(
+                board_id=board.id,
+                identity_id=identity_id,
+                primary_value=delta,
+                aux=aux,
+            )
+
+        # Accumulate delta
+        current_value = existing_state.primary_value or 0.0
+        new_value = current_value + delta
+        event_count = (existing_state.aux or {}).get("event_count", 0) + 1
+
+        aux = {
+            "event_count": event_count,
+            "last_event_id": str(event.id),
+        }
+        return await board_state_service.upsert_board_state(
+            board_id=board.id,
+            identity_id=identity_id,
+            primary_value=new_value,
+            aux=aux,
+        )
 
     async def get_score(self, score_id: ScoreID) -> Score | None:
         """Get a score by its ID.
