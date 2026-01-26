@@ -35,7 +35,7 @@ class TestScoreAroundEndpoint:
         )
 
         device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        device = await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
         )
@@ -107,7 +107,7 @@ class TestScoreAroundEndpoint:
         )
 
         device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        device = await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint="b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3",
         )
@@ -218,7 +218,7 @@ class TestScoreAroundEndpoint:
         )
 
         device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        device = await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint="c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4",
         )
@@ -276,7 +276,7 @@ class TestScoreAroundEndpoint:
         )
 
         device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        device = await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint="d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5",
         )
@@ -333,7 +333,7 @@ class TestScoreAroundEndpoint:
         )
 
         device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        device = await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint="e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6",
         )

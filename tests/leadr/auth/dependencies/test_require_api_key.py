@@ -14,6 +14,7 @@ from leadr.accounts.services.user_service import UserService
 from leadr.auth.dependencies import require_admin_auth
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.api_key_service import APIKeyService
+from leadr.auth.services.device_service import DeviceService
 from leadr.auth.services.identity_service import IdentityService
 from leadr.auth.services.nonce_service import NonceService
 from leadr.common.domain.ids import AccountID
@@ -27,7 +28,7 @@ class TestRequireAdminAuth:
         """Test that missing API key header raises 401 Unauthorized."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -80,7 +81,7 @@ class TestRequireAdminAuth:
         )
 
         # Try with a completely invalid key
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -134,7 +135,7 @@ class TestRequireAdminAuth:
         )
 
         # Use the dependency
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -194,7 +195,7 @@ class TestRequireAdminAuth:
         )
 
         # Try to use expired key
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -253,7 +254,7 @@ class TestRequireAdminAuth:
         await api_key_service.revoke_api_key(api_key.id)
 
         # Try to use revoked key
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -312,7 +313,7 @@ class TestRequireAdminAuth:
         await api_key_service.soft_delete(api_key.id)
 
         # Try to use deleted key
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -369,7 +370,7 @@ class TestRequireAdminAuth:
         assert api_key.last_used_at is None
 
         # Use the dependency
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 

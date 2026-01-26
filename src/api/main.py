@@ -21,7 +21,6 @@ from leadr.auth.api.client_routes import (
     public_router as client_public_router,
 )
 from leadr.auth.api.device_routes import router as device_router
-from leadr.auth.api.device_session_routes import router as device_session_router
 from leadr.auth.api.identity_routes import router as identity_router
 from leadr.auth.api.identity_session_routes import router as identity_session_router
 from leadr.auth.bootstrap import ensure_superadmin_exists
@@ -222,7 +221,6 @@ def create_app(
     admin_router.include_router(score_flag_router, tags=["Score Flags"])
     admin_router.include_router(score_submission_meta_router, tags=["Score Submission Metadata"])
     admin_router.include_router(device_router, tags=["Devices"])
-    admin_router.include_router(device_session_router, tags=["Device Sessions"])
     admin_router.include_router(identity_router, tags=["Identities"])
     admin_router.include_router(identity_session_router, tags=["Identity Sessions"])
     admin_router.include_router(jam_code_router, tags=["Registration"])

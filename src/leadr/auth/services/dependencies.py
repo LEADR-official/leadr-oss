@@ -47,16 +47,20 @@ async def get_nonce_service(db: DatabaseSession) -> NonceService:
     return NonceService(db)
 
 
-async def get_identity_service(db: DatabaseSession) -> IdentityService:
-    """Get IdentityService dependency.
+async def get_identity_service(
+    db: DatabaseSession,
+    device_service: DeviceService = Depends(get_device_service),
+) -> IdentityService:
+    """Get IdentityService dependency with DeviceService injected.
 
     Args:
         db: Database session injected via dependency injection
+        device_service: DeviceService injected via dependency injection
 
     Returns:
-        IdentityService instance configured with the database session
+        IdentityService instance configured with the database session and device service
     """
-    return IdentityService(db)
+    return IdentityService(db, device_service=device_service)
 
 
 # Type aliases for dependency injection in routes

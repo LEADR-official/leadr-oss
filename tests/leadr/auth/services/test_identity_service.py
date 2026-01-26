@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.accounts.adapters.orm import AccountORM
 from leadr.auth.adapters.orm import IdentityKindEnum, IdentityORM, IdentitySessionORM
 from leadr.auth.domain.identity import IdentityKind
+from leadr.auth.services.device_service import DeviceService
 from leadr.auth.services.identity_service import IdentityService
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
@@ -25,7 +26,7 @@ class TestIdentityServiceGetOrCreate:
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test creating a new identity when one doesn't exist."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         identity, created = await service.get_or_create_identity(
             account_id=AccountID(account_orm.id),
@@ -47,7 +48,7 @@ class TestIdentityServiceGetOrCreate:
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test that existing identity is returned instead of creating new one."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         # Create first identity
         identity1, created1 = await service.get_or_create_identity(
@@ -74,7 +75,7 @@ class TestIdentityServiceGetOrCreate:
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test that display name is updated when identity exists."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         # Create first identity
         identity1, _ = await service.get_or_create_identity(
@@ -103,7 +104,7 @@ class TestIdentityServiceGetOrCreate:
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test that different kinds create different identities."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         identity_device, created1 = await service.get_or_create_identity(
             account_id=AccountID(account_orm.id),
@@ -132,7 +133,7 @@ class TestIdentityServiceGetIdentity:
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test getting an identity by ID."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         identity, _ = await service.get_or_create_identity(
             account_id=AccountID(account_orm.id),
@@ -148,7 +149,7 @@ class TestIdentityServiceGetIdentity:
 
     async def test_get_identity_returns_none_for_nonexistent(self, db_session: AsyncSession):
         """Test getting a non-existent identity returns None."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         result = await service.get_identity(IdentityID(uuid4()))
 
@@ -158,7 +159,7 @@ class TestIdentityServiceGetIdentity:
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test getting an identity by ID or raising."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         identity, _ = await service.get_or_create_identity(
             account_id=AccountID(account_orm.id),
@@ -174,7 +175,7 @@ class TestIdentityServiceGetIdentity:
 
     async def test_get_identity_or_raise_raises_for_nonexistent(self, db_session: AsyncSession):
         """Test getting a non-existent identity raises EntityNotFoundError."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with pytest.raises(EntityNotFoundError):
             await service.get_identity_or_raise(IdentityID(uuid4()))
@@ -188,7 +189,7 @@ class TestIdentityServiceUpdateIdentity:
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test updating an identity's display name."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         identity, _ = await service.get_or_create_identity(
             account_id=AccountID(account_orm.id),
@@ -207,7 +208,7 @@ class TestIdentityServiceUpdateIdentity:
 
     async def test_update_identity_raises_for_nonexistent(self, db_session: AsyncSession):
         """Test updating a non-existent identity raises EntityNotFoundError."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with pytest.raises(EntityNotFoundError):
             await service.update_identity(
@@ -224,14 +225,7 @@ class TestIdentityServiceStartSession:
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test that starting a session creates an IdentitySession record."""
-        service = IdentityService(db_session)
-
-        identity, _ = await service.get_or_create_identity(
-            account_id=AccountID(account_orm.id),
-            game_id=GameID(game_orm.id),
-            kind=IdentityKind.DEVICE,
-            external_key="dev_start_session_test",
-        )
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.generate_access_token") as mock_access:
             mock_access.return_value = ("test_access_token", "test_access_hash")
@@ -240,10 +234,10 @@ class TestIdentityServiceStartSession:
             ) as mock_refresh:
                 mock_refresh.return_value = ("test_refresh_token", "test_refresh_hash")
 
-                access_token, refresh_token, expires_in = await service.start_session(
-                    identity=identity,
-                    ip_address="192.168.1.1",
-                    user_agent="TestApp/1.0",
+                identity, access_token, refresh_token, expires_in = await service.start_session(
+                    game_id=GameID(game_orm.id),
+                    client_fingerprint="a" * 64,  # Valid SHA256 hash format
+                    platform="ios",
                 )
 
         assert access_token == "test_access_token"
@@ -261,21 +255,12 @@ class TestIdentityServiceStartSession:
         assert result.items[0].identity_id == identity.id
         assert result.items[0].access_token_hash == "test_access_hash"
         assert result.items[0].refresh_token_hash == "test_refresh_hash"
-        assert result.items[0].ip_address == "192.168.1.1"
-        assert result.items[0].user_agent == "TestApp/1.0"
 
     async def test_start_session_uses_correct_expiration(
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test that session token has correct expiration time."""
-        service = IdentityService(db_session)
-
-        identity, _ = await service.get_or_create_identity(
-            account_id=AccountID(account_orm.id),
-            game_id=GameID(game_orm.id),
-            kind=IdentityKind.DEVICE,
-            external_key="dev_expiration_test",
-        )
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.generate_access_token") as mock_access:
             mock_access.return_value = ("token", "hash")
@@ -284,7 +269,10 @@ class TestIdentityServiceStartSession:
             ) as mock_refresh:
                 mock_refresh.return_value = ("refresh", "refresh_hash")
 
-                await service.start_session(identity=identity)
+                await service.start_session(
+                    game_id=GameID(game_orm.id),
+                    client_fingerprint="b" * 64,  # Valid SHA256 hash format
+                )
 
                 # Verify generate_access_token was called with correct expiration
                 assert mock_access.called
@@ -302,14 +290,7 @@ class TestIdentityServiceValidateToken:
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test that valid token returns associated identity."""
-        service = IdentityService(db_session)
-
-        identity, _ = await service.get_or_create_identity(
-            account_id=AccountID(account_orm.id),
-            game_id=GameID(game_orm.id),
-            kind=IdentityKind.DEVICE,
-            external_key="dev_validate_token_test",
-        )
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.generate_access_token") as mock_access:
             mock_access.return_value = ("test_token", "test_hash")
@@ -317,7 +298,10 @@ class TestIdentityServiceValidateToken:
                 "leadr.auth.services.identity_service.generate_refresh_token"
             ) as mock_refresh:
                 mock_refresh.return_value = ("test_refresh", "test_refresh_hash")
-                await service.start_session(identity=identity)
+                identity, _, _, _ = await service.start_session(
+                    game_id=GameID(game_orm.id),
+                    client_fingerprint="c" * 64,  # Valid SHA256 hash format
+                )
 
         # Validate token
         with patch("leadr.auth.services.identity_service.validate_access_token") as mock_val:
@@ -337,7 +321,7 @@ class TestIdentityServiceValidateToken:
 
     async def test_validate_token_returns_none_for_invalid_jwt(self, db_session: AsyncSession):
         """Test that invalid JWT returns None."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.validate_access_token") as mock_val:
             mock_val.return_value = None
@@ -350,7 +334,7 @@ class TestIdentityServiceValidateToken:
         self, db_session: AsyncSession
     ):
         """Test that token without identity_id returns None."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.validate_access_token") as mock_val:
             mock_val.return_value = {
@@ -368,7 +352,7 @@ class TestIdentityServiceValidateToken:
         self, db_session: AsyncSession
     ):
         """Test that token with non-existent identity returns None."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         nonexistent_id = uuid4()
 
@@ -412,7 +396,7 @@ class TestIdentityServiceValidateToken:
         db_session.add(expired_session)
         await db_session.commit()
 
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.validate_access_token") as mock_val:
             mock_val.return_value = {
@@ -457,7 +441,7 @@ class TestIdentityServiceValidateToken:
         db_session.add(revoked_session)
         await db_session.commit()
 
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.validate_access_token") as mock_val:
             mock_val.return_value = {
@@ -488,7 +472,7 @@ class TestIdentityServiceValidateToken:
         db_session.add(identity_orm)
         await db_session.commit()
 
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.validate_access_token") as mock_val:
             mock_val.return_value = {
@@ -537,7 +521,7 @@ class TestIdentityServiceRefreshToken:
         db_session.add(session_orm)
         await db_session.commit()
 
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.validate_refresh_token") as mock_val:
             mock_val.return_value = {
@@ -574,7 +558,7 @@ class TestIdentityServiceRefreshToken:
 
     async def test_refresh_token_rejects_invalid_jwt(self, db_session: AsyncSession):
         """Test that invalid refresh JWT is rejected."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.validate_refresh_token") as mock_val:
             mock_val.return_value = None
@@ -587,7 +571,7 @@ class TestIdentityServiceRefreshToken:
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test that refresh is rejected when session not found."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.validate_refresh_token") as mock_val:
             mock_val.return_value = {
@@ -631,7 +615,7 @@ class TestIdentityServiceRefreshToken:
         db_session.add(session_orm)
         await db_session.commit()
 
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.validate_refresh_token") as mock_val:
             mock_val.return_value = {
@@ -675,7 +659,7 @@ class TestIdentityServiceRefreshToken:
         db_session.add(session_orm)
         await db_session.commit()
 
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.validate_refresh_token") as mock_val:
             mock_val.return_value = {
@@ -720,7 +704,7 @@ class TestIdentityServiceRefreshToken:
         db_session.add(session_orm)
         await db_session.commit()
 
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.validate_refresh_token") as mock_val:
             mock_val.return_value = {
@@ -767,7 +751,7 @@ class TestIdentityServiceRefreshToken:
         db_session.add(session_orm)
         await db_session.commit()
 
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with patch("leadr.auth.services.identity_service.validate_refresh_token") as mock_val:
             mock_val.return_value = {
@@ -817,7 +801,7 @@ class TestIdentityServiceSessionManagement:
         db_session.add(session_orm)
         await db_session.commit()
 
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
         result = await service.get_session(IdentitySessionID(session_id))
 
         assert result is not None
@@ -825,7 +809,7 @@ class TestIdentityServiceSessionManagement:
 
     async def test_get_session_returns_none_for_nonexistent(self, db_session: AsyncSession):
         """Test getting a non-existent session returns None."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
         result = await service.get_session(IdentitySessionID(uuid4()))
 
         assert result is None
@@ -859,7 +843,7 @@ class TestIdentityServiceSessionManagement:
         db_session.add(session_orm)
         await db_session.commit()
 
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
         result = await service.get_session_or_raise(IdentitySessionID(session_id))
 
         assert result is not None
@@ -867,7 +851,7 @@ class TestIdentityServiceSessionManagement:
 
     async def test_get_session_or_raise_raises_for_nonexistent(self, db_session: AsyncSession):
         """Test getting a non-existent session raises EntityNotFoundError."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with pytest.raises(EntityNotFoundError):
             await service.get_session_or_raise(IdentitySessionID(uuid4()))
@@ -901,7 +885,7 @@ class TestIdentityServiceSessionManagement:
         db_session.add(session_orm)
         await db_session.commit()
 
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
         result = await service.revoke_session(IdentitySessionID(session_id))
 
         assert result.revoked_at is not None
@@ -909,7 +893,7 @@ class TestIdentityServiceSessionManagement:
 
     async def test_revoke_session_raises_for_nonexistent(self, db_session: AsyncSession):
         """Test revoking a non-existent session raises EntityNotFoundError."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         with pytest.raises(EntityNotFoundError):
             await service.revoke_session(IdentitySessionID(uuid4()))
@@ -923,7 +907,7 @@ class TestIdentityServiceListMethods:
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test listing identities for an account."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         # Create multiple identities
         await service.get_or_create_identity(
@@ -951,7 +935,7 @@ class TestIdentityServiceListMethods:
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test filtering identities by kind."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
         # Create identities with different kinds
         await service.get_or_create_identity(
@@ -981,23 +965,22 @@ class TestIdentityServiceListMethods:
         self, db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
     ):
         """Test listing sessions for an identity."""
-        service = IdentityService(db_session)
+        service = IdentityService(db_session, device_service=DeviceService(db_session))
 
-        identity, _ = await service.get_or_create_identity(
-            account_id=AccountID(account_orm.id),
-            game_id=GameID(game_orm.id),
-            kind=IdentityKind.DEVICE,
-            external_key="dev_list_sessions",
-        )
+        # Use the same fingerprint for both calls to get the same identity
+        fingerprint = "d" * 64
 
-        # Create multiple sessions
+        # Create multiple sessions for the same identity
         with patch("leadr.auth.services.identity_service.generate_access_token") as mock_access:
             mock_access.return_value = ("token1", "hash1")
             with patch(
                 "leadr.auth.services.identity_service.generate_refresh_token"
             ) as mock_refresh:
                 mock_refresh.return_value = ("refresh1", "refresh_hash1")
-                await service.start_session(identity=identity)
+                identity, _, _, _ = await service.start_session(
+                    game_id=GameID(game_orm.id),
+                    client_fingerprint=fingerprint,
+                )
 
         with patch("leadr.auth.services.identity_service.generate_access_token") as mock_access:
             mock_access.return_value = ("token2", "hash2")
@@ -1005,7 +988,11 @@ class TestIdentityServiceListMethods:
                 "leadr.auth.services.identity_service.generate_refresh_token"
             ) as mock_refresh:
                 mock_refresh.return_value = ("refresh2", "refresh_hash2")
-                await service.start_session(identity=identity)
+                # Same fingerprint returns same identity, but creates new session
+                await service.start_session(
+                    game_id=GameID(game_orm.id),
+                    client_fingerprint=fingerprint,
+                )
 
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
         result = await service.list_sessions(

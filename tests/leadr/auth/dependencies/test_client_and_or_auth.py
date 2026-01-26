@@ -11,6 +11,7 @@ from leadr.accounts.services.user_service import UserService
 from leadr.auth.dependencies import AuthContextDependency
 from leadr.auth.domain.identity import Identity, IdentityKind
 from leadr.auth.services.api_key_service import APIKeyService
+from leadr.auth.services.device_service import DeviceService
 from leadr.auth.services.identity_service import IdentityService
 from leadr.auth.services.nonce_service import NonceService
 from leadr.common.domain.ids import AccountID, GameID, IdentityID
@@ -40,7 +41,7 @@ class TestClientOnlyAuth:
         """Test that client auth raises 500 when ENABLE_CLIENT_API is False."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -66,7 +67,7 @@ class TestClientOnlyAuth:
         """Test that missing bearer token raises 401."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -91,7 +92,7 @@ class TestClientOnlyAuth:
         """Test that invalid bearer token format raises 401."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -116,7 +117,7 @@ class TestClientOnlyAuth:
         """Test that invalid identity token raises 401."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -146,7 +147,7 @@ class TestClientOnlyAuth:
         """Test that missing nonce raises 412 when nonce is required."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -179,7 +180,7 @@ class TestClientOnlyAuth:
         """Test that invalid nonce raises 412."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -217,7 +218,7 @@ class TestClientOnlyAuth:
         """Test that nonce from wrong identity raises 412."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -255,7 +256,7 @@ class TestClientOnlyAuth:
         """Test that already used nonce raises 412."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -293,7 +294,7 @@ class TestClientOnlyAuth:
         """Test that expired nonce raises 412."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -331,7 +332,7 @@ class TestClientOnlyAuth:
         """Test that valid token and nonce returns ClientAuthContext."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -371,7 +372,7 @@ class TestClientOnlyAuth:
         """Test that debug logging occurs when DEBUG=True."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -406,7 +407,7 @@ class TestClientOnlyAuth:
         """Test that generic ValueError from nonce validation raises 412 with 'Invalid nonce'."""
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 

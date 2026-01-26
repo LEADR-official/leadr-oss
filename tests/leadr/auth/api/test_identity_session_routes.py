@@ -5,8 +5,10 @@ from httpx import AsyncClient
 
 from leadr.accounts.services.account_service import AccountService
 from leadr.auth.domain.identity import IdentityKind
+from leadr.auth.services.device_service import DeviceService
 from leadr.auth.services.identity_service import IdentityService
 from leadr.common.api.pagination import PaginationParams
+from leadr.common.domain.ids import GameID
 from leadr.games.services.game_service import GameService
 
 
@@ -30,23 +32,18 @@ class TestIdentitySessionRoutes:
         )
 
         # Create identities and sessions
-        identity_service = IdentityService(db_session)
-        identity1, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_session_list_test_1",
-        )
-        identity2, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_session_list_test_2",
-        )
+        device_service = DeviceService(db_session)
+        identity_service = IdentityService(db_session, device_service=device_service)
 
-        # Start sessions
-        await identity_service.start_session(identity1)
-        await identity_service.start_session(identity2)
+        # Start sessions (creates identities internally)
+        _, _, _, _ = await identity_service.start_session(
+            game_id=game.id,
+            client_fingerprint="a" * 64,
+        )
+        _, _, _, _ = await identity_service.start_session(
+            game_id=game.id,
+            client_fingerprint="b" * 64,
+        )
 
         # List sessions
         response = await client.get(
@@ -78,23 +75,17 @@ class TestIdentitySessionRoutes:
         )
 
         # Create identities and sessions
-        identity_service = IdentityService(db_session)
-        identity1, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_session_filter_test_1",
-        )
-        identity2, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_session_filter_test_2",
-        )
+        device_service = DeviceService(db_session)
+        identity_service = IdentityService(db_session, device_service=device_service)
 
-        # Start sessions
-        await identity_service.start_session(identity1)
-        await identity_service.start_session(identity2)
+        identity1, _, _, _ = await identity_service.start_session(
+            game_id=game.id,
+            client_fingerprint="c" * 64,
+        )
+        identity2, _, _, _ = await identity_service.start_session(
+            game_id=game.id,
+            client_fingerprint="d" * 64,
+        )
 
         # Filter by identity1
         response = await client.get(
@@ -125,14 +116,13 @@ class TestIdentitySessionRoutes:
         )
 
         # Create identity and session
-        identity_service = IdentityService(db_session)
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
+        device_service = DeviceService(db_session)
+        identity_service = IdentityService(db_session, device_service=device_service)
+
+        identity, _, _, _ = await identity_service.start_session(
             game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_session_get_test",
+            client_fingerprint="e" * 64,
         )
-        await identity_service.start_session(identity)
 
         # Get the session
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
@@ -179,14 +169,13 @@ class TestIdentitySessionRoutes:
         )
 
         # Create identity and session
-        identity_service = IdentityService(db_session)
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
+        device_service = DeviceService(db_session)
+        identity_service = IdentityService(db_session, device_service=device_service)
+
+        identity, _, _, _ = await identity_service.start_session(
             game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_session_revoke_test",
+            client_fingerprint="f" * 64,
         )
-        await identity_service.start_session(identity)
 
         # Get the session
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
@@ -197,8 +186,8 @@ class TestIdentitySessionRoutes:
         )
         session = result.items[0]
 
-        # Revoke session
-        response = await client.delete(
+        # Revoke session via PATCH
+        response = await client.patch(
             f"/identity-sessions/{session.id}",
             headers={"leadr-api-key": test_api_key},
         )
@@ -240,7 +229,7 @@ class TestIdentitySessionRoutes:
         await account_repo.create(account1)
         await account_repo.create(account2)
 
-        # Create games and identities for each account
+        # Create games for each account
         game_service = GameService(db_session)
         game1 = await game_service.create_game(
             account_id=account1.id,
@@ -251,23 +240,18 @@ class TestIdentitySessionRoutes:
             name="Game Account 2 Session",
         )
 
-        identity_service = IdentityService(db_session)
-        identity1, _ = await identity_service.get_or_create_identity(
-            account_id=account1.id,
-            game_id=game1.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_superadmin_session_test_1",
-        )
-        identity2, _ = await identity_service.get_or_create_identity(
-            account_id=account2.id,
-            game_id=game2.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_superadmin_session_test_2",
-        )
+        # Create sessions
+        device_service = DeviceService(db_session)
+        identity_service = IdentityService(db_session, device_service=device_service)
 
-        # Start sessions
-        await identity_service.start_session(identity1)
-        await identity_service.start_session(identity2)
+        await identity_service.start_session(
+            game_id=game1.id,
+            client_fingerprint="1" * 64,
+        )
+        await identity_service.start_session(
+            game_id=game2.id,
+            client_fingerprint="2" * 64,
+        )
 
         # List sessions WITHOUT account_id - should return sessions from ALL accounts
         response = await authenticated_client.get("/identity-sessions")

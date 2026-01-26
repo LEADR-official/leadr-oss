@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import Field, field_validator
 
-from leadr.common.domain.ids import AccountID, DeviceID, DeviceSessionID, GameID
+from leadr.common.domain.ids import AccountID, DeviceID, GameID
 from leadr.common.domain.models import Entity
 
 
@@ -84,72 +84,3 @@ class Device(Entity):
     def update_last_seen(self) -> None:
         """Update the last_seen_at timestamp to current time."""
         self.last_seen_at = datetime.now(UTC)
-
-
-class DeviceSession(Entity):
-    """Device session domain entity.
-
-    Represents an active authentication session for a device.
-    Sessions have an expiration time and can be revoked manually.
-    Includes both access and refresh tokens with token rotation support.
-    """
-
-    id: DeviceSessionID = Field(
-        frozen=True,
-        default_factory=DeviceSessionID,
-        description="Unique device session identifier",
-    )
-    device_id: DeviceID
-    access_token_hash: str
-    refresh_token_hash: str
-    token_version: int = 1
-    expires_at: datetime
-    refresh_expires_at: datetime
-    ip_address: str | None = None
-    user_agent: str | None = None
-    revoked_at: datetime | None = None
-
-    def is_expired(self) -> bool:
-        """Check if the access token has expired.
-
-        Returns:
-            True if the current time is past the expiration time.
-        """
-        return datetime.now(UTC) >= self.expires_at
-
-    def is_refresh_expired(self) -> bool:
-        """Check if the refresh token has expired.
-
-        Returns:
-            True if the current time is past the refresh expiration time.
-        """
-        return datetime.now(UTC) >= self.refresh_expires_at
-
-    def is_revoked(self) -> bool:
-        """Check if the session has been manually revoked.
-
-        Returns:
-            True if revoked_at is set.
-        """
-        return self.revoked_at is not None
-
-    def is_valid(self) -> bool:
-        """Check if the session is valid for use.
-
-        A session is valid if it's not expired and not revoked.
-
-        Returns:
-            True if the session can be used for authentication.
-        """
-        return not self.is_expired() and not self.is_revoked()
-
-    def revoke(self) -> None:
-        """Revoke the session, preventing further use."""
-        self.revoked_at = datetime.now(UTC)
-
-    def rotate_tokens(self) -> None:
-        """Increment token version for token rotation.
-
-        Called when refreshing tokens to invalidate old refresh tokens.
-        """
-        self.token_version += 1

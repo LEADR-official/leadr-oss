@@ -5,6 +5,7 @@ from httpx import AsyncClient
 
 from leadr.accounts.services.account_service import AccountService
 from leadr.auth.domain.identity import IdentityKind
+from leadr.auth.services.device_service import DeviceService
 from leadr.auth.services.identity_service import IdentityService
 from leadr.games.services.game_service import GameService
 
@@ -29,7 +30,7 @@ class TestIdentityRoutes:
         )
 
         # Create identities
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity1, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -82,7 +83,7 @@ class TestIdentityRoutes:
         )
 
         # Create identities for both games
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game1.id,
@@ -127,7 +128,7 @@ class TestIdentityRoutes:
         )
 
         # Create identities with different kinds
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -191,7 +192,7 @@ class TestIdentityRoutes:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -240,7 +241,7 @@ class TestIdentityRoutes:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -276,7 +277,7 @@ class TestIdentityRoutes:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -347,7 +348,7 @@ class TestIdentityRoutes:
             name="Game Account 2 Identity",
         )
 
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         await identity_service.get_or_create_identity(
             account_id=account1.id,
             game_id=game1.id,

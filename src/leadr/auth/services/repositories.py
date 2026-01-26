@@ -11,7 +11,6 @@ from leadr.auth.adapters.orm import (
     APIKeyORM,
     APIKeyStatusEnum,
     DeviceORM,
-    DeviceSessionORM,
     DeviceStatusEnum,
     IdentityKindEnum,
     IdentityORM,
@@ -19,14 +18,13 @@ from leadr.auth.adapters.orm import (
     NonceORM,
 )
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
-from leadr.auth.domain.device import Device, DeviceSession
+from leadr.auth.domain.device import Device
 from leadr.auth.domain.identity import Identity, IdentityKind, IdentitySession
 from leadr.auth.domain.nonce import Nonce
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import (
     AccountID,
     APIKeyID,
-    DeviceID,
     GameID,
     IdentityID,
     UserID,
@@ -259,130 +257,6 @@ class DeviceRepository(BaseRepository[Device, DeviceORM]):
         if status is not None:
             query = query.where(DeviceORM.status == DeviceStatusEnum(status))
             filters_dict["status"] = status
-
-        # Validate sort fields
-        for sort_field in pagination.sort_spec:
-            if sort_field.name not in self.SORTABLE_FIELDS:
-                raise ValueError(
-                    f"Unknown sort field: {sort_field.name}. "
-                    f"Valid fields: {', '.join(sorted(self.SORTABLE_FIELDS))}"
-                )
-
-        # Handle cursor if present
-        cursor = None
-        if pagination.has_cursor():
-            cursor = pagination.decode_cursor()
-            if cursor is not None:
-                cursor.validate_state(pagination.sort_spec, filters_dict)
-
-        # Execute paginated query
-        return await self._execute_paginated_query(
-            query=query,
-            sort_fields=pagination.sort_spec,
-            cursor=cursor,
-            limit=pagination.limit,
-        )
-
-
-class DeviceSessionRepository(BaseRepository[DeviceSession, DeviceSessionORM]):
-    """DeviceSession repository for managing device session persistence."""
-
-    # Valid sortable fields for device sessions
-    SORTABLE_FIELDS = {
-        "id",
-        "created_at",
-        "updated_at",
-    }
-
-    def _to_domain(self, orm: DeviceSessionORM) -> DeviceSession:
-        """Convert ORM model to domain entity."""
-        return orm.to_domain()
-
-    def _to_orm(self, entity: DeviceSession) -> DeviceSessionORM:
-        """Convert domain entity to ORM model."""
-        return DeviceSessionORM.from_domain(entity)
-
-    def _get_orm_class(self) -> type[DeviceSessionORM]:
-        """Get the ORM model class."""
-        return DeviceSessionORM
-
-    async def get_by_token_hash(self, token_hash: str) -> DeviceSession | None:
-        """Get session by access token hash, returns None if not found or soft-deleted.
-
-        Args:
-            token_hash: The hashed access token
-
-        Returns:
-            DeviceSession if found and not deleted, None otherwise
-        """
-        query = select(DeviceSessionORM).where(
-            DeviceSessionORM.access_token_hash == token_hash,
-            DeviceSessionORM.deleted_at.is_(None),
-        )
-        result = await self.session.execute(query)
-        orm = result.scalar_one_or_none()
-        return self._to_domain(orm) if orm else None
-
-    async def get_by_refresh_token_hash(self, refresh_token_hash: str) -> DeviceSession | None:
-        """Get session by refresh token hash, returns None if not found or soft-deleted.
-
-        Args:
-            refresh_token_hash: The hashed refresh token
-
-        Returns:
-            DeviceSession if found and not deleted, None otherwise
-        """
-        query = select(DeviceSessionORM).where(
-            DeviceSessionORM.refresh_token_hash == refresh_token_hash,
-            DeviceSessionORM.deleted_at.is_(None),
-        )
-        result = await self.session.execute(query)
-        orm = result.scalar_one_or_none()
-        return self._to_domain(orm) if orm else None
-
-    async def filter(
-        self,
-        account_id: AccountID | None = None,
-        *,
-        device_id: DeviceID | None = None,
-        pagination: PaginationParams,
-        **kwargs: Any,
-    ) -> PaginatedResult[DeviceSession]:
-        """Filter sessions by account and optional criteria with pagination.
-
-        Note: account_id is used for multi-tenant safety via JOIN with devices table.
-
-        Args:
-            account_id: Optional account ID to filter by. If None, returns all sessions
-                (superadmin use case). Regular users should always pass account_id.
-            device_id: Optional device ID to filter by
-            pagination: Pagination parameters (required).
-            **kwargs: Additional filter parameters (reserved for future use)
-
-        Returns:
-            PaginatedResult containing device sessions.
-
-        Raises:
-            ValueError: If sort field is not in SORTABLE_FIELDS
-            CursorValidationError: If cursor is invalid or state doesn't match
-        """
-        # Base query without account filter
-        query = select(DeviceSessionORM).where(DeviceSessionORM.deleted_at.is_(None))
-
-        # Join with devices table to filter by account_id if provided
-        if account_id is not None:
-            account_uuid = self._extract_uuid(account_id)
-            query = query.join(DeviceORM, DeviceSessionORM.device_id == DeviceORM.id).where(
-                DeviceORM.account_id == account_uuid
-            )
-
-        # Build filters dict for cursor validation
-        filters_dict: dict[str, str] = {}
-
-        if device_id is not None:
-            device_uuid = self._extract_uuid(device_id)
-            query = query.where(DeviceSessionORM.device_id == device_uuid)
-            filters_dict["device_id"] = str(device_id)
 
         # Validate sort fields
         for sort_field in pagination.sort_spec:

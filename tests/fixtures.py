@@ -20,7 +20,6 @@ from leadr.auth.adapters.orm import (
     APIKeyORM,
     APIKeyStatusEnum,
     DeviceORM,
-    DeviceSessionORM,
     DeviceStatusEnum,
     IdentityKindEnum,
     IdentityORM,
@@ -214,34 +213,6 @@ async def identity_orm(
     db_session.add(identity)
     await db_session.flush()
     return identity
-
-
-@pytest_asyncio.fixture
-async def device_session_orm(db_session: AsyncSession, device_orm: DeviceORM) -> DeviceSessionORM:
-    """Create and persist a test DeviceSessionORM linked to device.
-
-    Args:
-        device_orm: Parent device (auto-injected fixture).
-
-    Returns:
-        DeviceSessionORM instance with auto-generated id.
-    """
-    from datetime import timedelta
-
-    now = datetime.now(UTC)
-    session = DeviceSessionORM(
-        device_id=device_orm.id,  # Raw UUID
-        access_token_hash="test_access_hash",
-        refresh_token_hash="test_refresh_hash",
-        token_version=1,
-        expires_at=now + timedelta(hours=24),
-        refresh_expires_at=now + timedelta(days=30),
-        ip_address="127.0.0.1",
-        user_agent="TestAgent/1.0",
-    )
-    db_session.add(session)
-    await db_session.flush()
-    return session
 
 
 @pytest_asyncio.fixture

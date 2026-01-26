@@ -284,8 +284,6 @@ class TestIdentitySession:
             token_version=1,
             expires_at=expires_at,
             refresh_expires_at=refresh_expires_at,
-            ip_address="192.168.1.1",
-            user_agent="Mozilla/5.0",
             revoked_at=None,
             created_at=now,
             updated_at=now,
@@ -298,12 +296,10 @@ class TestIdentitySession:
         assert session.token_version == 1
         assert session.expires_at == expires_at
         assert session.refresh_expires_at == refresh_expires_at
-        assert session.ip_address == "192.168.1.1"
-        assert session.user_agent == "Mozilla/5.0"
         assert session.revoked_at is None
 
-    def test_create_identity_session_with_optional_fields_none(self):
-        """Test that identity session can be created with optional fields as None."""
+    def test_create_identity_session_with_optional_revoked_at_none(self):
+        """Test that identity session can be created with revoked_at as None."""
         session_id = IdentitySessionID(uuid4())
         identity_id = IdentityID(uuid4())
         now = datetime.now(UTC)
@@ -317,15 +313,11 @@ class TestIdentitySession:
             refresh_token_hash="hashed_refresh_token",
             expires_at=expires_at,
             refresh_expires_at=refresh_expires_at,
-            ip_address=None,
-            user_agent=None,
             revoked_at=None,
             created_at=now,
             updated_at=now,
         )
 
-        assert session.ip_address is None
-        assert session.user_agent is None
         assert session.revoked_at is None
 
     def test_identity_id_required(self):

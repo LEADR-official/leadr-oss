@@ -62,8 +62,6 @@ class IdentitySessionResponse(BaseModel):
     identity_id: IdentityID = Field(description="ID of the identity this session belongs to")
     expires_at: datetime = Field(description="Access token expiration time (UTC)")
     refresh_expires_at: datetime = Field(description="Refresh token expiration time (UTC)")
-    ip_address: str | None = Field(default=None, description="Client IP address")
-    user_agent: str | None = Field(default=None, description="Client user agent")
     revoked_at: datetime | None = Field(default=None, description="Time when session was revoked")
     created_at: datetime = Field(description="Timestamp when session was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
@@ -83,8 +81,6 @@ class IdentitySessionResponse(BaseModel):
             identity_id=session.identity_id,
             expires_at=session.expires_at,
             refresh_expires_at=session.refresh_expires_at,
-            ip_address=session.ip_address,
-            user_agent=session.user_agent,
             revoked_at=session.revoked_at,
             created_at=session.created_at,
             updated_at=session.updated_at,

@@ -117,7 +117,7 @@ async def get_identity_session(
     return IdentitySessionResponse.from_domain(session)
 
 
-@router.delete(
+@router.patch(
     "/identity-sessions/{session_id}",
     response_model=IdentitySessionResponse,
 )

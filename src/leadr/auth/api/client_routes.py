@@ -1,6 +1,6 @@
 """API routes for client authentication using Identity."""
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, status
 
 from leadr.auth.api.client_schemas import (
     NonceResponse,
@@ -10,25 +10,11 @@ from leadr.auth.api.client_schemas import (
     StartSessionResponse,
 )
 from leadr.auth.dependencies import ClientAuthContextDep
-from leadr.auth.domain.identity import IdentityKind
-from leadr.auth.services.dependencies import DeviceServiceDep, IdentityServiceDep, NonceServiceDep
+from leadr.auth.services.dependencies import IdentityServiceDep, NonceServiceDep
 from leadr.common.domain.exceptions import EntityNotFoundError
 
 public_router = APIRouter(prefix="/client")
 protected_router = APIRouter()
-
-
-def _get_client_ip(request: Request) -> str | None:
-    """Extract client IP from request headers."""
-    # Check common headers for real IP when behind proxy
-    for header in ["x-real-ip", "x-forwarded-for", "cf-connecting-ip"]:
-        if value := request.headers.get(header):
-            # x-forwarded-for can be comma-separated, take first
-            return value.split(",")[0].strip()
-    # Fall back to direct client
-    if request.client:
-        return request.client.host
-    return None
 
 
 @public_router.post(
@@ -37,9 +23,7 @@ def _get_client_ip(request: Request) -> str | None:
     status_code=status.HTTP_201_CREATED,
 )
 async def start_session(
-    request: Request,
     session_request: StartSessionRequest,
-    device_service: DeviceServiceDep,
     identity_service: IdentityServiceDep,
 ) -> StartSessionResponse:
     """Start a new identity session for a game client.
@@ -51,10 +35,8 @@ async def start_session(
     No authentication is required to call this endpoint (it IS the authentication).
 
     Args:
-        request: FastAPI request object
         session_request: Session start request with game_id and fingerprint
-        device_service: DeviceService dependency (for device lookup)
-        identity_service: IdentityService dependency (for session creation)
+        identity_service: IdentityService dependency (handles device and identity creation)
 
     Returns:
         StartSessionResponse with identity info and access tokens
@@ -64,27 +46,11 @@ async def start_session(
         422: Invalid request (missing required fields, invalid UUID format)
     """
     try:
-        # 1. Get or create device (internal lookup only)
-        device = await device_service.get_or_create_device(
+        identity, access_token, refresh_token, expires_in = await identity_service.start_session(
             game_id=session_request.game_id,
             client_fingerprint=session_request.client_fingerprint,
             platform=session_request.platform,
             metadata=session_request.metadata,
-        )
-
-        # 2. Get or create identity from device
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=device.account_id,
-            game_id=device.game_id,
-            kind=IdentityKind.DEVICE,
-            external_key=device.client_fingerprint,
-        )
-
-        # 3. Start identity session (creates tokens with identity_id)
-        access_token, refresh_token, expires_in = await identity_service.start_session(
-            identity=identity,
-            ip_address=_get_client_ip(request),
-            user_agent=request.headers.get("user-agent"),
             test_mode=session_request.test_mode,
         )
     except EntityNotFoundError as e:

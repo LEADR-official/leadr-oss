@@ -273,7 +273,7 @@ class TestClientSessionRoutes:
         """Test refreshing a session with an expired token returns 401."""
         from datetime import UTC, datetime, timedelta
 
-        from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM
+        from leadr.auth.adapters.orm import DeviceORM, IdentityORM, IdentitySessionORM
 
         # Create account and game
         account_service = AccountService(db_session)
@@ -288,7 +288,7 @@ class TestClientSessionRoutes:
             name="Test Game",
         )
 
-        # Create device and expired session directly
+        # Create device, identity and expired session directly
         now = datetime.now(UTC)
         device = DeviceORM(
             id=uuid4(),
@@ -300,17 +300,30 @@ class TestClientSessionRoutes:
             status="active",
         )
         db_session.add(device)
-        await db_session.commit()
+        await db_session.flush()
+
+        identity = IdentityORM(
+            id=uuid4(),
+            account_id=account.id.uuid,
+            game_id=game.id.uuid,
+            kind="DEVICE",
+            external_key=device.client_fingerprint,
+            created_at=now,
+            updated_at=now,
+        )
+        db_session.add(identity)
+        await db_session.flush()
 
         # Create expired session
-        expired_session = DeviceSessionORM(
+        expired_session = IdentitySessionORM(
             id=uuid4(),
-            device_id=device.id,
+            identity_id=identity.id,
             access_token_hash="dummy_hash",
             refresh_token_hash="expired_refresh_hash",
             token_version=1,
             expires_at=now - timedelta(hours=1),
             refresh_expires_at=now - timedelta(hours=1),  # Expired
+            created_at=now,
         )
         db_session.add(expired_session)
         await db_session.commit()

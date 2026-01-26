@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.services.account_service import AccountService
 from leadr.auth.domain.identity import IdentityKind
+from leadr.auth.services.device_service import DeviceService
 from leadr.auth.services.identity_service import IdentityService
 from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.boards.domain.board_state import BoardState
@@ -50,7 +51,7 @@ class TestSubmitScoreValidation:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -95,7 +96,7 @@ class TestSubmitScoreValidation:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -140,7 +141,7 @@ class TestSubmitScoreValidation:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -187,7 +188,7 @@ class TestSubmitScoreValidation:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -240,7 +241,7 @@ class TestRunIdentitySubmission:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -301,7 +302,7 @@ class TestRunIdentitySubmission:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -369,7 +370,7 @@ class TestRunIdentitySubmission:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -428,7 +429,7 @@ class TestRunIdentitySubmission:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -492,7 +493,7 @@ class TestRunRunsSubmission:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -566,7 +567,7 @@ class TestCounterSubmission:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -640,7 +641,7 @@ class TestGeoDataHandling:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -699,7 +700,7 @@ class TestAuxDataInBoardState:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
@@ -753,7 +754,7 @@ class TestAuxDataInBoardState:
         )
 
         # Create identity
-        identity_service = IdentityService(db_session)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,

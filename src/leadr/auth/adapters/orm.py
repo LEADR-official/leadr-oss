@@ -8,13 +8,12 @@ from uuid import UUID
 from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
+from leadr.auth.domain.device import Device, DeviceStatus
 from leadr.auth.domain.identity import Identity, IdentityKind, IdentitySession
 from leadr.auth.domain.nonce import Nonce, NonceStatus
 from leadr.common.domain.ids import (
     AccountID,
     DeviceID,
-    DeviceSessionID,
     GameID,
     IdentityID,
     IdentitySessionID,
@@ -141,11 +140,6 @@ class DeviceORM(Base):
 
     # Relationships
     game: Mapped["GameORM"] = relationship("GameORM")  # type: ignore[name-defined]
-    sessions: Mapped[list["DeviceSessionORM"]] = relationship(
-        "DeviceSessionORM",
-        back_populates="device",
-        cascade="all, delete-orphan",
-    )
 
     # Indexes
     __table_args__ = (
@@ -186,101 +180,6 @@ class DeviceORM(Base):
             first_seen_at=self.first_seen_at,
             last_seen_at=self.last_seen_at,
             metadata=self.device_metadata,
-        )
-
-
-class DeviceSessionORM(Base):
-    """DeviceSession ORM model.
-
-    Represents an active authentication session for a device in the database.
-    Maps to the device_sessions table with foreign key to devices.
-    Sessions include both access and refresh tokens with token rotation support.
-    """
-
-    __tablename__ = "device_sessions"
-
-    device_id: Mapped[UUID] = mapped_column(
-        ForeignKey("devices.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    access_token_hash: Mapped[str] = mapped_column(
-        String,
-        nullable=False,
-        index=True,
-    )
-    refresh_token_hash: Mapped[str] = mapped_column(
-        String,
-        nullable=False,
-        index=True,
-    )
-    token_version: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        default=1,
-        server_default="1",
-    )
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        index=True,
-    )
-    refresh_expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        index=True,
-    )
-    ip_address: Mapped[str | None] = mapped_column(
-        String,
-        nullable=True,
-    )
-    user_agent: Mapped[str | None] = mapped_column(
-        String,
-        nullable=True,
-    )
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-
-    # Relationships
-    device: Mapped["DeviceORM"] = relationship("DeviceORM", back_populates="sessions")
-
-    @classmethod
-    def from_domain(cls, session: DeviceSession) -> "DeviceSessionORM":
-        """Convert DeviceSession domain entity to ORM model."""
-        return cls(
-            id=session.id.uuid,
-            created_at=session.created_at,
-            updated_at=session.updated_at,
-            deleted_at=session.deleted_at,
-            device_id=session.device_id.uuid,
-            access_token_hash=session.access_token_hash,
-            refresh_token_hash=session.refresh_token_hash,
-            token_version=session.token_version,
-            expires_at=session.expires_at,
-            refresh_expires_at=session.refresh_expires_at,
-            ip_address=session.ip_address,
-            user_agent=session.user_agent,
-            revoked_at=session.revoked_at,
-        )
-
-    def to_domain(self) -> DeviceSession:
-        """Convert ORM model to DeviceSession domain entity."""
-        return DeviceSession(
-            id=DeviceSessionID(self.id),
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-            deleted_at=self.deleted_at,
-            device_id=DeviceID(self.device_id),
-            access_token_hash=self.access_token_hash,
-            refresh_token_hash=self.refresh_token_hash,
-            token_version=self.token_version,
-            expires_at=self.expires_at,
-            refresh_expires_at=self.refresh_expires_at,
-            ip_address=self.ip_address,
-            user_agent=self.user_agent,
-            revoked_at=self.revoked_at,
         )
 
 
@@ -428,14 +327,6 @@ class IdentitySessionORM(Base):
         nullable=False,
         index=True,
     )
-    ip_address: Mapped[str | None] = mapped_column(
-        String,
-        nullable=True,
-    )
-    user_agent: Mapped[str | None] = mapped_column(
-        String,
-        nullable=True,
-    )
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
@@ -458,8 +349,6 @@ class IdentitySessionORM(Base):
             token_version=session.token_version,
             expires_at=session.expires_at,
             refresh_expires_at=session.refresh_expires_at,
-            ip_address=session.ip_address,
-            user_agent=session.user_agent,
             revoked_at=session.revoked_at,
         )
 
@@ -476,8 +365,6 @@ class IdentitySessionORM(Base):
             token_version=self.token_version,
             expires_at=self.expires_at,
             refresh_expires_at=self.refresh_expires_at,
-            ip_address=self.ip_address,
-            user_agent=self.user_agent,
             revoked_at=self.revoked_at,
         )
 

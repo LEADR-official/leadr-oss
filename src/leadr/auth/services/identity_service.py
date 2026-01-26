@@ -1,6 +1,7 @@
 """Identity service for player identity management."""
 
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,17 +22,22 @@ from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.config import settings
 
+if TYPE_CHECKING:
+    from leadr.auth.services.device_service import DeviceService
+
 
 class IdentityService(BaseService[Identity, IdentityRepository]):
     """Service for identity management and session handling."""
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, device_service: "DeviceService"):
         """Initialize IdentityService.
 
         Args:
             session: SQLAlchemy async session
+            device_service: DeviceService for device lookup
         """
         self.session = session
+        self._device_service = device_service
         super().__init__(session)
         self.session_repo = IdentitySessionRepository(session)
 
@@ -164,24 +170,49 @@ class IdentityService(BaseService[Identity, IdentityRepository]):
 
     async def start_session(
         self,
-        identity: Identity,
-        ip_address: str | None = None,
-        user_agent: str | None = None,
+        game_id: GameID,
+        client_fingerprint: str,
+        platform: str | None = None,
+        metadata: dict[str, Any] | None = None,
         test_mode: bool = False,
-    ) -> tuple[str, str, int]:
+    ) -> tuple[Identity, str, str, int]:
         """Start a new identity session.
 
-        Creates a new session with access and refresh tokens.
+        Internally:
+        1. Get or create Device (via DeviceService)
+        2. Get or create Identity
+        3. Create IdentitySession with tokens
 
         Args:
-            identity: The identity to create a session for
-            ip_address: Client IP address
-            user_agent: Client user agent string
+            game_id: Game UUID
+            client_fingerprint: Client-generated SHA256 device fingerprint
+            platform: Device platform (ios, android, etc.)
+            metadata: Additional device metadata
             test_mode: If True, session is in test mode
 
         Returns:
-            tuple[str, str, int]: (access_token_plain, refresh_token_plain, expires_in_seconds)
+            tuple[Identity, str, str, int]: (identity, access_token, refresh_token, expires_in)
+
+        Raises:
+            EntityNotFoundError: If game doesn't exist
         """
+        # 1. Get or create device (internal lookup only)
+        device = await self._device_service.get_or_create_device(
+            game_id=game_id,
+            client_fingerprint=client_fingerprint,
+            platform=platform,
+            metadata=metadata,
+        )
+
+        # 2. Get or create identity from device
+        identity, _ = await self.get_or_create_identity(
+            account_id=device.account_id,
+            game_id=device.game_id,
+            kind=IdentityKind.DEVICE,
+            external_key=device.client_fingerprint,
+        )
+
+        # 3. Create session with tokens
         # Generate access token
         access_expires_delta = timedelta(hours=settings.ACCESS_TOKEN_EXPIRY_HOURS)
         access_token_plain, access_token_hash = generate_access_token(
@@ -216,13 +247,11 @@ class IdentityService(BaseService[Identity, IdentityRepository]):
             token_version=1,
             expires_at=now + access_expires_delta,
             refresh_expires_at=now + refresh_expires_delta,
-            ip_address=ip_address,
-            user_agent=user_agent,
         )
         await self.session_repo.create(session)
 
         expires_in_seconds = int(access_expires_delta.total_seconds())
-        return access_token_plain, refresh_token_plain, expires_in_seconds
+        return identity, access_token_plain, refresh_token_plain, expires_in_seconds
 
     async def validate_identity_token(self, token: str) -> Identity | None:
         """Validate access token and return associated identity.

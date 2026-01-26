@@ -71,8 +71,6 @@ class IdentitySession(Entity):
     token_version: int = 1
     expires_at: datetime
     refresh_expires_at: datetime
-    ip_address: str | None = None
-    user_agent: str | None = None
     revoked_at: datetime | None = None
 
     def is_expired(self) -> bool:
