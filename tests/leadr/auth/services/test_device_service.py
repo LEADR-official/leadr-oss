@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.adapters.orm import AccountORM
-from leadr.auth.adapters.orm import DeviceORM, DeviceStatusEnum
+from leadr.auth.adapters.orm import DeviceORM
 from leadr.auth.domain.device import DeviceStatus
 from leadr.auth.services.device_service import DeviceService
 from leadr.common.api.pagination import PaginationParams
@@ -67,9 +67,7 @@ class TestDeviceService:
         assert device2.id == device1.id
         assert device2.last_seen_at >= first_seen
 
-    async def test_get_or_create_device_raises_for_nonexistent_game(
-        self, db_session: AsyncSession
-    ):
+    async def test_get_or_create_device_raises_for_nonexistent_game(self, db_session: AsyncSession):
         """Test that get_or_create_device for nonexistent game raises error."""
         service = DeviceService(db_session)
 
@@ -103,9 +101,7 @@ class TestDeviceService:
 
         assert len(result.items) == 3
 
-    async def test_get_device_by_id(
-        self, db_session: AsyncSession, device_orm: DeviceORM
-    ):
+    async def test_get_device_by_id(self, db_session: AsyncSession, device_orm: DeviceORM):
         """Test getting a device by ID."""
         service = DeviceService(db_session)
         device = await service.get_device(device_orm.id)
@@ -120,9 +116,7 @@ class TestDeviceService:
 
         assert device is None
 
-    async def test_ban_device(
-        self, db_session: AsyncSession, device_orm: DeviceORM
-    ):
+    async def test_ban_device(self, db_session: AsyncSession, device_orm: DeviceORM):
         """Test banning a device."""
         service = DeviceService(db_session)
 
@@ -130,9 +124,7 @@ class TestDeviceService:
 
         assert device.status == DeviceStatus.BANNED
 
-    async def test_suspend_device(
-        self, db_session: AsyncSession, device_orm: DeviceORM
-    ):
+    async def test_suspend_device(self, db_session: AsyncSession, device_orm: DeviceORM):
         """Test suspending a device."""
         service = DeviceService(db_session)
 

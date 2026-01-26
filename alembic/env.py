@@ -17,12 +17,14 @@ sys.path.append(str(Path(__file__).parent.parent / "src"))
 # Import all ORM models to ensure they're registered with SQLAlchemy
 # (Import your ORM model modules here as they're created)
 from leadr.accounts.adapters.orm import AccountORM, UserORM  # noqa: F401
-from leadr.auth.adapters.orm import APIKeyORM, DeviceORM, DeviceSessionORM, NonceORM  # noqa: F401
-from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM  # noqa: F401
-from leadr.common.database import _get_connect_args, build_direct_database_url  # noqa: E402
-
-# Import for database configuration (removed - using build_direct_database_url from above)
-from leadr.common.orm import Base
+from leadr.auth.adapters.orm import APIKeyORM, DeviceORM, IdentityORM, IdentitySessionORM, NonceORM  # noqa: F401
+from leadr.boards.adapters.orm import (
+    BoardORM,
+    BoardTemplateORM,
+    BoardStateORM,
+    RunEntryORM,
+    BoardRatioConfigORM,
+)  # noqa: F401
 from leadr.games.adapters.orm import GameORM  # noqa: F401
 from leadr.infra.email.adapters.orm import EmailORM  # noqa: F401
 from leadr.registration.adapters.orm import (  # noqa: F401
@@ -30,7 +32,11 @@ from leadr.registration.adapters.orm import (  # noqa: F401
     JamCodeRedemptionORM,
     VerificationCodeORM,
 )
-from leadr.scores.adapters.orm import ScoreFlagORM, ScoreORM, ScoreSubmissionMetaORM  # noqa: F401
+from leadr.scores.adapters.orm import ScoreEventORM, ScoreFlagORM, ScoreORM, ScoreSubmissionMetaORM  # noqa: F401
+
+# Import for database configuration (removed - using build_direct_database_url from above)
+from leadr.common.orm import Base
+from leadr.common.database import _get_connect_args, build_direct_database_url  # noqa: E402
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -4,11 +4,9 @@ import pytest
 from httpx import AsyncClient
 
 from leadr.accounts.services.account_service import AccountService
-from leadr.auth.domain.identity import IdentityKind
 from leadr.auth.services.device_service import DeviceService
 from leadr.auth.services.identity_service import IdentityService
 from leadr.common.api.pagination import PaginationParams
-from leadr.common.domain.ids import GameID
 from leadr.games.services.game_service import GameService
 
 

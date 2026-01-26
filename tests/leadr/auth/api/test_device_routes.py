@@ -31,12 +31,12 @@ class TestDeviceRoutes:
         device_service = DeviceService(db_session)
         hash1 = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
         hash2 = "f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89"
-        device1 = await device_service.get_or_create_device(
+        await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint=hash1,
             platform="iOS",
         )
-        device2 = await device_service.get_or_create_device(
+        await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint=hash2,
             platform="Android",
@@ -123,7 +123,7 @@ class TestDeviceRoutes:
         device_service = DeviceService(db_session)
         hash1 = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
         hash2 = "f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89"
-        device1 = await device_service.get_or_create_device(
+        await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint=hash1,
         )
