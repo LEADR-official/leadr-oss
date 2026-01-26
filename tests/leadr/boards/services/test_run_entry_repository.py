@@ -45,6 +45,8 @@ class TestRunEntryRepository:
             identity_id=identity_id,
             score_event_id=score_event_id,
             primary_value=100.0,
+            player_name="Test Player",
+            is_test=False,
             created_at=now,
             updated_at=now,
         )

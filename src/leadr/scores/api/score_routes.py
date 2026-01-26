@@ -18,14 +18,12 @@ from leadr.boards.services.dependencies import BoardServiceDep
 from leadr.common.api.hooks import PostCreateScoreHookDep, PreCreateScoreHookDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
-from leadr.common.domain.ids import AccountID, BoardID, DeviceID, GameID, ScoreID
+from leadr.common.domain.ids import AccountID, BoardID, GameID, IdentityID, ScoreID
 from leadr.scores.api.score_schemas import (
     IsTestFilter,
     ScoreClientCreateRequest,
     ScoreClientResponse,
-    ScoreCreateRequest,
     ScoreResponse,
-    ScoreUpdateRequest,
 )
 from leadr.scores.domain.anti_cheat.enums import FlagAction, ScoreStatus
 from leadr.scores.services.dependencies import ScoreServiceDep
@@ -33,72 +31,6 @@ from leadr.scores.services.score_service import ScoreService
 
 router = APIRouter()
 client_router = APIRouter()
-
-
-@router.post("/scores", status_code=status.HTTP_201_CREATED)
-async def create_score_admin(
-    score_request: ScoreCreateRequest,
-    request: Request,
-    service: ScoreServiceDep,
-    background_tasks: BackgroundTasks,
-    auth: AdminAuthContextDep,
-) -> ScoreResponse:
-    """Create a new score (Admin API).
-
-    Creates a new score submission for a board. Performs three-level validation:
-    board exists, board belongs to the specified account, and game matches
-    the board's game.
-
-    For regular admins: account_id is derived from auth, must provide game_id and device_id.
-    For superadmins: can provide account_id to create scores for any account.
-
-    Args:
-        score_request: Score creation details including board_id, player_name, value,
-                      and optionally account_id (superadmin only), game_id, device_id.
-        request: FastAPI request object for accessing geo data.
-        service: Injected score service dependency.
-        background_tasks: FastAPI background tasks for async metadata updates.
-        auth: Admin authentication context.
-
-    Returns:
-        ScoreResponse with the created score including auto-generated ID and timestamps.
-
-    Raises:
-        403: Non-superadmin tries to specify account_id, or access denied.
-        400: Missing required fields (game_id or device_id).
-        404: Account, game, board, or device not found.
-        400: Validation failed (board doesn't belong to account, or game doesn't
-            match board's game).
-    """
-    # Get geo data from request or GeoIP middleware
-    timezone = score_request.timezone or getattr(request.state, "geo_timezone", None)
-    country = score_request.country or getattr(request.state, "geo_country", None)
-    city = score_request.city or getattr(request.state, "geo_city", None)
-
-    try:
-        score, _ = await service.create_score(
-            account_id=score_request.account_id or auth.account_id,
-            game_id=score_request.game_id,
-            board_id=score_request.board_id,
-            device_id=score_request.device_id,
-            player_name=score_request.player_name,
-            value=score_request.value,
-            value_display=score_request.value_display,
-            timezone=timezone,
-            country=country,
-            city=city,
-            metadata=score_request.metadata,
-            background_tasks=background_tasks,
-        )
-    except IntegrityError:
-        raise HTTPException(
-            status_code=404,
-            detail="Account, game, board, or device not found",
-        ) from None
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from None
-
-    return ScoreResponse.from_domain(score)
 
 
 @client_router.post("/scores", status_code=status.HTTP_201_CREATED)
@@ -228,28 +160,26 @@ def _build_score_client_response(
     if isinstance(ranking_entry, BoardState):
         return ScoreClientResponse.from_board_state(
             state=ranking_entry,
-            identity=identity,
-            score_event=event,
+            account_id=event.account_id,
+            game_id=event.game_id,
             rank=0,  # Rank not computed for creation response
         )
     elif isinstance(ranking_entry, RunEntry):
         return ScoreClientResponse.from_run_entry(
             entry=ranking_entry,
-            identity=identity,
-            score_event=event,
+            account_id=event.account_id,
+            game_id=event.game_id,
             rank=0,  # Rank not computed for creation response
         )
     else:
         # Fallback for cases with no ranking entry (shouldn't happen for normal flow)
         # This could happen if board type is RATIO or something went wrong
-        from leadr.common.domain.ids import ScoreID
-
         return ScoreClientResponse(
             id=ScoreID(event.id.uuid),  # Mask event ID as score ID
             account_id=event.account_id,
             game_id=event.game_id,
             board_id=event.board_id,
-            identity_id=identity.id,
+            identity_id=IdentityID(identity.id.uuid),
             player_name=identity.display_name or "",
             value=event.event_payload.get("value", event.event_payload.get("delta", 0.0)),
             value_display=None,
@@ -286,26 +216,41 @@ async def get_score(
         403: User does not have access to this score's account.
         404: Score not found or soft-deleted.
     """
-    score = await service.get_score_with_rank(score_id)
+    ranking_entry, board = await service.get_score_by_id(score_id)
 
     # Check authorization
-    if not auth.has_access_to_account(score.account_id):
+    if not auth.has_access_to_account(board.account_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this score's account",
         )
 
-    return ScoreResponse.from_domain(score)
+    # Build response based on entry type
+    if isinstance(ranking_entry, BoardState):
+        return ScoreResponse.from_board_state(
+            state=ranking_entry,
+            account_id=board.account_id,
+            game_id=board.game_id,
+            rank=0,  # Rank not computed for single fetch
+        )
+    else:
+        return ScoreResponse.from_run_entry(
+            entry=ranking_entry,
+            account_id=board.account_id,
+            game_id=board.game_id,
+            rank=0,  # Rank not computed for single fetch
+        )
 
 
 async def handle_list_scores(
     auth: AuthContext,
     service: ScoreService,
+    board_service,
     pagination: PaginationParams,
     account_id: AccountID | None,
     board_id: BoardID | None,
     game_id: GameID | None,
-    device_id: DeviceID | None,
+    identity_id: IdentityID | None,
     is_test: bool | None = None,
     around_score_id: ScoreID | None = None,
     around_score_value: float | None = None,
@@ -314,17 +259,18 @@ async def handle_list_scores(
 
     This shared handler implements the core list scores functionality and returns
     different response models based on the authentication type:
-    - Admin auth: Returns ScoreResponse with device_id and geo fields
-    - Client auth: Returns ScoreClientResponse without device_id and geo fields
+    - Admin auth: Returns ScoreResponse with geo fields
+    - Client auth: Returns ScoreClientResponse without geo fields
 
     Args:
         auth: Authentication context (admin or client).
         service: Score service for data access.
+        board_service: Board service for fetching board details.
         pagination: Pagination parameters (cursor, limit, sort).
         account_id: Optional account ID filter.
         board_id: Optional board ID filter.
         game_id: Optional game ID filter.
-        device_id: Optional device ID filter.
+        identity_id: Optional identity ID filter.
         is_test: Optional filter for test scores. True returns only test scores,
             False returns only production scores, None returns all scores.
         around_score_id: Optional score ID to center results around.
@@ -374,12 +320,24 @@ async def handle_list_scores(
                 detail="board_id is required when using around_score_value",
             )
 
+    # board_id is required for list_scores
+    if board_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="board_id is required for listing scores",
+        )
+
+    # Get board for account_id/game_id in response building
+    board = await board_service.get_by_id(board_id)
+    if board is None:
+        raise HTTPException(status_code=404, detail="Board not found")
+
     try:
         result = await service.list_scores(
             account_id=account_id,
             board_id=board_id,
             game_id=game_id,
-            device_id=device_id,
+            identity_id=identity_id,
             is_test=is_test,
             pagination=pagination,
             around_score_id=around_score_id,
@@ -388,43 +346,172 @@ async def handle_list_scores(
     except (CursorValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
-    # Since we always pass pagination, result is always PaginatedResult (via overload)
     # Build filter dict for cursors
-    filters_dict = {}
-    if board_id is not None:
-        filters_dict["board_id"] = str(board_id)
+    filters_dict: dict[str, str] = {}
+    filters_dict["board_id"] = str(board_id)
     if game_id is not None:
         filters_dict["game_id"] = str(game_id)
-    if device_id is not None:
-        filters_dict["device_id"] = str(device_id)
+    if identity_id is not None:
+        filters_dict["identity_id"] = str(identity_id)
     if is_test is not None:
         filters_dict["is_test"] = str(is_test)
 
+    # Convert items to response models with computed ranks
+    # Rank is 1-indexed position in the result set
     if auth.auth_type == "admin":
-        return PaginatedResponse.from_paginated_result(
+        response_items: list[ScoreResponse] = []
+        for idx, item in enumerate(result.items):
+            rank = idx + 1  # 1-indexed rank
+            if isinstance(item, BoardState):
+                response_items.append(
+                    ScoreResponse.from_board_state(
+                        state=item,
+                        account_id=board.account_id,
+                        game_id=board.game_id,
+                        rank=rank,
+                    )
+                )
+            else:
+                response_items.append(
+                    ScoreResponse.from_run_entry(
+                        entry=item,
+                        account_id=board.account_id,
+                        game_id=board.game_id,
+                        rank=rank,
+                    )
+                )
+        return _build_paginated_response_admin(
+            items=response_items,
             result=result,
             pagination=pagination,
             filters=filters_dict,
-            response_model=ScoreResponse,
         )
     else:
-        return PaginatedResponse.from_paginated_result(
+        client_response_items: list[ScoreClientResponse] = []
+        for idx, item in enumerate(result.items):
+            rank = idx + 1  # 1-indexed rank
+            if isinstance(item, BoardState):
+                client_response_items.append(
+                    ScoreClientResponse.from_board_state(
+                        state=item,
+                        account_id=board.account_id,
+                        game_id=board.game_id,
+                        rank=rank,
+                    )
+                )
+            else:
+                client_response_items.append(
+                    ScoreClientResponse.from_run_entry(
+                        entry=item,
+                        account_id=board.account_id,
+                        game_id=board.game_id,
+                        rank=rank,
+                    )
+                )
+        return _build_paginated_response_client(
+            items=client_response_items,
             result=result,
             pagination=pagination,
             filters=filters_dict,
-            response_model=ScoreClientResponse,
         )
+
+
+def _build_paginated_response_admin(
+    items: list[ScoreResponse],
+    result,
+    pagination: PaginationParams,
+    filters: dict[str, str],
+) -> PaginatedResponse[ScoreResponse]:
+    """Build a PaginatedResponse for admin with cursor encoding."""
+    from leadr.common.api.pagination import PaginationMeta
+    from leadr.common.domain.cursor import Cursor, PaginationDirection
+
+    next_cursor_str = None
+    prev_cursor_str = None
+
+    if result.next_position is not None:
+        next_cursor = Cursor(
+            position=result.next_position,
+            sort_fields=pagination.sort_spec,
+            filters=filters,
+            direction=PaginationDirection.FORWARD,
+        )
+        next_cursor_str = next_cursor.encode()
+
+    if result.prev_position is not None:
+        prev_cursor = Cursor(
+            position=result.prev_position,
+            sort_fields=pagination.sort_spec,
+            filters=filters,
+            direction=PaginationDirection.BACKWARD,
+        )
+        prev_cursor_str = prev_cursor.encode()
+
+    return PaginatedResponse(
+        data=items,
+        pagination=PaginationMeta(
+            next_cursor=next_cursor_str,
+            prev_cursor=prev_cursor_str,
+            has_next=result.has_next,
+            has_prev=result.has_prev,
+            count=result.count,
+        ),
+    )
+
+
+def _build_paginated_response_client(
+    items: list[ScoreClientResponse],
+    result,
+    pagination: PaginationParams,
+    filters: dict[str, str],
+) -> PaginatedResponse[ScoreClientResponse]:
+    """Build a PaginatedResponse for client with cursor encoding."""
+    from leadr.common.api.pagination import PaginationMeta
+    from leadr.common.domain.cursor import Cursor, PaginationDirection
+
+    next_cursor_str = None
+    prev_cursor_str = None
+
+    if result.next_position is not None:
+        next_cursor = Cursor(
+            position=result.next_position,
+            sort_fields=pagination.sort_spec,
+            filters=filters,
+            direction=PaginationDirection.FORWARD,
+        )
+        next_cursor_str = next_cursor.encode()
+
+    if result.prev_position is not None:
+        prev_cursor = Cursor(
+            position=result.prev_position,
+            sort_fields=pagination.sort_spec,
+            filters=filters,
+            direction=PaginationDirection.BACKWARD,
+        )
+        prev_cursor_str = prev_cursor.encode()
+
+    return PaginatedResponse(
+        data=items,
+        pagination=PaginationMeta(
+            next_cursor=next_cursor_str,
+            prev_cursor=prev_cursor_str,
+            has_next=result.has_next,
+            has_prev=result.has_prev,
+            count=result.count,
+        ),
+    )
 
 
 @router.get("/scores")
 async def list_scores_admin(
     auth: AdminAuthContextDep,
     service: ScoreServiceDep,
+    board_service: BoardServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     board_id: BoardID | None = None,
     game_id: GameID | None = None,
-    device_id: DeviceID | None = None,
+    identity_id: IdentityID | None = None,
     is_test: Annotated[
         IsTestFilter,
         Query(
@@ -443,7 +530,7 @@ async def list_scores_admin(
     """List scores for an account with optional filters and pagination.
 
     Returns paginated scores for the specified account, with optional
-    filtering by board, game, or device. Supports cursor-based pagination
+    filtering by board, game, or identity. Supports cursor-based pagination
     with bidirectional navigation and custom sorting.
 
     For regular admin users, account_id is automatically derived from their API key.
@@ -452,8 +539,7 @@ async def list_scores_admin(
     Pagination:
     - Default: 20 items per page, sorted by created_at:desc,id:asc
     - Custom sort: Use ?sort=value:desc,created_at:asc
-    - Valid sort fields: id, value, player_name, filter_timezone, filter_country,
-      filter_city, created_at, updated_at
+    - Valid sort fields: id, value, player_name, created_at, updated_at
     - Navigation: Use next_cursor/prev_cursor from response
 
     Around Score:
@@ -477,7 +563,7 @@ async def list_scores_admin(
         account_id: Optional account_id query parameter (required for superadmins).
         board_id: Optional board ID to filter by.
         game_id: Optional game ID to filter by.
-        device_id: Optional device ID to filter by.
+        identity_id: Optional identity ID to filter by.
         around_score_id: Optional score ID to center results around.
         around_score_value: Optional value to center results around (with placeholder).
 
@@ -506,11 +592,12 @@ async def list_scores_admin(
     return await handle_list_scores(  # type: ignore[return-value]
         auth,
         service,
+        board_service,
         pagination,
         effective_account_id,
         board_id,
         game_id,
-        device_id,
+        identity_id,
         is_test_filter,
         around_score_id,
         around_score_value,
@@ -543,25 +630,40 @@ async def get_score_client(
         403: Client does not have access to this score's game.
         404: Score not found or soft-deleted.
     """
-    score = await service.get_score_with_rank(score_id)
+    ranking_entry, board = await service.get_score_by_id(score_id)
 
     # Check client has access to this score's game
-    if score.game_id != auth.game_id:
+    if board.game_id != auth.game_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this score",
         )
 
-    return ScoreClientResponse.from_domain(score)
+    # Build response based on entry type
+    if isinstance(ranking_entry, BoardState):
+        return ScoreClientResponse.from_board_state(
+            state=ranking_entry,
+            account_id=board.account_id,
+            game_id=board.game_id,
+            rank=0,  # Rank not computed for single fetch
+        )
+    else:
+        return ScoreClientResponse.from_run_entry(
+            entry=ranking_entry,
+            account_id=board.account_id,
+            game_id=board.game_id,
+            rank=0,  # Rank not computed for single fetch
+        )
 
 
 @client_router.get("/scores")
 async def list_scores_client(
     auth: ClientAuthContextDep,
     service: ScoreServiceDep,
+    board_service: BoardServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     board_id: BoardID | None = None,
-    device_id: DeviceID | None = None,
+    identity_id: IdentityID | None = None,
     around_score_id: Annotated[
         ScoreID | None, Query(description="Center results around this score ID")
     ] = None,
@@ -573,14 +675,13 @@ async def list_scores_client(
     """List scores for an account with optional filters and pagination.
 
     Returns paginated scores for the specified account, with optional
-    filtering by board and/or device. Supports cursor-based pagination
+    filtering by board and/or identity. Supports cursor-based pagination
     with bidirectional navigation and custom sorting.
 
     Pagination:
     - Default: 20 items per page, sorted by created_at:desc,id:asc
     - Custom sort: Use ?sort=value:desc,created_at:asc
-    - Valid sort fields: id, value, player_name, filter_timezone, filter_country,
-      filter_city, created_at, updated_at
+    - Valid sort fields: id, value, player_name, created_at, updated_at
     - Navigation: Use next_cursor/prev_cursor from response
 
     Around Score:
@@ -602,7 +703,7 @@ async def list_scores_client(
         service: Injected score service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
         board_id: Optional board ID to filter by.
-        device_id: Optional device ID to filter by (e.g., to get "my scores").
+        identity_id: Optional identity ID to filter by (e.g., to get "my scores").
         around_score_id: Optional score ID to center results around.
         around_score_value: Optional value to center results around (with placeholder).
 
@@ -617,66 +718,13 @@ async def list_scores_client(
     return await handle_list_scores(  # type: ignore[return-value]
         auth,
         service,
+        board_service,
         pagination,
         auth.account_id,
         board_id,
         auth.game_id,
-        device_id,
+        identity_id,
         auth.test_mode,
         around_score_id,
         around_score_value,
     )
-
-
-@router.patch("/scores/{score_id}", response_model=ScoreResponse, deprecated=True)
-async def update_score(
-    score_id: ScoreID,
-    request: ScoreUpdateRequest,
-    service: ScoreServiceDep,
-    auth: AdminAuthContextDep,
-) -> ScoreResponse:
-    """Update a score.
-
-    DEPRECATED: This endpoint is deprecated and will be removed in a future version.
-    Scores are now immutable events. Use score flags for moderation instead.
-
-    Supports partial updates of score fields. Any field not provided will
-    remain unchanged. Set deleted: true to soft delete the score.
-
-    Args:
-        score_id: Score identifier to update.
-        request: Score update details with optional fields to modify.
-        service: Injected score service dependency.
-        auth: Authentication context with user info.
-
-    Returns:
-        ScoreResponse with the updated score details.
-
-    Raises:
-        403: User does not have access to this score's account.
-        404: Score not found or already soft-deleted.
-    """
-    # Fetch score to check authorization
-    score = await service.get_by_id_or_raise(score_id)
-
-    # Check authorization
-    if not auth.has_access_to_account(score.account_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this score's account",
-        )
-
-    # Handle soft delete
-    if request.deleted is True:
-        score = await service.soft_delete(score_id)
-        return ScoreResponse.from_domain(score)
-
-    # Get only fields explicitly provided in request (exclude_unset=True)
-    # This allows null values to clear fields vs omitted fields staying unchanged
-    update_data = request.model_dump(exclude_unset=True)
-    update_data.pop("deleted", None)  # Handled separately above
-
-    if update_data:
-        score = await service.update_score(score_id, **update_data)
-
-    return ScoreResponse.from_domain(score)

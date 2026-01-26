@@ -32,7 +32,6 @@ from leadr.games.adapters.orm import GameORM
 from leadr.scores.adapters.orm import (
     ScoreEventORM,
     ScoreFlagORM,
-    ScoreORM,
     ScoreSubmissionMetaORM,
 )
 
@@ -265,42 +264,6 @@ async def nonce_orm(db_session: AsyncSession, identity_orm: IdentityORM) -> Nonc
     db_session.add(nonce)
     await db_session.flush()
     return nonce
-
-
-@pytest_asyncio.fixture
-async def score_orm(
-    db_session: AsyncSession,
-    account_orm: AccountORM,
-    game_orm: GameORM,
-    board_orm: BoardORM,
-    device_orm: DeviceORM,
-) -> ScoreORM:
-    """Create and persist a test ScoreORM linked to account, game, board, and device.
-
-    Args:
-        account_orm: Parent account (auto-injected fixture).
-        game_orm: Parent game (auto-injected fixture).
-        board_orm: Parent board (auto-injected fixture).
-        device_orm: Source device (auto-injected fixture).
-
-    Returns:
-        ScoreORM instance with auto-generated id.
-    """
-    score = ScoreORM(
-        account_id=account_orm.id,  # Raw UUID
-        game_id=game_orm.id,  # Raw UUID
-        board_id=board_orm.id,  # Raw UUID
-        device_id=device_orm.id,  # Raw UUID
-        player_name="Test Player",
-        value=1000.0,
-        score_metadata={},
-        filter_timezone=None,
-        filter_country=None,
-        filter_city=None,
-    )
-    db_session.add(score)
-    await db_session.flush()
-    return score
 
 
 @pytest_asyncio.fixture

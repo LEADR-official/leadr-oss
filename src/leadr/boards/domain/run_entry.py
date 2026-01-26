@@ -1,5 +1,7 @@
 """RunEntry domain model for RUN_RUNS boards."""
 
+from typing import Any
+
 from pydantic import Field
 
 from leadr.common.domain.ids import BoardID, IdentityID, RunEntryID, ScoreEventID
@@ -16,12 +18,26 @@ class RunEntry(Entity):
     Each run entry is linked to a score event and is immutable except for
     soft-delete. The primary_value is the rankable value for leaderboard queries.
 
+    Denormalized fields (from Identity and ScoreEvent) are stored for query efficiency:
+    - player_name: Display name at submission time
+    - is_test: Test mode flag
+    - timezone, country, city: Geo data from GeoIP
+    - value_display: Formatted display string
+    - metadata: Game-specific JSON
+
     Attributes:
         id: Unique identifier for this run entry.
         board_id: The board this entry belongs to (immutable).
         identity_id: The identity that submitted this entry (immutable).
         score_event_id: The score event that created this entry (immutable).
         primary_value: The rankable value for this submission (immutable).
+        player_name: Display name at submission time.
+        is_test: Whether this is a test submission.
+        timezone: Timezone from GeoIP (optional).
+        country: Country code from GeoIP (optional).
+        city: City name from GeoIP (optional).
+        value_display: Formatted display string (optional).
+        metadata: Game-specific JSON metadata (optional).
         created_at: Timestamp when the entry was created (UTC).
         updated_at: Timestamp when the entry was last updated (UTC).
         deleted_at: Timestamp when the entry was soft-deleted, or None.
@@ -47,4 +63,33 @@ class RunEntry(Entity):
     primary_value: float = Field(
         frozen=True,
         description="Rankable value for this submission (immutable)",
+    )
+    # Denormalized fields for query efficiency
+    player_name: str = Field(
+        default="",
+        description="Display name at submission time (from Identity)",
+    )
+    is_test: bool = Field(
+        default=False,
+        description="Whether this is a test submission (from ScoreEvent)",
+    )
+    timezone: str | None = Field(
+        default=None,
+        description="Timezone from GeoIP (from ScoreEvent)",
+    )
+    country: str | None = Field(
+        default=None,
+        description="Country code from GeoIP (from ScoreEvent)",
+    )
+    city: str | None = Field(
+        default=None,
+        description="City name from GeoIP (from ScoreEvent)",
+    )
+    value_display: str | None = Field(
+        default=None,
+        description="Formatted display string",
+    )
+    metadata: Any | None = Field(
+        default=None,
+        description="Game-specific JSON metadata",
     )

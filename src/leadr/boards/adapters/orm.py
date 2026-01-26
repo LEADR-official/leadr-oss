@@ -321,6 +321,8 @@ class BoardStateORM(Base):
     Represents the materialized ranking state for a single identity on a single board.
     Maps to the board_states table with foreign keys to boards and identities.
     The primary_value can be NULL for non-rankable entries.
+
+    Denormalized fields (from Identity and ScoreEvent) are stored for query efficiency.
     """
 
     __tablename__ = "board_states"
@@ -351,6 +353,19 @@ class BoardStateORM(Base):
     primary_value: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
     aux: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True, default=None)
 
+    # Denormalized fields for query efficiency
+    player_name: Mapped[str] = mapped_column(String, nullable=False, default="", server_default="")
+    is_test: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa.text("false")
+    )
+    timezone: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    country: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    city: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    value_display: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    state_metadata: Mapped[Any | None] = mapped_column(
+        "state_metadata", JSONB, nullable=True, default=None
+    )
+
     # Relationships
     board: Mapped["BoardORM"] = relationship("BoardORM")  # type: ignore[name-defined]
     identity: Mapped["IdentityORM"] = relationship("IdentityORM")  # type: ignore[name-defined]
@@ -362,6 +377,8 @@ class RunEntryORM(Base):
     Represents a single scored run entry for RUN_RUNS boards where every
     submission is ranked. Maps to the run_entries table with foreign keys
     to boards, identities, and score_events.
+
+    Denormalized fields (from Identity and ScoreEvent) are stored for query efficiency.
     """
 
     __tablename__ = "run_entries"
@@ -395,6 +412,19 @@ class RunEntryORM(Base):
         index=True,
     )
     primary_value: Mapped[float] = mapped_column(Float, nullable=False)
+
+    # Denormalized fields for query efficiency
+    player_name: Mapped[str] = mapped_column(String, nullable=False, default="", server_default="")
+    is_test: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa.text("false")
+    )
+    timezone: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    country: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    city: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    value_display: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    entry_metadata: Mapped[Any | None] = mapped_column(
+        "entry_metadata", JSONB, nullable=True, default=None
+    )
 
     # Relationships
     board: Mapped["BoardORM"] = relationship("BoardORM")  # type: ignore[name-defined]

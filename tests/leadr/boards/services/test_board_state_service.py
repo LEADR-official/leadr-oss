@@ -8,6 +8,7 @@ import pytest
 
 from leadr.boards.domain.board_state import BoardState
 from leadr.boards.services.board_state_service import BoardStateService
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import BoardID, BoardStateID, IdentityID
 from leadr.common.domain.pagination_result import PaginatedResult
@@ -221,7 +222,8 @@ class TestBoardStateService:
         )
         service.repository.filter = AsyncMock(return_value=mock_result)
 
-        result = await service.list_board_states(board_id=board_id, limit=50)
+        pagination = PaginationParams(cursor=None, limit=50, sort=None)
+        result = await service.list_board_states(board_id=board_id, pagination=pagination)
 
         assert len(result.items) == 2
         assert result.has_next is False

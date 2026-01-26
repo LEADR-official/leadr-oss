@@ -44,7 +44,7 @@ async def list_run_entries(
         result = await service.list_run_entries(
             board_id=board_id,
             identity_id=identity_id,
-            limit=pagination.limit,
+            pagination=pagination,
         )
     except CursorValidationError as e:
         raise HTTPException(

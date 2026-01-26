@@ -38,7 +38,6 @@ from leadr.common.domain.ids import (
     BoardID,
     DeviceID,
     GameID,
-    ScoreID,
     UserID,
 )
 from leadr.common.orm import Base
@@ -52,9 +51,7 @@ from leadr.registration.adapters.orm import (  # noqa: F401
     JamCodeRedemptionORM,
     VerificationCodeORM,
 )
-from leadr.scores.adapters.orm import ScoreFlagORM, ScoreORM, ScoreSubmissionMetaORM  # noqa: F401
-from leadr.scores.domain.score import Score
-from leadr.scores.services.repositories import ScoreRepository
+from leadr.scores.adapters.orm import ScoreFlagORM, ScoreSubmissionMetaORM  # noqa: F401
 
 # Import all ORM fixtures from fixtures module
 from tests.fixtures import *  # noqa: F403, F401
@@ -433,34 +430,6 @@ async def run_runs_board(db_session: AsyncSession, test_account: Account, test_g
         updated_at=now,
     )
     return await board_repo.create(board)
-
-
-@pytest_asyncio.fixture
-async def test_score(
-    db_session: AsyncSession, test_account: Account, test_game, test_board, test_device
-):
-    """Create a test score for use in tests.
-
-    Returns:
-        The created Score domain entity.
-    """
-
-    score_repo = ScoreRepository(db_session)
-    score_id = ScoreID()
-    now = datetime.now(UTC)
-
-    score = Score(
-        id=score_id,
-        account_id=test_account.id,
-        game_id=test_game.id,
-        board_id=test_board.id,
-        device_id=test_device.id,
-        player_name="Test Player",
-        value=1000.0,
-        created_at=now,
-        updated_at=now,
-    )
-    return await score_repo.create(score)
 
 
 @pytest_asyncio.fixture

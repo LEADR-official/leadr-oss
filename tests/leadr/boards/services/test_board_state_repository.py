@@ -35,6 +35,8 @@ class TestBoardStateRepository:
             identity_id=identity_id,
             primary_value=100.0,
             aux={"key": "value"},
+            player_name="Test Player",
+            is_test=False,
             created_at=now,
             updated_at=now,
         )

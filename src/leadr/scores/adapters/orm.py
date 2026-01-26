@@ -1,12 +1,11 @@
 """Score ORM models."""
 
-import enum
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Index, Integer, String, text
-from sqlalchemy.dialects.postgresql import JSON, JSONB
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from leadr.common.domain.ids import (
@@ -31,89 +30,6 @@ if TYPE_CHECKING:
     from leadr.boards.adapters.orm import BoardORM
     from leadr.games.adapters.orm import GameORM
     from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
-
-
-class ScoreStatusEnum(str, enum.Enum):
-    """Score status enum for database."""
-
-    PROVISIONAL = "provisional"
-    ACTIVE = "active"
-    UNDER_REVIEW = "under_review"
-    REJECTED = "rejected"
-
-
-class ScoreORM(Base):
-    """Score ORM model.
-
-    Represents a player's score submission for a board in the database.
-    Maps to the scores table with foreign keys to accounts, devices, games, and boards.
-    """
-
-    __tablename__ = "scores"
-
-    account_id: Mapped[UUID] = mapped_column(
-        ForeignKey("accounts.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    game_id: Mapped[UUID] = mapped_column(
-        ForeignKey("games.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    board_id: Mapped[UUID] = mapped_column(
-        ForeignKey("boards.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    device_id: Mapped[UUID] = mapped_column(
-        nullable=False,
-        index=True,
-    )
-    player_name: Mapped[str] = mapped_column(String, nullable=False)
-    value: Mapped[float] = mapped_column(Float, nullable=False)
-    value_display: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
-    filter_timezone: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
-    filter_country: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
-    filter_city: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
-    score_metadata: Mapped[Any | None] = mapped_column(
-        "score_metadata", JSON, nullable=True, default=None
-    )
-    is_test: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    status: Mapped[ScoreStatusEnum] = mapped_column(
-        Enum(
-            ScoreStatusEnum,
-            name="score_status",
-            native_enum=True,
-            values_callable=lambda x: [e.value for e in x],
-        ),
-        nullable=False,
-        default=ScoreStatusEnum.PROVISIONAL,
-        server_default="provisional",
-        index=True,
-    )
-
-    # Relationships
-    account: Mapped["AccountORM"] = relationship("AccountORM")  # type: ignore[name-defined]
-    game: Mapped["GameORM"] = relationship("GameORM")  # type: ignore[name-defined]
-    board: Mapped["BoardORM"] = relationship("BoardORM")  # type: ignore[name-defined]
-    # Note: No relationship to DeviceORM as device_id has no FK constraint
-
-    # Indexes
-    __table_args__ = (
-        # Create composite index for efficient score ranking queries.
-        # Excludes deleted, rejected, and provisional scores from the index.
-        Index(
-            "ix_scores_ranking",
-            "board_id",
-            "value",
-            "created_at",
-            "id",
-            postgresql_where=text(
-                "deleted_at IS NULL AND status NOT IN ('rejected', 'provisional')"
-            ),
-        ),
-    )
 
 
 class ScoreEventORM(ImmutableBase):

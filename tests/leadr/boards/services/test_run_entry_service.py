@@ -8,6 +8,7 @@ import pytest
 
 from leadr.boards.domain.run_entry import RunEntry
 from leadr.boards.services.run_entry_service import RunEntryService
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import BoardID, IdentityID, RunEntryID, ScoreEventID
 from leadr.common.domain.pagination_result import PaginatedResult
@@ -168,7 +169,8 @@ class TestRunEntryService:
         )
         service.repository.filter = AsyncMock(return_value=mock_result)
 
-        result = await service.list_run_entries(board_id=board_id, limit=50)
+        pagination = PaginationParams(cursor=None, limit=50, sort=None)
+        result = await service.list_run_entries(board_id=board_id, pagination=pagination)
 
         assert len(result.items) == 2
         assert result.has_next is False

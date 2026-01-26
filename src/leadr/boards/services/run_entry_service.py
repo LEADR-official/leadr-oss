@@ -1,5 +1,7 @@
 """Run entry service for managing run entries."""
 
+from typing import Any
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.boards.domain.run_entry import RunEntry
@@ -33,6 +35,13 @@ class RunEntryService:
         identity_id: IdentityID,
         score_event_id: ScoreEventID,
         primary_value: float,
+        player_name: str = "",
+        is_test: bool = False,
+        timezone: str | None = None,
+        country: str | None = None,
+        city: str | None = None,
+        value_display: str | None = None,
+        metadata: Any | None = None,
     ) -> RunEntry:
         """Create a new run entry.
 
@@ -41,6 +50,13 @@ class RunEntryService:
             identity_id: The identity that submitted this entry.
             score_event_id: The score event that created this entry.
             primary_value: The rankable value for this submission.
+            player_name: Display name at submission time.
+            is_test: Whether this is a test submission.
+            timezone: Timezone from GeoIP.
+            country: Country code from GeoIP.
+            city: City name from GeoIP.
+            value_display: Formatted display string.
+            metadata: Game-specific JSON metadata.
 
         Returns:
             The created run entry.
@@ -50,6 +66,13 @@ class RunEntryService:
             identity_id=identity_id,
             score_event_id=score_event_id,
             primary_value=primary_value,
+            player_name=player_name,
+            is_test=is_test,
+            timezone=timezone,
+            country=country,
+            city=city,
+            value_display=value_display,
+            metadata=metadata,
         )
         return await self.repository.create(entry)
 
@@ -102,23 +125,20 @@ class RunEntryService:
         *,
         board_id: BoardID | None = None,
         identity_id: IdentityID | None = None,
-        limit: int = 50,
-        cursor: str | None = None,
-        sort: str | None = None,
+        pagination: PaginationParams | None = None,
     ) -> PaginatedResult[RunEntry]:
         """List run entries with optional filtering.
 
         Args:
             board_id: Optional board ID to filter by.
             identity_id: Optional identity ID to filter by.
-            limit: Maximum number of entries to return.
-            cursor: Optional cursor for pagination.
-            sort: Optional sort specification.
+            pagination: Optional pagination parameters.
 
         Returns:
             Paginated list of run entries.
         """
-        pagination = PaginationParams(limit=limit, cursor=cursor, sort=sort)
+        if pagination is None:
+            pagination = PaginationParams(limit=50, cursor=None, sort=None)
         return await self.repository.filter(
             board_id=board_id,
             identity_id=identity_id,

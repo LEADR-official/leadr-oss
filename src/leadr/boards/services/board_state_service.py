@@ -35,6 +35,14 @@ class BoardStateService:
         identity_id: IdentityID,
         primary_value: float | None = None,
         aux: dict[str, Any] | None = None,
+        *,
+        player_name: str = "",
+        is_test: bool = False,
+        timezone: str | None = None,
+        country: str | None = None,
+        city: str | None = None,
+        value_display: str | None = None,
+        metadata: Any | None = None,
     ) -> BoardState:
         """Create a new board state.
 
@@ -43,6 +51,13 @@ class BoardStateService:
             identity_id: Identity this state is for
             primary_value: Rankable value (None = not rankable)
             aux: Board-type-specific auxiliary data
+            player_name: Display name at submission time
+            is_test: Whether this is a test submission
+            timezone: Timezone from GeoIP
+            country: Country code from GeoIP
+            city: City name from GeoIP
+            value_display: Formatted display string
+            metadata: Game-specific JSON metadata
 
         Returns:
             Created BoardState entity
@@ -52,6 +67,13 @@ class BoardStateService:
             identity_id=identity_id,
             primary_value=primary_value,
             aux=aux,
+            player_name=player_name,
+            is_test=is_test,
+            timezone=timezone,
+            country=country,
+            city=city,
+            value_display=value_display,
+            metadata=metadata,
         )
         return await self.repository.create(state)
 
@@ -105,6 +127,14 @@ class BoardStateService:
         identity_id: IdentityID,
         primary_value: float | None = None,
         aux: dict[str, Any] | None = None,
+        *,
+        player_name: str = "",
+        is_test: bool = False,
+        timezone: str | None = None,
+        country: str | None = None,
+        city: str | None = None,
+        value_display: str | None = None,
+        metadata: Any | None = None,
     ) -> BoardState:
         """Create or update a board state.
 
@@ -116,6 +146,13 @@ class BoardStateService:
             identity_id: Identity this state is for
             primary_value: Rankable value (None = not rankable)
             aux: Board-type-specific auxiliary data
+            player_name: Display name at submission time
+            is_test: Whether this is a test submission
+            timezone: Timezone from GeoIP
+            country: Country code from GeoIP
+            city: City name from GeoIP
+            value_display: Formatted display string
+            metadata: Game-specific JSON metadata
 
         Returns:
             Created or updated BoardState entity
@@ -129,30 +166,45 @@ class BoardStateService:
                 identity_id=identity_id,
                 primary_value=primary_value,
                 aux=aux,
+                player_name=player_name,
+                is_test=is_test,
+                timezone=timezone,
+                country=country,
+                city=city,
+                value_display=value_display,
+                metadata=metadata,
             )
 
         # Update existing state
         existing.primary_value = primary_value
         existing.aux = aux
+        existing.player_name = player_name
+        existing.is_test = is_test
+        existing.timezone = timezone
+        existing.country = country
+        existing.city = city
+        existing.value_display = value_display
+        existing.metadata = metadata
         return await self.repository.update(existing)
 
     async def list_board_states(
         self,
         board_id: BoardID | None = None,
         identity_id: IdentityID | None = None,
-        limit: int = 50,
+        pagination: PaginationParams | None = None,
     ) -> PaginatedResult[BoardState]:
         """List board states with optional filters.
 
         Args:
             board_id: Optional filter by board
             identity_id: Optional filter by identity
-            limit: Maximum number of results
+            pagination: Optional pagination parameters
 
         Returns:
             Paginated list of board states
         """
-        pagination = PaginationParams(cursor=None, limit=limit, sort=None)
+        if pagination is None:
+            pagination = PaginationParams(cursor=None, limit=50, sort=None)
         return await self.repository.filter(
             board_id=board_id,
             identity_id=identity_id,
