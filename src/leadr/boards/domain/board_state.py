@@ -99,3 +99,12 @@ class BoardState(Entity):
         default=None,
         description="Game-specific JSON metadata",
     )
+    # Transient fields (not persisted in database)
+    is_placeholder: bool = Field(
+        default=False,
+        description="True if this is a synthetic placeholder for around_value queries",
+    )
+    rank: int = Field(
+        default=0,
+        description="Computed rank (transient, not persisted)",
+    )

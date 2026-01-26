@@ -125,23 +125,51 @@ class RunEntryService:
         *,
         board_id: BoardID | None = None,
         identity_id: IdentityID | None = None,
+        is_test: bool | None = None,
         pagination: PaginationParams | None = None,
+        around_entry: RunEntry | None = None,
+        around_value: float | None = None,
     ) -> PaginatedResult[RunEntry]:
         """List run entries with optional filtering.
 
         Args:
             board_id: Optional board ID to filter by.
             identity_id: Optional identity ID to filter by.
+            is_test: Optional filter for test entries (True=test only, False=prod only, None=all).
             pagination: Optional pagination parameters.
+            around_entry: Optional target entry to center results around.
+            around_value: Optional value to center results around (creates placeholder).
 
         Returns:
             Paginated list of run entries.
         """
         if pagination is None:
             pagination = PaginationParams(limit=50, cursor=None, sort=None)
+
+        # If around_value is provided, use around value query with placeholder
+        if around_value is not None and board_id is not None:
+            return await self.repository.execute_around_value_query(
+                board_id=board_id,
+                target_value=around_value,
+                sort_fields=pagination.sort_spec,
+                limit=pagination.limit,
+                is_test=is_test,
+            )
+
+        # If around_entry is provided, use around query
+        if around_entry is not None and board_id is not None:
+            return await self.repository.execute_around_query(
+                board_id=board_id,
+                target_entry=around_entry,
+                sort_fields=pagination.sort_spec,
+                limit=pagination.limit,
+                is_test=is_test,
+            )
+
         return await self.repository.filter(
             board_id=board_id,
             identity_id=identity_id,
+            is_test=is_test,
             pagination=pagination,
         )
 

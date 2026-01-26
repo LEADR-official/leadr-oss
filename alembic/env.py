@@ -32,7 +32,7 @@ from leadr.registration.adapters.orm import (  # noqa: F401
     JamCodeRedemptionORM,
     VerificationCodeORM,
 )
-from leadr.scores.adapters.orm import ScoreEventORM, ScoreFlagORM, ScoreORM, ScoreSubmissionMetaORM  # noqa: F401
+from leadr.scores.adapters.orm import ScoreEventORM, ScoreFlagORM, ScoreSubmissionMetaORM  # noqa: F401
 
 # Import for database configuration (removed - using build_direct_database_url from above)
 from leadr.common.orm import Base

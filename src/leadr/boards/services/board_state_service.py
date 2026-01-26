@@ -2,10 +2,19 @@
 
 from typing import Any
 
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.boards.adapters.orm import BoardRatioConfigORM
+from leadr.boards.domain.board_ratio_config import (
+    BoardRatioConfig,
+    ZeroDenominatorPolicy,
+)
 from leadr.boards.domain.board_state import BoardState
-from leadr.boards.services.repositories import BoardStateRepository
+from leadr.boards.services.repositories import (
+    BoardRatioConfigRepository,
+    BoardStateRepository,
+)
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import BoardID, BoardStateID, IdentityID
@@ -191,23 +200,51 @@ class BoardStateService:
         self,
         board_id: BoardID | None = None,
         identity_id: IdentityID | None = None,
+        is_test: bool | None = None,
         pagination: PaginationParams | None = None,
+        around_state: BoardState | None = None,
+        around_value: float | None = None,
     ) -> PaginatedResult[BoardState]:
         """List board states with optional filters.
 
         Args:
             board_id: Optional filter by board
             identity_id: Optional filter by identity
+            is_test: Optional filter for test entries (True=test only, False=prod only, None=all)
             pagination: Optional pagination parameters
+            around_state: Optional target state to center results around
+            around_value: Optional value to center results around (creates placeholder)
 
         Returns:
             Paginated list of board states
         """
         if pagination is None:
             pagination = PaginationParams(cursor=None, limit=50, sort=None)
+
+        # If around_value is provided, use around value query with placeholder
+        if around_value is not None and board_id is not None:
+            return await self.repository.execute_around_value_query(
+                board_id=board_id,
+                target_value=around_value,
+                sort_fields=pagination.sort_spec,
+                limit=pagination.limit,
+                is_test=is_test,
+            )
+
+        # If around_state is provided, use around query
+        if around_state is not None and board_id is not None:
+            return await self.repository.execute_around_query(
+                board_id=board_id,
+                target_state=around_state,
+                sort_fields=pagination.sort_spec,
+                limit=pagination.limit,
+                is_test=is_test,
+            )
+
         return await self.repository.filter(
             board_id=board_id,
             identity_id=identity_id,
+            is_test=is_test,
             pagination=pagination,
         )
 
@@ -226,3 +263,157 @@ class BoardStateService:
         state = await self.get_by_id_or_raise(state_id)
         state.soft_delete()
         return await self.repository.update(state)
+
+    # -------------------------------------------------------------------------
+    # RATIO board recomputation
+    # -------------------------------------------------------------------------
+
+    async def find_dependent_ratio_boards(
+        self,
+        board_id: BoardID,
+    ) -> list[BoardRatioConfig]:
+        """Find RATIO boards where this board is numerator or denominator.
+
+        Args:
+            board_id: The board ID to check for dependencies.
+
+        Returns:
+            List of BoardRatioConfig entities that depend on this board.
+        """
+        query = select(BoardRatioConfigORM).where(
+            BoardRatioConfigORM.deleted_at.is_(None),
+            or_(
+                BoardRatioConfigORM.numerator_board_id == board_id.uuid,
+                BoardRatioConfigORM.denominator_board_id == board_id.uuid,
+            ),
+        )
+
+        result = await self.session.execute(query)
+        orms = result.scalars().all()
+
+        repo = BoardRatioConfigRepository(self.session)
+        return [repo._to_domain(orm) for orm in orms]
+
+    async def recompute_ratio_for_identity(
+        self,
+        ratio_config: BoardRatioConfig,
+        identity_id: IdentityID,
+    ) -> BoardState | None:
+        """Recalculate ratio value and upsert board state.
+
+        Fetches the numerator and denominator values from the source boards,
+        calculates the ratio, and creates/updates the ratio board state.
+
+        Args:
+            ratio_config: The ratio configuration specifying source boards.
+            identity_id: The identity to recompute the ratio for.
+
+        Returns:
+            The created/updated BoardState, or None if source data is missing.
+        """
+        # Get numerator value
+        numerator_state = await self.repository.get_by_board_and_identity(
+            ratio_config.numerator_board_id,
+            identity_id,
+        )
+
+        # Get denominator value
+        denominator_state = await self.repository.get_by_board_and_identity(
+            ratio_config.denominator_board_id,
+            identity_id,
+        )
+
+        # If either source is missing, we can't compute a ratio
+        if numerator_state is None or denominator_state is None:
+            return None
+
+        numerator_value = numerator_state.primary_value or 0.0
+        denominator_value = denominator_state.primary_value or 0.0
+
+        # Calculate the ratio value
+        primary_value = self._calculate_ratio_value(
+            numerator_value=numerator_value,
+            denominator_value=denominator_value,
+            config=ratio_config,
+        )
+
+        # Build aux data
+        aux = {
+            "numerator_value": numerator_value,
+            "denominator_value": denominator_value,
+        }
+
+        # Determine test status (inherit from source states - both should match)
+        is_test = numerator_state.is_test
+
+        # Get existing ratio state
+        existing_state = await self.repository.get_by_board_and_identity(
+            ratio_config.board_id,
+            identity_id,
+        )
+
+        if existing_state is None:
+            # Create new state
+            state = BoardState(
+                board_id=ratio_config.board_id,
+                identity_id=identity_id,
+                primary_value=primary_value,
+                aux=aux,
+                is_test=is_test,
+                # Inherit player name from numerator state
+                player_name=numerator_state.player_name,
+                timezone=numerator_state.timezone,
+                country=numerator_state.country,
+                city=numerator_state.city,
+            )
+            return await self.repository.create(state)
+        else:
+            # Update existing state
+            existing_state.primary_value = primary_value
+            existing_state.aux = aux
+            existing_state.is_test = is_test
+            existing_state.player_name = numerator_state.player_name
+            existing_state.timezone = numerator_state.timezone
+            existing_state.country = numerator_state.country
+            existing_state.city = numerator_state.city
+            return await self.repository.update(existing_state)
+
+    def _calculate_ratio_value(
+        self,
+        numerator_value: float,
+        denominator_value: float,
+        config: BoardRatioConfig,
+    ) -> float | None:
+        """Calculate the ratio value based on configuration.
+
+        Args:
+            numerator_value: The numerator value.
+            denominator_value: The denominator value.
+            config: The ratio configuration.
+
+        Returns:
+            The calculated ratio * scale, or None if not rankable.
+        """
+        # Check min_denominator threshold
+        if denominator_value < config.min_denominator:
+            return None
+
+        # Check min_numerator threshold
+        if numerator_value < config.min_numerator:
+            return None
+
+        # Handle zero denominator
+        if denominator_value == 0:
+            if config.zero_denominator_policy == ZeroDenominatorPolicy.NULL:
+                return None
+            elif config.zero_denominator_policy == ZeroDenominatorPolicy.ZERO:
+                return 0.0
+            elif config.zero_denominator_policy == ZeroDenominatorPolicy.INFINITY:
+                # Use a very large value for "infinity"
+                return float(config.scale) * 1_000_000
+            else:
+                return None
+
+        # Calculate ratio with scale
+        ratio = (numerator_value / denominator_value) * config.scale
+        return ratio

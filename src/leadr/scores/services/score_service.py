@@ -4,13 +4,16 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.background import BackgroundTasks
 
 from leadr.boards.domain.board import Board, BoardType, KeepStrategy
 from leadr.boards.domain.board import SortDirection as BoardSortDirection
+from leadr.boards.domain.board_ratio_config import BoardRatioConfig
 from leadr.boards.domain.board_state import BoardState
 from leadr.boards.domain.run_entry import RunEntry
 from leadr.boards.services.board_service import BoardService
 from leadr.boards.services.board_state_service import BoardStateService
+from leadr.boards.services.repositories import BoardStateRepository, RunEntryRepository
 from leadr.boards.services.run_entry_service import RunEntryService
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
@@ -90,6 +93,7 @@ class ScoreService:
         city: str | None = None,
         is_test: bool = False,
         trust_tier: TrustTier = TrustTier.B,
+        background_tasks: BackgroundTasks | None = None,
     ) -> tuple[ScoreEvent, BoardState | RunEntry | None, AntiCheatResult | None]:
         """Submit a score using the event-sourcing architecture.
 
@@ -108,6 +112,7 @@ class ScoreService:
             city: Optional city name from GeoIP.
             is_test: Whether this is a test submission.
             trust_tier: Trust tier for anti-cheat thresholds (defaults to B).
+            background_tasks: Optional BackgroundTasks for async ratio updates.
 
         Returns:
             Tuple of (ScoreEvent, ranking_entry, anti_cheat_result).
@@ -207,6 +212,14 @@ class ScoreService:
                 city=city,
             )
         # RATIO boards have no direct handler - they are derived
+
+        # Trigger ratio board updates if this board is a source for any ratio boards
+        if ranking_entry is not None and background_tasks is not None:
+            await self._schedule_ratio_updates(
+                board_id=board_id,
+                identity_id=identity_id,
+                background_tasks=background_tasks,
+            )
 
         return event, ranking_entry, anti_cheat_result
 
@@ -584,6 +597,49 @@ class ScoreService:
         )
         return await flag_repo.create(flag)
 
+    async def _schedule_ratio_updates(
+        self,
+        board_id: BoardID,
+        identity_id: IdentityID,
+        background_tasks: BackgroundTasks,
+    ) -> None:
+        """Schedule ratio board updates as background tasks.
+
+        Checks if the updated board is a numerator or denominator for any ratio
+        boards and schedules recomputation for each.
+
+        Args:
+            board_id: The board that was just updated.
+            identity_id: The identity whose state was updated.
+            background_tasks: FastAPI BackgroundTasks instance.
+        """
+        state_service = BoardStateService(self.session)
+        dependent_configs = await state_service.find_dependent_ratio_boards(board_id)
+
+        for config in dependent_configs:
+            background_tasks.add_task(
+                self._recompute_ratio_background,
+                config,
+                identity_id,
+            )
+
+    async def _recompute_ratio_background(
+        self,
+        config: BoardRatioConfig,
+        identity_id: IdentityID,
+    ) -> None:
+        """Background task to recompute a ratio board state.
+
+        Args:
+            config: The ratio configuration.
+            identity_id: The identity to recompute for.
+        """
+        state_service = BoardStateService(self.session)
+        await state_service.recompute_ratio_for_identity(
+            ratio_config=config,
+            identity_id=identity_id,
+        )
+
     # ==================== Query Methods (delegate to boards domain) ====================
 
     async def get_score_by_id(
@@ -591,8 +647,8 @@ class ScoreService:
         score_id: ScoreID,
         account_id: AccountID | None = None,
         game_id: GameID | None = None,
-    ) -> tuple[BoardState | RunEntry, Board]:
-        """Get a score by its ID.
+    ) -> tuple[BoardState | RunEntry, Board, int]:
+        """Get a score by its ID with computed rank.
 
         The score_id uses scr_ prefix but internally maps to BoardState (bst_) or
         RunEntry (run_) based on board type. This method tries both services.
@@ -603,7 +659,8 @@ class ScoreService:
             game_id: Optional game ID for authorization check.
 
         Returns:
-            Tuple of (BoardState or RunEntry, Board) with the ranking data and board.
+            Tuple of (BoardState or RunEntry, Board, rank) with the ranking data,
+            board, and computed rank (1-indexed).
 
         Raises:
             EntityNotFoundError: If no matching BoardState or RunEntry is found.
@@ -619,15 +676,43 @@ class ScoreService:
         board_state = await board_state_service.get_board_state(BoardStateID(uuid))
         if board_state is not None:
             board = await board_service.get_by_id_or_raise(board_state.board_id)
-            return board_state, board
+            # Compute rank using repository
+            sort_fields = self._build_ranking_sort_fields(board)
+            repo = BoardStateRepository(self.session)
+            rank = await repo.get_rank(board_state, sort_fields)
+            return board_state, board, rank
 
         # Try RunEntryService
         run_entry = await run_entry_service.get_run_entry(RunEntryID(uuid))
         if run_entry is not None:
             board = await board_service.get_by_id_or_raise(run_entry.board_id)
-            return run_entry, board
+            # Compute rank using repository
+            sort_fields = self._build_ranking_sort_fields(board)
+            repo = RunEntryRepository(self.session)
+            rank = await repo.get_rank(run_entry, sort_fields)
+            return run_entry, board, rank
 
         raise EntityNotFoundError("Score", str(score_id))
+
+    def _build_ranking_sort_fields(self, board: Board) -> list[SortField]:
+        """Build sort fields for ranking based on board's sort direction.
+
+        Args:
+            board: The board entity.
+
+        Returns:
+            List of SortField objects for ranking queries.
+        """
+        value_direction = (
+            SortDirection.ASC
+            if board.sort_direction == BoardSortDirection.ASCENDING
+            else SortDirection.DESC
+        )
+        return [
+            SortField(name="primary_value", direction=value_direction),
+            SortField(name="created_at", direction=SortDirection.DESC),
+            SortField(name="id", direction=SortDirection.ASC),
+        ]
 
     async def list_scores(
         self,
@@ -680,13 +765,35 @@ class ScoreService:
                 SortField(name="id", direction=SortDirection.ASC),
             ]
 
+        # If around_score_id is provided, fetch the target entry first
+        around_state: BoardState | None = None
+        around_entry: RunEntry | None = None
+
+        if around_score_id is not None:
+            # Extract UUID from ScoreID and try to find the entry
+            uuid = around_score_id.uuid
+
+            if board.board_type == BoardType.RUN_RUNS:
+                run_entry_service = RunEntryService(self.session)
+                around_entry = await run_entry_service.get_run_entry(RunEntryID(uuid))
+                if around_entry is None:
+                    raise EntityNotFoundError("Score", str(around_score_id))
+            else:
+                board_state_service = BoardStateService(self.session)
+                around_state = await board_state_service.get_board_state(BoardStateID(uuid))
+                if around_state is None:
+                    raise EntityNotFoundError("Score", str(around_score_id))
+
         # Delegate to appropriate service based on board type
         if board.board_type == BoardType.RUN_RUNS:
             run_entry_service = RunEntryService(self.session)
             return await run_entry_service.list_run_entries(
                 board_id=board_id,
                 identity_id=identity_id,
+                is_test=is_test,
                 pagination=pagination,
+                around_entry=around_entry,
+                around_value=around_score_value,
             )
         else:
             # RUN_IDENTITY, COUNTER, RATIO use BoardState
@@ -694,5 +801,8 @@ class ScoreService:
             return await board_state_service.list_board_states(
                 board_id=board_id,
                 identity_id=identity_id,
+                is_test=is_test,
                 pagination=pagination,
+                around_state=around_state,
+                around_value=around_score_value,
             )

@@ -77,6 +77,22 @@ async def create_board(
             detail="ratio_config is required for RATIO board type",
         )
 
+    # Pre-validate ratio config board references BEFORE creating the board
+    if request.board_type == BoardType.RATIO and request.ratio_config is not None:
+        numerator_board = await service.get_board(request.ratio_config.numerator_board_id)
+        if numerator_board is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid numerator_board_id: board not found",
+            )
+
+        denominator_board = await service.get_board(request.ratio_config.denominator_board_id)
+        if denominator_board is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid denominator_board_id: board not found",
+            )
+
     await pre_create_hook(request, auth, background_tasks)
 
     try:
@@ -109,26 +125,18 @@ async def create_board(
     # Create ratio config if this is a RATIO board
     ratio_config = None
     if request.board_type == BoardType.RATIO and request.ratio_config is not None:
-        try:
-            ratio_config = await ratio_config_service.create_ratio_config(
-                board_id=board.id,
-                numerator_board_id=request.ratio_config.numerator_board_id,
-                denominator_board_id=request.ratio_config.denominator_board_id,
-                zero_denominator_policy=request.ratio_config.zero_denominator_policy,
-                min_denominator=request.ratio_config.min_denominator,
-                min_numerator=request.ratio_config.min_numerator,
-                scale=request.ratio_config.scale,
-                display=request.ratio_config.display,
-                decimals=request.ratio_config.decimals,
-                tie_breaker=request.ratio_config.tie_breaker,
-            )
-        except IntegrityError:
-            # Clean up the board if ratio config creation fails
-            await service.soft_delete(board.id)
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid numerator_board_id or denominator_board_id",
-            ) from None
+        ratio_config = await ratio_config_service.create_ratio_config(
+            board_id=board.id,
+            numerator_board_id=request.ratio_config.numerator_board_id,
+            denominator_board_id=request.ratio_config.denominator_board_id,
+            zero_denominator_policy=request.ratio_config.zero_denominator_policy,
+            min_denominator=request.ratio_config.min_denominator,
+            min_numerator=request.ratio_config.min_numerator,
+            scale=request.ratio_config.scale,
+            display=request.ratio_config.display,
+            decimals=request.ratio_config.decimals,
+            tie_breaker=request.ratio_config.tie_breaker,
+        )
 
     await post_create_hook(request, auth, background_tasks)
     return BoardResponse.from_domain(board, ratio_config)

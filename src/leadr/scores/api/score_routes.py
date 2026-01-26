@@ -216,7 +216,7 @@ async def get_score(
         403: User does not have access to this score's account.
         404: Score not found or soft-deleted.
     """
-    ranking_entry, board = await service.get_score_by_id(score_id)
+    ranking_entry, board, rank = await service.get_score_by_id(score_id)
 
     # Check authorization
     if not auth.has_access_to_account(board.account_id):
@@ -231,14 +231,14 @@ async def get_score(
             state=ranking_entry,
             account_id=board.account_id,
             game_id=board.game_id,
-            rank=0,  # Rank not computed for single fetch
+            rank=rank,
         )
     else:
         return ScoreResponse.from_run_entry(
             entry=ranking_entry,
             account_id=board.account_id,
             game_id=board.game_id,
-            rank=0,  # Rank not computed for single fetch
+            rank=rank,
         )
 
 
@@ -630,7 +630,7 @@ async def get_score_client(
         403: Client does not have access to this score's game.
         404: Score not found or soft-deleted.
     """
-    ranking_entry, board = await service.get_score_by_id(score_id)
+    ranking_entry, board, rank = await service.get_score_by_id(score_id)
 
     # Check client has access to this score's game
     if board.game_id != auth.game_id:
@@ -645,14 +645,14 @@ async def get_score_client(
             state=ranking_entry,
             account_id=board.account_id,
             game_id=board.game_id,
-            rank=0,  # Rank not computed for single fetch
+            rank=rank,
         )
     else:
         return ScoreClientResponse.from_run_entry(
             entry=ranking_entry,
             account_id=board.account_id,
             game_id=board.game_id,
-            rank=0,  # Rank not computed for single fetch
+            rank=rank,
         )
 
 

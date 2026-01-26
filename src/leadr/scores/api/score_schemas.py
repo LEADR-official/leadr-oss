@@ -143,7 +143,7 @@ class ScoreResponse(BaseModel):
             city=state.city,
             metadata=state.metadata,
             rank=rank,
-            is_placeholder=False,
+            is_placeholder=state.is_placeholder,
             is_test=state.is_test,
             status=ScoreStatus.ACTIVE,  # Board states are always active
             created_at=state.created_at,
@@ -188,7 +188,7 @@ class ScoreResponse(BaseModel):
             city=entry.city,
             metadata=entry.metadata,
             rank=rank,
-            is_placeholder=False,
+            is_placeholder=entry.is_placeholder,
             is_test=entry.is_test,
             status=ScoreStatus.ACTIVE,  # Run entries are always active
             created_at=entry.created_at,
@@ -265,7 +265,7 @@ class ScoreClientResponse(BaseModel):
             value_display=state.value_display,
             metadata=state.metadata,
             rank=rank,
-            is_placeholder=False,
+            is_placeholder=state.is_placeholder,
             is_test=state.is_test,
             status=ScoreStatus.ACTIVE,  # Board states are always active
             created_at=state.created_at,
@@ -307,7 +307,7 @@ class ScoreClientResponse(BaseModel):
             value_display=entry.value_display,
             metadata=entry.metadata,
             rank=rank,
-            is_placeholder=False,
+            is_placeholder=entry.is_placeholder,
             is_test=entry.is_test,
             status=ScoreStatus.ACTIVE,  # Run entries are always active
             created_at=entry.created_at,

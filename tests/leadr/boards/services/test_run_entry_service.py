@@ -204,3 +204,39 @@ class TestRunEntryService:
 
         with pytest.raises(EntityNotFoundError):
             await service.soft_delete(entry_id)
+
+    @pytest.mark.asyncio
+    async def test_list_run_entries_with_is_test_filter(self, service):
+        """Test listing run entries with is_test filter."""
+        board_id = BoardID(uuid4())
+
+        entry1 = RunEntry(
+            board_id=board_id,
+            identity_id=IdentityID(uuid4()),
+            score_event_id=ScoreEventID(uuid4()),
+            primary_value=100.0,
+            is_test=True,
+        )
+
+        mock_result = PaginatedResult(
+            items=[entry1],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+        service.repository.filter = AsyncMock(return_value=mock_result)
+
+        pagination = PaginationParams(cursor=None, limit=50, sort=None)
+        result = await service.list_run_entries(
+            board_id=board_id,
+            is_test=True,
+            pagination=pagination,
+        )
+
+        assert len(result.items) == 1
+        assert result.items[0].is_test is True
+        # Verify is_test was passed to repository
+        service.repository.filter.assert_called_once()
+        call_kwargs = service.repository.filter.call_args.kwargs
+        assert call_kwargs.get("is_test") is True
