@@ -246,6 +246,8 @@ class TestRatioRecomputation:
         # Expected: 7/10 * 1_000_000 = 700_000
         assert ratio_state.primary_value == 700_000.0
         assert ratio_state.board_id == ratio_test_fixtures["ratio_board_id"]
+        # Fixture has PERCENT display with 2 decimals: 0.7 * 100 = 70.00%
+        assert ratio_state.value_display == "70.00%"
 
     async def test_recompute_ratio_respects_min_denominator(
         self, db_session: AsyncSession, ratio_test_fixtures: dict
@@ -470,6 +472,116 @@ class TestRatioRecomputation:
         assert ratio_state_2.primary_value == 800_000.0  # 8/10 * 1M
         # Should be the same entity (upsert, not create)
         assert ratio_state_2.id == ratio_state_1.id
+
+    async def test_recompute_ratio_formats_display_value_raw(
+        self, db_session: AsyncSession, ratio_test_fixtures: dict
+    ):
+        """Test that value_display is formatted correctly for RAW display."""
+        state_repo = BoardStateRepository(db_session)
+        ratio_config_repo = BoardRatioConfigRepository(db_session)
+
+        # Update config to use RAW display
+        config = ratio_test_fixtures["ratio_config"]
+        config.display = RatioDisplay.RAW
+        config.decimals = 3
+        await ratio_config_repo.update(config)
+
+        # Create states for 101/60 ratio
+        numerator_state = BoardState(
+            board_id=ratio_test_fixtures["numerator_board_id"],
+            identity_id=ratio_test_fixtures["identity_id"],
+            primary_value=101.0,
+            is_test=False,
+        )
+        await state_repo.create(numerator_state)
+
+        denominator_state = BoardState(
+            board_id=ratio_test_fixtures["denominator_board_id"],
+            identity_id=ratio_test_fixtures["identity_id"],
+            primary_value=60.0,
+            is_test=False,
+        )
+        await state_repo.create(denominator_state)
+
+        # Recompute ratio
+        service = BoardStateService(db_session)
+        ratio_state = await service.recompute_ratio_for_identity(
+            ratio_config=config,
+            identity_id=ratio_test_fixtures["identity_id"],
+        )
+
+        assert ratio_state is not None
+        # 101/60 = 1.6833... formatted to 3 decimals
+        assert ratio_state.value_display == "1.683"
+
+    async def test_recompute_ratio_formats_display_value_percent(
+        self, db_session: AsyncSession, ratio_test_fixtures: dict
+    ):
+        """Test that value_display is formatted correctly for PERCENT display."""
+        state_repo = BoardStateRepository(db_session)
+
+        # Fixture already has PERCENT display with 2 decimals
+        # Create states for 3/4 ratio = 75%
+        numerator_state = BoardState(
+            board_id=ratio_test_fixtures["numerator_board_id"],
+            identity_id=ratio_test_fixtures["identity_id"],
+            primary_value=3.0,
+            is_test=False,
+        )
+        await state_repo.create(numerator_state)
+
+        denominator_state = BoardState(
+            board_id=ratio_test_fixtures["denominator_board_id"],
+            identity_id=ratio_test_fixtures["identity_id"],
+            primary_value=4.0,
+            is_test=False,
+        )
+        await state_repo.create(denominator_state)
+
+        # Recompute ratio
+        service = BoardStateService(db_session)
+        ratio_state = await service.recompute_ratio_for_identity(
+            ratio_config=ratio_test_fixtures["ratio_config"],
+            identity_id=ratio_test_fixtures["identity_id"],
+        )
+
+        assert ratio_state is not None
+        # 3/4 = 0.75 -> 75.00%
+        assert ratio_state.value_display == "75.00%"
+
+    async def test_recompute_ratio_display_value_none_when_not_rankable(
+        self, db_session: AsyncSession, ratio_test_fixtures: dict
+    ):
+        """Test that value_display is None when primary_value is None."""
+        state_repo = BoardStateRepository(db_session)
+
+        # Create states where denominator is 0 (NULL policy returns None)
+        numerator_state = BoardState(
+            board_id=ratio_test_fixtures["numerator_board_id"],
+            identity_id=ratio_test_fixtures["identity_id"],
+            primary_value=5.0,
+            is_test=False,
+        )
+        await state_repo.create(numerator_state)
+
+        denominator_state = BoardState(
+            board_id=ratio_test_fixtures["denominator_board_id"],
+            identity_id=ratio_test_fixtures["identity_id"],
+            primary_value=0.0,
+            is_test=False,
+        )
+        await state_repo.create(denominator_state)
+
+        # Recompute ratio (config has NULL policy by default)
+        service = BoardStateService(db_session)
+        ratio_state = await service.recompute_ratio_for_identity(
+            ratio_config=ratio_test_fixtures["ratio_config"],
+            identity_id=ratio_test_fixtures["identity_id"],
+        )
+
+        assert ratio_state is not None
+        assert ratio_state.primary_value is None
+        assert ratio_state.value_display is None
 
 
 @pytest.mark.asyncio

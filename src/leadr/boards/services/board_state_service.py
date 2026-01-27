@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.boards.adapters.orm import BoardRatioConfigORM
 from leadr.boards.domain.board_ratio_config import (
     BoardRatioConfig,
+    RatioDisplay,
     ZeroDenominatorPolicy,
 )
 from leadr.boards.domain.board_state import BoardState
@@ -337,6 +338,9 @@ class BoardStateService:
             config=ratio_config,
         )
 
+        # Format display value
+        value_display = self._format_ratio_display(primary_value, ratio_config)
+
         # Build aux data
         aux = {
             "numerator_value": numerator_value,
@@ -358,6 +362,7 @@ class BoardStateService:
                 board_id=ratio_config.board_id,
                 identity_id=identity_id,
                 primary_value=primary_value,
+                value_display=value_display,
                 aux=aux,
                 is_test=is_test,
                 # Inherit player name from numerator state
@@ -370,6 +375,7 @@ class BoardStateService:
         else:
             # Update existing state
             existing_state.primary_value = primary_value
+            existing_state.value_display = value_display
             existing_state.aux = aux
             existing_state.is_test = is_test
             existing_state.player_name = numerator_state.player_name
@@ -417,3 +423,30 @@ class BoardStateService:
         # Calculate ratio with scale
         ratio = (numerator_value / denominator_value) * config.scale
         return ratio
+
+    def _format_ratio_display(
+        self,
+        primary_value: float | None,
+        config: BoardRatioConfig,
+    ) -> str | None:
+        """Format ratio value for display.
+
+        Args:
+            primary_value: The scaled ratio value (or None if not rankable).
+            config: The ratio configuration with display settings.
+
+        Returns:
+            Formatted string like "1.68" (RAW) or "168.33%" (PERCENT), or None.
+        """
+        if primary_value is None:
+            return None
+
+        # Unscale the value
+        ratio = primary_value / config.scale
+
+        if config.display == RatioDisplay.PERCENT:
+            # Multiply by 100 for percentage
+            value = ratio * 100
+            return f"{value:.{config.decimals}f}%"
+        else:  # RAW
+            return f"{ratio:.{config.decimals}f}"
