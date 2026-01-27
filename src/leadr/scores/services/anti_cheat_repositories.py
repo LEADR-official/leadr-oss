@@ -182,8 +182,8 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
 
     def _to_domain(self, orm: ScoreFlagORM) -> ScoreFlag:
         """Convert ORM model to domain entity."""
-        from leadr.common.domain.ids import UserID
-        from leadr.scores.domain.anti_cheat.enums import (
+        from leadr.common.domain.ids import UserID  # noqa: PLC0415
+        from leadr.scores.domain.anti_cheat.enums import (  # noqa: PLC0415
             FlagConfidence,
             FlagType,
             ScoreFlagStatus,

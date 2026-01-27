@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.services.account_service import AccountService
@@ -576,8 +577,6 @@ class TestBoardTemplateService:
 
     async def test_advance_template_schedule_not_found(self, db_session: AsyncSession):
         """Test advancing schedule for non-existent template raises error."""
-        from leadr.common.domain.exceptions import EntityNotFoundError
-
         template_service = BoardTemplateService(db_session)
         non_existent_id = uuid4()
 
@@ -586,7 +585,6 @@ class TestBoardTemplateService:
 
     async def test_unique_series_per_game(self, db_session: AsyncSession):
         """Test that series must be unique per game."""
-        from sqlalchemy.exc import IntegrityError
 
         # Create account and game
         account_service = AccountService(db_session)

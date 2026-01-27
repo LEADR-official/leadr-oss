@@ -1,6 +1,6 @@
 """Tests for Board service."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.accounts.services.account_service import AccountService
 from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
+from leadr.boards.services.board_template_service import BoardTemplateService
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import BoardID, BoardTemplateID, GameID
 from leadr.games.services.game_service import GameService
@@ -846,8 +847,6 @@ class TestBoardService:
         )
 
         # Update starts_at
-        from datetime import datetime
-
         new_starts_at = datetime(2025, 1, 1, 0, 0, 0, tzinfo=UTC)
         updated_board = await board_service.update_board(
             board_id=created_board.id,
@@ -887,8 +886,6 @@ class TestBoardService:
         )
 
         # Update ends_at
-        from datetime import datetime
-
         new_ends_at = datetime(2025, 12, 31, 23, 59, 59, tzinfo=UTC)
         updated_board = await board_service.update_board(
             board_id=created_board.id,
@@ -938,10 +935,6 @@ class TestBoardService:
 
     async def test_create_board_from_template(self, db_session: AsyncSession):
         """Test creating a board from a template."""
-        from datetime import timedelta
-
-        from leadr.boards.services.board_template_service import BoardTemplateService
-
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -998,10 +991,6 @@ class TestBoardService:
 
     async def test_create_board_from_template_with_defaults(self, db_session: AsyncSession):
         """Test creating a board from a template with default config values."""
-        from datetime import timedelta
-
-        from leadr.boards.services.board_template_service import BoardTemplateService
-
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -1051,10 +1040,6 @@ class TestBoardService:
         Regression test: ensures series_value is calculated when name_template contains
         {series} placeholder, regardless of whether template.series field is set.
         """
-        from datetime import timedelta
-
-        from leadr.boards.services.board_template_service import BoardTemplateService
-
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(

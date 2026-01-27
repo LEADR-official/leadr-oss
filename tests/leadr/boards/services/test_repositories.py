@@ -1,6 +1,6 @@
 """Tests for Board repository services."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -1004,7 +1004,6 @@ class TestBoardRepository:
 
     async def test_list_boards_filter_by_starts_before(self, db_session: AsyncSession):
         """Test filtering boards starting before a given date."""
-        from datetime import timedelta
 
         # Create account and game
         account_repo = AccountRepository(db_session)
@@ -1076,7 +1075,6 @@ class TestBoardRepository:
 
     async def test_list_boards_filter_by_starts_after(self, db_session: AsyncSession):
         """Test filtering boards starting after a given date."""
-        from datetime import timedelta
 
         # Create account and game
         account_repo = AccountRepository(db_session)
@@ -1148,7 +1146,6 @@ class TestBoardRepository:
 
     async def test_list_boards_filter_by_ends_before(self, db_session: AsyncSession):
         """Test filtering boards ending before a given date."""
-        from datetime import timedelta
 
         # Create account and game
         account_repo = AccountRepository(db_session)
@@ -1220,7 +1217,6 @@ class TestBoardRepository:
 
     async def test_list_boards_filter_by_ends_after(self, db_session: AsyncSession):
         """Test filtering boards ending after a given date."""
-        from datetime import timedelta
 
         # Create account and game
         account_repo = AccountRepository(db_session)
@@ -1292,7 +1288,6 @@ class TestBoardRepository:
 
     async def test_list_boards_filter_by_multiple_criteria(self, db_session: AsyncSession):
         """Test filtering boards by multiple criteria at once."""
-        from datetime import timedelta
 
         # Create account and game
         account_repo = AccountRepository(db_session)
@@ -1390,8 +1385,6 @@ class TestBoardRepository:
 
     async def test_list_boards_with_game_id_supports_pagination(self, db_session: AsyncSession):
         """Test that filtering by game_id works with pagination."""
-        from leadr.common.api.pagination import PaginationParams
-
         # Create account and game
         account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())

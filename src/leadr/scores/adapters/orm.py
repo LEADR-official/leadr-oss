@@ -128,7 +128,7 @@ class ScoreSubmissionMetaORM(Base):
 
     def to_domain(self) -> "ScoreSubmissionMeta":
         """Convert ORM model to domain entity."""
-        from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
+        from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta  # noqa: PLC0415
 
         return ScoreSubmissionMeta(
             id=ScoreSubmissionMetaID(self.id),

@@ -3,6 +3,8 @@
 from typing import Self
 from uuid import UUID, uuid4
 
+from pydantic_core import core_schema
+
 
 class PrefixedID:
     """Base class for entity IDs with type prefixes.
@@ -104,8 +106,6 @@ class PrefixedID:
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type, handler):
         """Pydantic v2 schema for serialization/validation."""
-        from pydantic_core import core_schema
-
         return core_schema.no_info_after_validator_function(
             cls._validate,
             core_schema.union_schema(

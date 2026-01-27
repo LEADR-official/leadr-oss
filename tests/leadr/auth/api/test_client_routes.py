@@ -1,13 +1,18 @@
 """Tests for Client Authentication API routes."""
 
 import hashlib
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+import jwt
 import pytest
 from httpx import AsyncClient
 
 from leadr.accounts.services.account_service import AccountService
+from leadr.auth.adapters.orm import DeviceORM, IdentityORM, IdentitySessionORM, NonceORM
 from leadr.auth.domain.identity import IdentityKind
+from leadr.auth.services.nonce_service import NonceService
+from leadr.common.domain.ids import IdentityID
 from leadr.games.services.game_service import GameService
 
 
@@ -271,10 +276,6 @@ class TestClientSessionRoutes:
 
     async def test_refresh_session_with_expired_token(self, client: AsyncClient, db_session):
         """Test refreshing a session with an expired token returns 401."""
-        from datetime import UTC, datetime, timedelta
-
-        from leadr.auth.adapters.orm import DeviceORM, IdentityORM, IdentitySessionORM
-
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -404,8 +405,6 @@ class TestClientSessionTestMode:
 
     async def test_refresh_session_preserves_test_mode(self, client: AsyncClient, db_session):
         """Test that refreshing a test mode session preserves test_mode in new tokens."""
-        import jwt
-
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -599,9 +598,6 @@ class TestNonceIntegration:
 
     async def test_full_nonce_flow(self, client: AsyncClient, db_session):
         """Test complete nonce flow: session → nonce generation → validation → consumption."""
-        from leadr.auth.services.nonce_service import NonceService
-        from leadr.common.domain.ids import IdentityID
-
         # 1. Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -673,9 +669,6 @@ class TestNonceIntegration:
         self, client: AsyncClient, db_session
     ):
         """Test that a nonce generated for one identity cannot be used by another."""
-        from leadr.auth.services.nonce_service import NonceService
-        from leadr.common.domain.ids import IdentityID
-
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -722,12 +715,6 @@ class TestNonceIntegration:
 
     async def test_expired_nonce_cannot_be_used(self, client: AsyncClient, db_session):
         """Test that an expired nonce cannot be used."""
-        from datetime import UTC, datetime, timedelta
-
-        from leadr.auth.adapters.orm import NonceORM
-        from leadr.auth.services.nonce_service import NonceService
-        from leadr.common.domain.ids import IdentityID
-
         # Create account, game, and identity
         account_service = AccountService(db_session)
         account = await account_service.create_account(

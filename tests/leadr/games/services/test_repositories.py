@@ -518,8 +518,6 @@ class TestGameRepository:
 
     async def test_slug_globally_unique(self, db_session: AsyncSession, test_account: Account):
         """Test that slugs must be globally unique across all accounts."""
-        from sqlalchemy.exc import IntegrityError
-
         game_repo = GameRepository(db_session)
         account2_id = AccountID(uuid4())
         now = datetime.now(UTC)

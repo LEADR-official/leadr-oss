@@ -6,12 +6,15 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.account_service import AccountService
+from leadr.accounts.services.repositories import AccountRepository
 from leadr.auth.domain.identity import IdentityKind
 from leadr.auth.services.device_service import DeviceService
 from leadr.auth.services.identity_service import IdentityService
 from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
+from leadr.common.domain.ids import AccountID, DeviceID
 from leadr.games.services.game_service import GameService
 from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
 from leadr.scores.services.anti_cheat_repositories import ScoreSubmissionMetaRepository
@@ -390,9 +393,6 @@ class TestScoreSubmissionMetaRoutes:
         self, authenticated_client: AsyncClient, db_session: AsyncSession
     ):
         """Test that superadmin can list submission metadata WITHOUT account_id and sees all."""
-        from leadr.accounts.domain.account import Account, AccountStatus
-        from leadr.accounts.services.repositories import AccountRepository
-        from leadr.common.domain.ids import AccountID
 
         # Create two accounts with submission metadata in each
         account_repo = AccountRepository(db_session)
@@ -525,7 +525,6 @@ class TestScoreSubmissionMetaRoutes:
         self, client: AsyncClient, db_session: AsyncSession, test_api_key: str
     ):
         """Test filtering submission metadata by device_id via API."""
-        from leadr.common.domain.ids import DeviceID
 
         # Create supporting entities
         account_service = AccountService(db_session)

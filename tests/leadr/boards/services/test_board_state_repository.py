@@ -11,10 +11,13 @@ from leadr.accounts.services.repositories import AccountRepository
 from leadr.auth.domain.identity import Identity, IdentityKind
 from leadr.auth.services.repositories import IdentityRepository
 from leadr.boards.adapters.orm import BoardStateORM
-from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
 from leadr.boards.domain.board_state import BoardState
 from leadr.boards.services.repositories import BoardRepository, BoardStateRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardID, BoardStateID, GameID, IdentityID
+from leadr.common.domain.pagination import SortDirection as PaginationSortDirection
+from leadr.common.domain.pagination import SortField
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
 
@@ -505,8 +508,6 @@ class TestBoardStateRepositoryIsTestFilter:
 
     async def test_filter_by_is_test_true(self, db_session: AsyncSession):
         """Test filtering board states to return only test entries."""
-        from leadr.common.api.pagination import PaginationParams
-
         fixtures = await self._create_test_fixtures(db_session)
         state_repo = BoardStateRepository(db_session)
 
@@ -542,8 +543,6 @@ class TestBoardStateRepositoryIsTestFilter:
 
     async def test_filter_by_is_test_false(self, db_session: AsyncSession):
         """Test filtering board states to return only production entries."""
-        from leadr.common.api.pagination import PaginationParams
-
         fixtures = await self._create_test_fixtures(db_session)
         state_repo = BoardStateRepository(db_session)
 
@@ -579,8 +578,6 @@ class TestBoardStateRepositoryIsTestFilter:
 
     async def test_filter_by_is_test_none_returns_all(self, db_session: AsyncSession):
         """Test filtering without is_test returns all entries."""
-        from leadr.common.api.pagination import PaginationParams
-
         fixtures = await self._create_test_fixtures(db_session)
         state_repo = BoardStateRepository(db_session)
 
@@ -619,8 +616,6 @@ class TestBoardStateRepositoryGetRank:
 
     async def _create_test_fixtures_with_board(self, db_session: AsyncSession, sort_direction: str):
         """Create common test fixtures with configurable sort direction."""
-        from leadr.boards.domain.board import BoardType
-
         now = datetime.now(UTC)
         account_id = AccountID(uuid4())
         game_id = GameID(uuid4())
@@ -694,13 +689,6 @@ class TestBoardStateRepositoryGetRank:
 
     async def test_get_rank_in_desc_board(self, db_session: AsyncSession):
         """Test rank calculation in DESCENDING board (higher value = better rank)."""
-        from leadr.common.domain.pagination import (
-            SortDirection as PaginationSortDirection,
-        )
-        from leadr.common.domain.pagination import (
-            SortField,
-        )
-
         fixtures = await self._create_test_fixtures_with_board(db_session, "DESCENDING")
         state_repo = BoardStateRepository(db_session)
 
@@ -747,13 +735,6 @@ class TestBoardStateRepositoryGetRank:
 
     async def test_get_rank_in_asc_board(self, db_session: AsyncSession):
         """Test rank calculation in ASCENDING board (lower value = better rank)."""
-        from leadr.common.domain.pagination import (
-            SortDirection as PaginationSortDirection,
-        )
-        from leadr.common.domain.pagination import (
-            SortField,
-        )
-
         fixtures = await self._create_test_fixtures_with_board(db_session, "ASCENDING")
         state_repo = BoardStateRepository(db_session)
 
@@ -800,13 +781,6 @@ class TestBoardStateRepositoryGetRank:
 
     async def test_get_rank_excludes_deleted(self, db_session: AsyncSession):
         """Test that deleted entries are excluded from rank calculation."""
-        from leadr.common.domain.pagination import (
-            SortDirection as PaginationSortDirection,
-        )
-        from leadr.common.domain.pagination import (
-            SortField,
-        )
-
         fixtures = await self._create_test_fixtures_with_board(db_session, "DESCENDING")
         state_repo = BoardStateRepository(db_session)
 

@@ -6,7 +6,9 @@ from unittest.mock import Mock
 import pytest
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
+from httpx import ASGITransport, AsyncClient
 
+from api.middleware import AccessLogMiddleware, GeoIPMiddleware
 from leadr.common.geoip import GeoInfo
 
 
@@ -16,8 +18,6 @@ class TestGeoIPMiddleware:
     @pytest.mark.asyncio
     async def test_extracts_ip_from_x_real_ip_header(self):
         """Test that middleware extracts IP from X-Real-IP header."""
-        from api.middleware import GeoIPMiddleware
-
         app = FastAPI()
 
         # Mock GeoIP service
@@ -43,8 +43,6 @@ class TestGeoIPMiddleware:
             )
 
         # Test with X-Real-IP header
-        from httpx import ASGITransport, AsyncClient
-
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",
@@ -61,8 +59,6 @@ class TestGeoIPMiddleware:
     @pytest.mark.asyncio
     async def test_extracts_ip_from_x_forwarded_for_header(self):
         """Test that middleware extracts leftmost IP from X-Forwarded-For header."""
-        from api.middleware import GeoIPMiddleware
-
         app = FastAPI()
 
         # Mock GeoIP service
@@ -88,8 +84,6 @@ class TestGeoIPMiddleware:
             )
 
         # Test with X-Forwarded-For header (proxy chain)
-        from httpx import ASGITransport, AsyncClient
-
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",
@@ -109,8 +103,6 @@ class TestGeoIPMiddleware:
     @pytest.mark.asyncio
     async def test_extracts_ip_from_cf_connecting_ip_header(self):
         """Test that middleware extracts IP from CF-Connecting-IP header."""
-        from api.middleware import GeoIPMiddleware
-
         app = FastAPI()
 
         # Mock GeoIP service
@@ -134,8 +126,6 @@ class TestGeoIPMiddleware:
             )
 
         # Test with CF-Connecting-IP header
-        from httpx import ASGITransport, AsyncClient
-
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",
@@ -150,8 +140,6 @@ class TestGeoIPMiddleware:
     @pytest.mark.asyncio
     async def test_fallback_to_client_host(self):
         """Test that middleware falls back to request.client.host if no headers."""
-        from api.middleware import GeoIPMiddleware
-
         app = FastAPI()
 
         # Mock GeoIP service
@@ -167,8 +155,6 @@ class TestGeoIPMiddleware:
             return JSONResponse({"ok": True})
 
         # Test without headers (will use client.host from test client)
-        from httpx import ASGITransport, AsyncClient
-
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",
@@ -180,8 +166,6 @@ class TestGeoIPMiddleware:
     @pytest.mark.asyncio
     async def test_uses_dev_override_ip_when_set(self):
         """Test that middleware uses DEV_OVERRIDE_IP in development."""
-        from api.middleware import GeoIPMiddleware
-
         app = FastAPI()
 
         # Mock GeoIP service
@@ -207,8 +191,6 @@ class TestGeoIPMiddleware:
             )
 
         # Test - should use dev override IP even with headers
-        from httpx import ASGITransport, AsyncClient
-
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",
@@ -224,8 +206,6 @@ class TestGeoIPMiddleware:
     @pytest.mark.asyncio
     async def test_handles_geo_lookup_failure_gracefully(self):
         """Test that middleware handles geo lookup failures without crashing."""
-        from api.middleware import GeoIPMiddleware
-
         app = FastAPI()
 
         # Mock GeoIP service to return None (lookup failure)
@@ -247,8 +227,6 @@ class TestGeoIPMiddleware:
             )
 
         # Test with IP that's not in database
-        from httpx import ASGITransport, AsyncClient
-
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",
@@ -265,8 +243,6 @@ class TestGeoIPMiddleware:
     @pytest.mark.asyncio
     async def test_handles_geo_service_exception_gracefully(self):
         """Test that middleware handles geo service exceptions without crashing."""
-        from api.middleware import GeoIPMiddleware
-
         app = FastAPI()
 
         # Mock GeoIP service to raise exception
@@ -282,8 +258,6 @@ class TestGeoIPMiddleware:
             return JSONResponse({"ok": True})
 
         # Test - should not crash
-        from httpx import ASGITransport, AsyncClient
-
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",
@@ -296,8 +270,6 @@ class TestGeoIPMiddleware:
     @pytest.mark.asyncio
     async def test_header_priority_order(self):
         """Test that middleware checks headers in correct priority order."""
-        from api.middleware import GeoIPMiddleware
-
         app = FastAPI()
 
         # Mock GeoIP service
@@ -317,8 +289,6 @@ class TestGeoIPMiddleware:
             return JSONResponse({"ok": True})
 
         # Test with all headers - X-Real-IP should take priority
-        from httpx import ASGITransport, AsyncClient
-
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",
@@ -343,8 +313,6 @@ class TestAccessLogMiddleware:
     @pytest.mark.asyncio
     async def test_logs_request_with_timing(self):
         """Test that middleware logs requests with method, path, status_code, and duration_ms."""
-        from api.middleware import AccessLogMiddleware
-
         app = FastAPI()
         mock_logger = Mock()
 
@@ -354,8 +322,6 @@ class TestAccessLogMiddleware:
         @app.get("/test")
         async def test_route():
             return JSONResponse({"ok": True})
-
-        from httpx import ASGITransport, AsyncClient
 
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -383,8 +349,6 @@ class TestAccessLogMiddleware:
     @pytest.mark.asyncio
     async def test_logs_error_responses_with_timing(self):
         """Test that error responses are also logged with timing."""
-        from api.middleware import AccessLogMiddleware
-
         app = FastAPI()
         mock_logger = Mock()
 
@@ -393,8 +357,6 @@ class TestAccessLogMiddleware:
         @app.get("/error")
         async def error_route():
             raise HTTPException(status_code=500, detail="Server error")
-
-        from httpx import ASGITransport, AsyncClient
 
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -413,8 +375,6 @@ class TestAccessLogMiddleware:
     @pytest.mark.asyncio
     async def test_duration_reflects_actual_processing_time(self):
         """Test that duration_ms reflects actual request processing time."""
-        from api.middleware import AccessLogMiddleware
-
         app = FastAPI()
         mock_logger = Mock()
 
@@ -424,8 +384,6 @@ class TestAccessLogMiddleware:
         async def slow_route():
             await asyncio.sleep(0.05)  # 50ms delay
             return JSONResponse({"ok": True})
-
-        from httpx import ASGITransport, AsyncClient
 
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -440,8 +398,6 @@ class TestAccessLogMiddleware:
     @pytest.mark.asyncio
     async def test_uses_default_logger_when_none_provided(self):
         """Test that middleware uses module logger when none is provided."""
-        from api.middleware import AccessLogMiddleware
-
         app = FastAPI()
 
         # Add middleware without logger - should not raise
@@ -450,8 +406,6 @@ class TestAccessLogMiddleware:
         @app.get("/test")
         async def test_route():
             return JSONResponse({"ok": True})
-
-        from httpx import ASGITransport, AsyncClient
 
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -464,8 +418,6 @@ class TestAccessLogMiddleware:
     @pytest.mark.asyncio
     async def test_logs_client_ip_from_headers(self):
         """Test that middleware logs client IP from X-Real-IP header."""
-        from api.middleware import AccessLogMiddleware
-
         app = FastAPI()
         mock_logger = Mock()
 
@@ -474,8 +426,6 @@ class TestAccessLogMiddleware:
         @app.get("/test")
         async def test_route():
             return JSONResponse({"ok": True})
-
-        from httpx import ASGITransport, AsyncClient
 
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -489,8 +439,6 @@ class TestAccessLogMiddleware:
     @pytest.mark.asyncio
     async def test_logs_multiple_requests(self):
         """Test that middleware correctly logs multiple sequential requests."""
-        from api.middleware import AccessLogMiddleware
-
         app = FastAPI()
         mock_logger = Mock()
 
@@ -503,8 +451,6 @@ class TestAccessLogMiddleware:
         @app.post("/second")
         async def second_route():
             return JSONResponse({"route": "second"})
-
-        from httpx import ASGITransport, AsyncClient
 
         async with AsyncClient(
             transport=ASGITransport(app=app),

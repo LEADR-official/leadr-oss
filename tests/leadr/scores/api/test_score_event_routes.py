@@ -11,6 +11,7 @@ from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
 from leadr.boards.services.board_state_service import BoardStateService
 from leadr.boards.services.run_entry_service import RunEntryService
+from leadr.common.domain.ids import BoardID, IdentityID
 from leadr.games.services.game_service import GameService
 from leadr.scores.services.score_event_service import ScoreEventService
 
@@ -635,7 +636,6 @@ class TestCreateScoreEvent:
         self, client: AsyncClient, db_session, test_api_key
     ):
         """Test creating a score event with non-existent board returns 404."""
-        from leadr.common.domain.ids import BoardID, IdentityID
 
         # Use valid prefixed IDs
         fake_board_id = BoardID()

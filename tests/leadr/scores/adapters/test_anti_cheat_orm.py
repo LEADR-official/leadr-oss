@@ -4,7 +4,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from leadr.common.domain.ids import IdentityID
+from leadr.accounts.adapters.orm import UserORM
+from leadr.common.domain.ids import BoardID, IdentityID, ScoreEventID, UserID
 from leadr.scores.adapters.orm import ScoreFlagORM, ScoreSubmissionMetaORM
 from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
@@ -38,8 +39,6 @@ class TestScoreSubmissionMetaORM:
 
     async def test_submission_meta_to_domain(self, db_session, score_event_orm, identity_orm):
         """Test converting ORM to domain entity."""
-        from leadr.common.domain.ids import BoardID, ScoreEventID
-
         now = datetime.now(UTC)
 
         orm = ScoreSubmissionMetaORM(
@@ -67,8 +66,6 @@ class TestScoreSubmissionMetaORM:
 
     async def test_submission_meta_from_domain(self, db_session, score_event_orm, identity_orm):
         """Test converting domain entity to ORM."""
-        from leadr.common.domain.ids import BoardID, ScoreEventID
-
         now = datetime.now(UTC)
 
         domain = ScoreSubmissionMeta(
@@ -120,8 +117,6 @@ class TestScoreFlagORM:
 
     async def test_score_flag_to_domain(self, db_session, score_event_orm):
         """Test converting ORM to domain entity."""
-        from leadr.common.domain.ids import ScoreEventID
-
         orm = ScoreFlagORM(
             score_event_id=score_event_orm.id,
             flag_type=FlagType.DUPLICATE.value,
@@ -146,8 +141,6 @@ class TestScoreFlagORM:
 
     async def test_score_flag_from_domain(self, db_session, score_event_orm):
         """Test converting domain entity to ORM."""
-        from leadr.common.domain.ids import ScoreEventID
-
         domain = ScoreFlag(
             score_event_id=ScoreEventID(score_event_orm.id),
             flag_type=FlagType.VELOCITY,
@@ -168,9 +161,6 @@ class TestScoreFlagORM:
 
     async def test_score_flag_with_review_data(self, db_session, score_event_orm, account_orm):
         """Test flag with review information."""
-        from leadr.accounts.adapters.orm import UserORM
-        from leadr.common.domain.ids import UserID
-
         # Create a user for the reviewer
         user = UserORM(
             account_id=account_orm.id,

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.auth.adapters.orm import NonceORM
+from leadr.auth.services.nonce_service import NonceService
 from leadr.auth.services.nonce_tasks import cleanup_expired_nonces
 
 
@@ -33,8 +34,6 @@ class TestCleanupExpiredNonces:
         await db_session.commit()
 
         # Run cleanup using the service directly (same session as test)
-        from leadr.auth.services.nonce_service import NonceService
-
         service = NonceService(db_session)
         deleted_count = await service.cleanup_expired_nonces(older_than_hours=0)
 

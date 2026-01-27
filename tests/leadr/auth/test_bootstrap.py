@@ -1,8 +1,11 @@
 """Tests for superadmin bootstrap logic."""
 
+from uuid import uuid4
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository, UserRepository
 from leadr.accounts.services.user_service import UserService
 from leadr.auth.bootstrap import ensure_superadmin_exists
@@ -84,11 +87,6 @@ class TestSuperadminBootstrap:
     ):
         """Test that ensure_superadmin_exists skips creation if any superadmin exists."""
         # Create a different superadmin manually
-        from uuid import uuid4
-
-        from leadr.accounts.domain.account import Account, AccountStatus
-        from leadr.accounts.services.repositories import AccountRepository
-
         account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
 

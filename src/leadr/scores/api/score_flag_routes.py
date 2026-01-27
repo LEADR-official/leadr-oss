@@ -11,6 +11,7 @@ from leadr.common.domain.ids import AccountID, BoardID, GameID, ScoreFlagID
 from leadr.scores.api.score_flag_schemas import ScoreFlagResponse, ScoreFlagUpdateRequest
 from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
 from leadr.scores.services.dependencies import ScoreFlagServiceDep
+from leadr.scores.services.score_event_service import ScoreEventService
 
 router = APIRouter()
 
@@ -113,8 +114,6 @@ async def get_score_flag(
     flag = await service.get_by_id_or_raise(flag_id)
 
     # Get the associated score event to check account access
-    from leadr.scores.services.score_event_service import ScoreEventService
-
     score_event_service = ScoreEventService(service.repository.session)
     score_event = await score_event_service.get_by_id_or_raise(flag.score_event_id)
 
@@ -158,8 +157,6 @@ async def update_score_flag(
     flag = await service.get_by_id_or_raise(flag_id)
 
     # Get the associated score event to check account access
-    from leadr.scores.services.score_event_service import ScoreEventService
-
     score_event_service = ScoreEventService(service.repository.session)
     score_event = await score_event_service.get_by_id_or_raise(flag.score_event_id)
 

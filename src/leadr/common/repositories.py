@@ -6,7 +6,7 @@ from typing import Any, Generic, TypeVar
 from uuid import UUID
 
 from pydantic import UUID4
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import DateTime, Uuid, and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.common.api.pagination import PaginationParams
@@ -370,11 +370,6 @@ class BaseRepository(ABC, Generic[DomainEntityT, ORMModelT]):
         Returns:
             Value converted to match column's Python type
         """
-        from datetime import datetime
-        from uuid import UUID
-
-        from sqlalchemy import DateTime, Uuid
-
         # Get the column type
         column_type = column.type
 
@@ -721,8 +716,6 @@ class ImmutableBaseRepository(ABC, Generic[ImmutableEntityT, ImmutableORMT]):
         Returns:
             Value converted to match column's Python type
         """
-        from sqlalchemy import DateTime, Uuid
-
         column_type = column.type
 
         if isinstance(column_type, DateTime) and isinstance(value, str):

@@ -16,19 +16,21 @@ from leadr.auth.services.device_service import DeviceService
 from leadr.auth.services.identity_service import IdentityService
 from leadr.boards.domain.board import BoardType, KeepStrategy
 from leadr.boards.services.board_service import BoardService
-from leadr.common.domain.ids import IdentityID, ScoreEventID
+from leadr.common.domain.ids import BoardID, IdentityID, ScoreEventID, UserID
 from leadr.games.services.game_service import GameService
 from leadr.scores.domain.anti_cheat.enums import (
     FlagAction,
     FlagConfidence,
     FlagType,
     ScoreFlagStatus,
+    TrustTier,
 )
 from leadr.scores.domain.anti_cheat.models import (
     ScoreFlag,
     ScoreSubmissionMeta,
 )
 from leadr.scores.domain.score_event import ScoreEvent
+from leadr.scores.services.anti_cheat_service import AntiCheatService
 
 
 @pytest.mark.asyncio
@@ -39,7 +41,6 @@ class TestScoreSubmissionMetaWithIdentity:
         """ScoreSubmissionMeta should use identity_id instead of device_id."""
         identity_id = IdentityID()
         score_event_id = ScoreEventID()
-        from leadr.common.domain.ids import BoardID
 
         meta = ScoreSubmissionMeta(
             score_event_id=score_event_id,
@@ -59,7 +60,6 @@ class TestScoreSubmissionMetaWithIdentity:
         """ScoreSubmissionMeta should have all required fields."""
         identity_id = IdentityID()
         score_event_id = ScoreEventID()
-        from leadr.common.domain.ids import BoardID
 
         board_id = BoardID()
         now = datetime.now(UTC)
@@ -113,7 +113,6 @@ class TestScoreFlagWithScoreEvent:
 
     async def test_score_flag_has_review_fields(self):
         """ScoreFlag should have review-related fields."""
-        from leadr.common.domain.ids import UserID
 
         reviewer_id = UserID()
         reviewed_at = datetime.now(UTC)
@@ -185,8 +184,6 @@ class TestAntiCheatServiceWithIdentity:
         )
 
         # Check anti-cheat
-        from leadr.scores.domain.anti_cheat.enums import TrustTier
-        from leadr.scores.services.anti_cheat_service import AntiCheatService
 
         anti_cheat = AntiCheatService(db_session)
         result = await anti_cheat.check_submission_for_event(

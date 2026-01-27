@@ -14,6 +14,7 @@ from leadr.boards.adapters.orm import RunEntryORM
 from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
 from leadr.boards.domain.run_entry import RunEntry
 from leadr.boards.services.repositories import BoardRepository, RunEntryRepository
+from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import (
     AccountID,
     BoardID,
@@ -22,6 +23,8 @@ from leadr.common.domain.ids import (
     RunEntryID,
     ScoreEventID,
 )
+from leadr.common.domain.pagination import SortDirection as PaginationSortDirection
+from leadr.common.domain.pagination import SortField
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
 from leadr.scores.domain.score_event import ScoreEvent
@@ -357,7 +360,6 @@ class TestRunEntryRepositoryIsTestFilter:
 
     async def test_filter_by_is_test_true(self, db_session: AsyncSession):
         """Test filtering run entries to return only test entries."""
-        from leadr.common.api.pagination import PaginationParams
 
         fixtures = await self._create_test_fixtures(db_session)
         entry_repo = RunEntryRepository(db_session)
@@ -396,7 +398,6 @@ class TestRunEntryRepositoryIsTestFilter:
 
     async def test_filter_by_is_test_false(self, db_session: AsyncSession):
         """Test filtering run entries to return only production entries."""
-        from leadr.common.api.pagination import PaginationParams
 
         fixtures = await self._create_test_fixtures(db_session)
         entry_repo = RunEntryRepository(db_session)
@@ -435,7 +436,6 @@ class TestRunEntryRepositoryIsTestFilter:
 
     async def test_filter_by_is_test_none_returns_all(self, db_session: AsyncSession):
         """Test filtering without is_test returns all entries."""
-        from leadr.common.api.pagination import PaginationParams
 
         fixtures = await self._create_test_fixtures(db_session)
         entry_repo = RunEntryRepository(db_session)
@@ -568,12 +568,6 @@ class TestRunEntryRepositoryGetRank:
 
     async def test_get_rank_in_desc_board(self, db_session: AsyncSession):
         """Test rank calculation in DESCENDING board (higher value = better rank)."""
-        from leadr.common.domain.pagination import (
-            SortDirection as PaginationSortDirection,
-        )
-        from leadr.common.domain.pagination import (
-            SortField,
-        )
 
         fixtures = await self._create_test_fixtures_with_events(db_session, "DESCENDING")
         entry_repo = RunEntryRepository(db_session)
@@ -624,12 +618,6 @@ class TestRunEntryRepositoryGetRank:
 
     async def test_get_rank_in_asc_board(self, db_session: AsyncSession):
         """Test rank calculation in ASCENDING board (lower value = better rank)."""
-        from leadr.common.domain.pagination import (
-            SortDirection as PaginationSortDirection,
-        )
-        from leadr.common.domain.pagination import (
-            SortField,
-        )
 
         fixtures = await self._create_test_fixtures_with_events(db_session, "ASCENDING")
         entry_repo = RunEntryRepository(db_session)

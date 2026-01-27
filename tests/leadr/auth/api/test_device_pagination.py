@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account
 from leadr.auth.services.device_service import DeviceService
+from leadr.common.domain.ids import GameID
 from leadr.games.domain.game import Game
 
 
@@ -229,10 +230,6 @@ class TestDevicePagination:
             },
         )
         second_game_data = response.json()
-
-        # Import GameID for second game
-        from leadr.common.domain.ids import GameID
-
         second_game_id = GameID(second_game_data["id"])
 
         # Create 10 devices for test_game

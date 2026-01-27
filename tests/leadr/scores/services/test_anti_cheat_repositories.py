@@ -6,7 +6,10 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.auth.adapters.orm import IdentityORM
+from leadr.auth.domain.identity import IdentityKind
 from leadr.common.api.pagination import PaginationParams
+from leadr.common.domain.cursor import Cursor, PaginationDirection
 from leadr.common.domain.ids import (
     AccountID,
     BoardID,
@@ -14,6 +17,7 @@ from leadr.common.domain.ids import (
     IdentityID,
     ScoreEventID,
     ScoreFlagID,
+    ScoreSubmissionMetaID,
     UserID,
 )
 from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
@@ -77,7 +81,6 @@ class TestScoreSubmissionMetaRepository:
     async def test_get_submission_meta_by_id_not_found(self, db_session: AsyncSession):
         """Test retrieving a non-existent submission meta returns None."""
         repo = ScoreSubmissionMetaRepository(db_session)
-        from leadr.common.domain.ids import ScoreSubmissionMetaID
 
         non_existent_id = ScoreSubmissionMetaID(uuid4())
 
@@ -471,7 +474,6 @@ class TestScoreFlagRepository:
         assert result1.next_position is not None
 
         # Build cursor for next page
-        from leadr.common.domain.cursor import Cursor, PaginationDirection
 
         cursor = Cursor(
             position=result1.next_position,
@@ -506,8 +508,6 @@ class TestScoreSubmissionMetaRepositoryFilter:
         # Create several submission metas
         for i in range(5):
             # Need unique identities for each meta since (identity_id, board_id) is unique
-            from leadr.auth.adapters.orm import IdentityORM
-            from leadr.auth.domain.identity import IdentityKind
 
             identity = IdentityORM(
                 id=uuid4(),
@@ -647,8 +647,6 @@ class TestScoreSubmissionMetaRepositoryFilter:
         now = datetime.now(UTC)
 
         # Create several submission metas with unique identities
-        from leadr.auth.adapters.orm import IdentityORM
-        from leadr.auth.domain.identity import IdentityKind
 
         for i in range(5):
             identity = IdentityORM(
@@ -681,7 +679,6 @@ class TestScoreSubmissionMetaRepositoryFilter:
         assert result1.next_position is not None
 
         # Build cursor for next page
-        from leadr.common.domain.cursor import Cursor, PaginationDirection
 
         cursor = Cursor(
             position=result1.next_position,

@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.exc import DBAPIError, OperationalError
 
 from leadr.accounts.services.account_service import AccountService
@@ -62,7 +63,6 @@ class TestProcessDueTemplates:
             await process_due_templates()
 
         # Verify board was created
-        from sqlalchemy import select
 
         result = await db_session.execute(
             select(BoardORM).where(
@@ -121,7 +121,6 @@ class TestProcessDueTemplates:
             await process_due_templates()
 
         # Verify no board was created
-        from sqlalchemy import select
 
         result = await db_session.execute(
             select(BoardORM).where(

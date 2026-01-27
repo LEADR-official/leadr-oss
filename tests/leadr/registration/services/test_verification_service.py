@@ -235,7 +235,6 @@ class TestVerificationServiceValidateToken:
 
     async def test_validate_token_expired(self, db_session: AsyncSession):
         """Test validating expired token raises error."""
-        import jwt
 
         mock_email_service = AsyncMock()
 
@@ -256,7 +255,6 @@ class TestVerificationServiceValidateToken:
 
     async def test_validate_token_wrong_type(self, db_session: AsyncSession):
         """Test validating token with wrong type raises error."""
-        import jwt
 
         mock_email_service = AsyncMock()
 
@@ -279,7 +277,6 @@ class TestVerificationServiceValidateToken:
 
     async def test_validate_token_missing_email(self, db_session: AsyncSession):
         """Test validating token without email raises error."""
-        import jwt
 
         mock_email_service = AsyncMock()
 

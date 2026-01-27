@@ -1,12 +1,17 @@
 """Tests for Identity Session API routes."""
 
+from datetime import UTC, datetime
+
 import pytest
 from httpx import AsyncClient
 
+from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.account_service import AccountService
+from leadr.accounts.services.repositories import AccountRepository
 from leadr.auth.services.device_service import DeviceService
 from leadr.auth.services.identity_service import IdentityService
 from leadr.common.api.pagination import PaginationParams
+from leadr.common.domain.ids import AccountID
 from leadr.games.services.game_service import GameService
 
 
@@ -198,12 +203,6 @@ class TestIdentitySessionRoutes:
         self, authenticated_client: AsyncClient, db_session
     ):
         """Test that superadmin can list sessions WITHOUT account_id and sees all accounts."""
-        from datetime import UTC, datetime
-
-        from leadr.accounts.domain.account import Account, AccountStatus
-        from leadr.accounts.services.repositories import AccountRepository
-        from leadr.common.domain.ids import AccountID
-
         # Create two accounts with identities/sessions in each
         account_repo = AccountRepository(db_session)
         now = datetime.now(UTC)

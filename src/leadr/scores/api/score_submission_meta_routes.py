@@ -8,6 +8,7 @@ from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, BoardID, DeviceID, ScoreSubmissionMetaID
+from leadr.scores.adapters.orm import ScoreEventORM
 from leadr.scores.api.score_submission_meta_schemas import ScoreSubmissionMetaResponse
 from leadr.scores.services.dependencies import ScoreSubmissionMetaServiceDep
 
@@ -104,8 +105,6 @@ async def get_submission_meta(
         403: User does not have access to this metadata's account.
         404: Submission metadata not found or soft-deleted.
     """
-    from leadr.scores.adapters.orm import ScoreEventORM
-
     meta = await service.get_by_id_or_raise(meta_id)
 
     # Get the associated score event to check account access

@@ -2,6 +2,7 @@
 
 import pytest
 
+from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import (
     AccountID,
     BoardID,
@@ -118,7 +119,6 @@ class TestScoreEventService:
 
     async def test_get_score_event_or_raise_not_found(self, db_session):
         """Test get_by_id_or_raise raises when not found."""
-        from leadr.common.domain.exceptions import EntityNotFoundError
 
         service = ScoreEventService(db_session)
 

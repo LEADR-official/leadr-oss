@@ -1,5 +1,8 @@
 """Tests for cursor-based pagination."""
 
+import base64
+import json
+
 import pytest
 
 from leadr.common.domain.cursor import Cursor, CursorValidationError
@@ -72,9 +75,6 @@ class TestCursor:
 
     def test_decode_missing_fields_raises_error(self) -> None:
         """Test that decoding cursor with missing fields raises error."""
-        import base64
-        import json
-
         # Create cursor with missing required field
         incomplete_data = {"pv": [100], "pid": "id"}  # Missing "sf", "f", "dir"
         encoded = base64.urlsafe_b64encode(json.dumps(incomplete_data).encode()).decode()

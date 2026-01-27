@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -168,8 +169,6 @@ class TestUserORM:
         await db_session.commit()
 
         # Verify user is also deleted
-        from sqlalchemy import select
-
         result = await db_session.execute(
             select(UserORM).where(UserORM.id == user_id)  # type: ignore[arg-type]
         )

@@ -36,6 +36,7 @@ from leadr.common.domain.ids import (
 )
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
+from leadr.scores.services.score_service import ScoreService
 
 
 @pytest_asyncio.fixture
@@ -479,8 +480,6 @@ class TestScoreServiceRatioIntegration:
         self, db_session: AsyncSession, ratio_test_fixtures: dict
     ):
         """Test that score submission schedules ratio board update."""
-        from leadr.scores.services.score_service import ScoreService
-
         # Create a mock BackgroundTasks to verify add_task is called
         mock_background_tasks = Mock(spec=BackgroundTasks)
 
@@ -502,8 +501,6 @@ class TestScoreServiceRatioIntegration:
         self, db_session: AsyncSession, ratio_test_fixtures: dict
     ):
         """Test that score submission works without background_tasks."""
-        from leadr.scores.services.score_service import ScoreService
-
         # Submit score without background_tasks (should not error)
         service = ScoreService(db_session)
         event, ranking_entry, anti_cheat_result = await service.submit_score(

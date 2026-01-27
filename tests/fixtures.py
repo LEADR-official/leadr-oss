@@ -10,7 +10,8 @@ Key principles:
 - Use these for ORM-level tests; use domain fixtures from conftest for integration tests
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +40,7 @@ from leadr.scores.adapters.orm import (
     ScoreFlagORM,
     ScoreSubmissionMetaORM,
 )
+from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 
 
 @pytest_asyncio.fixture
@@ -115,8 +117,6 @@ async def board_template_orm(
     Returns:
         BoardTemplateORM instance with auto-generated id.
     """
-    from datetime import UTC, datetime, timedelta
-
     template = BoardTemplateORM(
         account_id=account_orm.id,  # Raw UUID
         game_id=game_orm.id,  # Raw UUID
@@ -206,8 +206,6 @@ async def identity_orm(
     Returns:
         IdentityORM instance with auto-generated id.
     """
-    from uuid import uuid4
-
     identity = IdentityORM(
         account_id=account_orm.id,  # Raw UUID
         game_id=game_orm.id,  # Raw UUID
@@ -257,9 +255,6 @@ async def nonce_orm(db_session: AsyncSession, identity_orm: IdentityORM) -> Nonc
     Returns:
         NonceORM instance with auto-generated id.
     """
-    from datetime import timedelta
-    from uuid import uuid4
-
     now = datetime.now(UTC)
     nonce = NonceORM(
         identity_id=identity_orm.id,  # Raw UUID
@@ -317,8 +312,6 @@ async def score_flag_orm(db_session: AsyncSession, score_event_orm: ScoreEventOR
     Returns:
         ScoreFlagORM instance with auto-generated id.
     """
-    from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
-
     flag = ScoreFlagORM(
         score_event_id=score_event_orm.id,  # Raw UUID
         flag_type=FlagType.VELOCITY.value,

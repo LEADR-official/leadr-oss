@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.auth.domain.api_key import APIKey
+from leadr.auth.domain.api_key import APIKey, APIKeyStatus
 from leadr.auth.services.api_key_crypto import generate_api_key, hash_api_key, verify_api_key
 from leadr.auth.services.repositories import APIKeyRepository
 from leadr.common.api.pagination import PaginationParams
@@ -218,8 +218,6 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         Returns:
             PaginatedResult containing APIKey entities.
         """
-        from leadr.auth.domain.api_key import APIKeyStatus
-
         # Convert status string to enum if provided
         status_enum: APIKeyStatus | None = None
         if status is not None:
@@ -279,8 +277,6 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
             EntityNotFoundError: If the key doesn't exist.
             ValueError: If the status is invalid.
         """
-        from leadr.auth.domain.api_key import APIKeyStatus
-
         api_key = await self.repository.get_by_id(key_id)
         if not api_key:
             raise EntityNotFoundError("APIKey", str(key_id))

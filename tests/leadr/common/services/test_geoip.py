@@ -1,5 +1,6 @@
 """Tests for GeoIP service."""
 
+import os
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -175,8 +176,6 @@ class TestGeoIPService:
             old_timestamp = (datetime.now(UTC) - timedelta(days=10)).timestamp()
             city_db_path.touch()
             country_db_path.touch()
-            import os
-
             os.utime(city_db_path, (old_timestamp, old_timestamp))
             os.utime(country_db_path, (old_timestamp, old_timestamp))
 

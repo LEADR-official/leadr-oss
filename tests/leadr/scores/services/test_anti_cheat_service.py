@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.common.domain.ids import BoardID, IdentityID, ScoreEventID
+from leadr.common.domain.ids import AccountID, BoardID, GameID, IdentityID, ScoreEventID
 from leadr.scores.domain.anti_cheat.enums import FlagAction, FlagConfidence, FlagType, TrustTier
 from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
 from leadr.scores.domain.score_event import ScoreEvent
@@ -16,7 +16,6 @@ from leadr.scores.services.anti_cheat_service import AntiCheatService
 @pytest.fixture
 def score_event_domain(score_event_orm) -> ScoreEvent:
     """Create a domain ScoreEvent from the ORM fixture."""
-    from leadr.common.domain.ids import AccountID, GameID
 
     return ScoreEvent(
         id=ScoreEventID(score_event_orm.id),

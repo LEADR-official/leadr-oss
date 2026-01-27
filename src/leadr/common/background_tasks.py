@@ -7,6 +7,7 @@ within the FastAPI application process.
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -67,8 +68,6 @@ class BackgroundTaskScheduler:
             func: Async function to call.
             interval: Seconds between executions.
         """
-        from datetime import UTC, datetime
-
         logger.info("Starting background task loop: %s", name)
 
         while self.running:

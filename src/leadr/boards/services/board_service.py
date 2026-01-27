@@ -1,6 +1,6 @@
 """Board service for managing board operations."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -187,8 +187,6 @@ class BoardService(BaseService[Board, BoardRepository]):
         Example:
             >>> board = await service.create_board_from_template(template)
         """
-        from datetime import UTC
-
         # Get current timestamp for name generation
         now = datetime.now(UTC)
 

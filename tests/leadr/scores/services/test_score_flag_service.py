@@ -11,8 +11,10 @@ from leadr.auth.services.device_service import DeviceService
 from leadr.auth.services.identity_service import IdentityService
 from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
+from leadr.boards.services.board_state_service import BoardStateService
 from leadr.boards.services.run_entry_service import RunEntryService
-from leadr.common.domain.ids import ScoreEventID, ScoreFlagID
+from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import ScoreEventID, ScoreFlagID, UserID
 from leadr.games.services.game_service import GameService
 from leadr.scores.domain.anti_cheat.enums import (
     FlagConfidence,
@@ -498,7 +500,6 @@ class TestRankingSyncForRunIdentity:
 
     async def test_confirmed_cheat_recomputes_selected_event(self, db_session: AsyncSession):
         """Test that confirming a flag recomputes board state when flagged event is selected."""
-        from leadr.boards.services.board_state_service import BoardStateService
 
         account_service = AccountService(db_session)
         account = await account_service.create_account(name="Test Account", slug="test-ri-cheat")
@@ -571,7 +572,6 @@ class TestRankingSyncForRunIdentity:
 
     async def test_confirmed_cheat_no_op_for_non_selected_event(self, db_session: AsyncSession):
         """Test that confirming a flag on non-selected event doesn't change state."""
-        from leadr.boards.services.board_state_service import BoardStateService
 
         account_service = AccountService(db_session)
         account = await account_service.create_account(name="Test Account", slug="test-ri-noop")
@@ -644,7 +644,6 @@ class TestRankingSyncForRunIdentity:
         self, db_session: AsyncSession
     ):
         """Test that state is cleared when all events are flagged."""
-        from leadr.boards.services.board_state_service import BoardStateService
 
         account_service = AccountService(db_session)
         account = await account_service.create_account(name="Test Account", slug="test-ri-clear")
@@ -707,7 +706,6 @@ class TestRankingSyncForRunIdentity:
 
     async def test_recompute_with_first_keep_strategy(self, db_session: AsyncSession):
         """Test recomputation with FIRST keep strategy."""
-        from leadr.boards.services.board_state_service import BoardStateService
 
         account_service = AccountService(db_session)
         account = await account_service.create_account(name="Test Account", slug="test-ri-first")
@@ -779,7 +777,6 @@ class TestRankingSyncForRunIdentity:
 
     async def test_recompute_with_latest_keep_strategy(self, db_session: AsyncSession):
         """Test recomputation with LATEST keep strategy."""
-        from leadr.boards.services.board_state_service import BoardStateService
 
         account_service = AccountService(db_session)
         account = await account_service.create_account(name="Test Account", slug="test-ri-latest")
@@ -850,7 +847,6 @@ class TestRankingSyncForRunIdentity:
 
     async def test_recompute_with_ascending_sort(self, db_session: AsyncSession):
         """Test recomputation with ASCENDING sort direction (lower is better)."""
-        from leadr.boards.services.board_state_service import BoardStateService
 
         account_service = AccountService(db_session)
         account = await account_service.create_account(name="Test Account", slug="test-ri-asc")
@@ -927,7 +923,6 @@ class TestRankingSyncForCounter:
 
     async def test_confirmed_cheat_recomputes_counter(self, db_session: AsyncSession):
         """Test that confirming a cheat recomputes the counter total."""
-        from leadr.boards.services.board_state_service import BoardStateService
 
         account_service = AccountService(db_session)
         account = await account_service.create_account(name="Test Account", slug="test-counter-ch")
@@ -1005,7 +1000,6 @@ class TestRankingSyncForCounter:
 
     async def test_counter_zero_when_all_events_flagged(self, db_session: AsyncSession):
         """Test that counter goes to 0 when all events are flagged."""
-        from leadr.boards.services.board_state_service import BoardStateService
 
         account_service = AccountService(db_session)
         account = await account_service.create_account(name="Test Account", slug="test-cnt-zero")
@@ -1073,7 +1067,6 @@ class TestReviewFlag:
 
     async def test_review_flag_confirms_cheat(self, db_session: AsyncSession):
         """Test review_flag method with confirmed cheat status."""
-        from leadr.common.domain.ids import UserID
 
         account_service = AccountService(db_session)
         account = await account_service.create_account(name="Test Account", slug="test-review-1")
@@ -1188,7 +1181,6 @@ class TestReviewFlag:
 
     async def test_review_flag_not_found(self, db_session: AsyncSession):
         """Test review_flag raises error for non-existent flag."""
-        from leadr.common.services import EntityNotFoundError
 
         flag_service = ScoreFlagService(db_session)
 

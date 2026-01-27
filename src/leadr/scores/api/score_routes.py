@@ -16,8 +16,8 @@ from leadr.boards.domain.board_state import BoardState
 from leadr.boards.domain.run_entry import RunEntry
 from leadr.boards.services.dependencies import BoardServiceDep
 from leadr.common.api.hooks import PostCreateScoreHookDep, PreCreateScoreHookDep
-from leadr.common.api.pagination import PaginatedResponse, PaginationParams
-from leadr.common.domain.cursor import CursorValidationError
+from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
+from leadr.common.domain.cursor import Cursor, CursorValidationError, PaginationDirection
 from leadr.common.domain.ids import AccountID, BoardID, GameID, IdentityID, ScoreID
 from leadr.scores.api.score_schemas import (
     IsTestFilter,
@@ -423,9 +423,6 @@ def _build_paginated_response_admin(
     filters: dict[str, str],
 ) -> PaginatedResponse[ScoreResponse]:
     """Build a PaginatedResponse for admin with cursor encoding."""
-    from leadr.common.api.pagination import PaginationMeta
-    from leadr.common.domain.cursor import Cursor, PaginationDirection
-
     next_cursor_str = None
     prev_cursor_str = None
 
@@ -466,9 +463,6 @@ def _build_paginated_response_client(
     filters: dict[str, str],
 ) -> PaginatedResponse[ScoreClientResponse]:
     """Build a PaginatedResponse for client with cursor encoding."""
-    from leadr.common.api.pagination import PaginationMeta
-    from leadr.common.domain.cursor import Cursor, PaginationDirection
-
     next_cursor_str = None
     prev_cursor_str = None
 

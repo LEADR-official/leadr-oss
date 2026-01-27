@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.auth.adapters.orm import IdentityORM, NonceORM
+from leadr.auth.adapters.orm import IdentityKindEnum, IdentityORM, NonceORM
 from leadr.auth.domain.nonce import NonceStatus
 from leadr.auth.services.nonce_service import NonceService
 from leadr.common.domain.ids import IdentityID
@@ -104,8 +104,6 @@ class TestNonceService:
     ):
         """Test that using nonce from different identity raises ValueError."""
         # Create second identity with different external_key
-        from leadr.auth.adapters.orm import IdentityKindEnum
-
         identity2 = IdentityORM(
             id=uuid4(),
             game_id=game_orm.id,
@@ -218,8 +216,6 @@ class TestNonceService:
     ):
         """Test that multiple identities can have pending nonces simultaneously."""
         # Create second identity with different external_key
-        from leadr.auth.adapters.orm import IdentityKindEnum
-
         identity2 = IdentityORM(
             id=uuid4(),
             game_id=game_orm.id,

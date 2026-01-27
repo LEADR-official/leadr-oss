@@ -1,11 +1,16 @@
 """Tests for Board API routes."""
 
 import logging
+from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
 
+from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.account_service import AccountService
+from leadr.accounts.services.repositories import AccountRepository
+from leadr.boards.services.board_service import BoardService
+from leadr.common.domain.ids import AccountID
 from leadr.games.services.game_service import GameService
 
 logger = logging.getLogger(__name__)
@@ -892,13 +897,6 @@ class TestBoardRoutes:
         self, authenticated_client: AsyncClient, db_session
     ):
         """Test that superadmin can list boards WITHOUT account_id and sees all accounts."""
-        from datetime import UTC, datetime
-
-        from leadr.accounts.domain.account import Account, AccountStatus
-        from leadr.accounts.services.repositories import AccountRepository
-        from leadr.boards.services.board_service import BoardService
-        from leadr.common.domain.ids import AccountID
-
         # Create two accounts with boards in each
         account_repo = AccountRepository(db_session)
         now = datetime.now(UTC)
@@ -1147,8 +1145,6 @@ class TestBoardRoutes:
         self, authenticated_client: AsyncClient, db_session
     ):
         """Test that admin can see multiple boards with same slug (active + inactive)."""
-        from leadr.boards.services.board_service import BoardService
-
         account_service = AccountService(db_session)
         account = await account_service.create_account(
             name="Acme Corporation",
@@ -1200,8 +1196,6 @@ class TestBoardRoutes:
         self, authenticated_client: AsyncClient, db_session
     ):
         """Test that admin can filter by slug AND is_active to get single result."""
-        from leadr.boards.services.board_service import BoardService
-
         account_service = AccountService(db_session)
         account = await account_service.create_account(
             name="Acme Corporation",

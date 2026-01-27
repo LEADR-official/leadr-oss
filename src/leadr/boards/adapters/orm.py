@@ -247,9 +247,13 @@ class BoardTemplateORM(Base):
         Returns:
             BoardTemplate domain entity with all fields populated from ORM model.
         """
-        from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
-        from leadr.boards.domain.board_template import BoardTemplate
-        from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
+        from leadr.boards.domain.board import (  # noqa: PLC0415
+            BoardType,
+            KeepStrategy,
+            SortDirection,
+        )
+        from leadr.boards.domain.board_template import BoardTemplate  # noqa: PLC0415
+        from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID  # noqa: PLC0415
 
         return BoardTemplate(
             id=BoardTemplateID(self.id),

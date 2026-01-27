@@ -117,7 +117,7 @@ class VerificationCodeORM(Base):
         Returns:
             The domain entity instance.
         """
-        from leadr.common.domain.ids import UserID
+        from leadr.common.domain.ids import UserID  # noqa: PLC0415
 
         return VerificationCode(
             id=self.id,
@@ -273,7 +273,7 @@ class JamCodeRedemptionORM(Base):
         Returns:
             The domain entity instance.
         """
-        from leadr.common.domain.ids import AccountID
+        from leadr.common.domain.ids import AccountID  # noqa: PLC0415
 
         return JamCodeRedemption(
             id=self.id,

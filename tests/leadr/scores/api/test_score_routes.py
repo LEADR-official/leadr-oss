@@ -1,13 +1,16 @@
 """Tests for Score API routes."""
 
 import hashlib
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
 
 from leadr.accounts.services.account_service import AccountService
+from leadr.accounts.services.dependencies import get_user_service
 from leadr.auth.domain.identity import IdentityID, IdentityKind
+from leadr.auth.services.dependencies import get_api_key_service
 from leadr.auth.services.device_service import DeviceService
 from leadr.auth.services.identity_service import IdentityService
 from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
@@ -15,7 +18,9 @@ from leadr.boards.services.board_service import BoardService
 from leadr.boards.services.board_state_service import BoardStateService
 from leadr.boards.services.run_entry_service import RunEntryService
 from leadr.games.services.game_service import GameService
+from leadr.scores.domain.anti_cheat.enums import FlagAction
 from leadr.scores.services.score_event_service import ScoreEventService
+from leadr.scores.services.score_service import ScoreService
 
 
 @pytest.mark.asyncio
@@ -154,8 +159,6 @@ class TestScoreRoutesAdmin:
         self, client: AsyncClient, db_session, test_api_key
     ):
         """Test that accessing a score from another account is forbidden for non-superadmins."""
-        from leadr.auth.services.dependencies import get_api_key_service
-
         # Create Account 1 (where the score will live)
         account_service = AccountService(db_session)
         account1 = await account_service.create_account(name="Account 1", slug="acc1-forbidden")
@@ -192,8 +195,6 @@ class TestScoreRoutesAdmin:
 
         # Create Account 2 with a non-superadmin user
         account2 = await account_service.create_account(name="Account 2", slug="acc2-forbidden")
-
-        from leadr.accounts.services.dependencies import get_user_service
 
         user_service = await get_user_service(db_session)
         user2 = await user_service.create_user(
@@ -1438,10 +1439,6 @@ class TestScoreRoutesClient:
 
     async def test_create_score_anti_cheat_reject(self, client: AsyncClient, db_session):
         """Test that anti-cheat REJECT returns 429."""
-        from unittest.mock import patch
-
-        from leadr.scores.domain.anti_cheat.enums import FlagAction
-
         account_service = AccountService(db_session)
         account = await account_service.create_account(name="Test Account", slug="test-reject")
 
@@ -1491,8 +1488,6 @@ class TestScoreRoutesClient:
             db_session, "_score_service_submit_score", mock_submit_score, create=True
         ):
             # Actually patch the service method
-            from leadr.scores.services.score_service import ScoreService
-
             with patch.object(ScoreService, "submit_score", mock_submit_score):
                 response = await client.post(
                     "/client/scores",

@@ -19,6 +19,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from api.main import create_app
+
 # Import all ORM models to register them with SQLAlchemy metadata
 from leadr.accounts.adapters.orm import AccountORM, UserORM  # noqa: F401
 from leadr.accounts.domain.account import Account, AccountStatus
@@ -210,8 +212,6 @@ def test_app():
     Tests that need to set dependency_overrides should request this fixture
     in addition to client/authenticated_client.
     """
-    from api.main import create_app
-
     return create_app(lifespan_override=noop_lifespan)
 
 
