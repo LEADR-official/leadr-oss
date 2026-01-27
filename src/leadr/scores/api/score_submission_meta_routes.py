@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
-from leadr.common.domain.ids import AccountID, BoardID, DeviceID, ScoreSubmissionMetaID
+from leadr.common.domain.ids import AccountID, BoardID, ScoreSubmissionMetaID
 from leadr.scores.adapters.orm import ScoreEventORM
 from leadr.scores.api.score_submission_meta_schemas import ScoreSubmissionMetaResponse
 from leadr.scores.services.dependencies import ScoreSubmissionMetaServiceDep
@@ -24,12 +24,11 @@ async def list_submission_meta(
     pagination: Annotated[PaginationParams, Depends()],
     account_id: Annotated[AccountID | None, Query(description="Account ID filter")] = None,
     board_id: BoardID | None = None,
-    device_id: DeviceID | None = None,
 ) -> PaginatedResponse[ScoreSubmissionMetaResponse]:
     """List score submission metadata for an account with optional filters and pagination.
 
     Returns paginated submission metadata for the specified account, with optional
-    filtering by board or device. Supports cursor-based pagination with bidirectional
+    filtering by board. Supports cursor-based pagination with bidirectional
     navigation and custom sorting.
 
     For regular users, account_id is automatically derived from their API key.
@@ -41,7 +40,6 @@ async def list_submission_meta(
         pagination: Pagination parameters (cursor, limit, sort).
         account_id: Optional account_id query parameter (superadmins can omit to see all).
         board_id: Optional board ID to filter by.
-        device_id: Optional device ID to filter by.
 
     Returns:
         PaginatedResponse containing ScoreSubmissionMetaResponse objects matching the filter.
@@ -59,7 +57,6 @@ async def list_submission_meta(
         result = await service.list_submission_meta(
             account_id=effective_account_id,
             board_id=board_id,
-            device_id=device_id,
             pagination=pagination,
         )
     except (CursorValidationError, ValueError) as e:
@@ -71,8 +68,6 @@ async def list_submission_meta(
         filters_dict["account_id"] = str(effective_account_id)
     if board_id is not None:
         filters_dict["board_id"] = str(board_id)
-    if device_id is not None:
-        filters_dict["device_id"] = str(device_id)
 
     return PaginatedResponse.from_paginated_result(
         result=result,
