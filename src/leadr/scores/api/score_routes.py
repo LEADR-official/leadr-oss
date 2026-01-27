@@ -347,10 +347,11 @@ async def handle_list_scores(
         raise HTTPException(status_code=400, detail=str(e)) from None
 
     # Build filter dict for cursors
+    # Note: game_id is NOT included - it's not used for repository filtering
+    # (board_id already ensures we're querying the correct board, and boards
+    # are bound to specific games)
     filters_dict: dict[str, str] = {}
     filters_dict["board_id"] = str(board_id)
-    if game_id is not None:
-        filters_dict["game_id"] = str(game_id)
     if identity_id is not None:
         filters_dict["identity_id"] = str(identity_id)
     if is_test is not None:
