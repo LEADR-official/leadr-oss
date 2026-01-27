@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import Float, func, select
+from sqlalchemy import Float, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.boards.domain.board import Board, BoardType, KeepStrategy
@@ -143,28 +143,28 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             return
 
         if board.board_type == BoardType.RUN_RUNS:
-            await self._handle_run_runs_exclusion(
+            await self._sync_run_runs_entry(
                 board_id=board.id,
                 score_event_id=flag.score_event_id,
                 exclude=is_exclusion,
             )
         elif board.board_type == BoardType.RUN_IDENTITY:
-            await self._handle_run_identity_recompute(
+            await self._sync_run_identity_state(
                 board=board,
                 identity_id=event.identity_id,
                 flagged_event_id=flag.score_event_id,
             )
         elif board.board_type == BoardType.COUNTER:
-            await self._handle_counter_recompute(
+            await self._sync_counter_state(
                 board=board,
                 identity_id=event.identity_id,
             )
 
         # Trigger ratio recomputes if needed
         if board.board_type in (BoardType.RUN_IDENTITY, BoardType.COUNTER):
-            await self._trigger_ratio_recomputes(board.id, event.identity_id)
+            await self._sync_ratio_dependents(board.id, event.identity_id)
 
-    async def _handle_run_runs_exclusion(
+    async def _sync_run_runs_entry(
         self,
         board_id: BoardID,
         score_event_id: ScoreEventID,
@@ -191,7 +191,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
 
         await run_entry_service.repository.update(entry)
 
-    async def _handle_run_identity_recompute(
+    async def _sync_run_identity_state(
         self,
         board: Board,
         identity_id: IdentityID,
@@ -217,9 +217,9 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             return  # Flagged event is not the selected one, no recomputation needed
 
         # Recompute by finding the next eligible event
-        await self._recompute_run_identity_state(board, identity_id, state)
+        await self._recompute_run_identity(board, identity_id, state)
 
-    async def _recompute_run_identity_state(
+    async def _recompute_run_identity(
         self,
         board: Board,
         identity_id: IdentityID,
@@ -237,10 +237,13 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         """
         board_state_service = BoardStateService(self.session)
 
-        # Query to find eligible events (not flagged as CONFIRMED_CHEAT)
-        # Using a scalar subquery to find events with CONFIRMED_CHEAT flags
-        confirmed_cheat_subquery = select(ScoreFlagORM.score_event_id).where(
-            ScoreFlagORM.status == ScoreFlagStatus.CONFIRMED_CHEAT.value
+        # Correlated subquery - only checks flags for events being queried
+        # Uses NOT EXISTS for efficient early-exit evaluation
+        confirmed_cheat_exists = exists(
+            select(ScoreFlagORM.id).where(
+                ScoreFlagORM.score_event_id == ScoreEventORM.id,
+                ScoreFlagORM.status == ScoreFlagStatus.CONFIRMED_CHEAT.value,
+            )
         )
 
         # Build ordering based on keep_strategy
@@ -264,7 +267,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             .where(
                 ScoreEventORM.board_id == board.id.uuid,
                 ScoreEventORM.identity_id == identity_id.uuid,
-                ScoreEventORM.id.notin_(confirmed_cheat_subquery),
+                ~confirmed_cheat_exists,
             )
             .order_by(order_by)
             .limit(1)
@@ -297,7 +300,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
 
         await board_state_service.repository.update(existing_state)
 
-    async def _handle_counter_recompute(
+    async def _sync_counter_state(
         self,
         board: Board,
         identity_id: IdentityID,
@@ -313,12 +316,13 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         if state is None:
             return
 
-        # TODO: This looks like it loads ALL ScoreFlag objects from the table, which is
-        # horrendously inefficient given the potential size of this table. Update the overall
-        # query to join ScoreEvent and ScoreFlag instead?
-        # Subquery for CONFIRMED_CHEAT event IDs
-        confirmed_cheat_subquery = select(ScoreFlagORM.score_event_id).where(
-            ScoreFlagORM.status == ScoreFlagStatus.CONFIRMED_CHEAT.value
+        # Correlated subquery - only checks flags for events being queried
+        # Uses NOT EXISTS for efficient early-exit evaluation
+        confirmed_cheat_exists = exists(
+            select(ScoreFlagORM.id).where(
+                ScoreFlagORM.score_event_id == ScoreEventORM.id,
+                ScoreFlagORM.status == ScoreFlagStatus.CONFIRMED_CHEAT.value,
+            )
         )
 
         # Sum all deltas excluding confirmed cheats
@@ -328,7 +332,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         ).where(
             ScoreEventORM.board_id == board.id.uuid,
             ScoreEventORM.identity_id == identity_id.uuid,
-            ScoreEventORM.id.notin_(confirmed_cheat_subquery),
+            ~confirmed_cheat_exists,
         )
 
         result = await self.session.execute(sum_query)
@@ -350,7 +354,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
 
         await board_state_service.repository.update(state)
 
-    async def _trigger_ratio_recomputes(
+    async def _sync_ratio_dependents(
         self,
         board_id: BoardID,
         identity_id: IdentityID,
