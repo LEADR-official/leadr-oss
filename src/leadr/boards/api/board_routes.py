@@ -17,7 +17,7 @@ from leadr.boards.api.board_schemas import (
     BoardResponse,
     BoardUpdateRequest,
 )
-from leadr.boards.domain.board import BoardType
+from leadr.boards.domain.board import BoardType, KeepStrategy
 from leadr.boards.services.board_service import BoardService
 from leadr.boards.services.dependencies import BoardRatioConfigServiceDep, BoardServiceDep
 from leadr.common.api.hooks import PostCreateBoardHookDep, PreCreateBoardHookDep
@@ -93,6 +93,13 @@ async def create_board(
                 detail="Invalid denominator_board_id: board not found",
             )
 
+    # Resolve keep_strategy based on board_type
+    if request.board_type == BoardType.RUN_IDENTITY:
+        effective_keep_strategy = request.keep_strategy or KeepStrategy.BEST
+    else:
+        # Non-RUN_IDENTITY boards always use NA
+        effective_keep_strategy = KeepStrategy.NA
+
     await pre_create_hook(request, auth, background_tasks)
 
     try:
@@ -108,7 +115,7 @@ async def create_board(
             is_published=request.is_published,
             sort_direction=request.sort_direction,
             board_type=request.board_type,
-            keep_strategy=request.keep_strategy,
+            keep_strategy=effective_keep_strategy,
             created_from_template_id=request.created_from_template_id,
             template_name=request.template_name,
             starts_at=request.starts_at,

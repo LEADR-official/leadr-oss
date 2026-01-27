@@ -356,19 +356,17 @@ async def handle_list_scores(
     if is_test is not None:
         filters_dict["is_test"] = str(is_test)
 
-    # Convert items to response models with computed ranks
-    # Rank is 1-indexed position in the result set
+    # Convert items to response models using pre-computed ranks from repository
     if auth.auth_type == "admin":
         response_items: list[ScoreResponse] = []
-        for idx, item in enumerate(result.items):
-            rank = idx + 1  # 1-indexed rank
+        for item in result.items:
             if isinstance(item, BoardState):
                 response_items.append(
                     ScoreResponse.from_board_state(
                         state=item,
                         account_id=board.account_id,
                         game_id=board.game_id,
-                        rank=rank,
+                        rank=item.rank,
                     )
                 )
             else:
@@ -377,7 +375,7 @@ async def handle_list_scores(
                         entry=item,
                         account_id=board.account_id,
                         game_id=board.game_id,
-                        rank=rank,
+                        rank=item.rank,
                     )
                 )
         return _build_paginated_response_admin(
@@ -388,15 +386,14 @@ async def handle_list_scores(
         )
     else:
         client_response_items: list[ScoreClientResponse] = []
-        for idx, item in enumerate(result.items):
-            rank = idx + 1  # 1-indexed rank
+        for item in result.items:
             if isinstance(item, BoardState):
                 client_response_items.append(
                     ScoreClientResponse.from_board_state(
                         state=item,
                         account_id=board.account_id,
                         game_id=board.game_id,
-                        rank=rank,
+                        rank=item.rank,
                     )
                 )
             else:
@@ -405,7 +402,7 @@ async def handle_list_scores(
                         entry=item,
                         account_id=board.account_id,
                         game_id=board.game_id,
-                        rank=rank,
+                        rank=item.rank,
                     )
                 )
         return _build_paginated_response_client(

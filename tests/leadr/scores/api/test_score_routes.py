@@ -1658,3 +1658,205 @@ class TestScoreRoutesClient:
         assert len(data2["data"]) == 3
         # Should have prev_cursor now
         assert data2["pagination"]["prev_cursor"] is not None
+
+    async def test_list_scores_around_score_id_returns_absolute_ranks(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """GET /scores with around_score_id returns correct absolute ranks.
+
+        When querying around a score at rank 6 with 10 scores total,
+        the response should show ranks [4, 5, 6, 7, 8] not [1, 2, 3, 4, 5].
+        """
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Account", slug="test-abs-rank")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Leaderboard",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        state_service = BoardStateService(db_session)
+
+        # Create 10 scores with values 100-1000 (ranks 10 to 1 in DESC order)
+        states = []
+        for i in range(10):
+            identity, _ = await identity_service.get_or_create_identity(
+                account_id=account.id,
+                game_id=game.id,
+                kind=IdentityKind.DEVICE,
+                external_key=f"dev_absrank_{i}",
+                display_name=f"Player{i}",
+            )
+            state = await state_service.create_board_state(
+                board_id=board.id,
+                identity_id=identity.id,
+                primary_value=float((i + 1) * 100),
+                player_name=f"Player{i}",
+            )
+            states.append(state)
+
+        # Target: value 500 = rank 6 (in DESC order: 1000=1, 900=2, ... 500=6)
+        target_state = states[4]  # 500 points
+        score_id = f"scr_{target_state.id.uuid}"
+
+        response = await client.get(
+            f"/scores?board_id={board.id}&around_score_id={score_id}&limit=5",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 5
+
+        # Check ranks are absolute (not relative)
+        # Expected: ranks [4, 5, 6, 7, 8] for values [700, 600, 500, 400, 300]
+        ranks = [score["rank"] for score in data["data"]]
+        assert ranks == [4, 5, 6, 7, 8], f"Expected absolute ranks [4, 5, 6, 7, 8], got {ranks}"
+
+        # Also verify values are correct (client response uses "value" not "primary_value")
+        values = [score["value"] for score in data["data"]]
+        assert values == [700.0, 600.0, 500.0, 400.0, 300.0]
+
+    async def test_list_scores_around_score_value_returns_absolute_ranks(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """GET /scores with around_score_value returns correct absolute ranks.
+
+        When querying around a hypothetical value with placeholder,
+        all items should have correct absolute ranks.
+        """
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Account", slug="test-val-rank")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Leaderboard",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        state_service = BoardStateService(db_session)
+
+        # Create 7 scores with values 100-700 (ranks 7 to 1 in DESC order)
+        for i in range(7):
+            identity, _ = await identity_service.get_or_create_identity(
+                account_id=account.id,
+                game_id=game.id,
+                kind=IdentityKind.DEVICE,
+                external_key=f"dev_valrank_{i}",
+                display_name=f"Player{i}",
+            )
+            await state_service.create_board_state(
+                board_id=board.id,
+                identity_id=identity.id,
+                primary_value=float((i + 1) * 100),
+                player_name=f"Player{i}",
+            )
+
+        # Query around value 450 (between 400 and 500, hypothetical rank 4)
+        response = await client.get(
+            f"/scores?board_id={board.id}&around_score_value=450&limit=5",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 5
+
+        # Expected: values [600, 500, 450 (placeholder), 400, 300]
+        # Ranks should be [2, 3, 4, 5, 6] (absolute ranks)
+        values = [score["value"] for score in data["data"]]
+        assert values == [600.0, 500.0, 450.0, 400.0, 300.0]
+
+        ranks = [score["rank"] for score in data["data"]]
+        assert ranks == [2, 3, 4, 5, 6], f"Expected absolute ranks [2, 3, 4, 5, 6], got {ranks}"
+
+        # Verify placeholder is marked
+        assert data["data"][2]["is_placeholder"] is True
+
+    async def test_list_scores_standard_pagination_returns_absolute_ranks(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Standard list_scores pagination returns correct absolute ranks.
+
+        When querying page 2 (offset 5), ranks should be [6, 7, 8, ...] not [1, 2, 3, ...].
+        """
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Account", slug="test-std-rank")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Leaderboard",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        state_service = BoardStateService(db_session)
+
+        # Create 10 scores with values 100-1000
+        for i in range(10):
+            identity, _ = await identity_service.get_or_create_identity(
+                account_id=account.id,
+                game_id=game.id,
+                kind=IdentityKind.DEVICE,
+                external_key=f"dev_stdrank_{i}",
+                display_name=f"Player{i}",
+            )
+            await state_service.create_board_state(
+                board_id=board.id,
+                identity_id=identity.id,
+                primary_value=float((i + 1) * 100),
+                player_name=f"Player{i}",
+            )
+
+        # Get first page to obtain cursor
+        response1 = await client.get(
+            f"/scores?board_id={board.id}&limit=5",
+            headers={"leadr-api-key": test_api_key},
+        )
+        assert response1.status_code == 200
+        data1 = response1.json()
+
+        # First page should have ranks [1, 2, 3, 4, 5]
+        ranks1 = [score["rank"] for score in data1["data"]]
+        assert ranks1 == [1, 2, 3, 4, 5], (
+            f"First page: expected ranks [1, 2, 3, 4, 5], got {ranks1}"
+        )
+
+        # Get second page using cursor
+        next_cursor = data1["pagination"]["next_cursor"]
+        response2 = await client.get(
+            f"/scores?board_id={board.id}&limit=5&cursor={next_cursor}",
+            headers={"leadr-api-key": test_api_key},
+        )
+        assert response2.status_code == 200
+        data2 = response2.json()
+
+        # Second page should have ranks [6, 7, 8, 9, 10]
+        ranks2 = [score["rank"] for score in data2["data"]]
+        assert ranks2 == [6, 7, 8, 9, 10], (
+            f"Second page: expected ranks [6, 7, 8, 9, 10], got {ranks2}"
+        )

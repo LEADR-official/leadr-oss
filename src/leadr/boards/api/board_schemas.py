@@ -119,9 +119,10 @@ class BoardCreateRequest(BaseModel):
         default=BoardType.RUN_IDENTITY,
         description="Type of board determining score behavior",
     )
-    keep_strategy: KeepStrategy = Field(
-        default=KeepStrategy.BEST,
-        description="Strategy for keeping scores (RUN_IDENTITY boards only)",
+    keep_strategy: KeepStrategy | None = Field(
+        default=None,
+        description="Strategy for keeping scores (RUN_IDENTITY boards only). "
+        "Defaults to BEST for RUN_IDENTITY, ignored for other board types.",
     )
     created_from_template_id: BoardTemplateID | None = Field(
         default=None, description="Optional template ID this board was created from"

@@ -486,12 +486,20 @@ class BoardStateRepository(BaseRepository[BoardState, BoardStateORM]):
                 cursor.validate_state(pagination.sort_spec, filters_dict)
 
         # Execute paginated query
-        return await self._execute_paginated_query(
+        result = await self._execute_paginated_query(
             query=query,
             sort_fields=pagination.sort_spec,
             cursor=cursor,
             limit=pagination.limit,
         )
+
+        # Compute ranks for returned items
+        if result.items:
+            first_rank = await self.get_rank(result.items[0], pagination.sort_spec)
+            for i, item in enumerate(result.items):
+                item.rank = first_rank + i
+
+        return result
 
     async def get_rank(
         self,
@@ -746,10 +754,27 @@ class BoardStateRepository(BaseRepository[BoardState, BoardStateORM]):
         # Reverse above results (they were fetched closest-first, need best-first)
         above_orms.reverse()
 
-        # Build results: above items + target + below items
-        items: list[BoardState] = [self._to_domain(orm) for orm in above_orms]
+        # Compute target's absolute rank
+        target_rank = await self.get_rank(target_state, sort_fields)
+
+        # Build results: above items + target + below items with computed ranks
+        items: list[BoardState] = []
+
+        # Add above items with ranks (counting backwards from target)
+        for i, orm in enumerate(above_orms):
+            state = self._to_domain(orm)
+            state.rank = target_rank - (actual_above_count - i)
+            items.append(state)
+
+        # Add target with its rank
+        target_state.rank = target_rank
         items.append(target_state)
-        items.extend(self._to_domain(orm) for orm in below_orms)
+
+        # Add below items with ranks (counting forwards from target)
+        for i, orm in enumerate(below_orms):
+            state = self._to_domain(orm)
+            state.rank = target_rank + i + 1
+            items.append(state)
 
         return PaginatedResult(
             items=items,
@@ -1125,12 +1150,20 @@ class RunEntryRepository(BaseRepository[RunEntry, RunEntryORM]):
                 cursor.validate_state(pagination.sort_spec, filters_dict)
 
         # Execute paginated query
-        return await self._execute_paginated_query(
+        result = await self._execute_paginated_query(
             query=query,
             sort_fields=pagination.sort_spec,
             cursor=cursor,
             limit=pagination.limit,
         )
+
+        # Compute ranks for returned items
+        if result.items:
+            first_rank = await self.get_rank(result.items[0], pagination.sort_spec)
+            for i, item in enumerate(result.items):
+                item.rank = first_rank + i
+
+        return result
 
     async def get_rank(
         self,
@@ -1383,10 +1416,27 @@ class RunEntryRepository(BaseRepository[RunEntry, RunEntryORM]):
         # Reverse above results (they were fetched closest-first, need best-first)
         above_orms.reverse()
 
-        # Build results: above items + target + below items
-        items: list[RunEntry] = [self._to_domain(orm) for orm in above_orms]
+        # Compute target's absolute rank
+        target_rank = await self.get_rank(target_entry, sort_fields)
+
+        # Build results: above items + target + below items with computed ranks
+        items: list[RunEntry] = []
+
+        # Add above items with ranks (counting backwards from target)
+        for i, orm in enumerate(above_orms):
+            entry = self._to_domain(orm)
+            entry.rank = target_rank - (actual_above_count - i)
+            items.append(entry)
+
+        # Add target with its rank
+        target_entry.rank = target_rank
         items.append(target_entry)
-        items.extend(self._to_domain(orm) for orm in below_orms)
+
+        # Add below items with ranks (counting forwards from target)
+        for i, orm in enumerate(below_orms):
+            entry = self._to_domain(orm)
+            entry.rank = target_rank + i + 1
+            items.append(entry)
 
         return PaginatedResult(
             items=items,
