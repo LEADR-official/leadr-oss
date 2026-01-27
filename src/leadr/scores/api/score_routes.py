@@ -113,6 +113,7 @@ async def create_score_client(
             country=country,
             city=city,
             is_test=auth.test_mode,
+            background_tasks=background_tasks,
         )
     except IntegrityError:
         raise HTTPException(

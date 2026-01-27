@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import AdminAuthContextDep
@@ -23,6 +23,7 @@ async def create_score_event(
     auth: AdminAuthContextDep,
     score_service: ScoreServiceDep,
     board_service: BoardServiceDep,
+    background_tasks: BackgroundTasks,
 ) -> ScoreEventResponse:
     """Create a score event (Admin API).
 
@@ -74,6 +75,7 @@ async def create_score_event(
             country=request.country,
             city=request.city,
             is_test=request.is_test,
+            background_tasks=background_tasks,
         )
     except IntegrityError:
         raise HTTPException(
