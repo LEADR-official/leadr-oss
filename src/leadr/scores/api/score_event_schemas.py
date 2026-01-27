@@ -1,4 +1,4 @@
-"""API response models for score events."""
+"""API request and response models for score events."""
 
 from datetime import datetime
 from typing import Any
@@ -7,6 +7,25 @@ from pydantic import BaseModel, Field
 
 from leadr.common.domain.ids import AccountID, BoardID, GameID, IdentityID, ScoreEventID
 from leadr.scores.domain.score_event import ScoreEvent
+
+
+class ScoreEventCreateRequest(BaseModel):
+    """Request model for creating a score event (admin only).
+
+    Creates a score event using the same processing as client submissions:
+    - Runs anti-cheat checks
+    - Updates rankings (BoardState/RunEntry)
+    - Validates board type and payload
+    """
+
+    board_id: BoardID = Field(description="Board to submit to")
+    identity_id: IdentityID = Field(description="Identity submitting the score")
+    value: float = Field(description="Score value (or delta for COUNTER boards)")
+    player_name: str | None = Field(default=None, description="Optional display name")
+    is_test: bool = Field(default=False, description="Whether this is a test event")
+    timezone: str | None = Field(default=None, description="Optional timezone")
+    country: str | None = Field(default=None, description="Optional country code")
+    city: str | None = Field(default=None, description="Optional city name")
 
 
 class ScoreEventResponse(BaseModel):

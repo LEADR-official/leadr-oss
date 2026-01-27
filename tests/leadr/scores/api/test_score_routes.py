@@ -154,9 +154,72 @@ class TestScoreRoutesAdmin:
         self, client: AsyncClient, db_session, test_api_key
     ):
         """Test that accessing a score from another account is forbidden for non-superadmins."""
-        # Note: test_api_key creates a superadmin, so this test verifies the check exists
-        # A more thorough test would need a non-superadmin API key
-        # Superadmin can access all accounts, so skip this test
+        from leadr.auth.services.dependencies import get_api_key_service
+
+        # Create Account 1 (where the score will live)
+        account_service = AccountService(db_session)
+        account1 = await account_service.create_account(name="Account 1", slug="acc1-forbidden")
+
+        game_service = GameService(db_session)
+        game1 = await game_service.create_game(account_id=account1.id, name="Game 1")
+
+        board_service = BoardService(db_session)
+        board1 = await board_service.create_board(
+            account_id=account1.id,
+            game_id=game1.id,
+            name="Board 1",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity1, _ = await identity_service.get_or_create_identity(
+            account_id=account1.id,
+            game_id=game1.id,
+            kind=IdentityKind.DEVICE,
+            external_key="acc1_player",
+            display_name="Player1",
+        )
+
+        state_service = BoardStateService(db_session)
+        state = await state_service.create_board_state(
+            board_id=board1.id,
+            identity_id=identity1.id,
+            primary_value=500.0,
+            player_name="Player1",
+        )
+
+        # Create Account 2 with a non-superadmin user
+        account2 = await account_service.create_account(name="Account 2", slug="acc2-forbidden")
+
+        from leadr.accounts.services.dependencies import get_user_service
+
+        user_service = await get_user_service(db_session)
+        user2 = await user_service.create_user(
+            account_id=account2.id,
+            email="nonsuperadmin@example.com",
+            display_name="Non-Admin",
+            super_admin=False,  # NOT a superadmin
+        )
+
+        api_key_service = await get_api_key_service(db_session)
+        _, plain_key = await api_key_service.create_api_key(
+            account_id=account2.id,
+            user_id=user2.id,
+            name="Non-Admin Key",
+            expires_at=None,
+        )
+
+        # Try to access Account 1's score with Account 2's non-superadmin API key
+        score_id = f"scr_{state.id.uuid}"
+        response = await client.get(
+            f"/scores/{score_id}",
+            headers={"leadr-api-key": plain_key},
+        )
+
+        assert response.status_code == 403
+        assert "access" in response.json()["error"].lower()
 
     async def test_list_scores_requires_board_id(
         self, client: AsyncClient, db_session, test_api_key
@@ -298,39 +361,43 @@ class TestScoreRoutesAdmin:
             keep_strategy=KeepStrategy.BEST,
         )
 
-        # First request to get a cursor
+        # Create multiple scores to ensure we get a cursor
         identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_cursor_test",
-            display_name="CursorTest",
-        )
-
         state_service = BoardStateService(db_session)
-        state = await state_service.create_board_state(
-            board_id=board.id,
-            identity_id=identity.id,
-            primary_value=100.0,
-            player_name="CursorTest",
-        )
 
-        # Get initial response with cursor
+        states = []
+        for i in range(5):
+            identity, _ = await identity_service.get_or_create_identity(
+                account_id=account.id,
+                game_id=game.id,
+                kind=IdentityKind.DEVICE,
+                external_key=f"dev_cursor_mutual_{i}",
+                display_name=f"CursorPlayer{i}",
+            )
+            state = await state_service.create_board_state(
+                board_id=board.id,
+                identity_id=identity.id,
+                primary_value=float(i * 100),
+                player_name=f"CursorPlayer{i}",
+            )
+            states.append(state)
+
+        # Get initial response with limit=2 to get a cursor (5 items, limit 2 = has next)
         initial_response = await client.get(
-            f"/scores?board_id={board.id}&limit=1",
+            f"/scores?board_id={board.id}&limit=2&is_test=all",
             headers={"leadr-api-key": test_api_key},
         )
         cursor = initial_response.json()["pagination"].get("next_cursor")
+        assert cursor is not None, "Expected a cursor with 5 scores and limit=2"
 
-        if cursor:
-            score_id = f"scr_{state.id.uuid}"
-            response = await client.get(
-                f"/scores?board_id={board.id}&around_score_id={score_id}&cursor={cursor}",
-                headers={"leadr-api-key": test_api_key},
-            )
-            assert response.status_code == 400
-            assert "cursor" in response.json()["error"].lower()
+        # Now try to use cursor AND around_score_id together - should fail
+        score_id = f"scr_{states[2].id.uuid}"
+        response = await client.get(
+            f"/scores?board_id={board.id}&around_score_id={score_id}&cursor={cursor}",
+            headers={"leadr-api-key": test_api_key},
+        )
+        assert response.status_code == 400
+        assert "cursor" in response.json()["error"].lower()
 
     async def test_list_scores_around_score_id_requires_board_id(
         self, client: AsyncClient, db_session, test_api_key
@@ -403,6 +470,61 @@ class TestScoreRoutesAdmin:
             headers={"leadr-api-key": test_api_key},
         )
         assert response.status_code == 400
+
+    async def test_list_scores_around_score_value_and_cursor_mutually_exclusive(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that around_score_value and cursor cannot be used together."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Account", slug="test-val-cur")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Leaderboard",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        # Create multiple scores to ensure we get a cursor
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        state_service = BoardStateService(db_session)
+
+        for i in range(5):
+            identity, _ = await identity_service.get_or_create_identity(
+                account_id=account.id,
+                game_id=game.id,
+                kind=IdentityKind.DEVICE,
+                external_key=f"dev_val_cursor_{i}",
+                display_name=f"ValPlayer{i}",
+            )
+            await state_service.create_board_state(
+                board_id=board.id,
+                identity_id=identity.id,
+                primary_value=float(i * 100),
+                player_name=f"ValPlayer{i}",
+            )
+
+        # Get initial response with limit=2 to get a cursor
+        initial_response = await client.get(
+            f"/scores?board_id={board.id}&limit=2&is_test=all",
+            headers={"leadr-api-key": test_api_key},
+        )
+        cursor = initial_response.json()["pagination"].get("next_cursor")
+        assert cursor is not None, "Expected a cursor with 5 scores and limit=2"
+
+        # Now try to use cursor AND around_score_value together - should fail
+        response = await client.get(
+            f"/scores?board_id={board.id}&around_score_value=150&cursor={cursor}",
+            headers={"leadr-api-key": test_api_key},
+        )
+        assert response.status_code == 400
+        assert "cursor" in response.json()["error"].lower()
 
     async def test_list_scores_around_value_and_id_mutually_exclusive(
         self, client: AsyncClient, db_session, test_api_key
@@ -1048,3 +1170,496 @@ class TestScoreRoutesClient:
         assert response.status_code == 200
         data = response.json()
         assert len(data["data"]) == 1
+
+    async def test_list_scores_client_with_identity_filter(self, client: AsyncClient, db_session):
+        """Test listing client scores filtered by identity_id."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Account", slug="test-ident-f")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="High Scores",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        # Start session via API
+        session_response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": str(game.id),
+                "client_fingerprint": hashlib.sha256(str(uuid4()).encode()).hexdigest(),
+                "platform": "ios",
+            },
+        )
+        assert session_response.status_code == 201
+        session_data = session_response.json()
+        access_token = session_data["access_token"]
+
+        # Get the identity from the session
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity = await identity_service.get_identity(IdentityID(session_data["identity_id"]))
+        assert identity is not None
+
+        # Create another identity with a different score
+        other_identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="other_player",
+            display_name="OtherPlayer",
+        )
+
+        state_service = BoardStateService(db_session)
+        # Create score for our identity
+        await state_service.create_board_state(
+            board_id=board.id,
+            identity_id=identity.id,
+            primary_value=500.0,
+            player_name="TestPlayer",
+        )
+        # Create score for other identity
+        await state_service.create_board_state(
+            board_id=board.id,
+            identity_id=other_identity.id,
+            primary_value=300.0,
+            player_name="OtherPlayer",
+        )
+
+        # Filter by our identity_id - should only return our score
+        response = await client.get(
+            f"/client/scores?board_id={board.id}&identity_id={identity.id}",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        assert data["data"][0]["player_name"] == "TestPlayer"
+
+    async def test_list_scores_client_run_runs_board(self, client: AsyncClient, db_session):
+        """Test listing client scores from a RUN_RUNS board returns RunEntry data."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Account", slug="test-runs-cl")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speedruns",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        # Start session via API
+        session_response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": str(game.id),
+                "client_fingerprint": hashlib.sha256(str(uuid4()).encode()).hexdigest(),
+                "platform": "android",
+            },
+        )
+        assert session_response.status_code == 201
+        session_data = session_response.json()
+        access_token = session_data["access_token"]
+
+        # Get identity from session
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity = await identity_service.get_identity(IdentityID(session_data["identity_id"]))
+        assert identity is not None
+
+        # Create run entries
+        event_service = ScoreEventService(db_session)
+        run_entry_service = RunEntryService(db_session)
+
+        for i in range(3):
+            event = await event_service.create_score_event(
+                account_id=account.id,
+                game_id=game.id,
+                board_id=board.id,
+                identity_id=identity.id,
+                event_payload={"value": float(100 + i * 10)},
+            )
+            await run_entry_service.create_run_entry(
+                board_id=board.id,
+                identity_id=identity.id,
+                score_event_id=event.id,
+                primary_value=float(100 + i * 10),
+                player_name="Speedrunner",
+            )
+
+        response = await client.get(
+            f"/client/scores?board_id={board.id}",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 3
+
+    async def test_get_score_client_run_entry(self, client: AsyncClient, db_session):
+        """Test getting a RunEntry score via client API."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Account", slug="test-re-cl")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speedruns",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        # Start session via API
+        session_response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": str(game.id),
+                "client_fingerprint": hashlib.sha256(str(uuid4()).encode()).hexdigest(),
+                "platform": "ios",
+            },
+        )
+        assert session_response.status_code == 201
+        session_data = session_response.json()
+        access_token = session_data["access_token"]
+
+        # Get identity from session
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity = await identity_service.get_identity(IdentityID(session_data["identity_id"]))
+        assert identity is not None
+
+        # Create score event and run entry
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 120.5},
+        )
+
+        run_entry_service = RunEntryService(db_session)
+        entry = await run_entry_service.create_run_entry(
+            board_id=board.id,
+            identity_id=identity.id,
+            score_event_id=event.id,
+            primary_value=120.5,
+            player_name="Speedrunner",
+        )
+
+        # Get the score
+        score_id = f"scr_{entry.id.uuid}"
+        response = await client.get(
+            f"/client/scores/{score_id}",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["value"] == 120.5
+
+    async def test_list_scores_client_with_pagination(self, client: AsyncClient, db_session):
+        """Test that client list_scores returns proper pagination metadata."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Account", slug="test-pag-cl")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="High Scores",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        # Start session via API
+        session_response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": str(game.id),
+                "client_fingerprint": hashlib.sha256(str(uuid4()).encode()).hexdigest(),
+                "platform": "ios",
+            },
+        )
+        assert session_response.status_code == 201
+        access_token = session_response.json()["access_token"]
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        state_service = BoardStateService(db_session)
+
+        # Create 10 scores
+        for i in range(10):
+            identity, _ = await identity_service.get_or_create_identity(
+                account_id=account.id,
+                game_id=game.id,
+                kind=IdentityKind.DEVICE,
+                external_key=f"dev_pag_client_{i}",
+                display_name=f"Player{i}",
+            )
+            await state_service.create_board_state(
+                board_id=board.id,
+                identity_id=identity.id,
+                primary_value=float(i * 100),
+                player_name=f"Player{i}",
+            )
+
+        # Request first page with small limit - this exercises client pagination path
+        response = await client.get(
+            f"/client/scores?board_id={board.id}&limit=3",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 3
+        assert data["pagination"]["has_next"] is True
+        # Client endpoint builds cursor with next_position which exercises cursor building code
+        assert data["pagination"]["next_cursor"] is not None
+
+    async def test_create_score_anti_cheat_reject(self, client: AsyncClient, db_session):
+        """Test that anti-cheat REJECT returns 429."""
+        from unittest.mock import patch
+
+        from leadr.scores.domain.anti_cheat.enums import FlagAction
+
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Account", slug="test-reject")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="High Scores",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        # Start session via API
+        session_response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": str(game.id),
+                "client_fingerprint": hashlib.sha256(str(uuid4()).encode()).hexdigest(),
+                "platform": "ios",
+            },
+        )
+        assert session_response.status_code == 201
+        access_token = session_response.json()["access_token"]
+
+        # Generate nonce
+        nonce_response = await client.get(
+            "/client/nonce",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        nonce_value = nonce_response.json()["nonce_value"]
+
+        # Mock the anti-cheat to return REJECT
+        class MockAntiCheatResult:
+            action = FlagAction.REJECT
+            reason = "Rate limit exceeded"
+            flags = []
+
+        async def mock_submit_score(*args, **kwargs):
+            # Return a tuple that matches (event, ranking_entry, anti_cheat_result)
+            return (None, None, MockAntiCheatResult())
+
+        with patch.object(
+            db_session, "_score_service_submit_score", mock_submit_score, create=True
+        ):
+            # Actually patch the service method
+            from leadr.scores.services.score_service import ScoreService
+
+            with patch.object(ScoreService, "submit_score", mock_submit_score):
+                response = await client.post(
+                    "/client/scores",
+                    json={
+                        "board_id": str(board.id),
+                        "value": 1000.0,
+                        "player_name": "TestPlayer",
+                    },
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "leadr-client-nonce": nonce_value,
+                    },
+                )
+
+        assert response.status_code == 429
+        assert "Rate limit" in response.json()["error"]
+
+    async def test_list_scores_admin_invalid_cursor(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test list scores with invalid cursor returns 400."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Account", slug="test-bad-cur")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Leaderboard",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        response = await client.get(
+            f"/scores?board_id={board.id}&cursor=invalid_cursor_value",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 400
+
+    async def test_list_scores_admin_with_identity_filter(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test listing admin scores filtered by identity_id."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Account", slug="test-ident-a")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Leaderboard",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        state_service = BoardStateService(db_session)
+
+        # Create two identities with scores
+        identity1, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="identity_a",
+            display_name="PlayerA",
+        )
+        identity2, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="identity_b",
+            display_name="PlayerB",
+        )
+
+        await state_service.create_board_state(
+            board_id=board.id,
+            identity_id=identity1.id,
+            primary_value=500.0,
+            player_name="PlayerA",
+        )
+        await state_service.create_board_state(
+            board_id=board.id,
+            identity_id=identity2.id,
+            primary_value=300.0,
+            player_name="PlayerB",
+        )
+
+        # Filter by identity1 - should only return their score
+        response = await client.get(
+            f"/scores?board_id={board.id}&identity_id={identity1.id}&is_test=all",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        assert data["data"][0]["player_name"] == "PlayerA"
+
+    async def test_list_scores_admin_with_pagination_cursors(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that admin list_scores returns proper pagination cursors."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Account", slug="test-pag-adm")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="High Scores",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        state_service = BoardStateService(db_session)
+
+        # Create 10 scores
+        for i in range(10):
+            identity, _ = await identity_service.get_or_create_identity(
+                account_id=account.id,
+                game_id=game.id,
+                kind=IdentityKind.DEVICE,
+                external_key=f"dev_pag_admin_{i}",
+                display_name=f"Player{i}",
+            )
+            await state_service.create_board_state(
+                board_id=board.id,
+                identity_id=identity.id,
+                primary_value=float(i * 100),
+                player_name=f"Player{i}",
+            )
+
+        # Request first page with small limit
+        response = await client.get(
+            f"/scores?board_id={board.id}&limit=3&is_test=all",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 3
+        assert data["pagination"]["has_next"] is True
+        assert data["pagination"]["next_cursor"] is not None
+
+        # Use next_cursor to get next page
+        next_cursor = data["pagination"]["next_cursor"]
+        response2 = await client.get(
+            f"/scores?board_id={board.id}&limit=3&cursor={next_cursor}&is_test=all",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response2.status_code == 200
+        data2 = response2.json()
+        assert len(data2["data"]) == 3
+        # Should have prev_cursor now
+        assert data2["pagination"]["prev_cursor"] is not None

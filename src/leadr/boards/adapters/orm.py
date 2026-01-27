@@ -426,6 +426,12 @@ class RunEntryORM(Base):
         "entry_metadata", JSONB, nullable=True, default=None
     )
 
+    # Exclusion fields (set when entry is excluded from ranking by anti-cheat moderation)
+    excluded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    excluded_reason: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+
     # Relationships
     board: Mapped["BoardORM"] = relationship("BoardORM")  # type: ignore[name-defined]
     identity: Mapped["IdentityORM"] = relationship("IdentityORM")  # type: ignore[name-defined]

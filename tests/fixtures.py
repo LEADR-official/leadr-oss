@@ -26,8 +26,13 @@ from leadr.auth.adapters.orm import (
     NonceORM,
     NonceStatusEnum,
 )
-from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM
-from leadr.boards.domain.board import KeepStrategy, SortDirection
+from leadr.boards.adapters.orm import (
+    BoardORM,
+    BoardTemplateORM,
+    BoardTypeEnum,
+    KeepStrategyEnum,
+)
+from leadr.boards.domain.board import SortDirection
 from leadr.games.adapters.orm import GameORM
 from leadr.scores.adapters.orm import (
     ScoreEventORM,
@@ -150,8 +155,9 @@ async def board_orm(
         short_code="TEST01",
         unit="points",
         is_active=True,
-        sort_direction=SortDirection.DESCENDING.value,  # Use enum value (string)
-        keep_strategy=KeepStrategy.BEST.value,  # Use enum value (string)
+        sort_direction=SortDirection.DESCENDING.value,  # Use string value for sort_direction
+        board_type=BoardTypeEnum.RUN_IDENTITY,  # Use ORM enum
+        keep_strategy=KeepStrategyEnum.BEST,  # Use ORM enum
         created_from_template_id=None,
         tags=[],
     )

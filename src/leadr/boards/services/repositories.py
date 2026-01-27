@@ -1005,6 +1005,8 @@ class RunEntryRepository(BaseRepository[RunEntry, RunEntryORM]):
             city=orm.city,
             value_display=orm.value_display,
             metadata=orm.entry_metadata,
+            excluded_at=orm.excluded_at,
+            excluded_reason=orm.excluded_reason,
             created_at=orm.created_at,
             updated_at=orm.updated_at,
             deleted_at=orm.deleted_at,
@@ -1025,6 +1027,8 @@ class RunEntryRepository(BaseRepository[RunEntry, RunEntryORM]):
             city=entity.city,
             value_display=entity.value_display,
             entry_metadata=entity.metadata,
+            excluded_at=entity.excluded_at,
+            excluded_reason=entity.excluded_reason,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,
@@ -1083,7 +1087,10 @@ class RunEntryRepository(BaseRepository[RunEntry, RunEntryORM]):
             ValueError: If sort field is not in SORTABLE_FIELDS.
             CursorValidationError: If cursor is invalid or state doesn't match.
         """
-        query = select(RunEntryORM).where(RunEntryORM.deleted_at.is_(None))
+        query = select(RunEntryORM).where(
+            RunEntryORM.deleted_at.is_(None),
+            RunEntryORM.excluded_at.is_(None),  # Exclude entries marked as excluded
+        )
 
         # Build filters dict for cursor validation
         filters_dict: dict[str, str] = {}
@@ -1151,11 +1158,12 @@ class RunEntryRepository(BaseRepository[RunEntry, RunEntryORM]):
             before_target=True,  # Entries that come BEFORE target = better ranked
         )
 
-        # Count entries that rank better (within same board, not deleted)
+        # Count entries that rank better (within same board, not deleted, not excluded)
         count_query = (
             select(func.count())
             .select_from(RunEntryORM)
             .where(RunEntryORM.deleted_at.is_(None))
+            .where(RunEntryORM.excluded_at.is_(None))
             .where(RunEntryORM.board_id == entry.board_id.uuid)
             .where(RunEntryORM.is_test == entry.is_test)
             .where(better_condition)
@@ -1322,6 +1330,7 @@ class RunEntryRepository(BaseRepository[RunEntry, RunEntryORM]):
         # Build base query
         base_query = select(RunEntryORM).where(
             RunEntryORM.deleted_at.is_(None),
+            RunEntryORM.excluded_at.is_(None),  # Exclude entries marked as excluded
             RunEntryORM.board_id == board_id.uuid,
         )
         if is_test is not None:
@@ -1443,6 +1452,7 @@ class RunEntryRepository(BaseRepository[RunEntry, RunEntryORM]):
         # Build base query
         base_query = select(RunEntryORM).where(
             RunEntryORM.deleted_at.is_(None),
+            RunEntryORM.excluded_at.is_(None),  # Exclude entries marked as excluded
             RunEntryORM.board_id == board_id.uuid,
         )
         if is_test is not None:
@@ -1561,6 +1571,7 @@ class RunEntryRepository(BaseRepository[RunEntry, RunEntryORM]):
             select(func.count())
             .select_from(RunEntryORM)
             .where(RunEntryORM.deleted_at.is_(None))
+            .where(RunEntryORM.excluded_at.is_(None))
             .where(RunEntryORM.board_id == board_id.uuid)
             .where(better_condition)
         )

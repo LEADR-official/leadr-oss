@@ -16,7 +16,6 @@ from leadr.boards.domain.board_ratio_config import (
 from leadr.games.adapters.orm import GameORM
 
 
-@pytest.mark.asyncio
 class TestBoardRatioConfigORM:
     """Test cases for BoardRatioConfigORM model."""
 
@@ -24,6 +23,7 @@ class TestBoardRatioConfigORM:
         """ORM model has correct table name."""
         assert BoardRatioConfigORM.__tablename__ == "board_ratio_configs"
 
+    @pytest.mark.asyncio
     async def test_create_board_ratio_config_with_all_fields(self, db_session) -> None:
         """BoardRatioConfigORM can be created with all fields."""
         # Create required parent entities
@@ -119,6 +119,7 @@ class TestBoardRatioConfigORM:
         assert saved_config.created_at is not None
         assert saved_config.updated_at is not None
 
+    @pytest.mark.asyncio
     async def test_board_ratio_config_cascade_delete_with_board(self, db_session) -> None:
         """BoardRatioConfigORM is deleted when ratio board is deleted."""
         # Create required parent entities
@@ -191,6 +192,7 @@ class TestBoardRatioConfigORM:
         )
         assert result.scalar_one_or_none() is None
 
+    @pytest.mark.asyncio
     async def test_board_ratio_config_unique_constraint_board_id(self, db_session) -> None:
         """Only one ratio config per board is allowed."""
         # Create required parent entities

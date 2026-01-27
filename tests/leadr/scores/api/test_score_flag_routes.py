@@ -898,3 +898,324 @@ class TestScoreFlagRoutes:
         flag_types = {f["flag_type"] for f in data["data"]}
         assert "velocity" in flag_types
         assert "duplicate" in flag_types
+
+    async def test_list_flags_filter_by_game(self, client: AsyncClient, db_session, test_api_key):
+        """Test filtering flags by game_id via API."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game1 = await game_service.create_game(
+            account_id=account.id,
+            name="Game 1",
+        )
+        game2 = await game_service.create_game(
+            account_id=account.id,
+            name="Game 2",
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity1, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game1.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_device_game1",
+            display_name="TestPlayer",
+        )
+        identity2, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game2.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_device_game2",
+            display_name="TestPlayer2",
+        )
+
+        board_service = BoardService(db_session)
+        board1 = await board_service.create_board(
+            account_id=account.id,
+            game_id=game1.id,
+            name="Board 1",
+            icon="trophy",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+        board2 = await board_service.create_board(
+            account_id=account.id,
+            game_id=game2.id,
+            name="Board 2",
+            icon="star",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        # Create score events for both games
+        event_service = ScoreEventService(db_session)
+        event1 = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game1.id,
+            board_id=board1.id,
+            identity_id=identity1.id,
+            event_payload={"value": 100.0},
+        )
+        event2 = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game2.id,
+            board_id=board2.id,
+            identity_id=identity2.id,
+            event_payload={"value": 200.0},
+        )
+
+        # Create flags for both score events
+        flag_repo = ScoreFlagRepository(db_session)
+        flag1 = ScoreFlag(
+            score_event_id=event1.id,
+            flag_type=FlagType.VELOCITY,
+            confidence=FlagConfidence.MEDIUM,
+            metadata={"game": "game1"},
+            status=ScoreFlagStatus.PENDING,
+        )
+        flag2 = ScoreFlag(
+            score_event_id=event2.id,
+            flag_type=FlagType.DUPLICATE,
+            confidence=FlagConfidence.HIGH,
+            metadata={"game": "game2"},
+            status=ScoreFlagStatus.PENDING,
+        )
+        await flag_repo.create(flag1)
+        await flag_repo.create(flag2)
+
+        # Filter by game1
+        response = await client.get(
+            f"/score-flags?account_id={account.id}&game_id={game1.id}",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        assert data["data"][0]["flag_type"] == "velocity"
+
+    async def test_list_flags_invalid_cursor(self, client: AsyncClient, db_session, test_api_key):
+        """Test listing flags with invalid cursor returns 400."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        response = await client.get(
+            f"/score-flags?account_id={account.id}&cursor=invalid_cursor_here",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 400
+
+    async def test_update_flag_invalid_status(self, client: AsyncClient, db_session, test_api_key):
+        """Test updating a flag with invalid status returns 400."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_invalid_status",
+            display_name="TestPlayer",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
+        )
+
+        flag_repo = ScoreFlagRepository(db_session)
+        flag = ScoreFlag(
+            score_event_id=event.id,
+            flag_type=FlagType.VELOCITY,
+            confidence=FlagConfidence.MEDIUM,
+            metadata={},
+            status=ScoreFlagStatus.PENDING,
+        )
+        created_flag = await flag_repo.create(flag)
+
+        # Try to update with invalid status
+        response = await client.patch(
+            f"/score-flags/{created_flag.id}",
+            json={"status": "invalid_status"},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 400
+        assert "Invalid status" in response.json()["error"]
+
+    async def test_update_flag_no_data(self, client: AsyncClient, db_session, test_api_key):
+        """Test updating a flag without providing any data returns 400."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_no_data",
+            display_name="TestPlayer",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
+        )
+
+        flag_repo = ScoreFlagRepository(db_session)
+        flag = ScoreFlag(
+            score_event_id=event.id,
+            flag_type=FlagType.VELOCITY,
+            confidence=FlagConfidence.MEDIUM,
+            metadata={},
+            status=ScoreFlagStatus.PENDING,
+        )
+        created_flag = await flag_repo.create(flag)
+
+        # Try to update without any data
+        response = await client.patch(
+            f"/score-flags/{created_flag.id}",
+            json={},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 400
+        assert (
+            "Must provide either status, reviewer_decision, or deleted=true"
+            in response.json()["error"]
+        )
+
+    async def test_update_flag_reviewer_decision_only(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test updating a flag with only reviewer_decision (no status change)."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_decision_only",
+            display_name="TestPlayer",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
+        )
+
+        flag_repo = ScoreFlagRepository(db_session)
+        flag = ScoreFlag(
+            score_event_id=event.id,
+            flag_type=FlagType.VELOCITY,
+            confidence=FlagConfidence.MEDIUM,
+            metadata={},
+            status=ScoreFlagStatus.PENDING,
+        )
+        created_flag = await flag_repo.create(flag)
+
+        # Update only reviewer_decision
+        response = await client.patch(
+            f"/score-flags/{created_flag.id}",
+            json={"reviewer_decision": "Needs more investigation"},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["reviewer_decision"] == "Needs more investigation"
+        assert data["status"] == "pending"  # Status unchanged

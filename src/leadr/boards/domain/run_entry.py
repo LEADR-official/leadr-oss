@@ -1,5 +1,6 @@
 """RunEntry domain model for RUN_RUNS boards."""
 
+from datetime import datetime
 from typing import Any
 
 from pydantic import Field
@@ -92,6 +93,15 @@ class RunEntry(Entity):
     metadata: Any | None = Field(
         default=None,
         description="Game-specific JSON metadata",
+    )
+    # Exclusion fields (set when entry is excluded from ranking by anti-cheat moderation)
+    excluded_at: datetime | None = Field(
+        default=None,
+        description="When this entry was excluded from ranking (e.g., confirmed cheat)",
+    )
+    excluded_reason: str | None = Field(
+        default=None,
+        description="Reason for exclusion (e.g., 'confirmed_cheat')",
     )
     # Transient fields (not persisted in database)
     is_placeholder: bool = Field(

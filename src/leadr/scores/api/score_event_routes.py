@@ -1,17 +1,88 @@
-"""API routes for score event management (admin only, read-only)."""
+"""API routes for score event management (admin only)."""
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import AdminAuthContextDep
+from leadr.boards.domain.board import BoardType
+from leadr.boards.services.dependencies import BoardServiceDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.common.domain.cursor import CursorValidationError
 from leadr.common.domain.ids import AccountID, BoardID, IdentityID, ScoreEventID
-from leadr.scores.api.score_event_schemas import ScoreEventResponse
-from leadr.scores.services.dependencies import ScoreEventServiceDep
+from leadr.scores.api.score_event_schemas import ScoreEventCreateRequest, ScoreEventResponse
+from leadr.scores.services.dependencies import ScoreEventServiceDep, ScoreServiceDep
 
 router = APIRouter()
+
+
+@router.post("/score-events", status_code=status.HTTP_201_CREATED)
+async def create_score_event(
+    request: ScoreEventCreateRequest,
+    auth: AdminAuthContextDep,
+    score_service: ScoreServiceDep,
+    board_service: BoardServiceDep,
+) -> ScoreEventResponse:
+    """Create a score event (Admin API).
+
+    Creates a score event using the same processing as client submissions:
+    - Runs anti-cheat checks
+    - Updates rankings (BoardState/RunEntry)
+    - Validates board type and payload
+
+    This endpoint is for admin testing, data seeding, and demo purposes.
+
+    Args:
+        request: Score event creation request
+        auth: Admin authentication context
+        score_service: Score service for submission
+        board_service: Board service for validation
+
+    Returns:
+        Created score event
+
+    Raises:
+        404: Board not found
+        403: Non-superadmin accessing another account's board
+        400: Validation error (wrong board type, etc.)
+    """
+    # Get board and validate access
+    board = await board_service.get_board(request.board_id)
+    if board is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
+
+    if not auth.is_superadmin and board.account_id != auth.account_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    # Determine value/delta based on board type
+    value: float | None = None
+    delta: float | None = None
+    if board.board_type == BoardType.COUNTER:
+        delta = request.value
+    else:
+        value = request.value
+
+    try:
+        event, _ranking_entry, _anti_cheat_result = await score_service.submit_score(
+            board_id=request.board_id,
+            identity_id=request.identity_id,
+            value=value,
+            delta=delta,
+            player_name=request.player_name,
+            timezone=request.timezone,
+            country=request.country,
+            city=request.city,
+            is_test=request.is_test,
+        )
+    except IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Board or identity not found"
+        ) from None
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from None
+
+    return ScoreEventResponse.from_domain(event)
 
 
 @router.get("/score-events")

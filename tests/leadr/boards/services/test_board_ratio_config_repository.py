@@ -16,7 +16,6 @@ from leadr.boards.services.repositories import BoardRatioConfigRepository
 from leadr.common.domain.ids import BoardID, BoardRatioConfigID
 
 
-@pytest.mark.asyncio
 class TestBoardRatioConfigRepository:
     """Tests for BoardRatioConfigRepository."""
 
