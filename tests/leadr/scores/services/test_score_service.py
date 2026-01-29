@@ -1,6 +1,6 @@
 """Tests for ScoreService."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -511,6 +511,95 @@ class TestScoreServiceSubmission:
                 value=100.0,  # Wrong param - should be delta
                 player_name="Player1",
             )
+
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_skips_anticheat_when_disabled(
+        self, mock_settings, db_session: AsyncSession
+    ):
+        """Test that anti-cheat is skipped when ANTICHEAT_ENABLED is False."""
+        mock_settings.ANTICHEAT_ENABLED = False
+
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test", slug="test-ac-disabled")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_ac_disabled",
+            display_name="Player1",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="High Scores",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        service = ScoreService(db_session)
+        event, ranking_entry, anti_cheat_result = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
+            value=100.0,
+            player_name="Player1",
+        )
+
+        assert event is not None
+        assert ranking_entry is not None
+        assert ranking_entry.primary_value == 100.0
+        assert anti_cheat_result is None
+
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_runs_anticheat_when_enabled(
+        self, mock_settings, db_session: AsyncSession
+    ):
+        """Test that anti-cheat runs when ANTICHEAT_ENABLED is True."""
+        mock_settings.ANTICHEAT_ENABLED = True
+
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test", slug="test-ac-enabled")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_ac_enabled",
+            display_name="Player1",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="High Scores",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        service = ScoreService(db_session)
+        event, ranking_entry, anti_cheat_result = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
+            value=100.0,
+            player_name="Player1",
+        )
+
+        assert event is not None
+        assert ranking_entry is not None
+        assert anti_cheat_result is not None
 
     async def test_submit_score_board_not_found(self, db_session: AsyncSession):
         """Test submitting to non-existent board raises error."""

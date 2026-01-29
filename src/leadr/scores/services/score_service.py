@@ -28,6 +28,7 @@ from leadr.common.domain.ids import (
 )
 from leadr.common.domain.pagination import SortDirection, SortField
 from leadr.common.domain.pagination_result import PaginatedResult
+from leadr.config import settings
 from leadr.scores.domain.anti_cheat.enums import FlagAction, TrustTier
 from leadr.scores.domain.anti_cheat.models import AntiCheatResult, ScoreFlag, ScoreSubmissionMeta
 from leadr.scores.domain.score_event import ScoreEvent
@@ -148,30 +149,32 @@ class ScoreService:
             city=city,
         )
 
-        # Run anti-cheat checks
-        anti_cheat_service = AntiCheatService(self.session)
-        anti_cheat_result = await anti_cheat_service.check_submission_for_event(
-            score_event=event,
-            trust_tier=trust_tier,
-            identity_id=identity_id,
-            board_id=board_id,
-        )
+        # Run anti-cheat checks (if enabled)
+        anti_cheat_result: AntiCheatResult | None = None
+        if settings.ANTICHEAT_ENABLED:
+            anti_cheat_service = AntiCheatService(self.session)
+            anti_cheat_result = await anti_cheat_service.check_submission_for_event(
+                score_event=event,
+                trust_tier=trust_tier,
+                identity_id=identity_id,
+                board_id=board_id,
+            )
 
-        # Update submission metadata for future anti-cheat checks
-        await self._update_submission_metadata(
-            event=event,
-            identity_id=identity_id,
-            board_id=board_id,
-            value=value,
-        )
+            # Update submission metadata for future anti-cheat checks
+            await self._update_submission_metadata(
+                event=event,
+                identity_id=identity_id,
+                board_id=board_id,
+                value=value,
+            )
 
-        # Create flag if anti-cheat FLAGs the submission
-        if anti_cheat_result.action == FlagAction.FLAG:
-            await self._create_score_flag(event=event, result=anti_cheat_result)
+            # Create flag if anti-cheat FLAGs the submission
+            if anti_cheat_result.action == FlagAction.FLAG:
+                await self._create_score_flag(event=event, result=anti_cheat_result)
 
-        # Skip ranking update if anti-cheat REJECTs the submission
-        if anti_cheat_result.action == FlagAction.REJECT:
-            return event, None, anti_cheat_result
+            # Skip ranking update if anti-cheat REJECTs the submission
+            if anti_cheat_result.action == FlagAction.REJECT:
+                return event, None, anti_cheat_result
 
         # Handle based on board type (ACCEPT or FLAG both update rankings)
         ranking_entry: BoardState | RunEntry | None = None

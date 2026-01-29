@@ -255,11 +255,6 @@ class CommonSettings(BaseSettings):
         default=False,
         description="Enable anti-cheat checks on score submissions",
     )
-    ANTICHEAT_LOGGING_ONLY: bool = Field(
-        default=True,
-        description="Log anti-cheat detections but don't reject/flag submissions (dry-run mode)",
-    )
-
     # Rate Limit Tiers (submissions per hour)
     ANTICHEAT_RATE_LIMIT_TIER_A: int = Field(
         default=100,
