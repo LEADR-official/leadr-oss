@@ -1,0 +1,434 @@
+"""Tests for Run Entry API routes."""
+
+import pytest
+from httpx import AsyncClient
+
+from leadr.accounts.services.account_service import AccountService
+from leadr.auth.domain.identity import IdentityKind
+from leadr.auth.services.device_service import DeviceService
+from leadr.auth.services.identity_service import IdentityService
+from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
+from leadr.boards.services.board_service import BoardService
+from leadr.boards.services.run_entry_service import RunEntryService
+from leadr.games.services.game_service import GameService
+from leadr.scores.services.score_event_service import ScoreEventService
+
+
+@pytest.mark.asyncio
+class TestRunEntryRoutes:
+    """Test suite for Run Entry API routes."""
+
+    async def test_list_run_entries(self, client: AsyncClient, db_session, test_api_key):
+        """Test listing run entries via API."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-entries",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_entry_1",
+            display_name="Speedrunner",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speedruns",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        event_service = ScoreEventService(db_session)
+        run_entry_service = RunEntryService(db_session)
+
+        for i in range(3):
+            event = await event_service.create_score_event(
+                account_id=account.id,
+                game_id=game.id,
+                board_id=board.id,
+                identity_id=identity.id,
+                event_payload={"value": float(100 + i * 10)},
+            )
+            await run_entry_service.create_run_entry(
+                board_id=board.id,
+                identity_id=identity.id,
+                score_event_id=event.id,
+                primary_value=float(100 + i * 10),
+                player_name="Speedrunner",
+            )
+
+        response = await client.get(
+            f"/run-entries?board_id={board.id}",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) == 3
+
+    async def test_list_run_entries_filter_by_board(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test filtering run entries by board_id."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-entry-board",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_entry_board_1",
+            display_name="Speedrunner",
+        )
+
+        board_service = BoardService(db_session)
+        board1 = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speedruns 1",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+        board2 = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speedruns 2",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        event_service = ScoreEventService(db_session)
+        run_entry_service = RunEntryService(db_session)
+
+        event1 = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board1.id,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
+        )
+        await run_entry_service.create_run_entry(
+            board_id=board1.id,
+            identity_id=identity.id,
+            score_event_id=event1.id,
+            primary_value=100.0,
+            player_name="Speedrunner",
+        )
+
+        event2 = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board2.id,
+            identity_id=identity.id,
+            event_payload={"value": 200.0},
+        )
+        await run_entry_service.create_run_entry(
+            board_id=board2.id,
+            identity_id=identity.id,
+            score_event_id=event2.id,
+            primary_value=200.0,
+            player_name="Speedrunner",
+        )
+
+        response = await client.get(
+            f"/run-entries?board_id={board1.id}",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        assert data["data"][0]["board_id"] == str(board1.id)
+
+    async def test_list_run_entries_filter_by_identity(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test filtering run entries by identity_id."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-entry-identity",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity1, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_entry_id_1",
+            display_name="Runner1",
+        )
+        identity2, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_entry_id_2",
+            display_name="Runner2",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speedruns",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        event_service = ScoreEventService(db_session)
+        run_entry_service = RunEntryService(db_session)
+
+        event1 = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity1.id,
+            event_payload={"value": 100.0},
+        )
+        await run_entry_service.create_run_entry(
+            board_id=board.id,
+            identity_id=identity1.id,
+            score_event_id=event1.id,
+            primary_value=100.0,
+            player_name="Runner1",
+        )
+
+        event2 = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity2.id,
+            event_payload={"value": 200.0},
+        )
+        await run_entry_service.create_run_entry(
+            board_id=board.id,
+            identity_id=identity2.id,
+            score_event_id=event2.id,
+            primary_value=200.0,
+            player_name="Runner2",
+        )
+
+        response = await client.get(
+            f"/run-entries?identity_id={identity1.id}",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        assert data["data"][0]["identity_id"] == str(identity1.id)
+
+    async def test_get_run_entry_by_id(self, client: AsyncClient, db_session, test_api_key):
+        """Test getting a single run entry by ID."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-entry-get",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_entry_get_1",
+            display_name="Speedrunner",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speedruns",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 120.5},
+        )
+
+        run_entry_service = RunEntryService(db_session)
+        entry = await run_entry_service.create_run_entry(
+            board_id=board.id,
+            identity_id=identity.id,
+            score_event_id=event.id,
+            primary_value=120.5,
+            player_name="Speedrunner",
+        )
+
+        response = await client.get(
+            f"/run-entries/{entry.id}",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == str(entry.id)
+        assert data["primary_value"] == 120.5
+        assert data["board_id"] == str(board.id)
+        assert data["identity_id"] == str(identity.id)
+
+    async def test_get_run_entry_not_found(self, client: AsyncClient, db_session, test_api_key):
+        """Test getting a non-existent run entry returns 404."""
+        response = await client.get(
+            "/run-entries/run_00000000-0000-0000-0000-000000000000",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["error"].lower()
+
+    async def test_list_run_entries_pagination(self, client: AsyncClient, db_session, test_api_key):
+        """Test pagination of run entries."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-entry-pag",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_entry_pag_1",
+            display_name="Speedrunner",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speedruns",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        event_service = ScoreEventService(db_session)
+        run_entry_service = RunEntryService(db_session)
+
+        for i in range(15):
+            event = await event_service.create_score_event(
+                account_id=account.id,
+                game_id=game.id,
+                board_id=board.id,
+                identity_id=identity.id,
+                event_payload={"value": float(100 + i * 10)},
+            )
+            await run_entry_service.create_run_entry(
+                board_id=board.id,
+                identity_id=identity.id,
+                score_event_id=event.id,
+                primary_value=float(100 + i * 10),
+                player_name="Speedrunner",
+            )
+
+        response = await client.get(
+            f"/run-entries?board_id={board.id}&limit=5",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 5
+        assert data["pagination"]["has_next"] is True
+
+    async def test_list_run_entries_combined_filters(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test filtering run entries by both board_id and identity_id."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-entry-combined",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_entry_combined_1",
+            display_name="Speedrunner",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speedruns",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
+        )
+
+        run_entry_service = RunEntryService(db_session)
+        await run_entry_service.create_run_entry(
+            board_id=board.id,
+            identity_id=identity.id,
+            score_event_id=event.id,
+            primary_value=100.0,
+            player_name="Speedrunner",
+        )
+
+        response = await client.get(
+            f"/run-entries?board_id={board.id}&identity_id={identity.id}",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        assert data["data"][0]["board_id"] == str(board.id)
+        assert data["data"][0]["identity_id"] == str(identity.id)

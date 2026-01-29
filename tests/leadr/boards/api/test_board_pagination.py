@@ -31,7 +31,7 @@ class TestBoardPagination:
                     "unit": "points",
                     "is_active": True,
                     "sort_direction": "DESCENDING",
-                    "keep_strategy": "BEST_ONLY",
+                    "keep_strategy": "BEST",
                 },
             )
 
@@ -80,7 +80,7 @@ class TestBoardPagination:
                     "unit": "points",
                     "is_active": True,
                     "sort_direction": "DESCENDING",
-                    "keep_strategy": "BEST_ONLY",
+                    "keep_strategy": "BEST",
                 },
             )
 
@@ -126,7 +126,7 @@ class TestBoardPagination:
                     "unit": "points",
                     "is_active": True,
                     "sort_direction": "DESCENDING",
-                    "keep_strategy": "BEST_ONLY",
+                    "keep_strategy": "BEST",
                 },
             )
 
@@ -177,7 +177,7 @@ class TestBoardPagination:
                     "unit": "points",
                     "is_active": True,
                     "sort_direction": "DESCENDING",
-                    "keep_strategy": "BEST_ONLY",
+                    "keep_strategy": "BEST",
                 },
             )
 
@@ -225,7 +225,7 @@ class TestBoardPagination:
                     "unit": "points",
                     "is_active": True,
                     "sort_direction": "DESCENDING",
-                    "keep_strategy": "BEST_ONLY",
+                    "keep_strategy": "BEST",
                 },
             )
 
@@ -265,7 +265,7 @@ class TestBoardPagination:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
         )
 
@@ -282,7 +282,7 @@ class TestBoardPagination:
                     "unit": "points",
                     "is_active": True,
                     "sort_direction": "DESCENDING",
-                    "keep_strategy": "BEST_ONLY",
+                    "keep_strategy": "BEST",
                 },
             )
 

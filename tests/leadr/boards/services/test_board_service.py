@@ -1,6 +1,6 @@
 """Tests for Board service."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.accounts.services.account_service import AccountService
 from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
+from leadr.boards.services.board_template_service import BoardTemplateService
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import BoardID, BoardTemplateID, GameID
 from leadr.games.services.game_service import GameService
@@ -45,7 +46,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         assert board.id is not None
@@ -83,7 +84,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_from_template_id=BoardTemplateID(template_id),
             template_name="Speed Run Template",
             tags=["speedrun", "no-damage"],
@@ -126,7 +127,7 @@ class TestBoardService:
                 unit="points",
                 is_active=True,
                 sort_direction=SortDirection.DESCENDING,
-                keep_strategy=KeepStrategy.ALL,
+                keep_strategy=KeepStrategy.BEST,
             )
 
         assert "does not belong to account" in str(exc_info.value).lower()
@@ -154,7 +155,7 @@ class TestBoardService:
                 unit="points",
                 is_active=True,
                 sort_direction=SortDirection.DESCENDING,
-                keep_strategy=KeepStrategy.ALL,
+                keep_strategy=KeepStrategy.BEST,
             )
 
         assert "Game not found" in str(exc_info.value)
@@ -185,7 +186,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Retrieve it
@@ -230,7 +231,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Retrieve by short_code
@@ -275,7 +276,7 @@ class TestBoardService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
         await board_service.create_board(
             account_id=account.id,
@@ -286,7 +287,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # List them
@@ -332,7 +333,7 @@ class TestBoardService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
         await board_service.create_board(
             account_id=account2.id,
@@ -343,7 +344,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # List boards for account 1
@@ -379,7 +380,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Update it
@@ -425,7 +426,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Update only the name
@@ -477,7 +478,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Soft-delete it (returns entity before deletion)
@@ -516,7 +517,7 @@ class TestBoardService:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
         await board_service.create_board(
             account_id=account.id,
@@ -527,7 +528,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Soft-delete one
@@ -575,7 +576,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Update icon
@@ -613,7 +614,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Update short_code
@@ -651,7 +652,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Update unit
@@ -689,7 +690,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Update sort_direction
@@ -727,16 +728,16 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Update keep_strategy
         updated_board = await board_service.update_board(
             board_id=created_board.id,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        assert updated_board.keep_strategy == KeepStrategy.ALL
+        assert updated_board.keep_strategy == KeepStrategy.BEST
         assert updated_board.name == "Speed Run Board"  # Unchanged
 
     async def test_update_board_template_id(self, db_session: AsyncSession):
@@ -765,7 +766,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Update template_id
@@ -804,7 +805,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Update template_name
@@ -842,12 +843,10 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Update starts_at
-        from datetime import datetime
-
         new_starts_at = datetime(2025, 1, 1, 0, 0, 0, tzinfo=UTC)
         updated_board = await board_service.update_board(
             board_id=created_board.id,
@@ -883,12 +882,10 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Update ends_at
-        from datetime import datetime
-
         new_ends_at = datetime(2025, 12, 31, 23, 59, 59, tzinfo=UTC)
         updated_board = await board_service.update_board(
             board_id=created_board.id,
@@ -924,7 +921,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Update tags
@@ -938,10 +935,6 @@ class TestBoardService:
 
     async def test_create_board_from_template(self, db_session: AsyncSession):
         """Test creating a board from a template."""
-        from datetime import timedelta
-
-        from leadr.boards.services.board_template_service import BoardTemplateService
-
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -969,7 +962,7 @@ class TestBoardService:
             icon="star",
             unit="points",
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             tags=["weekly", "challenge"],
             config={},
         )
@@ -987,7 +980,7 @@ class TestBoardService:
         assert board.unit == "points"
         assert board.is_active is True
         assert board.sort_direction == SortDirection.DESCENDING
-        assert board.keep_strategy == KeepStrategy.BEST_ONLY
+        assert board.keep_strategy == KeepStrategy.BEST
         assert board.created_from_template_id == template.id
         assert board.template_name == "Weekly Challenge"
         assert board.starts_at == next_run
@@ -998,10 +991,6 @@ class TestBoardService:
 
     async def test_create_board_from_template_with_defaults(self, db_session: AsyncSession):
         """Test creating a board from a template with default config values."""
-        from datetime import timedelta
-
-        from leadr.boards.services.board_template_service import BoardTemplateService
-
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -1038,7 +1027,7 @@ class TestBoardService:
         assert board.unit is None  # Template default
         assert board.is_active is True  # Always true for new boards
         assert board.sort_direction == SortDirection.DESCENDING  # Template default
-        assert board.keep_strategy == KeepStrategy.ALL  # Template default
+        assert board.keep_strategy == KeepStrategy.BEST  # Template default
         assert board.tags == []  # Template default
         assert board.starts_at == next_run
         assert board.ends_at == next_run + timedelta(hours=1)
@@ -1051,10 +1040,6 @@ class TestBoardService:
         Regression test: ensures series_value is calculated when name_template contains
         {series} placeholder, regardless of whether template.series field is set.
         """
-        from datetime import timedelta
-
-        from leadr.boards.services.board_template_service import BoardTemplateService
-
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -1116,7 +1101,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             description="Complete the level as fast as possible",
         )
 
@@ -1147,7 +1132,7 @@ class TestBoardService:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
         # Update description

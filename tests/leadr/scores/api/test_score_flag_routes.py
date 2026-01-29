@@ -5,10 +5,15 @@ from datetime import UTC, datetime
 import pytest
 from httpx import AsyncClient
 
+from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.account_service import AccountService
+from leadr.accounts.services.repositories import AccountRepository
+from leadr.auth.domain.identity import IdentityKind
 from leadr.auth.services.device_service import DeviceService
+from leadr.auth.services.identity_service import IdentityService
 from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
+from leadr.common.domain.ids import AccountID
 from leadr.games.services.game_service import GameService
 from leadr.scores.domain.anti_cheat.enums import (
     FlagConfidence,
@@ -17,7 +22,7 @@ from leadr.scores.domain.anti_cheat.enums import (
 )
 from leadr.scores.domain.anti_cheat.models import ScoreFlag
 from leadr.scores.services.anti_cheat_repositories import ScoreFlagRepository
-from leadr.scores.services.score_service import ScoreService
+from leadr.scores.services.score_event_service import ScoreEventService
 
 
 @pytest.mark.asyncio
@@ -39,10 +44,13 @@ class TestScoreFlagRoutes:
             name="Test Game",
         )
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_device_123",
+            display_name="TestPlayer",
         )
 
         board_service = BoardService(db_session)
@@ -55,39 +63,37 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create scores
-        score_service = ScoreService(db_session)
-        score1, _ = await score_service.create_score(
+        # Create score events
+        event_service = ScoreEventService(db_session)
+        event1 = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player1",
-            value=100.0,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
         )
-        score2, _ = await score_service.create_score(
+        event2 = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player2",
-            value=200.0,
+            identity_id=identity.id,
+            event_payload={"value": 200.0},
         )
 
-        # Create flags for the scores
+        # Create flags for the score events
         flag_repo = ScoreFlagRepository(db_session)
         flag1 = ScoreFlag(
-            score_id=score1.id,
+            score_event_id=event1.id,
             flag_type=FlagType.VELOCITY,
             confidence=FlagConfidence.MEDIUM,
             metadata={"reason": "score improved too quickly"},
             status=ScoreFlagStatus.PENDING,
         )
         flag2 = ScoreFlag(
-            score_id=score2.id,
+            score_event_id=event2.id,
             flag_type=FlagType.DUPLICATE,
             confidence=FlagConfidence.HIGH,
             metadata={"reason": "duplicate submission detected"},
@@ -126,10 +132,13 @@ class TestScoreFlagRoutes:
             name="Test Game",
         )
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_device_456",
+            display_name="TestPlayer",
         )
 
         board_service = BoardService(db_session)
@@ -142,7 +151,7 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
         board2 = await board_service.create_board(
             account_id=account.id,
@@ -153,39 +162,37 @@ class TestScoreFlagRoutes:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create scores for both boards
-        score_service = ScoreService(db_session)
-        score1, _ = await score_service.create_score(
+        # Create score events for both boards
+        event_service = ScoreEventService(db_session)
+        event1 = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board1.id,
-            device_id=device.id,
-            player_name="Board1Player",
-            value=100.0,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
         )
-        score2, _ = await score_service.create_score(
+        event2 = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board2.id,
-            device_id=device.id,
-            player_name="Board2Player",
-            value=200.0,
+            identity_id=identity.id,
+            event_payload={"value": 200.0},
         )
 
-        # Create flags for both scores
+        # Create flags for both score events
         flag_repo = ScoreFlagRepository(db_session)
         flag1 = ScoreFlag(
-            score_id=score1.id,
+            score_event_id=event1.id,
             flag_type=FlagType.VELOCITY,
             confidence=FlagConfidence.MEDIUM,
             metadata={"board": "board1"},
             status=ScoreFlagStatus.PENDING,
         )
         flag2 = ScoreFlag(
-            score_id=score2.id,
+            score_event_id=event2.id,
             flag_type=FlagType.DUPLICATE,
             confidence=FlagConfidence.HIGH,
             metadata={"board": "board2"},
@@ -220,10 +227,13 @@ class TestScoreFlagRoutes:
             name="Test Game",
         )
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_device_789",
+            display_name="TestPlayer",
         )
 
         board_service = BoardService(db_session)
@@ -236,39 +246,37 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create scores
-        score_service = ScoreService(db_session)
-        score1, _ = await score_service.create_score(
+        # Create score events
+        event_service = ScoreEventService(db_session)
+        event1 = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player1",
-            value=100.0,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
         )
-        score2, _ = await score_service.create_score(
+        event2 = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player2",
-            value=200.0,
+            identity_id=identity.id,
+            event_payload={"value": 200.0},
         )
 
         # Create flags with different statuses
         flag_repo = ScoreFlagRepository(db_session)
         flag1 = ScoreFlag(
-            score_id=score1.id,
+            score_event_id=event1.id,
             flag_type=FlagType.VELOCITY,
             confidence=FlagConfidence.MEDIUM,
             metadata={},
             status=ScoreFlagStatus.PENDING,
         )
         flag2 = ScoreFlag(
-            score_id=score2.id,
+            score_event_id=event2.id,
             flag_type=FlagType.DUPLICATE,
             confidence=FlagConfidence.HIGH,
             metadata={},
@@ -306,10 +314,13 @@ class TestScoreFlagRoutes:
             name="Test Game",
         )
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_device_aaa",
+            display_name="TestPlayer",
         )
 
         board_service = BoardService(db_session)
@@ -322,39 +333,37 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create scores
-        score_service = ScoreService(db_session)
-        score1, _ = await score_service.create_score(
+        # Create score events
+        event_service = ScoreEventService(db_session)
+        event1 = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player1",
-            value=100.0,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
         )
-        score2, _ = await score_service.create_score(
+        event2 = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player2",
-            value=200.0,
+            identity_id=identity.id,
+            event_payload={"value": 200.0},
         )
 
         # Create flags with different types
         flag_repo = ScoreFlagRepository(db_session)
         flag1 = ScoreFlag(
-            score_id=score1.id,
+            score_event_id=event1.id,
             flag_type=FlagType.VELOCITY,
             confidence=FlagConfidence.MEDIUM,
             metadata={},
             status=ScoreFlagStatus.PENDING,
         )
         flag2 = ScoreFlag(
-            score_id=score2.id,
+            score_event_id=event2.id,
             flag_type=FlagType.DUPLICATE,
             confidence=FlagConfidence.HIGH,
             metadata={},
@@ -389,10 +398,13 @@ class TestScoreFlagRoutes:
             name="Test Game",
         )
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_device_bbb",
+            display_name="TestPlayer",
         )
 
         board_service = BoardService(db_session)
@@ -405,24 +417,23 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create score
-        score_service = ScoreService(db_session)
-        score, _ = await score_service.create_score(
+        # Create score event
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player1",
-            value=100.0,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
         )
 
         # Create flag
         flag_repo = ScoreFlagRepository(db_session)
         flag = ScoreFlag(
-            score_id=score.id,
+            score_event_id=event.id,
             flag_type=FlagType.VELOCITY,
             confidence=FlagConfidence.MEDIUM,
             metadata={"reason": "score improved too quickly"},
@@ -468,10 +479,13 @@ class TestScoreFlagRoutes:
             name="Test Game",
         )
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_device_ccc",
+            display_name="TestPlayer",
         )
 
         board_service = BoardService(db_session)
@@ -484,24 +498,23 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create score
-        score_service = ScoreService(db_session)
-        score, _ = await score_service.create_score(
+        # Create score event
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player1",
-            value=100.0,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
         )
 
         # Create flag
         flag_repo = ScoreFlagRepository(db_session)
         flag = ScoreFlag(
-            score_id=score.id,
+            score_event_id=event.id,
             flag_type=FlagType.VELOCITY,
             confidence=FlagConfidence.MEDIUM,
             metadata={"reason": "score improved too quickly"},
@@ -542,10 +555,13 @@ class TestScoreFlagRoutes:
             name="Test Game",
         )
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_device_ddd",
+            display_name="TestPlayer",
         )
 
         board_service = BoardService(db_session)
@@ -558,24 +574,23 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create score
-        score_service = ScoreService(db_session)
-        score, _ = await score_service.create_score(
+        # Create score event
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player1",
-            value=100.0,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
         )
 
         # Create flag
         flag_repo = ScoreFlagRepository(db_session)
         flag = ScoreFlag(
-            score_id=score.id,
+            score_event_id=event.id,
             flag_type=FlagType.VELOCITY,
             confidence=FlagConfidence.MEDIUM,
             metadata={"reason": "score improved too quickly"},
@@ -613,10 +628,13 @@ class TestScoreFlagRoutes:
             name="Test Game",
         )
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_device_eee",
+            display_name="TestPlayer",
         )
 
         board_service = BoardService(db_session)
@@ -629,24 +647,23 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create score
-        score_service = ScoreService(db_session)
-        score, _ = await score_service.create_score(
+        # Create score event
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player1",
-            value=100.0,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
         )
 
         # Create flag
         flag_repo = ScoreFlagRepository(db_session)
         flag = ScoreFlag(
-            score_id=score.id,
+            score_event_id=event.id,
             flag_type=FlagType.VELOCITY,
             confidence=FlagConfidence.MEDIUM,
             metadata={},
@@ -687,10 +704,13 @@ class TestScoreFlagRoutes:
             name="Test Game",
         )
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_device_fff",
+            display_name="TestPlayer",
         )
 
         board_service = BoardService(db_session)
@@ -703,31 +723,30 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create score
-        score_service = ScoreService(db_session)
-        score, _ = await score_service.create_score(
+        # Create score event
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player1",
-            value=100.0,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
         )
 
         # Create two flags
         flag_repo = ScoreFlagRepository(db_session)
         flag1 = ScoreFlag(
-            score_id=score.id,
+            score_event_id=event.id,
             flag_type=FlagType.VELOCITY,
             confidence=FlagConfidence.MEDIUM,
             metadata={},
             status=ScoreFlagStatus.PENDING,
         )
         flag2 = ScoreFlag(
-            score_id=score.id,
+            score_event_id=event.id,
             flag_type=FlagType.DUPLICATE,
             confidence=FlagConfidence.HIGH,
             metadata={},
@@ -757,11 +776,6 @@ class TestScoreFlagRoutes:
         self, authenticated_client: AsyncClient, db_session
     ):
         """Test that superadmin can list score flags WITHOUT account_id and sees all."""
-        from datetime import UTC, datetime
-
-        from leadr.accounts.domain.account import Account, AccountStatus
-        from leadr.accounts.services.repositories import AccountRepository
-        from leadr.common.domain.ids import AccountID
 
         # Create two accounts with score flags in each
         account_repo = AccountRepository(db_session)
@@ -786,7 +800,7 @@ class TestScoreFlagRoutes:
         await account_repo.create(account1)
         await account_repo.create(account2)
 
-        # Create games, devices, boards, scores and flags for each account
+        # Create games, identities, boards and score events for each account
         game_service = GameService(db_session)
         game1 = await game_service.create_game(
             account_id=account1.id,
@@ -797,16 +811,20 @@ class TestScoreFlagRoutes:
             name="Game Flag 2",
         )
 
-        device_service = DeviceService(db_session)
-        hash1 = "111934981c5a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbf10"
-        hash2 = "222934981c5a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbf20"
-        device1, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity1, _ = await identity_service.get_or_create_identity(
+            account_id=account1.id,
             game_id=game1.id,
-            client_fingerprint=hash1,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_superadmin_test_1",
+            display_name="Player1",
         )
-        device2, _, _, _ = await device_service.start_session(
+        identity2, _ = await identity_service.get_or_create_identity(
+            account_id=account2.id,
             game_id=game2.id,
-            client_fingerprint=hash2,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_superadmin_test_2",
+            display_name="Player2",
         )
 
         board_service = BoardService(db_session)
@@ -819,7 +837,7 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
         board2 = await board_service.create_board(
             account_id=account2.id,
@@ -830,38 +848,36 @@ class TestScoreFlagRoutes:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        score_service = ScoreService(db_session)
-        score1, _ = await score_service.create_score(
+        event_service = ScoreEventService(db_session)
+        event1 = await event_service.create_score_event(
             account_id=account1.id,
             game_id=game1.id,
             board_id=board1.id,
-            device_id=device1.id,
-            player_name="Player Flag 1",
-            value=1000.0,
+            identity_id=identity1.id,
+            event_payload={"value": 1000.0},
         )
-        score2, _ = await score_service.create_score(
+        event2 = await event_service.create_score_event(
             account_id=account2.id,
             game_id=game2.id,
             board_id=board2.id,
-            device_id=device2.id,
-            player_name="Player Flag 2",
-            value=2000.0,
+            identity_id=identity2.id,
+            event_payload={"value": 2000.0},
         )
 
-        # Create flags for each score
+        # Create flags for each score event
         flag_repo = ScoreFlagRepository(db_session)
         flag1 = ScoreFlag(
-            score_id=score1.id,
+            score_event_id=event1.id,
             flag_type=FlagType.VELOCITY,
             confidence=FlagConfidence.MEDIUM,
             metadata={"source": "account1"},
             status=ScoreFlagStatus.PENDING,
         )
         flag2 = ScoreFlag(
-            score_id=score2.id,
+            score_event_id=event2.id,
             flag_type=FlagType.DUPLICATE,
             confidence=FlagConfidence.HIGH,
             metadata={"source": "account2"},
@@ -882,3 +898,324 @@ class TestScoreFlagRoutes:
         flag_types = {f["flag_type"] for f in data["data"]}
         assert "velocity" in flag_types
         assert "duplicate" in flag_types
+
+    async def test_list_flags_filter_by_game(self, client: AsyncClient, db_session, test_api_key):
+        """Test filtering flags by game_id via API."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game1 = await game_service.create_game(
+            account_id=account.id,
+            name="Game 1",
+        )
+        game2 = await game_service.create_game(
+            account_id=account.id,
+            name="Game 2",
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity1, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game1.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_device_game1",
+            display_name="TestPlayer",
+        )
+        identity2, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game2.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_device_game2",
+            display_name="TestPlayer2",
+        )
+
+        board_service = BoardService(db_session)
+        board1 = await board_service.create_board(
+            account_id=account.id,
+            game_id=game1.id,
+            name="Board 1",
+            icon="trophy",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+        board2 = await board_service.create_board(
+            account_id=account.id,
+            game_id=game2.id,
+            name="Board 2",
+            icon="star",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        # Create score events for both games
+        event_service = ScoreEventService(db_session)
+        event1 = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game1.id,
+            board_id=board1.id,
+            identity_id=identity1.id,
+            event_payload={"value": 100.0},
+        )
+        event2 = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game2.id,
+            board_id=board2.id,
+            identity_id=identity2.id,
+            event_payload={"value": 200.0},
+        )
+
+        # Create flags for both score events
+        flag_repo = ScoreFlagRepository(db_session)
+        flag1 = ScoreFlag(
+            score_event_id=event1.id,
+            flag_type=FlagType.VELOCITY,
+            confidence=FlagConfidence.MEDIUM,
+            metadata={"game": "game1"},
+            status=ScoreFlagStatus.PENDING,
+        )
+        flag2 = ScoreFlag(
+            score_event_id=event2.id,
+            flag_type=FlagType.DUPLICATE,
+            confidence=FlagConfidence.HIGH,
+            metadata={"game": "game2"},
+            status=ScoreFlagStatus.PENDING,
+        )
+        await flag_repo.create(flag1)
+        await flag_repo.create(flag2)
+
+        # Filter by game1
+        response = await client.get(
+            f"/score-flags?account_id={account.id}&game_id={game1.id}",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        assert data["data"][0]["flag_type"] == "velocity"
+
+    async def test_list_flags_invalid_cursor(self, client: AsyncClient, db_session, test_api_key):
+        """Test listing flags with invalid cursor returns 400."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        response = await client.get(
+            f"/score-flags?account_id={account.id}&cursor=invalid_cursor_here",
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 400
+
+    async def test_update_flag_invalid_status(self, client: AsyncClient, db_session, test_api_key):
+        """Test updating a flag with invalid status returns 400."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_invalid_status",
+            display_name="TestPlayer",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
+        )
+
+        flag_repo = ScoreFlagRepository(db_session)
+        flag = ScoreFlag(
+            score_event_id=event.id,
+            flag_type=FlagType.VELOCITY,
+            confidence=FlagConfidence.MEDIUM,
+            metadata={},
+            status=ScoreFlagStatus.PENDING,
+        )
+        created_flag = await flag_repo.create(flag)
+
+        # Try to update with invalid status
+        response = await client.patch(
+            f"/score-flags/{created_flag.id}",
+            json={"status": "invalid_status"},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 400
+        assert "Invalid status" in response.json()["error"]
+
+    async def test_update_flag_no_data(self, client: AsyncClient, db_session, test_api_key):
+        """Test updating a flag without providing any data returns 400."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_no_data",
+            display_name="TestPlayer",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
+        )
+
+        flag_repo = ScoreFlagRepository(db_session)
+        flag = ScoreFlag(
+            score_event_id=event.id,
+            flag_type=FlagType.VELOCITY,
+            confidence=FlagConfidence.MEDIUM,
+            metadata={},
+            status=ScoreFlagStatus.PENDING,
+        )
+        created_flag = await flag_repo.create(flag)
+
+        # Try to update without any data
+        response = await client.patch(
+            f"/score-flags/{created_flag.id}",
+            json={},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 400
+        assert (
+            "Must provide either status, reviewer_decision, or deleted=true"
+            in response.json()["error"]
+        )
+
+    async def test_update_flag_reviewer_decision_only(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test updating a flag with only reviewer_decision (no status change)."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_decision_only",
+            display_name="TestPlayer",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
+        )
+
+        flag_repo = ScoreFlagRepository(db_session)
+        flag = ScoreFlag(
+            score_event_id=event.id,
+            flag_type=FlagType.VELOCITY,
+            confidence=FlagConfidence.MEDIUM,
+            metadata={},
+            status=ScoreFlagStatus.PENDING,
+        )
+        created_flag = await flag_repo.create(flag)
+
+        # Update only reviewer_decision
+        response = await client.patch(
+            f"/score-flags/{created_flag.id}",
+            json={"reviewer_decision": "Needs more investigation"},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["reviewer_decision"] == "Needs more investigation"
+        assert data["status"] == "pending"  # Status unchanged

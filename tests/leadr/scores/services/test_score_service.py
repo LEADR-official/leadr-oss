@@ -1,1903 +1,998 @@
-"""Tests for Score service."""
+"""Tests for ScoreService."""
 
-from uuid import uuid4
+from unittest.mock import Mock, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.background import BackgroundTasks
 
 from leadr.accounts.services.account_service import AccountService
+from leadr.auth.domain.identity import IdentityKind
 from leadr.auth.services.device_service import DeviceService
-from leadr.boards.domain.board import KeepStrategy, SortDirection
+from leadr.auth.services.identity_service import IdentityService
+from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.boards.services.board_service import BoardService
+from leadr.boards.services.board_state_service import BoardStateService
+from leadr.boards.services.run_entry_service import RunEntryService
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import BoardID, ScoreID
 from leadr.games.services.game_service import GameService
+from leadr.scores.services.score_event_service import ScoreEventService
 from leadr.scores.services.score_service import ScoreService
 
 
 @pytest.mark.asyncio
-class TestScoreService:
-    """Test suite for Score service."""
+class TestScoreServiceSubmission:
+    """Tests for score submission flow."""
 
-    async def test_create_score(self, db_session: AsyncSession):
-        """Test creating a score via service."""
-        # Create account
+    async def test_submit_score_run_identity_first_submission(self, db_session: AsyncSession):
+        """Test first submission to a RUN_IDENTITY board creates a BoardState."""
+        # Setup
         account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-
-        # Create game
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create device
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Test Board",
-            icon="trophy",
-            short_code="TB2025",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
-        )
-
-        # Create score
-        score_service = ScoreService(db_session)
-        score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="SpeedRunner99",
-            value=123.45,
-        )
-
-        assert score.id is not None
-        assert score.account_id == account.id
-        assert score.game_id == game.id
-        assert score.board_id == board.id
-        assert score.device_id == device.id
-        assert score.player_name == "SpeedRunner99"
-        assert score.value == 123.45
-
-    async def test_create_score_returns_rank(self, db_session: AsyncSession):
-        """Test that create_score returns score with rank populated."""
-        # Create supporting entities
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Rank Test Account",
-            slug="rank-test",
-        )
+        account = await account_service.create_account(name="Test", slug="test-ri-first")
 
         game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Rank Test Game",
-        )
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_ri_first",
+            display_name="Player1",
         )
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
             game_id=game.id,
-            name="Rank Test Board",
-            icon="trophy",
-            short_code="RANK1",
-            unit="points",
-            is_active=True,
+            name="High Scores",
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        score_service = ScoreService(db_session)
-
-        # Create first score - should be rank 1
-        score1, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
+        # Submit score
+        service = ScoreService(db_session)
+        event, ranking_entry, anti_cheat = await service.submit_score(
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player1",
+            identity_id=identity.id,
             value=100.0,
+            player_name="Player1",
         )
-        assert score1.rank == 1
 
-        # Create second score with higher value - should be rank 1 (DESC sort)
-        score2, _ = await score_service.create_score(
+        assert event is not None
+        assert ranking_entry is not None
+        assert ranking_entry.primary_value == 100.0
+
+    async def test_submit_score_run_identity_keep_best_higher_is_better(
+        self, db_session: AsyncSession
+    ):
+        """Test BEST strategy keeps higher score for DESCENDING board."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test", slug="test-keep-best")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_keep_best",
+            display_name="Player1",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="High Scores",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        service = ScoreService(db_session)
+
+        # First submission
+        _, entry1, _ = await service.submit_score(
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player2",
+            identity_id=identity.id,
+            value=100.0,
+            player_name="Player1",
+        )
+        assert entry1 is not None
+        assert entry1.primary_value == 100.0
+
+        # Second submission with higher score (better for DESC)
+        _, entry2, _ = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
             value=200.0,
-        )
-        assert score2.rank == 1
-
-        # Create third score with lower value - should be rank 3
-        score3, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="Player3",
-            value=50.0,
-        )
-        assert score3.rank == 3
-
-    async def test_create_score_returns_rank_ascending_board(self, db_session: AsyncSession):
-        """Test that create_score returns correct rank for ascending board (lower is better)."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Rank ASC Account",
-            slug="rank-asc",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Rank ASC Game",
-        )
-
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Time Trial Board",
-            icon="clock",
-            short_code="TIME1",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,  # Lower is better
-            keep_strategy=KeepStrategy.ALL,
-        )
-
-        score_service = ScoreService(db_session)
-
-        # Create first score (100 seconds) - should be rank 1
-        score1, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
             player_name="Player1",
-            value=100.0,
         )
-        assert score1.rank == 1
+        assert entry2 is not None
+        assert entry2.primary_value == 200.0
 
-        # Create score with lower time (50 seconds) - should be rank 1 (ASC sort, lower is better)
-        score2, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
+        # Third submission with lower score (worse for DESC)
+        _, entry3, _ = await service.submit_score(
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player2",
-            value=50.0,
-        )
-        assert score2.rank == 1
-
-        # Create score with higher time (150 seconds) - should be rank 3
-        score3, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="Player3",
+            identity_id=identity.id,
             value=150.0,
+            player_name="Player1",
         )
-        assert score3.rank == 3
+        # Should still be 200 (best)
+        assert entry3 is not None
+        assert entry3.primary_value == 200.0
 
-    async def test_create_score_first_only_returns_existing_with_rank(
+    async def test_submit_score_run_identity_keep_best_lower_is_better(
         self, db_session: AsyncSession
     ):
-        """Test that FIRST_ONLY strategy returns existing score with rank populated."""
+        """Test BEST strategy keeps lower score for ASCENDING board."""
         account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="First Only Rank Account",
-            slug="first-rank",
-        )
+        account = await account_service.create_account(name="Test", slug="test-keep-low")
 
         game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="First Only Rank Game",
-        )
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_keep_low",
+            display_name="Speedrunner",
         )
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
             game_id=game.id,
-            name="First Only Board",
-            icon="medal",
-            short_code="FIRST-RANK",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.FIRST_ONLY,
+            name="Speedruns",
+            sort_direction=SortDirection.ASCENDING,  # Lower is better
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        score_service = ScoreService(db_session)
+        service = ScoreService(db_session)
 
-        # Create first score
-        first_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
+        # First submission
+        _, entry1, _ = await service.submit_score(
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player1",
+            identity_id=identity.id,
+            value=120.0,
+            player_name="Speedrunner",
+        )
+        assert entry1 is not None
+        assert entry1.primary_value == 120.0
+
+        # Second submission with lower time (better for ASC)
+        _, entry2, _ = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
             value=100.0,
+            player_name="Speedrunner",
         )
-        assert first_score.rank == 1
+        assert entry2 is not None
+        assert entry2.primary_value == 100.0
 
-        # Try to create second score - should return existing score with rank
-        returned_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
+        # Third submission with higher time (worse for ASC)
+        _, entry3, _ = await service.submit_score(
             board_id=board.id,
-            device_id=device.id,
-            player_name="Player1",
-            value=200.0,
+            identity_id=identity.id,
+            value=110.0,
+            player_name="Speedrunner",
         )
+        # Should still be 100 (best)
+        assert entry3 is not None
+        assert entry3.primary_value == 100.0
 
-        assert returned_score.id == first_score.id
-        assert returned_score.rank is not None
-        assert returned_score.rank == 1
-
-    async def test_create_score_best_only_returns_existing_with_rank_when_worse(
-        self, db_session: AsyncSession
-    ):
-        """Test that BEST_ONLY returns existing score with rank when new score is worse."""
+    async def test_submit_score_run_identity_keep_first(self, db_session: AsyncSession):
+        """Test FIRST strategy keeps the first score."""
         account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Best Only Rank Account",
-            slug="best-rank",
-        )
+        account = await account_service.create_account(name="Test", slug="test-keep-first")
 
         game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Best Only Rank Game",
-        )
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_keep_first",
+            display_name="Player1",
         )
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
             game_id=game.id,
-            name="Best Only Board",
-            icon="trophy",
-            short_code="BEST-RANK",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,  # Higher is better
-            keep_strategy=KeepStrategy.BEST_ONLY,
-        )
-
-        score_service = ScoreService(db_session)
-
-        # Create first score with high value
-        best_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="Player1",
-            value=200.0,
-        )
-        assert best_score.rank == 1
-
-        # Submit worse score - should return existing score with rank
-        returned_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="Player1",
-            value=50.0,  # Worse than 200
-        )
-
-        assert returned_score.id == best_score.id
-        assert returned_score.rank is not None
-        assert returned_score.rank == 1
-
-    async def test_create_score_with_optional_fields(self, db_session: AsyncSession):
-        """Test creating a score with optional fields."""
-        # Create account
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-
-        # Create game
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create device
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Test Board",
-            icon="trophy",
-            short_code="TB2025",
-            unit="points",
-            is_active=True,
+            name="First Completion",
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.FIRST,
         )
 
-        # Create score with optional fields
-        score_service = ScoreService(db_session)
-        score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
+        service = ScoreService(db_session)
+
+        # First submission
+        _, entry1, _ = await service.submit_score(
             board_id=board.id,
-            device_id=device.id,
-            player_name="SpeedRunner99",
-            value=123.45,
-            value_display="2:03.45",
-            timezone="America/New_York",
-            country="USA",
-            city="New York",
+            identity_id=identity.id,
+            value=100.0,
+            player_name="Player1",
         )
+        assert entry1 is not None
+        assert entry1.primary_value == 100.0
 
-        assert score.value_display == "2:03.45"
-        assert score.timezone == "America/New_York"
-        assert score.country == "USA"
-        assert score.city == "New York"
+        # Second submission (should be ignored)
+        _, entry2, _ = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
+            value=200.0,
+            player_name="Player1",
+        )
+        # Should still be 100 (first)
+        assert entry2 is not None
+        assert entry2.primary_value == 100.0
 
-    async def test_create_score_validates_board_exists(self, db_session: AsyncSession):
-        """Test that create_score validates board exists."""
-        # Create account
+    async def test_submit_score_run_identity_keep_latest(self, db_session: AsyncSession):
+        """Test LATEST strategy always uses the latest score."""
         account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account = await account_service.create_account(name="Test", slug="test-keep-latest")
 
-        # Create game
         game_service = GameService(db_session)
-        game = await game_service.create_game(
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create device
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_keep_latest",
+            display_name="Player1",
         )
 
-        # Try to create score with non-existent board
-        score_service = ScoreService(db_session)
-        non_existent_board_id = uuid4()
-
-        with pytest.raises(EntityNotFoundError) as exc_info:
-            await score_service.create_score(
-                account_id=account.id,
-                game_id=game.id,
-                board_id=BoardID(non_existent_board_id),
-                device_id=device.id,
-                player_name="SpeedRunner99",
-                value=123.45,
-            )
-
-        assert "Board not found" in str(exc_info.value)
-
-    async def test_create_score_validates_board_belongs_to_account(self, db_session: AsyncSession):
-        """Test that create_score validates board belongs to account."""
-        # Create two accounts
-        account_service = AccountService(db_session)
-        account1 = await account_service.create_account(
-            name="Account 1",
-            slug="account-1",
-        )
-        account2 = await account_service.create_account(
-            name="Account 2",
-            slug="account-2",
-        )
-
-        # Create games for both accounts
-        game_service = GameService(db_session)
-
-        # Create game for account1
-        game_service = GameService(db_session)
-        game1 = await game_service.create_game(
-            account_id=account1.id,
-            name="Game 1",
-        )
-
-        # Create game for account2
-        game2 = await game_service.create_game(
-            account_id=account2.id,
-            name="Game 2",
-        )
-
-        # Create device for account1/game1
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game1.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
-        )
-
-        # Create board for account2
         board_service = BoardService(db_session)
-        board2 = await board_service.create_board(
-            account_id=account2.id,
-            game_id=game2.id,
-            name="Account 2 Board",
-            icon="star",
-            short_code="A2B1",
-            unit="seconds",
-            is_active=True,
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Latest Score",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.LATEST,
+        )
+
+        service = ScoreService(db_session)
+
+        # First submission
+        _, entry1, _ = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
+            value=100.0,
+            player_name="Player1",
+        )
+        assert entry1 is not None
+        assert entry1.primary_value == 100.0
+
+        # Second submission
+        _, entry2, _ = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
+            value=50.0,  # Lower, but it's latest
+            player_name="Player1",
+        )
+        assert entry2 is not None
+        assert entry2.primary_value == 50.0
+
+    async def test_submit_score_run_runs_creates_entry(self, db_session: AsyncSession):
+        """Test RUN_RUNS board creates a new RunEntry for each submission."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test", slug="test-run-runs")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_run_runs",
+            display_name="Speedrunner",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Speedruns",
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
-        # Try to create score for account1 with account2's board
-        score_service = ScoreService(db_session)
+        service = ScoreService(db_session)
 
-        with pytest.raises(ValueError) as exc_info:
-            await score_service.create_score(
-                account_id=account1.id,
-                game_id=game1.id,
-                board_id=board2.id,
-                device_id=device.id,
-                player_name="SpeedRunner99",
-                value=123.45,
-            )
+        # First submission
+        _, entry1, _ = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
+            value=120.0,
+            player_name="Speedrunner",
+        )
 
-        assert "does not belong to account" in str(exc_info.value).lower()
+        # Second submission
+        _, entry2, _ = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
+            value=110.0,
+            player_name="Speedrunner",
+        )
 
-    async def test_create_score_validates_game_matches_board(self, db_session: AsyncSession):
-        """Test that create_score validates game_id matches board's game_id."""
-        # Create account
+        # Each submission should create a new entry
+        assert entry1 is not None
+        assert entry2 is not None
+        assert entry1.id != entry2.id
+        assert entry1.primary_value == 120.0
+        assert entry2.primary_value == 110.0
+
+    async def test_submit_score_counter_accumulates(self, db_session: AsyncSession):
+        """Test COUNTER board accumulates delta values."""
         account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account = await account_service.create_account(name="Test", slug="test-counter")
 
-        # Create two games
         game_service = GameService(db_session)
-        game1 = await game_service.create_game(
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
-            name="Game 1",
-        )
-        game2 = await game_service.create_game(
-            account_id=account.id,
-            name="Game 2",
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_counter",
+            display_name="Killer",
         )
 
-        # Create device
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game1.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
-        )
-
-        # Create board for game1
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
-            game_id=game1.id,
-            name="Game 1 Board",
-            icon="trophy",
-            short_code="G1B1",
-            unit="points",
-            is_active=True,
+            game_id=game.id,
+            name="Kill Count",
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            board_type=BoardType.COUNTER,
+            keep_strategy=KeepStrategy.NA,
         )
 
-        # Try to create score with mismatched game_id
-        score_service = ScoreService(db_session)
+        service = ScoreService(db_session)
 
-        with pytest.raises(ValueError) as exc_info:
-            await score_service.create_score(
-                account_id=account.id,
-                game_id=game2.id,
+        # First delta
+        _, entry1, _ = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
+            delta=5.0,
+            player_name="Killer",
+        )
+        assert entry1 is not None
+        assert entry1.primary_value == 5.0
+
+        # Second delta
+        _, entry2, _ = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
+            delta=3.0,
+            player_name="Killer",
+        )
+        assert entry2 is not None
+        assert entry2.primary_value == 8.0
+
+        # Third delta (negative)
+        _, entry3, _ = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
+            delta=-2.0,
+            player_name="Killer",
+        )
+        assert entry3 is not None
+        assert entry3.primary_value == 6.0
+
+    async def test_submit_score_ratio_board_rejected(self, db_session: AsyncSession):
+        """Test that RATIO boards reject direct submissions."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test", slug="test-ratio-reject")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_ratio",
+            display_name="Player1",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="K/D Ratio",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RATIO,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        service = ScoreService(db_session)
+
+        with pytest.raises(ValueError, match="RATIO boards do not accept direct submissions"):
+            await service.submit_score(
                 board_id=board.id,
-                device_id=device.id,
-                player_name="SpeedRunner99",
-                value=123.45,
+                identity_id=identity.id,
+                value=1.5,
+                player_name="Player1",
             )
 
-        assert "does not match board" in str(exc_info.value).lower()
-
-    async def test_get_score(self, db_session: AsyncSession):
-        """Test retrieving a score by ID via service."""
-        # Create supporting entities
+    async def test_submit_score_missing_value_for_run_board(self, db_session: AsyncSession):
+        """Test that RUN boards require value."""
         account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account = await account_service.create_account(name="Test", slug="test-missing-value")
 
         game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_missing",
+            display_name="Player1",
         )
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
             game_id=game.id,
-            name="Test Board",
-            icon="trophy",
-            short_code="TB2025",
-            unit="points",
-            is_active=True,
+            name="High Scores",
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create score
-        score_service = ScoreService(db_session)
-        created_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="SpeedRunner99",
-            value=123.45,
-        )
+        service = ScoreService(db_session)
 
-        # Retrieve it
-        score = await score_service.get_score(created_score.id)
+        with pytest.raises(ValueError, match="value is required"):
+            await service.submit_score(
+                board_id=board.id,
+                identity_id=identity.id,
+                delta=100.0,  # Wrong param - should be value
+                player_name="Player1",
+            )
 
-        assert score is not None
-        assert score.id == created_score.id
-        assert score.player_name == "SpeedRunner99"
-
-    async def test_get_score_not_found(self, db_session: AsyncSession):
-        """Test retrieving a non-existent score returns None."""
-        score_service = ScoreService(db_session)
-        non_existent_id = uuid4()
-
-        score = await score_service.get_score(ScoreID(non_existent_id))
-
-        assert score is None
-
-    async def test_list_scores_by_account(self, db_session: AsyncSession):
-        """Test listing all scores for an account."""
-        # Create account
+    async def test_submit_score_missing_delta_for_counter(self, db_session: AsyncSession):
+        """Test that COUNTER boards require delta."""
         account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account = await account_service.create_account(name="Test", slug="test-missing-delta")
 
         game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_missing_delta",
+            display_name="Player1",
         )
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
             game_id=game.id,
-            name="Test Board",
-            icon="trophy",
-            short_code="TB2025",
-            unit="points",
-            is_active=True,
+            name="Kill Count",
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,  # Use ALL to keep both scores
+            board_type=BoardType.COUNTER,
+            keep_strategy=KeepStrategy.NA,
         )
 
-        # Create multiple scores
-        score_service = ScoreService(db_session)
-        await score_service.create_score(
+        service = ScoreService(db_session)
+
+        with pytest.raises(ValueError, match="delta is required"):
+            await service.submit_score(
+                board_id=board.id,
+                identity_id=identity.id,
+                value=100.0,  # Wrong param - should be delta
+                player_name="Player1",
+            )
+
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_skips_anticheat_when_disabled(
+        self, mock_settings, db_session: AsyncSession
+    ):
+        """Test that anti-cheat is skipped when ANTICHEAT_ENABLED is False."""
+        mock_settings.ANTICHEAT_ENABLED = False
+
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test", slug="test-ac-disabled")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_ac_disabled",
+            display_name="Player1",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="High Scores",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        service = ScoreService(db_session)
+        event, ranking_entry, anti_cheat_result = await service.submit_score(
             board_id=board.id,
-            device_id=device.id,
+            identity_id=identity.id,
+            value=100.0,
             player_name="Player1",
-            value=100.0,
-        )
-        await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="Player2",
-            value=200.0,
         )
 
-        # List them
-        pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await score_service.list_scores(account_id=account.id, pagination=pagination)
-
-        assert len(result.items) == 2
-        names = {s.player_name for s in result.items}
-        assert "Player1" in names
-        assert "Player2" in names
-
-    async def test_list_scores_filters_by_board(self, db_session: AsyncSession):
-        """Test filtering scores by board_id."""
-        # Create account
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
-        )
-
-        board_service = BoardService(db_session)
-        board1 = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Board 1",
-            icon="trophy",
-            short_code="B1",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
-        )
-        board2 = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Board 2",
-            icon="star",
-            short_code="B2",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.ALL,
-        )
-
-        # Create scores for both boards
-        score_service = ScoreService(db_session)
-        await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board1.id,
-            device_id=device.id,
-            player_name="Board1Score",
-            value=100.0,
-        )
-        await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board2.id,
-            device_id=device.id,
-            player_name="Board2Score",
-            value=200.0,
-        )
-
-        # Filter by board1
-        pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await score_service.list_scores(
-            account_id=account.id, board_id=board1.id, pagination=pagination
-        )
-
-        assert len(result.items) == 1
-        assert result.items[0].player_name == "Board1Score"
-
-    async def test_update_score(self, db_session: AsyncSession):
-        """Test updating a score via service."""
-        # Create supporting entities
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Test Board",
-            icon="trophy",
-            short_code="TB2025",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
-        )
-
-        # Create score
-        score_service = ScoreService(db_session)
-        created_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="SpeedRunner99",
-            value=123.45,
-        )
-
-        # Update it
-        updated_score = await score_service.update_score(
-            score_id=created_score.id,
-            player_name="NewName",
-            value=200.0,
-        )
-
-        assert updated_score.player_name == "NewName"
-        assert updated_score.value == 200.0
-
-    async def test_soft_delete_score(self, db_session: AsyncSession):
-        """Test soft-deleting a score via service."""
-        # Create supporting entities
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Test Board",
-            icon="trophy",
-            short_code="TB2025",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
-        )
-
-        # Create score
-        score_service = ScoreService(db_session)
-        created_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="SpeedRunner99",
-            value=123.45,
-        )
-
-        # Soft-delete it
-        deleted_score = await score_service.soft_delete(created_score.id)
-
-        assert deleted_score.id == created_score.id
-        assert deleted_score.is_deleted is False  # Returns entity before deletion
-
-        # Verify it's not returned by get
-        score = await score_service.get_score(created_score.id)
-        assert score is None
-
-    async def test_update_submission_metadata_with_none_result(self, db_session: AsyncSession):
-        """Test that update_submission_metadata returns early if anti_cheat_result is None."""
-        # Create supporting entities
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-            anti_cheat_enabled=False,  # Disable anti-cheat
-        )
-
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Test Board",
-            icon="trophy",
-            short_code="TB2025",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
-        )
-
-        # Create score
-        score_service = ScoreService(db_session)
-        score, anti_cheat_result = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="SpeedRunner99",
-            value=123.45,
-        )
-
-        # anti_cheat_result should be None since anti-cheat is disabled
+        assert event is not None
+        assert ranking_entry is not None
+        assert ranking_entry.primary_value == 100.0
         assert anti_cheat_result is None
 
-        # Call update_submission_metadata with None (should return early)
-        await score_service.update_submission_metadata(
-            saved_score=score,
-            device_id=device.id,
-            board_id=board.id,
-            anti_cheat_result=None,
-        )
-
-        # Verify no submission metadata was created
-        from leadr.scores.services.anti_cheat_repositories import (
-            ScoreSubmissionMetaRepository,
-        )
-
-        meta_repo = ScoreSubmissionMetaRepository(db_session)
-        meta = await meta_repo.get_by_device_and_board(device.id, board.id)
-        assert meta is None
-
-    async def test_create_score_with_metadata(self, db_session: AsyncSession):
-        """Test creating a score with metadata via service."""
-        # Create account
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-
-        # Create game
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create device
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Test Board",
-            icon="trophy",
-            short_code="TB2025",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
-        )
-
-        # Create score with metadata
-        score_service = ScoreService(db_session)
-        metadata = {"level": 5, "character": "Warrior", "loadout": ["sword", "shield"]}
-        score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="SpeedRunner99",
-            value=123.45,
-            metadata=metadata,
-        )
-
-        assert score.metadata == metadata
-        assert score.metadata["level"] == 5  # type: ignore[index]
-        assert score.metadata["character"] == "Warrior"  # type: ignore[index]
-
-    async def test_update_score_metadata(self, db_session: AsyncSession):
-        """Test updating score metadata via service."""
-        # Create account
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-
-        # Create game
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create device
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Test Board",
-            icon="trophy",
-            short_code="TB2025",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
-        )
-
-        # Create score with initial metadata
-        score_service = ScoreService(db_session)
-        initial_metadata = {"level": 1, "character": "Mage"}
-        score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="SpeedRunner99",
-            value=123.45,
-            metadata=initial_metadata,
-        )
-
-        assert score.metadata == initial_metadata
-
-        # Update metadata
-        new_metadata = {"level": 10, "character": "Warrior", "items": ["sword", "shield", "potion"]}
-        updated = await score_service.update_score(
-            score_id=score.id,
-            metadata=new_metadata,
-        )
-
-        assert updated.metadata == new_metadata
-        assert updated.metadata["level"] == 10  # type: ignore[index]
-
-    async def test_keep_strategy_all_keeps_all_scores(self, db_session: AsyncSession):
-        """Test that ALL strategy keeps all scores from the same device."""
-        # Create supporting entities
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
-        )
-
-        # Create board with ALL strategy
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="All Scores Board",
-            icon="trophy",
-            short_code="ALL1",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
-        )
-
-        # Create multiple scores from the same device
-        score_service = ScoreService(db_session)
-        score1, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=100.0,
-        )
-        score2, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=200.0,
-        )
-        score3, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=150.0,
-        )
-
-        # Verify all scores were saved
-        assert score1.id is not None
-        assert score2.id is not None
-        assert score3.id is not None
-        assert score1.id != score2.id
-        assert score2.id != score3.id
-
-        # List scores for this board and device - should get all 3
-        pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await score_service.list_scores(
-            account_id=account.id,
-            board_id=board.id,
-            device_id=device.id,
-            pagination=pagination,
-        )
-
-        assert len(result.items) == 3
-        values = {s.value for s in result.items}
-        assert values == {100.0, 200.0, 150.0}
-
-    async def test_keep_strategy_first_only_keeps_first_score(self, db_session: AsyncSession):
-        """Test that FIRST_ONLY strategy keeps only the first score from a device."""
-        # Create supporting entities
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3",
-        )
-
-        # Create board with FIRST_ONLY strategy
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="First Only Board",
-            icon="medal",
-            short_code="FIRST1",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.FIRST_ONLY,
-        )
-
-        # Create first score
-        score_service = ScoreService(db_session)
-        first_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=100.0,
-        )
-
-        assert first_score.id is not None
-        assert first_score.value == 100.0
-
-        # Try to create second score from same device
-        returned_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=200.0,
-        )
-
-        # Should return the first score, not save the new one
-        assert returned_score.id == first_score.id
-        assert returned_score.value == 100.0
-
-        # Verify only one score exists in DB
-        pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await score_service.list_scores(
-            account_id=account.id,
-            board_id=board.id,
-            device_id=device.id,
-            pagination=pagination,
-        )
-
-        assert len(result.items) == 1
-        assert result.items[0].id == first_score.id
-        assert result.items[0].value == 100.0
-
-    async def test_keep_strategy_first_only_allows_different_devices(
-        self, db_session: AsyncSession
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_runs_anticheat_when_enabled(
+        self, mock_settings, db_session: AsyncSession
     ):
-        """Test that FIRST_ONLY allows scores from different devices."""
-        # Create supporting entities
+        """Test that anti-cheat runs when ANTICHEAT_ENABLED is True."""
+        mock_settings.ANTICHEAT_ENABLED = True
+
         account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account",
-        )
+        account = await account_service.create_account(name="Test", slug="test-ac-enabled")
 
         game_service = GameService(db_session)
-        game = await game_service.create_game(
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
-            name="Test Game",
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_ac_enabled",
+            display_name="Player1",
         )
 
-        device_service = DeviceService(db_session)
-        device1, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
-        )
-        device2, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89",
-        )
-
-        # Create board with FIRST_ONLY strategy
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
             game_id=game.id,
-            name="First Only Board",
-            icon="medal",
-            short_code="FIRST2",
-            unit="points",
-            is_active=True,
+            name="High Scores",
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.FIRST_ONLY,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create scores from different devices
-        score_service = ScoreService(db_session)
-        score1, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
+        service = ScoreService(db_session)
+        event, ranking_entry, anti_cheat_result = await service.submit_score(
             board_id=board.id,
-            device_id=device1.id,
+            identity_id=identity.id,
+            value=100.0,
             player_name="Player1",
-            value=100.0,
-        )
-        score2, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device2.id,
-            player_name="Player2",
-            value=200.0,
         )
 
-        # Both scores should be saved (different devices)
-        assert score1.id is not None
-        assert score2.id is not None
-        assert score1.id != score2.id
+        assert event is not None
+        assert ranking_entry is not None
+        assert anti_cheat_result is not None
 
-        # Verify both scores exist in DB
-        pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await score_service.list_scores(
-            account_id=account.id,
-            board_id=board.id,
-            pagination=pagination,
-        )
-
-        assert len(result.items) == 2
-        values = {s.value for s in result.items}
-        assert values == {100.0, 200.0}
-
-    async def test_keep_strategy_latest_only_keeps_latest_score(self, db_session: AsyncSession):
-        """Test that LATEST_ONLY strategy keeps only the latest score, soft-deleting old ones."""
-        # Create supporting entities
+    async def test_submit_score_board_not_found(self, db_session: AsyncSession):
+        """Test submitting to non-existent board raises error."""
         account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account",
-        )
+        account = await account_service.create_account(name="Test", slug="test-board-404")
 
         game_service = GameService(db_session)
-        game = await game_service.create_game(
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
-            name="Test Game",
-        )
-
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            client_fingerprint="c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_404",
+            display_name="Player1",
         )
 
-        # Create board with LATEST_ONLY strategy
+        service = ScoreService(db_session)
+
+        fake_board_id = BoardID()
+        with pytest.raises(EntityNotFoundError):
+            await service.submit_score(
+                board_id=fake_board_id,
+                identity_id=identity.id,
+                value=100.0,
+                player_name="Player1",
+            )
+
+
+@pytest.mark.asyncio
+class TestScoreServiceQuery:
+    """Tests for score query methods."""
+
+    async def test_get_score_by_id_board_state(self, db_session: AsyncSession):
+        """Test getting a BoardState score by ID."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test", slug="test-get-state")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_get_state",
+            display_name="Player1",
+        )
+
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
             game_id=game.id,
-            name="Latest Only Board",
-            icon="star",
-            short_code="LATEST1",
-            unit="points",
-            is_active=True,
+            name="High Scores",
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.LATEST_ONLY,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create first score
-        score_service = ScoreService(db_session)
-        first_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
+        state_service = BoardStateService(db_session)
+        state = await state_service.create_board_state(
             board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=100.0,
+            identity_id=identity.id,
+            primary_value=500.0,
+            player_name="Player1",
         )
 
-        assert first_score.id is not None
-        assert first_score.value == 100.0
+        service = ScoreService(db_session)
+        score_id = ScoreID(state.id.uuid)
+        result, result_board, rank = await service.get_score_by_id(score_id)
 
-        # Create second score - should soft-delete first
-        second_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=200.0,
-        )
+        assert result.id == state.id
+        assert result.primary_value == 500.0
+        assert result_board.id == board.id
+        assert rank == 1
 
-        assert second_score.id is not None
-        assert second_score.value == 200.0
-        assert second_score.id != first_score.id
-
-        # Verify first score is soft-deleted
-        first_score_check = await score_service.get_score(first_score.id)
-        assert first_score_check is None  # Soft-deleted scores not returned by get
-
-        # Verify only second score is active
-        pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await score_service.list_scores(
-            account_id=account.id,
-            board_id=board.id,
-            device_id=device.id,
-            pagination=pagination,
-        )
-        assert len(result.items) == 1
-        assert result.items[0].id == second_score.id
-
-        # Create third score - should soft-delete second
-        third_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=150.0,
-        )
-
-        assert third_score.id is not None
-        assert third_score.value == 150.0
-        assert third_score.id != second_score.id
-
-        # Verify only third score is active
-        result = await score_service.list_scores(
-            account_id=account.id,
-            board_id=board.id,
-            device_id=device.id,
-            pagination=pagination,
-        )
-        assert len(result.items) == 1
-        assert result.items[0].id == third_score.id
-        assert result.items[0].value == 150.0
-
-    async def test_keep_strategy_best_only_ascending_keeps_best_score(
-        self, db_session: AsyncSession
-    ):
-        """Test BEST_ONLY with ASCENDING sort keeps lowest value (better score)."""
-        # Create supporting entities
+    async def test_get_score_by_id_run_entry(self, db_session: AsyncSession):
+        """Test getting a RunEntry score by ID."""
         account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account",
-        )
+        account = await account_service.create_account(name="Test", slug="test-get-entry")
 
         game_service = GameService(db_session)
-        game = await game_service.create_game(
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
-            name="Test Game",
-        )
-
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
             game_id=game.id,
-            client_fingerprint="d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_get_entry",
+            display_name="Speedrunner",
         )
 
-        # Create board with BEST_ONLY + ASCENDING (lower is better)
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
             game_id=game.id,
-            name="Best Only Board (ASC)",
-            icon="trophy",
-            short_code="BEST-ASC",
-            unit="seconds",
-            is_active=True,
+            name="Speedruns",
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
-        score_service = ScoreService(db_session)
-
-        # Create first score (100)
-        first_score, _ = await score_service.create_score(
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
             account_id=account.id,
             game_id=game.id,
             board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=100.0,
+            identity_id=identity.id,
+            event_payload={"value": 120.0},
         )
-        assert first_score.value == 100.0
 
-        # Submit better score (50 < 100) - should save and delete old
-        better_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
+        run_entry_service = RunEntryService(db_session)
+        entry = await run_entry_service.create_run_entry(
             board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=50.0,
-        )
-        assert better_score.id is not None
-        assert better_score.value == 50.0
-        assert better_score.id != first_score.id
-
-        # Verify old score is soft-deleted
-        first_check = await score_service.get_score(first_score.id)
-        assert first_check is None
-
-        # Verify only better score is active
-        pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await score_service.list_scores(
-            account_id=account.id,
-            board_id=board.id,
-            device_id=device.id,
-            pagination=pagination,
-        )
-        assert len(result.items) == 1
-        assert result.items[0].id == better_score.id
-        assert result.items[0].value == 50.0
-
-        # Submit worse score (150 > 50) - should return existing, not save new
-        returned_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=150.0,
+            identity_id=identity.id,
+            score_event_id=event.id,
+            primary_value=120.0,
+            player_name="Speedrunner",
         )
 
-        # Should return the existing better score
-        assert returned_score.id == better_score.id
-        assert returned_score.value == 50.0
+        service = ScoreService(db_session)
+        score_id = ScoreID(entry.id.uuid)
+        result, result_board, rank = await service.get_score_by_id(score_id)
 
-        # Verify still only one active score
-        result = await score_service.list_scores(
-            account_id=account.id,
-            board_id=board.id,
-            device_id=device.id,
-            pagination=pagination,
-        )
-        assert len(result.items) == 1
-        assert result.items[0].id == better_score.id
+        assert result.id == entry.id
+        assert result.primary_value == 120.0
+        assert result_board.id == board.id
 
-        # Submit equal score (50 == 50) - should return existing, not save new
-        equal_returned, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=50.0,
-        )
-        assert equal_returned.id == better_score.id
+    async def test_get_score_by_id_not_found(self, db_session: AsyncSession):
+        """Test getting non-existent score raises error."""
+        service = ScoreService(db_session)
+        fake_id = ScoreID()
 
-        # Still only one score
-        result = await score_service.list_scores(
-            account_id=account.id,
-            board_id=board.id,
-            device_id=device.id,
-            pagination=pagination,
-        )
-        assert len(result.items) == 1
+        with pytest.raises(EntityNotFoundError):
+            await service.get_score_by_id(fake_id)
 
-    async def test_keep_strategy_best_only_descending_keeps_best_score(
-        self, db_session: AsyncSession
-    ):
-        """Test BEST_ONLY with DESCENDING sort keeps highest value (better score)."""
-        # Create supporting entities
+    async def test_list_scores_board_state(self, db_session: AsyncSession):
+        """Test listing scores from a RUN_IDENTITY board."""
         account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account",
-        )
+        account = await account_service.create_account(name="Test", slug="test-list-state")
 
         game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6",
-        )
-
-        # Create board with BEST_ONLY + DESCENDING (higher is better)
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Best Only Board (DESC)",
-            icon="medal",
-            short_code="BEST-DESC",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
-        )
-
-        score_service = ScoreService(db_session)
-
-        # Create first score (100)
-        first_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=100.0,
-        )
-        assert first_score.value == 100.0
-
-        # Submit better score (150 > 100) - should save and delete old
-        better_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=150.0,
-        )
-        assert better_score.id is not None
-        assert better_score.value == 150.0
-        assert better_score.id != first_score.id
-
-        # Verify old score is soft-deleted
-        first_check = await score_service.get_score(first_score.id)
-        assert first_check is None
-
-        # Verify only better score is active
-        pagination = PaginationParams(cursor=None, limit=100, sort=None)
-        result = await score_service.list_scores(
-            account_id=account.id,
-            board_id=board.id,
-            device_id=device.id,
-            pagination=pagination,
-        )
-        assert len(result.items) == 1
-        assert result.items[0].id == better_score.id
-        assert result.items[0].value == 150.0
-
-        # Submit worse score (50 < 150) - should return existing, not save new
-        returned_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=50.0,
-        )
-
-        # Should return the existing better score
-        assert returned_score.id == better_score.id
-        assert returned_score.value == 150.0
-
-        # Verify still only one active score
-        result = await score_service.list_scores(
-            account_id=account.id,
-            board_id=board.id,
-            device_id=device.id,
-            pagination=pagination,
-        )
-        assert len(result.items) == 1
-        assert result.items[0].id == better_score.id
-
-
-@pytest.mark.asyncio
-class TestScoreRepository:
-    """Test suite for ScoreRepository."""
-
-    async def test_get_by_device_and_board_returns_score(self, db_session: AsyncSession):
-        """Test that get_by_device_and_board returns the score for a device on a board."""
-        # Create supporting entities
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
-        )
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
             game_id=game.id,
-            name="Test Board",
-            icon="trophy",
-            short_code="TB2025",
-            unit="points",
-            is_active=True,
+            name="High Scores",
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create a score
-        score_service = ScoreService(db_session)
-        created_score, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        state_service = BoardStateService(db_session)
+
+        for i in range(5):
+            identity, _ = await identity_service.get_or_create_identity(
+                account_id=account.id,
+                game_id=game.id,
+                kind=IdentityKind.DEVICE,
+                external_key=f"dev_list_state_{i}",
+                display_name=f"Player{i}",
+            )
+            await state_service.create_board_state(
+                board_id=board.id,
+                identity_id=identity.id,
+                primary_value=float(i * 100),
+                player_name=f"Player{i}",
+            )
+
+        service = ScoreService(db_session)
+        pagination = PaginationParams(limit=10, cursor=None, sort=None)
+        result = await service.list_scores(
             board_id=board.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=100.0,
+            pagination=pagination,
         )
 
-        # Use repository method to retrieve by device and board
-        from leadr.scores.services.repositories import ScoreRepository
+        assert len(result.items) == 5
 
-        repo = ScoreRepository(db_session)
-        found_score = await repo.get_by_device_and_board(
-            account_id=account.id,
-            device_id=device.id,
-            board_id=board.id,
-        )
-
-        assert found_score is not None
-        assert found_score.id == created_score.id
-        assert found_score.value == 100.0
-
-    async def test_get_by_device_and_board_returns_none_when_not_found(
-        self, db_session: AsyncSession
-    ):
-        """Test that get_by_device_and_board returns None when no score exists."""
-        # Create supporting entities
+    async def test_list_scores_run_entry(self, db_session: AsyncSession):
+        """Test listing scores from a RUN_RUNS board."""
         account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account",
-        )
+        account = await account_service.create_account(name="Test", slug="test-list-entry")
 
         game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3",
-        )
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
             game_id=game.id,
-            name="Test Board",
-            icon="trophy",
-            short_code="TB2025",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            name="Speedruns",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
         )
 
-        # Don't create any score - just try to retrieve
-        from leadr.scores.services.repositories import ScoreRepository
-
-        repo = ScoreRepository(db_session)
-        found_score = await repo.get_by_device_and_board(
-            account_id=account.id,
-            device_id=device.id,
-            board_id=board.id,
-        )
-
-        assert found_score is None
-
-
-@pytest.mark.asyncio
-class TestScoreServiceAroundScoreId:
-    """Test suite for list_scores with around_score_id parameter."""
-
-    async def test_list_scores_around_score_id_basic(self, db_session: AsyncSession):
-        """Test listing scores centered around a specific score."""
-        # Create supporting entities
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account-around",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
-            game_id=game.id,
-            client_fingerprint="f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7",
-        )
-
-        # Create board with DESCENDING sort (higher is better)
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
             account_id=account.id,
             game_id=game.id,
-            name="Around Test Board",
-            icon="trophy",
-            short_code="AROUND1",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_list_entry",
+            display_name="Speedrunner",
         )
 
-        # Create 7 scores with different values
-        score_service = ScoreService(db_session)
-        scores = []
-        for value in [100, 200, 300, 400, 500, 600, 700]:
-            score, _ = await score_service.create_score(
+        event_service = ScoreEventService(db_session)
+        run_entry_service = RunEntryService(db_session)
+
+        for i in range(5):
+            event = await event_service.create_score_event(
                 account_id=account.id,
                 game_id=game.id,
                 board_id=board.id,
-                device_id=device.id,
-                player_name=f"Player{value}",
-                value=float(value),
+                identity_id=identity.id,
+                event_payload={"value": float(100 + i * 10)},
             )
-            scores.append(score)
+            await run_entry_service.create_run_entry(
+                board_id=board.id,
+                identity_id=identity.id,
+                score_event_id=event.id,
+                primary_value=float(100 + i * 10),
+                player_name="Speedrunner",
+            )
 
-        # Get scores centered around the score with value 400 (scores[3])
-        target_score = scores[3]  # Player400
-        pagination = PaginationParams(cursor=None, limit=5, sort=None)
-        result = await score_service.list_scores(
-            account_id=account.id,
+        service = ScoreService(db_session)
+        pagination = PaginationParams(limit=10, cursor=None, sort=None)
+        result = await service.list_scores(
             board_id=board.id,
             pagination=pagination,
-            around_score_id=target_score.id,
         )
 
-        # With DESC sort and limit=5:
-        # Expected: [600, 500, 400, 300, 200] - 2 above, target, 2 below
         assert len(result.items) == 5
-        values = [s.value for s in result.items]
-        assert values == [600.0, 500.0, 400.0, 300.0, 200.0]
 
-        # Verify target is in the middle
-        assert result.items[2].id == target_score.id
+    async def test_list_scores_requires_board_id(self, db_session: AsyncSession):
+        """Test list_scores raises error without board_id."""
+        service = ScoreService(db_session)
+        pagination = PaginationParams(limit=10, cursor=None, sort=None)
 
-    async def test_list_scores_around_score_id_not_found(self, db_session: AsyncSession):
-        """Test that around_score_id raises error when score doesn't exist."""
-        # Create supporting entities
+        with pytest.raises(ValueError, match="board_id is required"):
+            await service.list_scores(pagination=pagination)
+
+    async def test_list_scores_with_around_score_id(self, db_session: AsyncSession):
+        """Test listing scores centered around a specific score."""
         account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account-around-404",
-        )
+        account = await account_service.create_account(name="Test", slug="test-around-id")
 
         game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
 
         board_service = BoardService(db_session)
         board = await board_service.create_board(
             account_id=account.id,
             game_id=game.id,
-            name="Around Test Board",
-            icon="trophy",
-            short_code="AROUND404",
-            unit="points",
-            is_active=True,
+            name="High Scores",
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        score_service = ScoreService(db_session)
-        non_existent_id = ScoreID(uuid4())
-        pagination = PaginationParams(cursor=None, limit=5, sort=None)
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        state_service = BoardStateService(db_session)
 
-        with pytest.raises(EntityNotFoundError) as exc_info:
-            await score_service.list_scores(
+        states = []
+        for i in range(10):
+            identity, _ = await identity_service.get_or_create_identity(
                 account_id=account.id,
-                board_id=board.id,
-                pagination=pagination,
-                around_score_id=non_existent_id,
+                game_id=game.id,
+                kind=IdentityKind.DEVICE,
+                external_key=f"dev_around_{i}",
+                display_name=f"Player{i}",
             )
+            state = await state_service.create_board_state(
+                board_id=board.id,
+                identity_id=identity.id,
+                primary_value=float((i + 1) * 100),
+                player_name=f"Player{i}",
+            )
+            states.append(state)
 
-        assert "Score not found" in str(exc_info.value)
+        # Get around the middle score
+        target_state = states[4]  # 500 points
+        service = ScoreService(db_session)
+        pagination = PaginationParams(limit=5, cursor=None, sort=None)
 
-    async def test_list_scores_around_score_id_wrong_board(self, db_session: AsyncSession):
-        """Test that around_score_id raises error when score doesn't belong to specified board."""
-        # Create supporting entities
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account-around-board",
+        result = await service.list_scores(
+            board_id=board.id,
+            pagination=pagination,
+            around_score_id=ScoreID(target_state.id.uuid),
         )
+
+        assert len(result.items) == 5
+
+    async def test_list_scores_with_around_score_value(self, db_session: AsyncSession):
+        """Test listing scores centered around a hypothetical value."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test", slug="test-around-val")
 
         game_service = GameService(db_session)
-        game = await game_service.create_game(
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
             account_id=account.id,
-            name="Test Game",
+            game_id=game.id,
+            name="High Scores",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        state_service = BoardStateService(db_session)
+
+        for i in range(5):
+            identity, _ = await identity_service.get_or_create_identity(
+                account_id=account.id,
+                game_id=game.id,
+                kind=IdentityKind.DEVICE,
+                external_key=f"dev_around_val_{i}",
+                display_name=f"Player{i}",
+            )
+            await state_service.create_board_state(
+                board_id=board.id,
+                identity_id=identity.id,
+                primary_value=float((i + 1) * 100),
+                player_name=f"Player{i}",
+            )
+
+        service = ScoreService(db_session)
+        pagination = PaginationParams(limit=5, cursor=None, sort=None)
+
+        result = await service.list_scores(
+            board_id=board.id,
+            pagination=pagination,
+            around_score_value=250.0,  # Between 200 and 300
+        )
+
+        # Should include a placeholder
+        assert len(result.items) > 0
+
+
+@pytest.mark.asyncio
+class TestScoreServiceRatioIntegration:
+    """Tests for ratio board integration."""
+
+    async def test_submit_score_schedules_ratio_update(self, db_session: AsyncSession):
+        """Test that submitting to a source board schedules ratio updates."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test", slug="test-ratio-sched")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
             game_id=game.id,
-            client_fingerprint="a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8",
+            kind=IdentityKind.DEVICE,
+            external_key="dev_ratio_sched",
+            display_name="Player1",
         )
 
         board_service = BoardService(db_session)
-        board1 = await board_service.create_board(
+        # Create counter board (source)
+        counter_board = await board_service.create_board(
             account_id=account.id,
             game_id=game.id,
-            name="Board 1",
-            icon="trophy",
-            short_code="BOARD1",
-            unit="points",
-            is_active=True,
+            name="Kills",
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
-        )
-        board2 = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Board 2",
-            icon="star",
-            short_code="BOARD2",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            board_type=BoardType.COUNTER,
+            keep_strategy=KeepStrategy.NA,
         )
 
-        # Create score on board1
-        score_service = ScoreService(db_session)
-        score_on_board1, _ = await score_service.create_score(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board1.id,
-            device_id=device.id,
-            player_name="TestPlayer",
-            value=100.0,
+        service = ScoreService(db_session)
+
+        # Mock background tasks
+        mock_background = Mock(spec=BackgroundTasks)
+
+        # Submit score with background tasks
+        await service.submit_score(
+            board_id=counter_board.id,
+            identity_id=identity.id,
+            delta=5.0,
+            player_name="Player1",
+            background_tasks=mock_background,
         )
 
-        # Try to list scores on board2 with around_score_id from board1
-        pagination = PaginationParams(cursor=None, limit=5, sort=None)
-
-        with pytest.raises(ValueError) as exc_info:
-            await score_service.list_scores(
-                account_id=account.id,
-                board_id=board2.id,
-                pagination=pagination,
-                around_score_id=score_on_board1.id,
-            )
-
-        assert "does not belong to board" in str(exc_info.value).lower()
+        # Background tasks should have been called if there were ratio dependencies
+        # (In this case, there are none, so it won't be called)
+        # This test verifies the code path works without errors

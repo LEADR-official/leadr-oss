@@ -1,10 +1,15 @@
 """Tests for Device API routes."""
 
+from datetime import UTC, datetime
+
 import pytest
 from httpx import AsyncClient
 
+from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.account_service import AccountService
+from leadr.accounts.services.repositories import AccountRepository
 from leadr.auth.services.device_service import DeviceService
+from leadr.common.domain.ids import AccountID
 from leadr.games.services.game_service import GameService
 
 
@@ -31,12 +36,12 @@ class TestDeviceRoutes:
         device_service = DeviceService(db_session)
         hash1 = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
         hash2 = "f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89"
-        device1, _, _, _ = await device_service.start_session(
+        await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint=hash1,
             platform="iOS",
         )
-        device2, _, _, _ = await device_service.start_session(
+        await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint=hash2,
             platform="Android",
@@ -80,11 +85,11 @@ class TestDeviceRoutes:
         device_service = DeviceService(db_session)
         hash1 = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
         hash2 = "f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89"
-        await device_service.start_session(
+        await device_service.get_or_create_device(
             game_id=game1.id,
             client_fingerprint=hash1,
         )
-        await device_service.start_session(
+        await device_service.get_or_create_device(
             game_id=game2.id,
             client_fingerprint=hash2,
         )
@@ -123,11 +128,11 @@ class TestDeviceRoutes:
         device_service = DeviceService(db_session)
         hash1 = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
         hash2 = "f0bfe8b352e3f87c10f5f37ccd2e3a5fb22ba397a54b43172a9770466537bc89"
-        device1, _, _, _ = await device_service.start_session(
+        await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint=hash1,
         )
-        device2, _, _, _ = await device_service.start_session(
+        device2 = await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint=hash2,
         )
@@ -168,7 +173,7 @@ class TestDeviceRoutes:
         # Create device
         device_service = DeviceService(db_session)
         hash1 = "cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0"
-        device, _, _, _ = await device_service.start_session(
+        device = await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint=hash1,
             platform="iOS",
@@ -213,7 +218,7 @@ class TestDeviceRoutes:
 
         # Create device
         device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        device = await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
@@ -246,7 +251,7 @@ class TestDeviceRoutes:
 
         # Create device
         device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        device = await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
@@ -279,7 +284,7 @@ class TestDeviceRoutes:
 
         # Create and suspend device
         device_service = DeviceService(db_session)
-        device, _, _, _ = await device_service.start_session(
+        device = await device_service.get_or_create_device(
             game_id=game.id,
             client_fingerprint="cdf93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfb0",
         )
@@ -301,12 +306,6 @@ class TestDeviceRoutes:
         self, authenticated_client: AsyncClient, db_session
     ):
         """Test that superadmin can list devices WITHOUT account_id and sees all accounts."""
-        from datetime import UTC, datetime
-
-        from leadr.accounts.domain.account import Account, AccountStatus
-        from leadr.accounts.services.repositories import AccountRepository
-        from leadr.common.domain.ids import AccountID
-
         # Create two accounts with devices in each
         account_repo = AccountRepository(db_session)
         now = datetime.now(UTC)
@@ -344,11 +343,11 @@ class TestDeviceRoutes:
         device_service = DeviceService(db_session)
         hash1 = "ccc93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfc0"
         hash2 = "ddd93498135a6f1cba7de719278b27b7dd993547eec4127492fc94c35e3fbfd0"
-        await device_service.start_session(
+        await device_service.get_or_create_device(
             game_id=game1.id,
             client_fingerprint=hash1,
         )
-        await device_service.start_session(
+        await device_service.get_or_create_device(
             game_id=game2.id,
             client_fingerprint=hash2,
         )

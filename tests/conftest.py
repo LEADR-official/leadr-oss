@@ -19,6 +19,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from api.main import create_app
+
 # Import all ORM models to register them with SQLAlchemy metadata
 from leadr.accounts.adapters.orm import AccountORM, UserORM  # noqa: F401
 from leadr.accounts.domain.account import Account, AccountStatus
@@ -30,7 +32,7 @@ from leadr.auth.domain.device import Device
 from leadr.auth.services.dependencies import get_api_key_service
 from leadr.auth.services.repositories import DeviceRepository
 from leadr.boards.adapters.orm import BoardORM  # noqa: F401
-from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
 from leadr.boards.services.repositories import BoardRepository
 from leadr.common.database import get_db
 from leadr.common.domain.ids import (
@@ -38,7 +40,6 @@ from leadr.common.domain.ids import (
     BoardID,
     DeviceID,
     GameID,
-    ScoreID,
     UserID,
 )
 from leadr.common.orm import Base
@@ -52,9 +53,7 @@ from leadr.registration.adapters.orm import (  # noqa: F401
     JamCodeRedemptionORM,
     VerificationCodeORM,
 )
-from leadr.scores.adapters.orm import ScoreFlagORM, ScoreORM, ScoreSubmissionMetaORM  # noqa: F401
-from leadr.scores.domain.score import Score
-from leadr.scores.services.repositories import ScoreRepository
+from leadr.scores.adapters.orm import ScoreFlagORM, ScoreSubmissionMetaORM  # noqa: F401
 
 # Import all ORM fixtures from fixtures module
 from tests.fixtures import *  # noqa: F403, F401
@@ -213,8 +212,6 @@ def test_app():
     Tests that need to set dependency_overrides should request this fixture
     in addition to client/authenticated_client.
     """
-    from api.main import create_app
-
     return create_app(lifespan_override=noop_lifespan)
 
 
@@ -395,7 +392,7 @@ async def test_board(db_session: AsyncSession, test_account: Account, test_game)
         unit="points",
         is_active=True,
         sort_direction=SortDirection.DESCENDING,
-        keep_strategy=KeepStrategy.ALL,  # Use ALL to keep all scores for testing
+        keep_strategy=KeepStrategy.BEST,  # Use ALL to keep all scores for testing
         created_at=now,
         updated_at=now,
     )
@@ -403,31 +400,36 @@ async def test_board(db_session: AsyncSession, test_account: Account, test_game)
 
 
 @pytest_asyncio.fixture
-async def test_score(
-    db_session: AsyncSession, test_account: Account, test_game, test_board, test_device
-):
-    """Create a test score for use in tests.
+async def run_runs_board(db_session: AsyncSession, test_account: Account, test_game):
+    """Create a RUN_RUNS board that keeps all score submissions.
+
+    Use this fixture for tests that need to create multiple scores from the same
+    device/identity and have all of them stored (pagination tests, around tests).
 
     Returns:
-        The created Score domain entity.
+        The created Board domain entity.
     """
-
-    score_repo = ScoreRepository(db_session)
-    score_id = ScoreID()
+    board_repo = BoardRepository(db_session)
+    board_id = BoardID()
     now = datetime.now(UTC)
 
-    score = Score(
-        id=score_id,
+    board = Board(
+        id=board_id,
         account_id=test_account.id,
         game_id=test_game.id,
-        board_id=test_board.id,
-        device_id=test_device.id,
-        player_name="Test Player",
-        value=1000.0,
+        name="Test Board (RUN_RUNS)",
+        slug="test-board-run-runs",
+        icon="trophy",
+        short_code=f"RUNS{str(board_id.uuid)[:6]}".upper(),
+        unit="points",
+        is_active=True,
+        sort_direction=SortDirection.DESCENDING,
+        board_type=BoardType.RUN_RUNS,
+        keep_strategy=KeepStrategy.NA,
         created_at=now,
         updated_at=now,
     )
-    return await score_repo.create(score)
+    return await board_repo.create(board)
 
 
 @pytest_asyncio.fixture

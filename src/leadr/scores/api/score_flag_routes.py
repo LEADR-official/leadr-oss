@@ -11,6 +11,7 @@ from leadr.common.domain.ids import AccountID, BoardID, GameID, ScoreFlagID
 from leadr.scores.api.score_flag_schemas import ScoreFlagResponse, ScoreFlagUpdateRequest
 from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
 from leadr.scores.services.dependencies import ScoreFlagServiceDep
+from leadr.scores.services.score_event_service import ScoreEventService
 
 router = APIRouter()
 
@@ -112,15 +113,12 @@ async def get_score_flag(
     """
     flag = await service.get_by_id_or_raise(flag_id)
 
-    # Get the associated score to check account access
-    # We need to import ScoreService to look up the score
-    from leadr.scores.services.score_service import ScoreService
-
-    score_service = ScoreService(service.repository.session)
-    score = await score_service.get_by_id_or_raise(flag.score_id)
+    # Get the associated score event to check account access
+    score_event_service = ScoreEventService(service.repository.session)
+    score_event = await score_event_service.get_by_id_or_raise(flag.score_event_id)
 
     # Check authorization
-    if not auth.has_access_to_account(score.account_id):
+    if not auth.has_access_to_account(score_event.account_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this flag's account",
@@ -158,14 +156,12 @@ async def update_score_flag(
     # Get the flag to check account access
     flag = await service.get_by_id_or_raise(flag_id)
 
-    # Get the associated score to check account access
-    from leadr.scores.services.score_service import ScoreService
-
-    score_service = ScoreService(service.repository.session)
-    score = await score_service.get_by_id_or_raise(flag.score_id)
+    # Get the associated score event to check account access
+    score_event_service = ScoreEventService(service.repository.session)
+    score_event = await score_event_service.get_by_id_or_raise(flag.score_event_id)
 
     # Check authorization
-    if not auth.has_access_to_account(score.account_id):
+    if not auth.has_access_to_account(score_event.account_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this flag's account",

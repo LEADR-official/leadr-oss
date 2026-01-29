@@ -1,5 +1,6 @@
 """Tests for API exception handlers."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -152,8 +153,6 @@ class TestValidationErrorHandler:
 
         response = await validation_error_handler(mock_request, exc)
 
-        import json
-
         body = json.loads(bytes(response.body))
         assert "error" in body
         assert len(body["error"]) == 1
@@ -168,8 +167,6 @@ class TestValidationErrorHandler:
         exc = RequestValidationError(errors=[], body=request_body)
 
         response = await validation_error_handler(mock_request, exc)
-
-        import json
 
         body = json.loads(bytes(response.body))
         assert "body" in body
@@ -196,8 +193,6 @@ class TestValidationErrorHandler:
         exc = RequestValidationError(errors=validation_errors)
 
         response = await validation_error_handler(mock_request, exc)
-
-        import json
 
         body = json.loads(bytes(response.body))
         assert len(body["error"]) == 2

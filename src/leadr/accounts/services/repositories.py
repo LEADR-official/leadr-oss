@@ -4,9 +4,9 @@ from typing import Any
 
 from sqlalchemy import select
 
-from leadr.accounts.adapters.orm import AccountORM, AccountStatusEnum, UserORM
+from leadr.accounts.adapters.orm import AccountORM, AccountStatusEnum, UserORM, UserStatusEnum
 from leadr.accounts.domain.account import Account, AccountStatus
-from leadr.accounts.domain.user import User
+from leadr.accounts.domain.user import User, UserStatus
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, UserID
 from leadr.common.domain.pagination_result import PaginatedResult
@@ -139,8 +139,6 @@ class UserRepository(BaseRepository[User, UserORM]):
 
     def _to_domain(self, orm: UserORM) -> User:
         """Convert ORM model to domain entity."""
-        from leadr.accounts.domain.user import UserStatus
-
         return User(
             id=UserID(orm.id),
             account_id=AccountID(orm.account_id),
@@ -156,8 +154,6 @@ class UserRepository(BaseRepository[User, UserORM]):
 
     def _to_orm(self, entity: User) -> UserORM:
         """Convert domain entity to ORM model."""
-        from leadr.accounts.adapters.orm import UserStatusEnum
-
         return UserORM(
             id=entity.id.uuid,
             account_id=entity.account_id.uuid,

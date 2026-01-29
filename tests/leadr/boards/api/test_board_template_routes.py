@@ -5,7 +5,11 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from httpx import AsyncClient
 
+from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.account_service import AccountService
+from leadr.accounts.services.repositories import AccountRepository
+from leadr.boards.services.board_template_service import BoardTemplateService
+from leadr.common.domain.ids import AccountID
 from leadr.games.services.game_service import GameService
 
 
@@ -389,13 +393,6 @@ class TestBoardTemplateRoutes:
         self, authenticated_client: AsyncClient, db_session
     ):
         """Test that superadmin can list board templates WITHOUT account_id and sees all."""
-        from datetime import UTC, datetime, timedelta
-
-        from leadr.accounts.domain.account import Account, AccountStatus
-        from leadr.accounts.services.repositories import AccountRepository
-        from leadr.boards.services.board_template_service import BoardTemplateService
-        from leadr.common.domain.ids import AccountID
-
         # Create two accounts with board templates in each
         account_repo = AccountRepository(db_session)
         now = datetime.now(UTC)

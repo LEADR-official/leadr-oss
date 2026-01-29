@@ -21,13 +21,16 @@ from leadr.auth.api.client_routes import (
     public_router as client_public_router,
 )
 from leadr.auth.api.device_routes import router as device_router
-from leadr.auth.api.device_session_routes import router as device_session_router
+from leadr.auth.api.identity_routes import router as identity_router
+from leadr.auth.api.identity_session_routes import router as identity_session_router
 from leadr.auth.bootstrap import ensure_superadmin_exists
 from leadr.auth.dependencies import require_admin_auth
 from leadr.auth.services.nonce_tasks import cleanup_expired_nonces
 from leadr.boards.api.board_routes import client_router as board_client_router
 from leadr.boards.api.board_routes import router as board_router
+from leadr.boards.api.board_state_routes import router as board_state_router
 from leadr.boards.api.board_template_routes import router as board_template_router
+from leadr.boards.api.run_entry_routes import router as run_entry_router
 from leadr.boards.services.board_tasks import expire_boards, process_due_templates
 from leadr.common.api.exceptions import (
     catchall_exception_handler,
@@ -45,6 +48,7 @@ from leadr.games.api.game_routes import router as game_router
 from leadr.logging import setup_logging
 from leadr.registration.api.routes import public_router as registration_public_router
 from leadr.registration.api.routes import router as jam_code_router
+from leadr.scores.api.score_event_routes import router as score_event_router
 from leadr.scores.api.score_flag_routes import router as score_flag_router
 from leadr.scores.api.score_routes import client_router as score_client_router
 from leadr.scores.api.score_routes import router as score_router
@@ -209,12 +213,16 @@ def create_app(
     admin_router.include_router(api_key_router, tags=["API Keys"])
     admin_router.include_router(game_router, tags=["Games"])
     admin_router.include_router(board_router, tags=["Boards"])
+    admin_router.include_router(board_state_router, tags=["Board States"])
     admin_router.include_router(board_template_router, tags=["Board Templates"])
+    admin_router.include_router(run_entry_router, tags=["Run Entries"])
     admin_router.include_router(score_router, tags=["Scores"])
+    admin_router.include_router(score_event_router, tags=["Score Events"])
     admin_router.include_router(score_flag_router, tags=["Score Flags"])
     admin_router.include_router(score_submission_meta_router, tags=["Score Submission Metadata"])
     admin_router.include_router(device_router, tags=["Devices"])
-    admin_router.include_router(device_session_router, tags=["Device Sessions"])
+    admin_router.include_router(identity_router, tags=["Identities"])
+    admin_router.include_router(identity_session_router, tags=["Identity Sessions"])
     admin_router.include_router(jam_code_router, tags=["Registration"])
 
     # Include admin router only when Admin API is enabled

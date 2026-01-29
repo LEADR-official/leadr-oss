@@ -1,9 +1,15 @@
 """Tests for Game API routes."""
 
+from datetime import UTC, datetime
+
 import pytest
 from httpx import AsyncClient
 
+from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.account_service import AccountService
+from leadr.accounts.services.repositories import AccountRepository
+from leadr.common.domain.ids import AccountID
+from leadr.games.services.game_service import GameService
 
 
 @pytest.mark.asyncio
@@ -412,13 +418,6 @@ class TestGameRoutes:
         self, authenticated_client: AsyncClient, db_session
     ):
         """Test that superadmin can list games WITHOUT account_id and sees all accounts."""
-        from datetime import UTC, datetime
-
-        from leadr.accounts.domain.account import Account, AccountStatus
-        from leadr.accounts.services.repositories import AccountRepository
-        from leadr.common.domain.ids import AccountID
-        from leadr.games.services.game_service import GameService
-
         # Create two accounts with games in each
         account_repo = AccountRepository(db_session)
         now = datetime.now(UTC)

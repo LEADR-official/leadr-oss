@@ -1,5 +1,8 @@
 """Registration service for orchestrating account creation and invite completion flows."""
 
+import random
+import string
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account
@@ -273,8 +276,5 @@ class RegistrationService:
             # Safety check to prevent infinite loop
             if counter > 1000:
                 # Add random suffix
-                import random
-                import string
-
                 random_suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=4))  # noqa: S311
                 return f"{base_slug}-{random_suffix}"

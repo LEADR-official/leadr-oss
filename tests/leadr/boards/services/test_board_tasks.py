@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.exc import DBAPIError, OperationalError
 
 from leadr.accounts.services.account_service import AccountService
@@ -47,7 +48,7 @@ class TestProcessDueTemplates:
             icon="star",
             unit="points",
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             config={},
         )
 
@@ -62,7 +63,6 @@ class TestProcessDueTemplates:
             await process_due_templates()
 
         # Verify board was created
-        from sqlalchemy import select
 
         result = await db_session.execute(
             select(BoardORM).where(
@@ -121,7 +121,6 @@ class TestProcessDueTemplates:
             await process_due_templates()
 
         # Verify no board was created
-        from sqlalchemy import select
 
         result = await db_session.execute(
             select(BoardORM).where(
@@ -274,7 +273,7 @@ class TestExpireBoards:
             unit="points",
             is_active=True,  # Should be set to False
             sort_direction=SortDirection.DESCENDING.value,
-            keep_strategy=KeepStrategy.BEST_ONLY.value,
+            keep_strategy=KeepStrategy.BEST.value,
             starts_at=past_time - timedelta(days=1),
             ends_at=past_time,  # Expired
         )
@@ -320,7 +319,7 @@ class TestExpireBoards:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING.value,
-            keep_strategy=KeepStrategy.BEST_ONLY.value,
+            keep_strategy=KeepStrategy.BEST.value,
             starts_at=datetime.now(UTC),
             ends_at=future_time,  # Not expired
         )
@@ -379,7 +378,7 @@ class TestExpireBoards:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING.value,
-            keep_strategy=KeepStrategy.BEST_ONLY.value,
+            keep_strategy=KeepStrategy.BEST.value,
             starts_at=past_time - timedelta(days=1),
             ends_at=past_time,
         )

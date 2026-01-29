@@ -8,15 +8,15 @@ from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import (
     AccountID,
     BoardID,
-    DeviceID,
     GameID,
+    IdentityID,
+    ScoreEventID,
     ScoreFlagID,
-    ScoreID,
     ScoreSubmissionMetaID,
 )
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
-from leadr.scores.adapters.orm import ScoreFlagORM, ScoreSubmissionMetaORM
+from leadr.scores.adapters.orm import ScoreEventORM, ScoreFlagORM, ScoreSubmissionMetaORM
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
 
 
@@ -25,7 +25,7 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
 
     SORTABLE_FIELDS = {
         "id",
-        "device_id",
+        "identity_id",
         "board_id",
         "submission_count",
         "last_submission_at",
@@ -38,8 +38,8 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
         """Convert ORM model to domain entity."""
         return ScoreSubmissionMeta(
             id=ScoreSubmissionMetaID(orm.id),
-            score_id=ScoreID(orm.score_id),
-            device_id=DeviceID(orm.device_id),
+            score_event_id=ScoreEventID(orm.score_event_id),
+            identity_id=IdentityID(orm.identity_id),
             board_id=BoardID(orm.board_id),
             submission_count=orm.submission_count,
             last_submission_at=orm.last_submission_at,
@@ -53,8 +53,8 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
         """Convert domain entity to ORM model."""
         return ScoreSubmissionMetaORM(
             id=entity.id.uuid,
-            score_id=entity.score_id.uuid,
-            device_id=entity.device_id.uuid,
+            score_event_id=entity.score_event_id.uuid,
+            identity_id=entity.identity_id.uuid,
             board_id=entity.board_id.uuid,
             submission_count=entity.submission_count,
             last_submission_at=entity.last_submission_at,
@@ -72,29 +72,27 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
         self,
         account_id: AccountID | None = None,
         board_id: BoardID | None = None,
-        device_id: DeviceID | None = None,
+        identity_id: IdentityID | None = None,
         *,
         pagination: PaginationParams,
         **kwargs: Any,
     ) -> PaginatedResult[ScoreSubmissionMeta]:
         """Filter submission metadata by account and optional criteria with pagination.
 
-        Joins with scores table to filter by account_id since submission meta doesn't have
+        Joins with score_events table to filter by account_id since submission meta doesn't have
         a direct account relation.
 
         Args:
             account_id: Optional account ID to filter by. If None, returns all metadata
                 (superadmin use case). Regular users should always pass account_id.
             board_id: Optional board ID to filter by
-            device_id: Optional device ID to filter by
+            identity_id: Optional identity ID to filter by
             pagination: Pagination parameters (required)
             **kwargs: Additional filter parameters (reserved for future use)
 
         Returns:
             PaginatedResult containing submission metadata matching the filter criteria
         """
-        from leadr.scores.adapters.orm import ScoreORM
-
         # Build base query
         query = select(ScoreSubmissionMetaORM).where(ScoreSubmissionMetaORM.deleted_at.is_(None))
 
@@ -103,10 +101,10 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
 
         if account_id is not None:
             account_uuid = self._extract_uuid(account_id)
-            # Join with scores table to filter by account
-            query = query.join(ScoreORM, ScoreSubmissionMetaORM.score_id == ScoreORM.id).where(
-                ScoreORM.account_id == account_uuid
-            )
+            # Join with score_events table to filter by account
+            query = query.join(
+                ScoreEventORM, ScoreSubmissionMetaORM.score_event_id == ScoreEventORM.id
+            ).where(ScoreEventORM.account_id == account_uuid)
             filters_dict["account_id"] = str(account_uuid)
 
         # Apply optional filters
@@ -115,10 +113,10 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
             query = query.where(ScoreSubmissionMetaORM.board_id == board_uuid)
             filters_dict["board_id"] = str(board_uuid)
 
-        if device_id is not None:
-            device_uuid = self._extract_uuid(device_id)
-            query = query.where(ScoreSubmissionMetaORM.device_id == device_uuid)
-            filters_dict["device_id"] = str(device_uuid)
+        if identity_id is not None:
+            identity_uuid = self._extract_uuid(identity_id)
+            query = query.where(ScoreSubmissionMetaORM.identity_id == identity_uuid)
+            filters_dict["identity_id"] = str(identity_uuid)
 
         # Validate sort fields
         for sort_field in pagination.sort_spec:
@@ -143,22 +141,22 @@ class ScoreSubmissionMetaRepository(BaseRepository[ScoreSubmissionMeta, ScoreSub
             limit=pagination.limit,
         )
 
-    async def get_by_device_and_board(
-        self, device_id: DeviceID, board_id: BoardID
+    async def get_by_identity_and_board(
+        self, identity_id: IdentityID, board_id: BoardID
     ) -> ScoreSubmissionMeta | None:
-        """Get submission metadata for a device/board combination.
+        """Get submission metadata for an identity/board combination.
 
         Args:
-            device_id: ID of the device submitting scores
+            identity_id: ID of the identity submitting scores
             board_id: ID of the board being submitted to
 
         Returns:
             ScoreSubmissionMeta if found, None otherwise
         """
-        device_uuid = self._extract_uuid(device_id)
+        identity_uuid = self._extract_uuid(identity_id)
         board_uuid = self._extract_uuid(board_id)
         query = select(ScoreSubmissionMetaORM).where(
-            ScoreSubmissionMetaORM.device_id == device_uuid,
+            ScoreSubmissionMetaORM.identity_id == identity_uuid,
             ScoreSubmissionMetaORM.board_id == board_uuid,
             ScoreSubmissionMetaORM.deleted_at.is_(None),
         )
@@ -174,7 +172,7 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
 
     SORTABLE_FIELDS = {
         "id",
-        "score_id",
+        "score_event_id",
         "flag_type",
         "confidence",
         "status",
@@ -184,8 +182,8 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
 
     def _to_domain(self, orm: ScoreFlagORM) -> ScoreFlag:
         """Convert ORM model to domain entity."""
-        from leadr.common.domain.ids import UserID
-        from leadr.scores.domain.anti_cheat.enums import (
+        from leadr.common.domain.ids import UserID  # noqa: PLC0415
+        from leadr.scores.domain.anti_cheat.enums import (  # noqa: PLC0415
             FlagConfidence,
             FlagType,
             ScoreFlagStatus,
@@ -193,7 +191,7 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
 
         return ScoreFlag(
             id=ScoreFlagID(orm.id),
-            score_id=ScoreID(orm.score_id),
+            score_event_id=ScoreEventID(orm.score_event_id),
             flag_type=FlagType(orm.flag_type),
             confidence=FlagConfidence(orm.confidence),
             metadata=orm.flag_metadata,
@@ -210,7 +208,7 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
         """Convert domain entity to ORM model."""
         return ScoreFlagORM(
             id=entity.id.uuid,
-            score_id=entity.score_id.uuid,
+            score_event_id=entity.score_event_id.uuid,
             flag_type=entity.flag_type.value,
             confidence=entity.confidence.value,
             flag_metadata=entity.metadata,
@@ -240,7 +238,7 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
     ) -> PaginatedResult[ScoreFlag]:
         """Filter flags by account and optional criteria with pagination.
 
-        Joins with scores table to filter by account_id since flags don't have
+        Joins with score_events table to filter by account_id since flags don't have
         a direct account relation.
 
         Args:
@@ -256,32 +254,30 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
         Returns:
             PaginatedResult containing flags matching the filter criteria
         """
-        from leadr.scores.adapters.orm import ScoreORM
-
         # Build base query
         query = select(ScoreFlagORM).where(ScoreFlagORM.deleted_at.is_(None))
 
-        # Join with scores table if we need to filter by account, board, or game
-        needs_score_join = account_id is not None or board_id is not None or game_id is not None
-        if needs_score_join:
-            query = query.join(ScoreORM, ScoreFlagORM.score_id == ScoreORM.id)
+        # Join with score_events table if we need to filter by account, board, or game
+        needs_event_join = account_id is not None or board_id is not None or game_id is not None
+        if needs_event_join:
+            query = query.join(ScoreEventORM, ScoreFlagORM.score_event_id == ScoreEventORM.id)
 
         # Build filters dict for cursor validation
         filters_dict: dict[str, Any] = {}
 
         if account_id is not None:
             account_uuid = self._extract_uuid(account_id)
-            query = query.where(ScoreORM.account_id == account_uuid)
+            query = query.where(ScoreEventORM.account_id == account_uuid)
             filters_dict["account_id"] = str(account_uuid)
 
         if board_id is not None:
             board_uuid = self._extract_uuid(board_id)
-            query = query.where(ScoreORM.board_id == board_uuid)
+            query = query.where(ScoreEventORM.board_id == board_uuid)
             filters_dict["board_id"] = str(board_uuid)
 
         if game_id is not None:
             game_uuid = self._extract_uuid(game_id)
-            query = query.where(ScoreORM.game_id == game_uuid)
+            query = query.where(ScoreEventORM.game_id == game_uuid)
             filters_dict["game_id"] = str(game_uuid)
 
         if status is not None:
@@ -315,18 +311,18 @@ class ScoreFlagRepository(BaseRepository[ScoreFlag, ScoreFlagORM]):
             limit=pagination.limit,
         )
 
-    async def get_flags_by_score_id(self, score_id: ScoreID) -> list[ScoreFlag]:
-        """Get all flags for a specific score.
+    async def get_flags_by_score_event_id(self, score_event_id: ScoreEventID) -> list[ScoreFlag]:
+        """Get all flags for a specific score event.
 
         Args:
-            score_id: ID of the score to get flags for
+            score_event_id: ID of the score event to get flags for
 
         Returns:
-            List of flags for the score (excludes soft-deleted)
+            List of flags for the score event (excludes soft-deleted)
         """
-        score_uuid = self._extract_uuid(score_id)
+        score_event_uuid = self._extract_uuid(score_event_id)
         query = select(ScoreFlagORM).where(
-            ScoreFlagORM.score_id == score_uuid,
+            ScoreFlagORM.score_event_id == score_event_uuid,
             ScoreFlagORM.deleted_at.is_(None),
         )
 

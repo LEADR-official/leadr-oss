@@ -1,13 +1,18 @@
 """Tests for Client Authentication API routes."""
 
 import hashlib
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+import jwt
 import pytest
 from httpx import AsyncClient
 
 from leadr.accounts.services.account_service import AccountService
-from leadr.auth.services.device_service import DeviceService
+from leadr.auth.adapters.orm import DeviceORM, IdentityORM, IdentitySessionORM, NonceORM
+from leadr.auth.domain.identity import IdentityKind
+from leadr.auth.services.nonce_service import NonceService
+from leadr.common.domain.ids import IdentityID
 from leadr.games.services.game_service import GameService
 
 
@@ -16,7 +21,7 @@ class TestClientSessionRoutes:
     """Test suite for client session API routes."""
 
     async def test_start_session_creates_new_device(self, client: AsyncClient, db_session):
-        """Test starting a session creates a new device and returns token."""
+        """Test starting a session creates a new identity and returns token."""
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -43,16 +48,19 @@ class TestClientSessionRoutes:
 
         assert response.status_code == 201
         data = response.json()
-        assert data["client_fingerprint"] == device_id
+        # New identity-first response schema
+        assert "identity_id" in data
         assert data["game_id"] == str(game.id)
-        assert data["platform"] == "ios"
+        assert data["account_id"] == str(account.id)
+        assert data["kind"] == IdentityKind.DEVICE.value
         assert "access_token" in data
+        assert "refresh_token" in data
         assert "expires_in" in data
         assert data["expires_in"] > 0
         assert len(data["access_token"]) > 50  # JWT tokens are long
 
     async def test_start_session_updates_existing_device(self, client: AsyncClient, db_session):
-        """Test starting a session for existing device updates last_seen_at."""
+        """Test starting a session for existing fingerprint returns same identity."""
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -67,38 +75,37 @@ class TestClientSessionRoutes:
         )
 
         # Start first session
-        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        device_fingerprint = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         response1 = await client.post(
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "client_fingerprint": device_id,
+                "client_fingerprint": device_fingerprint,
                 "platform": "android",
             },
         )
         assert response1.status_code == 201
-        device_id_from_first = response1.json()["id"]
+        identity_id_from_first = response1.json()["identity_id"]
 
-        # Start second session with same device_id
+        # Start second session with same fingerprint
         response2 = await client.post(
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "client_fingerprint": device_id,
+                "client_fingerprint": device_fingerprint,
                 "platform": "android",
             },
         )
 
         assert response2.status_code == 201
         data = response2.json()
-        # Should be same device entity
-        assert data["id"] == device_id_from_first
-        assert data["client_fingerprint"] == device_id
+        # Should be same identity
+        assert data["identity_id"] == identity_id_from_first
         # But new access token
         assert data["access_token"] != response1.json()["access_token"]
 
     async def test_start_session_with_metadata(self, client: AsyncClient, db_session):
-        """Test starting a session with device metadata."""
+        """Test starting a session with device metadata creates identity."""
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -112,8 +119,8 @@ class TestClientSessionRoutes:
             name="Test Game",
         )
 
-        # Start session with metadata
-        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        # Start session with metadata (metadata stored on device, not identity response)
+        device_fingerprint = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         metadata = {
             "device_model": "iPhone 14 Pro",
             "os_version": "iOS 17.2",
@@ -123,7 +130,7 @@ class TestClientSessionRoutes:
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "client_fingerprint": device_id,
+                "client_fingerprint": device_fingerprint,
                 "platform": "ios",
                 "metadata": metadata,
             },
@@ -131,7 +138,9 @@ class TestClientSessionRoutes:
 
         assert response.status_code == 201
         data = response.json()
-        assert data["metadata"] == metadata
+        # Response now returns identity info, not device metadata
+        assert "identity_id" in data
+        assert data["kind"] == IdentityKind.DEVICE.value
 
     async def test_start_session_without_platform(self, client: AsyncClient, db_session):
         """Test starting a session without platform (optional field)."""
@@ -149,19 +158,20 @@ class TestClientSessionRoutes:
         )
 
         # Start session without platform
-        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        device_fingerprint = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         response = await client.post(
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "client_fingerprint": device_id,
+                "client_fingerprint": device_fingerprint,
             },
         )
 
         assert response.status_code == 201
         data = response.json()
-        assert data["client_fingerprint"] == device_id
-        assert data["platform"] is None
+        # Response returns identity info (platform is stored on device, not returned)
+        assert "identity_id" in data
+        assert data["kind"] == IdentityKind.DEVICE.value
 
     async def test_start_session_with_nonexistent_game_returns_404(self, client: AsyncClient):
         """Test starting a session with nonexistent game returns 404."""
@@ -266,10 +276,6 @@ class TestClientSessionRoutes:
 
     async def test_refresh_session_with_expired_token(self, client: AsyncClient, db_session):
         """Test refreshing a session with an expired token returns 401."""
-        from datetime import UTC, datetime, timedelta
-
-        from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM
-
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -283,7 +289,7 @@ class TestClientSessionRoutes:
             name="Test Game",
         )
 
-        # Create device and expired session directly
+        # Create device, identity and expired session directly
         now = datetime.now(UTC)
         device = DeviceORM(
             id=uuid4(),
@@ -295,17 +301,30 @@ class TestClientSessionRoutes:
             status="active",
         )
         db_session.add(device)
-        await db_session.commit()
+        await db_session.flush()
+
+        identity = IdentityORM(
+            id=uuid4(),
+            account_id=account.id.uuid,
+            game_id=game.id.uuid,
+            kind="DEVICE",
+            external_key=device.client_fingerprint,
+            created_at=now,
+            updated_at=now,
+        )
+        db_session.add(identity)
+        await db_session.flush()
 
         # Create expired session
-        expired_session = DeviceSessionORM(
+        expired_session = IdentitySessionORM(
             id=uuid4(),
-            device_id=device.id,
+            identity_id=identity.id,
             access_token_hash="dummy_hash",
             refresh_token_hash="expired_refresh_hash",
             token_version=1,
             expires_at=now - timedelta(hours=1),
             refresh_expires_at=now - timedelta(hours=1),  # Expired
+            created_at=now,
         )
         db_session.add(expired_session)
         await db_session.commit()
@@ -386,8 +405,6 @@ class TestClientSessionTestMode:
 
     async def test_refresh_session_preserves_test_mode(self, client: AsyncClient, db_session):
         """Test that refreshing a test mode session preserves test_mode in new tokens."""
-        import jwt
-
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -581,8 +598,6 @@ class TestNonceIntegration:
 
     async def test_full_nonce_flow(self, client: AsyncClient, db_session):
         """Test complete nonce flow: session → nonce generation → validation → consumption."""
-        from leadr.auth.services.nonce_service import NonceService
-
         # 1. Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -596,19 +611,20 @@ class TestNonceIntegration:
             name="Test Game",
         )
 
-        # 2. Start device session
-        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        # 2. Start session (creates identity)
+        device_fingerprint = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         session_response = await client.post(
             "/client/sessions",
             json={
                 "game_id": str(game.id),
-                "client_fingerprint": device_id,
+                "client_fingerprint": device_fingerprint,
             },
         )
         assert session_response.status_code == 201
         access_token = session_response.json()["access_token"]
+        identity_id_str = session_response.json()["identity_id"]
 
-        # 3. Generate nonce for the device
+        # 3. Generate nonce for the identity
         nonce_response = await client.get(
             "/client/nonce",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -624,19 +640,15 @@ class TestNonceIntegration:
 
         # 4. Verify nonce is valid and can be consumed
         nonce_service = NonceService(db_session)
-        device_service = DeviceService(db_session)
-
-        # Get device entity
-        device = await device_service.repository.get_by_game_and_fingerprint(game.id, device_id)
-        assert device is not None
+        identity_id = IdentityID(identity_id_str)
 
         # Validate and consume the nonce
-        result = await nonce_service.validate_and_consume_nonce(nonce_value, device.id)
+        result = await nonce_service.validate_and_consume_nonce(nonce_value, identity_id)
         assert result is True
 
         # 5. Verify nonce cannot be reused (should raise ValueError)
         with pytest.raises(ValueError, match="already used"):
-            await nonce_service.validate_and_consume_nonce(nonce_value, device.id)
+            await nonce_service.validate_and_consume_nonce(nonce_value, identity_id)
 
         # 6. Generate new nonce and verify it works
         nonce_response2 = await client.get(
@@ -650,13 +662,13 @@ class TestNonceIntegration:
         assert nonce_value2 != nonce_value
 
         # New nonce should be valid
-        result2 = await nonce_service.validate_and_consume_nonce(nonce_value2, device.id)
+        result2 = await nonce_service.validate_and_consume_nonce(nonce_value2, identity_id)
         assert result2 is True
 
-    async def test_nonce_cannot_be_used_by_different_device(self, client: AsyncClient, db_session):
-        """Test that a nonce generated for one device cannot be used by another."""
-        from leadr.auth.services.nonce_service import NonceService
-
+    async def test_nonce_cannot_be_used_by_different_identity(
+        self, client: AsyncClient, db_session
+    ):
+        """Test that a nonce generated for one identity cannot be used by another."""
         # Create account and game
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -670,48 +682,40 @@ class TestNonceIntegration:
             name="Test Game",
         )
 
-        # Start sessions for two devices (use SHA256 hashes as fingerprints)
-        import hashlib
-
-        device1_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
-        device2_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        # Start sessions for two identities (use SHA256 hashes as fingerprints)
+        fingerprint1 = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        fingerprint2 = hashlib.sha256(str(uuid4()).encode()).hexdigest()
 
         session1 = await client.post(
             "/client/sessions",
-            json={"game_id": str(game.id), "client_fingerprint": device1_id},
+            json={"game_id": str(game.id), "client_fingerprint": fingerprint1},
         )
         access_token1 = session1.json()["access_token"]
 
-        # Start session for device 2
-        await client.post(
+        # Start session for identity 2
+        session2 = await client.post(
             "/client/sessions",
-            json={"game_id": str(game.id), "client_fingerprint": device2_id},
+            json={"game_id": str(game.id), "client_fingerprint": fingerprint2},
         )
+        identity2_id_str = session2.json()["identity_id"]
 
-        # Generate nonce for device 1
+        # Generate nonce for identity 1
         nonce_response = await client.get(
             "/client/nonce",
             headers={"Authorization": f"Bearer {access_token1}"},
         )
         nonce_value = nonce_response.json()["nonce_value"]
 
-        # Try to use device1's nonce with device2
-        device_service = DeviceService(db_session)
-        device2 = await device_service.repository.get_by_game_and_fingerprint(game.id, device2_id)
-        assert device2 is not None
+        # Try to use identity1's nonce with identity2
+        identity2_id = IdentityID(identity2_id_str)
 
         nonce_service = NonceService(db_session)
         with pytest.raises(ValueError, match="does not belong"):
-            await nonce_service.validate_and_consume_nonce(nonce_value, device2.id)
+            await nonce_service.validate_and_consume_nonce(nonce_value, identity2_id)
 
     async def test_expired_nonce_cannot_be_used(self, client: AsyncClient, db_session):
         """Test that an expired nonce cannot be used."""
-        from datetime import UTC, datetime, timedelta
-
-        from leadr.auth.adapters.orm import NonceORM
-        from leadr.auth.services.nonce_service import NonceService
-
-        # Create account, game, and device
+        # Create account, game, and identity
         account_service = AccountService(db_session)
         account = await account_service.create_account(
             name="Test Account",
@@ -724,21 +728,19 @@ class TestNonceIntegration:
             name="Test Game",
         )
 
-        # Get device via session
-        device_id = hashlib.sha256(str(uuid4()).encode()).hexdigest()
-        await client.post(
+        # Get identity via session
+        device_fingerprint = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        session_response = await client.post(
             "/client/sessions",
-            json={"game_id": str(game.id), "client_fingerprint": device_id},
+            json={"game_id": str(game.id), "client_fingerprint": device_fingerprint},
         )
-
-        device_service = DeviceService(db_session)
-        device = await device_service.repository.get_by_game_and_fingerprint(game.id, device_id)
-        assert device is not None
+        identity_id_str = session_response.json()["identity_id"]
+        identity_id = IdentityID(identity_id_str)
 
         # Manually create an expired nonce
         expired_nonce = NonceORM(
             id=uuid4(),
-            device_id=device.id.uuid,
+            identity_id=identity_id.uuid,
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(seconds=1),  # Expired 1 second ago
             status="pending",
@@ -749,4 +751,4 @@ class TestNonceIntegration:
         # Try to use expired nonce
         nonce_service = NonceService(db_session)
         with pytest.raises(ValueError, match="expired"):
-            await nonce_service.validate_and_consume_nonce(expired_nonce.nonce_value, device.id)
+            await nonce_service.validate_and_consume_nonce(expired_nonce.nonce_value, identity_id)

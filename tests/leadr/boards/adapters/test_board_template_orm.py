@@ -3,8 +3,8 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from leadr.boards.adapters.orm import BoardTemplateORM
-from leadr.boards.domain.board import KeepStrategy, SortDirection
+from leadr.boards.adapters.orm import BoardTemplateORM, BoardTypeEnum, KeepStrategyEnum
+from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 
@@ -30,7 +30,8 @@ class TestBoardTemplateORM:
             icon="fa-trophy",
             unit="seconds",
             sort_direction="ASCENDING",
-            keep_strategy="BEST_ONLY",
+            board_type=BoardTypeEnum.RUN_IDENTITY,
+            keep_strategy=KeepStrategyEnum.BEST,
             starts_at=now,
             ends_at=now + timedelta(days=30),
             tags=["speedrun", "weekly"],
@@ -56,7 +57,8 @@ class TestBoardTemplateORM:
         assert domain.icon == "fa-trophy"
         assert domain.unit == "seconds"
         assert domain.sort_direction == SortDirection.ASCENDING
-        assert domain.keep_strategy == KeepStrategy.BEST_ONLY
+        assert domain.board_type == BoardType.RUN_IDENTITY
+        assert domain.keep_strategy == KeepStrategy.BEST
         assert domain.starts_at == now
         assert domain.ends_at == now + timedelta(days=30)
         assert domain.tags == ["speedrun", "weekly"]
@@ -87,7 +89,8 @@ class TestBoardTemplateORM:
             icon="fa-crown",
             unit=None,
             sort_direction="DESCENDING",
-            keep_strategy="ALL",
+            board_type=BoardTypeEnum.RUN_IDENTITY,
+            keep_strategy=KeepStrategyEnum.BEST,
             starts_at=None,
             ends_at=None,
             tags=[],
@@ -109,7 +112,8 @@ class TestBoardTemplateORM:
         assert domain.icon == "fa-crown"
         assert domain.unit is None
         assert domain.sort_direction == SortDirection.DESCENDING
-        assert domain.keep_strategy == KeepStrategy.ALL
+        assert domain.board_type == BoardType.RUN_IDENTITY
+        assert domain.keep_strategy == KeepStrategy.BEST
         assert domain.starts_at is None
         assert domain.ends_at is None
         assert domain.tags == []
@@ -134,7 +138,7 @@ class TestBoardTemplateORM:
             icon="fa-trophy",
             unit="seconds",
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             starts_at=now,
             ends_at=now + timedelta(days=30),
             tags=["speedrun", "weekly"],
@@ -158,7 +162,8 @@ class TestBoardTemplateORM:
         assert orm.icon == "fa-trophy"
         assert orm.unit == "seconds"
         assert orm.sort_direction == "ASCENDING"
-        assert orm.keep_strategy == "BEST_ONLY"
+        assert orm.board_type == BoardTypeEnum.RUN_IDENTITY
+        assert orm.keep_strategy == KeepStrategyEnum.BEST
         assert orm.starts_at == now
         assert orm.ends_at == now + timedelta(days=30)
         assert orm.tags == ["speedrun", "weekly"]
@@ -217,7 +222,8 @@ class TestBoardTemplateORM:
             icon="fa-crown",
             unit=None,
             sort_direction="DESCENDING",
-            keep_strategy="ALL",
+            board_type=BoardTypeEnum.RUN_IDENTITY,
+            keep_strategy=KeepStrategyEnum.BEST,
             starts_at=None,
             ends_at=None,
             tags=["monthly", "competition"],
@@ -225,7 +231,7 @@ class TestBoardTemplateORM:
             config={
                 "unit": "points",
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             next_run_at=next_run_at,
             is_active=True,

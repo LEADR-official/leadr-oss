@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account
 from leadr.auth.services.device_service import DeviceService
+from leadr.common.domain.ids import GameID
 from leadr.games.domain.game import Game
 
 
@@ -24,7 +25,7 @@ class TestDevicePagination:
         # Create 25 devices via start_session
         device_service = DeviceService(db_session)
         for i in range(25):
-            await device_service.start_session(
+            await device_service.get_or_create_device(
                 game_id=test_game.id,
                 client_fingerprint=f"{i:064x}",
                 platform="ios",
@@ -66,7 +67,7 @@ class TestDevicePagination:
         # Create 30 devices
         device_service = DeviceService(db_session)
         for i in range(30):
-            await device_service.start_session(
+            await device_service.get_or_create_device(
                 game_id=test_game.id,
                 client_fingerprint=f"{i:064x}",
                 platform="android",
@@ -105,7 +106,7 @@ class TestDevicePagination:
         # Create 30 devices
         device_service = DeviceService(db_session)
         for i in range(30):
-            await device_service.start_session(
+            await device_service.get_or_create_device(
                 game_id=test_game.id,
                 client_fingerprint=f"{i:064x}",
                 platform="web",
@@ -149,7 +150,7 @@ class TestDevicePagination:
         device_service = DeviceService(db_session)
         platforms = ["ios", "android", "web", "windows"]
         for i, platform in enumerate(platforms):
-            await device_service.start_session(
+            await device_service.get_or_create_device(
                 game_id=test_game.id,
                 client_fingerprint=f"{i:064x}",
                 platform=platform,
@@ -192,7 +193,7 @@ class TestDevicePagination:
         # Create devices
         device_service = DeviceService(db_session)
         for i in range(20):
-            await device_service.start_session(
+            await device_service.get_or_create_device(
                 game_id=test_game.id,
                 client_fingerprint=f"{i:064x}",
                 platform="ios",
@@ -229,16 +230,12 @@ class TestDevicePagination:
             },
         )
         second_game_data = response.json()
-
-        # Import GameID for second game
-        from leadr.common.domain.ids import GameID
-
         second_game_id = GameID(second_game_data["id"])
 
         # Create 10 devices for test_game
         device_service = DeviceService(db_session)
         for i in range(10):
-            await device_service.start_session(
+            await device_service.get_or_create_device(
                 game_id=test_game.id,
                 client_fingerprint=f"{i + 100:064x}",  # Offset to avoid collisions
                 platform="ios",
@@ -246,7 +243,7 @@ class TestDevicePagination:
 
         # Create 5 devices for second_game
         for i in range(5):
-            await device_service.start_session(
+            await device_service.get_or_create_device(
                 game_id=second_game_id,
                 client_fingerprint=f"{i + 200:064x}",  # Different offset
                 platform="android",
@@ -279,7 +276,7 @@ class TestDevicePagination:
         device_service = DeviceService(db_session)
         device_ids = []
         for i in range(10):
-            device, _, _, _ = await device_service.start_session(
+            device = await device_service.get_or_create_device(
                 game_id=test_game.id,
                 client_fingerprint=f"{i:064x}",
                 platform="ios",

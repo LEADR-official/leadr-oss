@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import Field, field_validator
 
-from leadr.boards.domain.board import KeepStrategy, SortDirection
+from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 from leadr.common.domain.models import Entity
 
@@ -57,9 +57,13 @@ class BoardTemplate(Entity):
         description="Direction to sort scores (ascending/descending)",
         default=SortDirection.DESCENDING,
     )
+    board_type: BoardType = Field(
+        description="Type of board to create from this template",
+        default=BoardType.RUN_IDENTITY,
+    )
     keep_strategy: KeepStrategy = Field(
-        description="Strategy for keeping multiple scores from the same user",
-        default=KeepStrategy.ALL,
+        description="Strategy for keeping multiple scores from the same user (RUN_IDENTITY only)",
+        default=KeepStrategy.BEST,
     )
     starts_at: datetime | None = Field(
         default=None, description="Optional start time for time-bounded boards"

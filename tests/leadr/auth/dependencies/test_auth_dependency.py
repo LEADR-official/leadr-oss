@@ -59,7 +59,7 @@ class TestAuthContextDependencyInit:
         mock_request = Mock()
         mock_api_key_service = AsyncMock()
         mock_user_service = AsyncMock()
-        mock_device_service = AsyncMock()
+        mock_identity_service = AsyncMock()
         mock_nonce_service = AsyncMock()
 
         # This should hit the safety fallback
@@ -70,7 +70,7 @@ class TestAuthContextDependencyInit:
                 request=mock_request,
                 api_key_service=mock_api_key_service,
                 user_service=mock_user_service,
-                device_service=mock_device_service,
+                identity_service=mock_identity_service,
                 nonce_service=mock_nonce_service,
                 api_key=None,
                 authorization=None,

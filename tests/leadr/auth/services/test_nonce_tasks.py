@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.auth.adapters.orm import NonceORM
+from leadr.auth.services.nonce_service import NonceService
 from leadr.auth.services.nonce_tasks import cleanup_expired_nonces
 
 
@@ -16,7 +17,7 @@ class TestCleanupExpiredNonces:
     """Test suite for cleanup_expired_nonces background task."""
 
     async def test_cleanup_removes_expired_pending_nonces(
-        self, db_session: AsyncSession, device_orm
+        self, db_session: AsyncSession, identity_orm
     ):
         """Test that expired pending nonces are deleted."""
 
@@ -24,7 +25,7 @@ class TestCleanupExpiredNonces:
         nonce_id = uuid4()
         expired_nonce = NonceORM(
             id=nonce_id,
-            device_id=device_orm.id,
+            identity_id=identity_orm.id,
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(hours=1),  # Custom
             status="pending",
@@ -33,8 +34,6 @@ class TestCleanupExpiredNonces:
         await db_session.commit()
 
         # Run cleanup using the service directly (same session as test)
-        from leadr.auth.services.nonce_service import NonceService
-
         service = NonceService(db_session)
         deleted_count = await service.cleanup_expired_nonces(older_than_hours=0)
 
@@ -45,12 +44,12 @@ class TestCleanupExpiredNonces:
         result = await db_session.execute(select(NonceORM).where(NonceORM.id == nonce_id))
         assert result.scalar_one_or_none() is None
 
-    async def test_cleanup_keeps_valid_pending_nonces(self, db_session: AsyncSession, device_orm):
+    async def test_cleanup_keeps_valid_pending_nonces(self, db_session: AsyncSession, identity_orm):
         """Test that valid (not expired) pending nonces are kept."""
         # Create valid pending nonce (expires in 1 hour) - custom value
         valid_nonce = NonceORM(
             id=uuid4(),
-            device_id=device_orm.id,
+            identity_id=identity_orm.id,
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) + timedelta(hours=1),  # Custom
             status="pending",
@@ -65,12 +64,12 @@ class TestCleanupExpiredNonces:
         await db_session.refresh(valid_nonce)
         assert valid_nonce.status == "pending"
 
-    async def test_cleanup_keeps_used_nonces(self, db_session: AsyncSession, device_orm):
+    async def test_cleanup_keeps_used_nonces(self, db_session: AsyncSession, identity_orm):
         """Test that used nonces are kept even if expired (for audit)."""
         # Create used nonce that expired 1 hour ago - custom values
         used_nonce = NonceORM(
             id=uuid4(),
-            device_id=device_orm.id,
+            identity_id=identity_orm.id,
             nonce_value=str(uuid4()),
             expires_at=datetime.now(UTC) - timedelta(hours=1),  # Custom
             status="used",  # Custom

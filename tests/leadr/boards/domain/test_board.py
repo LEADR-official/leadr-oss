@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
 from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
 
 
@@ -22,20 +22,44 @@ class TestSortDirection:
         assert SortDirection.DESCENDING.value == "DESCENDING"
 
 
+class TestBoardType:
+    """Test suite for BoardType enum."""
+
+    def test_board_type_run_identity(self):
+        """Test RUN_IDENTITY enum value."""
+        assert BoardType.RUN_IDENTITY.value == "RUN_IDENTITY"
+
+    def test_board_type_run_runs(self):
+        """Test RUN_RUNS enum value."""
+        assert BoardType.RUN_RUNS.value == "RUN_RUNS"
+
+    def test_board_type_counter(self):
+        """Test COUNTER enum value."""
+        assert BoardType.COUNTER.value == "COUNTER"
+
+    def test_board_type_ratio(self):
+        """Test RATIO enum value."""
+        assert BoardType.RATIO.value == "RATIO"
+
+
 class TestKeepStrategy:
     """Test suite for KeepStrategy enum."""
 
-    def test_keep_strategy_best_only(self):
-        """Test BEST_ONLY enum value."""
-        assert KeepStrategy.BEST_ONLY.value == "BEST_ONLY"
+    def test_keep_strategy_first(self):
+        """Test FIRST enum value."""
+        assert KeepStrategy.FIRST.value == "FIRST"
 
-    def test_keep_strategy_latest_only(self):
-        """Test LATEST_ONLY enum value."""
-        assert KeepStrategy.LATEST_ONLY.value == "LATEST_ONLY"
+    def test_keep_strategy_best(self):
+        """Test BEST enum value."""
+        assert KeepStrategy.BEST.value == "BEST"
 
-    def test_keep_strategy_all(self):
-        """Test ALL enum value."""
-        assert KeepStrategy.ALL.value == "ALL"
+    def test_keep_strategy_latest(self):
+        """Test LATEST enum value."""
+        assert KeepStrategy.LATEST.value == "LATEST"
+
+    def test_keep_strategy_na(self):
+        """Test NA enum value for non-RUN_IDENTITY boards."""
+        assert KeepStrategy.NA.value == "NA"
 
 
 class TestBoard:
@@ -62,7 +86,7 @@ class TestBoard:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_from_template_id=template_id,
             template_name="Speed Run Template",
             starts_at=starts_at,
@@ -81,7 +105,7 @@ class TestBoard:
         assert board.unit == "seconds"
         assert board.is_active is True
         assert board.sort_direction == SortDirection.ASCENDING
-        assert board.keep_strategy == KeepStrategy.BEST_ONLY
+        assert board.keep_strategy == KeepStrategy.BEST
         assert board.created_from_template_id == template_id
         assert board.template_name == "Speed Run Template"
         assert board.starts_at == starts_at
@@ -108,7 +132,7 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -122,7 +146,7 @@ class TestBoard:
         assert board.unit == "points"
         assert board.is_active is True
         assert board.sort_direction == SortDirection.DESCENDING
-        assert board.keep_strategy == KeepStrategy.ALL
+        assert board.keep_strategy == KeepStrategy.BEST
         assert board.created_from_template_id is None
         assert board.template_name is None
         assert board.starts_at is None
@@ -160,7 +184,7 @@ class TestBoard:
         assert board.unit is None  # Default unit
         assert board.is_active is True  # Default active state
         assert board.sort_direction == SortDirection.DESCENDING  # Default sort
-        assert board.keep_strategy == KeepStrategy.ALL  # Default strategy
+        assert board.keep_strategy == KeepStrategy.BEST  # Default strategy
 
         # Verify optional fields
         assert board.created_from_template_id is None
@@ -186,7 +210,7 @@ class TestBoard:
                 unit="points",
                 is_active=True,
                 sort_direction=SortDirection.DESCENDING,
-                keep_strategy=KeepStrategy.ALL,
+                keep_strategy=KeepStrategy.BEST,
                 created_at=now,
                 updated_at=now,
             )
@@ -210,7 +234,7 @@ class TestBoard:
                 unit="points",
                 is_active=True,
                 sort_direction=SortDirection.DESCENDING,
-                keep_strategy=KeepStrategy.ALL,
+                keep_strategy=KeepStrategy.BEST,
                 created_at=now,
                 updated_at=now,
             )
@@ -234,7 +258,7 @@ class TestBoard:
                 unit="points",
                 is_active=True,
                 sort_direction=SortDirection.DESCENDING,
-                keep_strategy=KeepStrategy.ALL,
+                keep_strategy=KeepStrategy.BEST,
                 created_at=now,
                 updated_at=now,
             )
@@ -260,7 +284,7 @@ class TestBoard:
                 unit="points",
                 is_active=True,
                 sort_direction=SortDirection.DESCENDING,
-                keep_strategy=KeepStrategy.ALL,
+                keep_strategy=KeepStrategy.BEST,
                 created_at=now,
                 updated_at=now,
             )
@@ -286,7 +310,7 @@ class TestBoard:
                 unit="points",
                 is_active=True,
                 sort_direction=SortDirection.DESCENDING,
-                keep_strategy=KeepStrategy.ALL,
+                keep_strategy=KeepStrategy.BEST,
                 created_at=now,
                 updated_at=now,
             )
@@ -311,7 +335,7 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -337,7 +361,7 @@ class TestBoard:
                 unit="points",
                 is_active=True,
                 sort_direction=SortDirection.DESCENDING,
-                keep_strategy=KeepStrategy.ALL,
+                keep_strategy=KeepStrategy.BEST,
                 created_at=now,
                 updated_at=now,
             )
@@ -362,7 +386,7 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -387,7 +411,7 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -413,7 +437,7 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -429,7 +453,7 @@ class TestBoard:
             unit="seconds",
             is_active=False,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -453,7 +477,7 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -469,7 +493,7 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -494,7 +518,7 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -525,7 +549,7 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -553,7 +577,7 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -581,7 +605,7 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -609,7 +633,7 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -640,7 +664,7 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -670,7 +694,7 @@ class TestBoard:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             description="Complete the level as fast as possible",
             created_at=now,
             updated_at=now,
@@ -696,9 +720,229 @@ class TestBoard:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
 
         assert board.description is None
+
+
+class TestBoardTypeField:
+    """Test suite for board_type field and validation."""
+
+    def test_board_type_defaults_to_run_identity(self):
+        """Test that board_type defaults to RUN_IDENTITY."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Default Type Board",
+            slug="default-type-board",
+            short_code="DTB01",
+        )
+
+        assert board.board_type == BoardType.RUN_IDENTITY
+
+    def test_board_with_run_identity_type(self):
+        """Test creating a board with RUN_IDENTITY type."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Run Identity Board",
+            slug="run-identity-board",
+            short_code="RIB01",
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        assert board.board_type == BoardType.RUN_IDENTITY
+        assert board.keep_strategy == KeepStrategy.BEST
+
+    def test_board_with_run_runs_type(self):
+        """Test creating a board with RUN_RUNS type."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Run Runs Board",
+            slug="run-runs-board",
+            short_code="RRB01",
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        assert board.board_type == BoardType.RUN_RUNS
+        assert board.keep_strategy == KeepStrategy.NA
+
+    def test_board_with_counter_type(self):
+        """Test creating a board with COUNTER type."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Counter Board",
+            slug="counter-board",
+            short_code="CTB01",
+            board_type=BoardType.COUNTER,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        assert board.board_type == BoardType.COUNTER
+        assert board.keep_strategy == KeepStrategy.NA
+
+    def test_board_with_ratio_type(self):
+        """Test creating a board with RATIO type."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Ratio Board",
+            slug="ratio-board",
+            short_code="RAT01",
+            board_type=BoardType.RATIO,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        assert board.board_type == BoardType.RATIO
+        assert board.keep_strategy == KeepStrategy.NA
+
+    def test_run_identity_requires_non_na_keep_strategy(self):
+        """Test that RUN_IDENTITY boards cannot have NA keep_strategy."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        with pytest.raises(ValidationError) as exc_info:
+            Board(
+                id=board_id,
+                account_id=account_id,
+                game_id=game_id,
+                name="Invalid Board",
+                slug="invalid-board",
+                short_code="INV01",
+                board_type=BoardType.RUN_IDENTITY,
+                keep_strategy=KeepStrategy.NA,
+            )
+
+        assert "keep_strategy" in str(exc_info.value).lower()
+
+    def test_run_runs_requires_na_keep_strategy(self):
+        """Test that RUN_RUNS boards must have NA keep_strategy."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        with pytest.raises(ValidationError) as exc_info:
+            Board(
+                id=board_id,
+                account_id=account_id,
+                game_id=game_id,
+                name="Invalid Board",
+                slug="invalid-board",
+                short_code="INV02",
+                board_type=BoardType.RUN_RUNS,
+                keep_strategy=KeepStrategy.BEST,
+            )
+
+        assert "keep_strategy" in str(exc_info.value).lower()
+
+    def test_counter_requires_na_keep_strategy(self):
+        """Test that COUNTER boards must have NA keep_strategy."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        with pytest.raises(ValidationError) as exc_info:
+            Board(
+                id=board_id,
+                account_id=account_id,
+                game_id=game_id,
+                name="Invalid Board",
+                slug="invalid-board",
+                short_code="INV03",
+                board_type=BoardType.COUNTER,
+                keep_strategy=KeepStrategy.LATEST,
+            )
+
+        assert "keep_strategy" in str(exc_info.value).lower()
+
+    def test_ratio_requires_na_keep_strategy(self):
+        """Test that RATIO boards must have NA keep_strategy."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        with pytest.raises(ValidationError) as exc_info:
+            Board(
+                id=board_id,
+                account_id=account_id,
+                game_id=game_id,
+                name="Invalid Board",
+                slug="invalid-board",
+                short_code="INV04",
+                board_type=BoardType.RATIO,
+                keep_strategy=KeepStrategy.FIRST,
+            )
+
+        assert "keep_strategy" in str(exc_info.value).lower()
+
+    def test_run_identity_accepts_first_strategy(self):
+        """Test that RUN_IDENTITY boards accept FIRST keep_strategy."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="First Strategy Board",
+            slug="first-strategy-board",
+            short_code="FSB01",
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.FIRST,
+        )
+
+        assert board.keep_strategy == KeepStrategy.FIRST
+
+    def test_run_identity_accepts_latest_strategy(self):
+        """Test that RUN_IDENTITY boards accept LATEST keep_strategy."""
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Latest Strategy Board",
+            slug="latest-strategy-board",
+            short_code="LSB01",
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.LATEST,
+        )
+
+        assert board.keep_strategy == KeepStrategy.LATEST

@@ -1,6 +1,6 @@
 """Tests for Board repository services."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -67,7 +67,7 @@ class TestBoardRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -81,7 +81,7 @@ class TestBoardRepository:
         assert created.short_code == "SR2025"
         assert created.is_active is True
         assert created.sort_direction == SortDirection.ASCENDING
-        assert created.keep_strategy == KeepStrategy.BEST_ONLY
+        assert created.keep_strategy == KeepStrategy.BEST
 
     async def test_get_board_by_id(self, db_session: AsyncSession):
         """Test retrieving a board by ID."""
@@ -128,7 +128,7 @@ class TestBoardRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -196,7 +196,7 @@ class TestBoardRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -262,7 +262,7 @@ class TestBoardRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -327,7 +327,7 @@ class TestBoardRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -385,7 +385,7 @@ class TestBoardRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -400,7 +400,7 @@ class TestBoardRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -482,7 +482,7 @@ class TestBoardRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -497,7 +497,7 @@ class TestBoardRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -558,7 +558,7 @@ class TestBoardRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -615,7 +615,7 @@ class TestBoardRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -630,7 +630,7 @@ class TestBoardRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -712,7 +712,7 @@ class TestBoardRepository:
             unit="points",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -730,7 +730,7 @@ class TestBoardRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST_ONLY,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -795,7 +795,7 @@ class TestBoardRepository:
                 unit="points",
                 is_active=True,
                 sort_direction=SortDirection.DESCENDING,
-                keep_strategy=KeepStrategy.BEST_ONLY,
+                keep_strategy=KeepStrategy.BEST,
                 created_from_template_id=BoardTemplateID(template_id),
                 created_at=now,
                 updated_at=now,
@@ -815,7 +815,7 @@ class TestBoardRepository:
             unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_from_template_id=BoardTemplateID(other_template_id),
             created_at=now,
             updated_at=now,
@@ -834,7 +834,7 @@ class TestBoardRepository:
             unit="time",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.LATEST_ONLY,
+            keep_strategy=KeepStrategy.LATEST,
             created_at=now,
             updated_at=now,
         )
@@ -901,7 +901,7 @@ class TestBoardRepository:
             short_code="G1B1",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -914,7 +914,7 @@ class TestBoardRepository:
             short_code="G2B1",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -971,7 +971,7 @@ class TestBoardRepository:
             short_code="ACTIVE",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -984,7 +984,7 @@ class TestBoardRepository:
             short_code="INACTIVE",
             is_active=False,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -1004,7 +1004,6 @@ class TestBoardRepository:
 
     async def test_list_boards_filter_by_starts_before(self, db_session: AsyncSession):
         """Test filtering boards starting before a given date."""
-        from datetime import timedelta
 
         # Create account and game
         account_repo = AccountRepository(db_session)
@@ -1046,7 +1045,7 @@ class TestBoardRepository:
             short_code="EARLY",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             starts_at=now - timedelta(days=10),
             created_at=now,
             updated_at=now,
@@ -1060,7 +1059,7 @@ class TestBoardRepository:
             short_code="LATE",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             starts_at=now + timedelta(days=10),
             created_at=now,
             updated_at=now,
@@ -1076,7 +1075,6 @@ class TestBoardRepository:
 
     async def test_list_boards_filter_by_starts_after(self, db_session: AsyncSession):
         """Test filtering boards starting after a given date."""
-        from datetime import timedelta
 
         # Create account and game
         account_repo = AccountRepository(db_session)
@@ -1118,7 +1116,7 @@ class TestBoardRepository:
             short_code="EARLY",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             starts_at=now - timedelta(days=10),
             created_at=now,
             updated_at=now,
@@ -1132,7 +1130,7 @@ class TestBoardRepository:
             short_code="LATE",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             starts_at=now + timedelta(days=10),
             created_at=now,
             updated_at=now,
@@ -1148,7 +1146,6 @@ class TestBoardRepository:
 
     async def test_list_boards_filter_by_ends_before(self, db_session: AsyncSession):
         """Test filtering boards ending before a given date."""
-        from datetime import timedelta
 
         # Create account and game
         account_repo = AccountRepository(db_session)
@@ -1190,7 +1187,7 @@ class TestBoardRepository:
             short_code="ENDED",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             ends_at=now - timedelta(days=5),
             created_at=now,
             updated_at=now,
@@ -1204,7 +1201,7 @@ class TestBoardRepository:
             short_code="ONGOING",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             ends_at=now + timedelta(days=5),
             created_at=now,
             updated_at=now,
@@ -1220,7 +1217,6 @@ class TestBoardRepository:
 
     async def test_list_boards_filter_by_ends_after(self, db_session: AsyncSession):
         """Test filtering boards ending after a given date."""
-        from datetime import timedelta
 
         # Create account and game
         account_repo = AccountRepository(db_session)
@@ -1262,7 +1258,7 @@ class TestBoardRepository:
             short_code="ENDED",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             ends_at=now - timedelta(days=5),
             created_at=now,
             updated_at=now,
@@ -1276,7 +1272,7 @@ class TestBoardRepository:
             short_code="ONGOING",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             ends_at=now + timedelta(days=5),
             created_at=now,
             updated_at=now,
@@ -1292,7 +1288,6 @@ class TestBoardRepository:
 
     async def test_list_boards_filter_by_multiple_criteria(self, db_session: AsyncSession):
         """Test filtering boards by multiple criteria at once."""
-        from datetime import timedelta
 
         # Create account and game
         account_repo = AccountRepository(db_session)
@@ -1336,7 +1331,7 @@ class TestBoardRepository:
             is_active=True,
             is_published=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             starts_at=now - timedelta(days=5),
             created_at=now,
             updated_at=now,
@@ -1352,7 +1347,7 @@ class TestBoardRepository:
             is_active=False,
             is_published=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             starts_at=now - timedelta(days=5),
             created_at=now,
             updated_at=now,
@@ -1368,7 +1363,7 @@ class TestBoardRepository:
             is_active=True,
             is_published=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             starts_at=now + timedelta(days=5),
             created_at=now,
             updated_at=now,
@@ -1390,8 +1385,6 @@ class TestBoardRepository:
 
     async def test_list_boards_with_game_id_supports_pagination(self, db_session: AsyncSession):
         """Test that filtering by game_id works with pagination."""
-        from leadr.common.api.pagination import PaginationParams
-
         # Create account and game
         account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
@@ -1432,7 +1425,7 @@ class TestBoardRepository:
                 short_code=f"B{i:03d}",
                 is_active=True,
                 sort_direction=SortDirection.DESCENDING,
-                keep_strategy=KeepStrategy.ALL,
+                keep_strategy=KeepStrategy.BEST,
                 created_at=now,
                 updated_at=now,
             )
@@ -1488,7 +1481,7 @@ class TestBoardRepository:
             short_code="WEEK1",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -1501,7 +1494,7 @@ class TestBoardRepository:
             short_code="MONTH1",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -1562,7 +1555,7 @@ class TestBoardRepository:
             short_code="WEEK1",
             is_active=False,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -1576,7 +1569,7 @@ class TestBoardRepository:
             short_code="WEEK2",
             is_active=False,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -1590,7 +1583,7 @@ class TestBoardRepository:
             short_code="WEEK3",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -1648,7 +1641,7 @@ class TestBoardRepository:
             short_code="WEEK1",
             is_active=False,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -1661,7 +1654,7 @@ class TestBoardRepository:
             short_code="WEEK2",
             is_active=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )

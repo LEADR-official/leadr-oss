@@ -10,7 +10,8 @@ Key principles:
 - Use these for ORM-level tests; use domain fixtures from conftest for integration tests
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,15 +21,26 @@ from leadr.auth.adapters.orm import (
     APIKeyORM,
     APIKeyStatusEnum,
     DeviceORM,
-    DeviceSessionORM,
     DeviceStatusEnum,
+    IdentityKindEnum,
+    IdentityORM,
     NonceORM,
     NonceStatusEnum,
 )
-from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM
-from leadr.boards.domain.board import KeepStrategy, SortDirection
+from leadr.boards.adapters.orm import (
+    BoardORM,
+    BoardTemplateORM,
+    BoardTypeEnum,
+    KeepStrategyEnum,
+)
+from leadr.boards.domain.board import SortDirection
 from leadr.games.adapters.orm import GameORM
-from leadr.scores.adapters.orm import ScoreFlagORM, ScoreORM, ScoreSubmissionMetaORM
+from leadr.scores.adapters.orm import (
+    ScoreEventORM,
+    ScoreFlagORM,
+    ScoreSubmissionMetaORM,
+)
+from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 
 
 @pytest_asyncio.fixture
@@ -105,8 +117,6 @@ async def board_template_orm(
     Returns:
         BoardTemplateORM instance with auto-generated id.
     """
-    from datetime import UTC, datetime, timedelta
-
     template = BoardTemplateORM(
         account_id=account_orm.id,  # Raw UUID
         game_id=game_orm.id,  # Raw UUID
@@ -145,8 +155,9 @@ async def board_orm(
         short_code="TEST01",
         unit="points",
         is_active=True,
-        sort_direction=SortDirection.DESCENDING.value,  # Use enum value (string)
-        keep_strategy=KeepStrategy.BEST_ONLY.value,  # Use enum value (string)
+        sort_direction=SortDirection.DESCENDING.value,  # Use string value for sort_direction
+        board_type=BoardTypeEnum.RUN_IDENTITY,  # Use ORM enum
+        keep_strategy=KeepStrategyEnum.BEST,  # Use ORM enum
         created_from_template_id=None,
         tags=[],
     )
@@ -183,31 +194,28 @@ async def device_orm(
 
 
 @pytest_asyncio.fixture
-async def device_session_orm(db_session: AsyncSession, device_orm: DeviceORM) -> DeviceSessionORM:
-    """Create and persist a test DeviceSessionORM linked to device.
+async def identity_orm(
+    db_session: AsyncSession, account_orm: AccountORM, game_orm: GameORM
+) -> IdentityORM:
+    """Create and persist a test IdentityORM linked to account and game.
 
     Args:
-        device_orm: Parent device (auto-injected fixture).
+        account_orm: Parent account (auto-injected fixture).
+        game_orm: Parent game (auto-injected fixture).
 
     Returns:
-        DeviceSessionORM instance with auto-generated id.
+        IdentityORM instance with auto-generated id.
     """
-    from datetime import timedelta
-
-    now = datetime.now(UTC)
-    session = DeviceSessionORM(
-        device_id=device_orm.id,  # Raw UUID
-        access_token_hash="test_access_hash",
-        refresh_token_hash="test_refresh_hash",
-        token_version=1,
-        expires_at=now + timedelta(hours=24),
-        refresh_expires_at=now + timedelta(days=30),
-        ip_address="127.0.0.1",
-        user_agent="TestAgent/1.0",
+    identity = IdentityORM(
+        account_id=account_orm.id,  # Raw UUID
+        game_id=game_orm.id,  # Raw UUID
+        kind=IdentityKindEnum.DEVICE,
+        external_key=f"dev_{uuid4()}",  # Device ID format
+        display_name="Test Player",
     )
-    db_session.add(session)
+    db_session.add(identity)
     await db_session.flush()
-    return session
+    return identity
 
 
 @pytest_asyncio.fixture
@@ -238,21 +246,18 @@ async def api_key_orm(
 
 
 @pytest_asyncio.fixture
-async def nonce_orm(db_session: AsyncSession, device_orm: DeviceORM) -> NonceORM:
-    """Create and persist a test NonceORM linked to device.
+async def nonce_orm(db_session: AsyncSession, identity_orm: IdentityORM) -> NonceORM:
+    """Create and persist a test NonceORM linked to identity.
 
     Args:
-        device_orm: Parent device (auto-injected fixture).
+        identity_orm: Parent identity (auto-injected fixture).
 
     Returns:
         NonceORM instance with auto-generated id.
     """
-    from datetime import timedelta
-    from uuid import uuid4
-
     now = datetime.now(UTC)
     nonce = NonceORM(
-        device_id=device_orm.id,  # Raw UUID
+        identity_id=identity_orm.id,  # Raw UUID
         nonce_value=str(uuid4()),
         status=NonceStatusEnum.PENDING,
         expires_at=now + timedelta(seconds=60),
@@ -263,55 +268,52 @@ async def nonce_orm(db_session: AsyncSession, device_orm: DeviceORM) -> NonceORM
 
 
 @pytest_asyncio.fixture
-async def score_orm(
+async def score_event_orm(
     db_session: AsyncSession,
     account_orm: AccountORM,
     game_orm: GameORM,
     board_orm: BoardORM,
-    device_orm: DeviceORM,
-) -> ScoreORM:
-    """Create and persist a test ScoreORM linked to account, game, board, and device.
+    identity_orm: IdentityORM,
+) -> ScoreEventORM:
+    """Create and persist a test ScoreEventORM linked to account, game, board, and identity.
 
     Args:
         account_orm: Parent account (auto-injected fixture).
         game_orm: Parent game (auto-injected fixture).
         board_orm: Parent board (auto-injected fixture).
-        device_orm: Source device (auto-injected fixture).
+        identity_orm: Source identity (auto-injected fixture).
 
     Returns:
-        ScoreORM instance with auto-generated id.
+        ScoreEventORM instance with auto-generated id.
     """
-    score = ScoreORM(
+    score_event = ScoreEventORM(
         account_id=account_orm.id,  # Raw UUID
         game_id=game_orm.id,  # Raw UUID
         board_id=board_orm.id,  # Raw UUID
-        device_id=device_orm.id,  # Raw UUID
-        player_name="Test Player",
-        value=1000.0,
-        score_metadata={},
-        filter_timezone=None,
-        filter_country=None,
-        filter_city=None,
+        identity_id=identity_orm.id,  # Raw UUID
+        event_payload={"value": 1000.0},
+        is_test=False,
+        timezone=None,
+        country=None,
+        city=None,
     )
-    db_session.add(score)
+    db_session.add(score_event)
     await db_session.flush()
-    return score
+    return score_event
 
 
 @pytest_asyncio.fixture
-async def score_flag_orm(db_session: AsyncSession, score_orm: ScoreORM) -> ScoreFlagORM:
-    """Create and persist a test ScoreFlagORM linked to score.
+async def score_flag_orm(db_session: AsyncSession, score_event_orm: ScoreEventORM) -> ScoreFlagORM:
+    """Create and persist a test ScoreFlagORM linked to score event.
 
     Args:
-        score_orm: Parent score (auto-injected fixture).
+        score_event_orm: Parent score event (auto-injected fixture).
 
     Returns:
         ScoreFlagORM instance with auto-generated id.
     """
-    from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
-
     flag = ScoreFlagORM(
-        score_id=score_orm.id,  # Raw UUID
+        score_event_id=score_event_orm.id,  # Raw UUID
         flag_type=FlagType.VELOCITY.value,
         confidence=FlagConfidence.MEDIUM.value,
         flag_metadata={"reason": "test"},
@@ -328,15 +330,15 @@ async def score_flag_orm(db_session: AsyncSession, score_orm: ScoreORM) -> Score
 @pytest_asyncio.fixture
 async def score_submission_meta_orm(
     db_session: AsyncSession,
-    score_orm: ScoreORM,
-    device_orm: DeviceORM,
+    score_event_orm: ScoreEventORM,
+    identity_orm: IdentityORM,
     board_orm: BoardORM,
 ) -> ScoreSubmissionMetaORM:
     """Create and persist a test ScoreSubmissionMetaORM.
 
     Args:
-        score_orm: Related score (auto-injected fixture).
-        device_orm: Source device (auto-injected fixture).
+        score_event_orm: Related score event (auto-injected fixture).
+        identity_orm: Source identity (auto-injected fixture).
         board_orm: Target board (auto-injected fixture).
 
     Returns:
@@ -344,8 +346,8 @@ async def score_submission_meta_orm(
     """
     now = datetime.now(UTC)
     meta = ScoreSubmissionMetaORM(
-        score_id=score_orm.id,  # Raw UUID
-        device_id=device_orm.id,  # Raw UUID
+        score_event_id=score_event_orm.id,  # Raw UUID
+        identity_id=identity_orm.id,  # Raw UUID
         board_id=board_orm.id,  # Raw UUID
         submission_count=1,
         last_submission_at=now,

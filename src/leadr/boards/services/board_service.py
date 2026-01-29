@@ -1,11 +1,11 @@
 """Board service for managing board operations."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
 from leadr.boards.domain.interval_parser import parse_interval_to_timedelta
 from leadr.boards.services.repositories import BoardRepository
 from leadr.boards.services.short_code_generator import generate_unique_short_code
@@ -46,7 +46,8 @@ class BoardService(BaseService[Board, BoardRepository]):
         is_active: bool = True,
         is_published: bool = True,
         sort_direction: SortDirection = SortDirection.DESCENDING,
-        keep_strategy: KeepStrategy = KeepStrategy.ALL,
+        board_type: BoardType = BoardType.RUN_IDENTITY,
+        keep_strategy: KeepStrategy = KeepStrategy.BEST,
         slug: str | None = None,
         short_code: str | None = None,
         created_from_template_id: BoardTemplateID | None = None,
@@ -94,7 +95,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             ...     unit="seconds",
             ...     is_active=True,
             ...     sort_direction=SortDirection.ASCENDING,
-            ...     keep_strategy=KeepStrategy.BEST_ONLY,
+            ...     keep_strategy=KeepStrategy.BEST,
             ... )
         """
         # Validate that game exists and belongs to account
@@ -153,6 +154,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             is_active=is_active,
             is_published=is_published,
             sort_direction=sort_direction,
+            board_type=board_type,
             keep_strategy=keep_strategy,
             created_from_template_id=created_from_template_id,
             template_name=template_name,
@@ -185,8 +187,6 @@ class BoardService(BaseService[Board, BoardRepository]):
         Example:
             >>> board = await service.create_board_from_template(template)
         """
-        from datetime import UTC
-
         # Get current timestamp for name generation
         now = datetime.now(UTC)
 
@@ -218,6 +218,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             is_active=True,  # New boards from templates are always active
             is_published=template.is_published,
             sort_direction=template.sort_direction,
+            board_type=template.board_type,
             keep_strategy=template.keep_strategy,
             created_from_template_id=template.id,
             template_name=template.name,

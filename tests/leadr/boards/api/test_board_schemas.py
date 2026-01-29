@@ -24,7 +24,7 @@ class TestBoardResponseUrlShort:
             is_active=True,
             is_published=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -46,7 +46,7 @@ class TestBoardResponseUrlShort:
             is_active=True,
             is_published=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -70,7 +70,7 @@ class TestBoardResponseUrlShort:
             is_active=True,
             is_published=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -92,7 +92,7 @@ class TestBoardResponseUrlShort:
             is_active=True,
             is_published=True,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )
@@ -114,7 +114,7 @@ class TestBoardResponseUrlShort:
             is_active=True,
             is_published=False,
             sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.ALL,
+            keep_strategy=KeepStrategy.BEST,
             created_at=now,
             updated_at=now,
         )

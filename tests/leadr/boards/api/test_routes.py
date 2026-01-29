@@ -1,11 +1,16 @@
 """Tests for Board API routes."""
 
 import logging
+from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
 
+from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.account_service import AccountService
+from leadr.accounts.services.repositories import AccountRepository
+from leadr.boards.services.board_service import BoardService
+from leadr.common.domain.ids import AccountID
 from leadr.games.services.game_service import GameService
 
 logger = logging.getLogger(__name__)
@@ -42,7 +47,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -85,7 +90,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
                 "tags": ["speedrun", "no-damage"],
                 "template_name": "Speed Run Template",
             },
@@ -137,7 +142,7 @@ class TestBoardRoutes:
         assert data["unit"] is None  # Default unit (None)
         assert data["is_active"] is True  # Default active state
         assert data["sort_direction"] == "DESCENDING"  # Default sort direction
-        assert data["keep_strategy"] == "ALL"  # Default keep strategy
+        assert data["keep_strategy"] == "BEST"  # Default keep strategy
 
     async def test_create_board_with_game_not_found(
         self, client: AsyncClient, db_session, test_api_key
@@ -161,7 +166,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -203,7 +208,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -239,7 +244,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -289,7 +294,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -359,7 +364,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -374,7 +379,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -421,7 +426,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -436,7 +441,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -503,7 +508,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -518,7 +523,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -561,7 +566,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -620,7 +625,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -672,7 +677,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -689,7 +694,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -741,7 +746,7 @@ class TestBoardRoutes:
                 "unit": "seconds",
                 "is_active": True,
                 "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST_ONLY",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -780,7 +785,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -821,7 +826,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -860,7 +865,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -880,7 +885,7 @@ class TestBoardRoutes:
                 "unit": "points",
                 "is_active": True,
                 "sort_direction": "DESCENDING",
-                "keep_strategy": "ALL",
+                "keep_strategy": "BEST",
             },
             headers={"leadr-api-key": test_api_key},
         )
@@ -892,13 +897,6 @@ class TestBoardRoutes:
         self, authenticated_client: AsyncClient, db_session
     ):
         """Test that superadmin can list boards WITHOUT account_id and sees all accounts."""
-        from datetime import UTC, datetime
-
-        from leadr.accounts.domain.account import Account, AccountStatus
-        from leadr.accounts.services.repositories import AccountRepository
-        from leadr.boards.services.board_service import BoardService
-        from leadr.common.domain.ids import AccountID
-
         # Create two accounts with boards in each
         account_repo = AccountRepository(db_session)
         now = datetime.now(UTC)
@@ -1147,8 +1145,6 @@ class TestBoardRoutes:
         self, authenticated_client: AsyncClient, db_session
     ):
         """Test that admin can see multiple boards with same slug (active + inactive)."""
-        from leadr.boards.services.board_service import BoardService
-
         account_service = AccountService(db_session)
         account = await account_service.create_account(
             name="Acme Corporation",
@@ -1200,8 +1196,6 @@ class TestBoardRoutes:
         self, authenticated_client: AsyncClient, db_session
     ):
         """Test that admin can filter by slug AND is_active to get single result."""
-        from leadr.boards.services.board_service import BoardService
-
         account_service = AccountService(db_session)
         account = await account_service.create_account(
             name="Acme Corporation",

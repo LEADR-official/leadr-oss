@@ -3,7 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.common.api.pagination import PaginationParams
-from leadr.common.domain.ids import AccountID, BoardID, DeviceID, ScoreSubmissionMetaID
+from leadr.common.domain.ids import AccountID, BoardID, ScoreSubmissionMetaID
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.scores.domain.anti_cheat.models import ScoreSubmissionMeta
@@ -28,7 +28,6 @@ class ScoreSubmissionMetaService(BaseService[ScoreSubmissionMeta, ScoreSubmissio
         self,
         account_id: AccountID | None,
         board_id: BoardID | None = None,
-        device_id: DeviceID | None = None,
         *,
         pagination: PaginationParams,
     ) -> PaginatedResult[ScoreSubmissionMeta]:
@@ -38,7 +37,6 @@ class ScoreSubmissionMetaService(BaseService[ScoreSubmissionMeta, ScoreSubmissio
             account_id: Account ID to filter by. If None, returns all metadata
                 (superadmin use case).
             board_id: Optional board ID to filter by
-            device_id: Optional device ID to filter by
             pagination: Pagination parameters (required)
 
         Returns:
@@ -54,7 +52,6 @@ class ScoreSubmissionMetaService(BaseService[ScoreSubmissionMeta, ScoreSubmissio
         return await self.repository.filter(
             account_id=account_id,
             board_id=board_id,
-            device_id=device_id,
             pagination=pagination,
         )
 

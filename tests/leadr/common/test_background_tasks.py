@@ -1,6 +1,7 @@
 """Tests for background task scheduler."""
 
 import asyncio
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -170,8 +171,6 @@ class TestBackgroundTaskScheduler:
         call_times = []
 
         async def timed_func():
-            from datetime import UTC, datetime
-
             call_times.append(datetime.now(UTC))
             if len(call_times) >= 2:
                 scheduler.running = False

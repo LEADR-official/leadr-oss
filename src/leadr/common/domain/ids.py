@@ -3,6 +3,8 @@
 from typing import Self
 from uuid import UUID, uuid4
 
+from pydantic_core import core_schema
+
 
 class PrefixedID:
     """Base class for entity IDs with type prefixes.
@@ -104,8 +106,6 @@ class PrefixedID:
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type, handler):
         """Pydantic v2 schema for serialization/validation."""
-        from pydantic_core import core_schema
-
         return core_schema.no_info_after_validator_function(
             cls._validate,
             core_schema.union_schema(
@@ -184,7 +184,26 @@ class DeviceID(PrefixedID):
 
 
 class DeviceSessionID(PrefixedID):
-    """Device session entity identifier."""
+    """Device session entity identifier.
+
+    Deprecated: Use IdentitySessionID instead. Will be removed in cleanup phase.
+    """
+
+    prefix = "ses"
+
+
+class IdentityID(PrefixedID):
+    """Identity entity identifier."""
+
+    prefix = "ide"
+
+
+class IdentitySessionID(PrefixedID):
+    """Identity session entity identifier.
+
+    Note: Uses same prefix as DeviceSessionID since it replaces that entity.
+    During transition, both exist but reference different tables.
+    """
 
     prefix = "ses"
 
@@ -223,3 +242,27 @@ class JamCodeRedemptionID(PrefixedID):
     """Jam Code Redemption entity identifier."""
 
     prefix = "red"
+
+
+class ScoreEventID(PrefixedID):
+    """Score event entity identifier."""
+
+    prefix = "sev"
+
+
+class BoardStateID(PrefixedID):
+    """Board state entity identifier."""
+
+    prefix = "bst"
+
+
+class RunEntryID(PrefixedID):
+    """Run entry entity identifier."""
+
+    prefix = "run"
+
+
+class BoardRatioConfigID(PrefixedID):
+    """Board ratio config entity identifier."""
+
+    prefix = "brc"

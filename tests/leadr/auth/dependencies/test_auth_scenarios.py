@@ -14,6 +14,7 @@ from leadr.accounts.services.user_service import UserService
 from leadr.auth.dependencies import require_admin_auth
 from leadr.auth.services.api_key_service import APIKeyService
 from leadr.auth.services.device_service import DeviceService
+from leadr.auth.services.identity_service import IdentityService
 from leadr.auth.services.nonce_service import NonceService
 from leadr.common.domain.ids import AccountID
 
@@ -28,6 +29,7 @@ class TestAdminAPIDisabled:
         api_key_service = APIKeyService(db_session)
         user_service = UserService(db_session)
         device_service = DeviceService(db_session)
+        identity_service = IdentityService(db_session, device_service=device_service)
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -36,7 +38,7 @@ class TestAdminAPIDisabled:
                 request=mock_request,
                 api_key_service=api_key_service,
                 user_service=user_service,
-                device_service=device_service,
+                identity_service=identity_service,
                 nonce_service=nonce_service,
                 api_key="ldr_test123",
                 authorization=None,
@@ -90,6 +92,7 @@ class TestUserNotFoundEdgeCase:
 
         # Try to use the API key with deleted user
         device_service = DeviceService(db_session)
+        identity_service = IdentityService(db_session, device_service=device_service)
         nonce_service = NonceService(db_session)
         mock_request = Mock()
 
@@ -98,7 +101,7 @@ class TestUserNotFoundEdgeCase:
                 request=mock_request,
                 api_key_service=api_key_service,
                 user_service=user_service,
-                device_service=device_service,
+                identity_service=identity_service,
                 nonce_service=nonce_service,
                 api_key=plain_key,
                 authorization=None,

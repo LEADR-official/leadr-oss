@@ -1,7 +1,7 @@
 """Tests for API pagination models and dependencies."""
 
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
 from leadr.common.domain.cursor import Cursor
@@ -176,8 +176,6 @@ class TestPaginatedResponse:
 
     def test_validate_data_must_be_list(self) -> None:
         """Test that data must be a list."""
-        from pydantic import ValidationError
-
         pagination = PaginationMeta(
             next_cursor=None,
             prev_cursor=None,

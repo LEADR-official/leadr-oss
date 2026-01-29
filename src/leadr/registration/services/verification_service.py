@@ -2,6 +2,7 @@
 
 import random
 from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 import jwt
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -197,8 +198,6 @@ class VerificationService:
             user_id_str = payload.get("user_id")
             if not user_id_str:
                 return None
-
-            from uuid import UUID
 
             return UserID(UUID(user_id_str))
 

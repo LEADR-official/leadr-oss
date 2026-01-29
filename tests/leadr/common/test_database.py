@@ -10,6 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
+from leadr.common import database
 from leadr.common.database import (
     _get_connect_args,
     _get_pool_class,
@@ -249,8 +250,6 @@ class TestGetDb:
     @pytest.mark.asyncio
     async def test_get_db_yields_session(self) -> None:
         """Test that get_db yields an AsyncSession."""
-        from leadr.common import database
-
         generator = get_db()
         assert isinstance(generator, AsyncGenerator)
 
@@ -268,8 +267,6 @@ class TestGetDb:
     @pytest.mark.asyncio
     async def test_get_db_session_cleanup(self) -> None:
         """Test that get_db properly cleans up the session."""
-        from leadr.common import database
-
         generator = get_db()
         session = await generator.__anext__()
 
@@ -290,8 +287,6 @@ class TestGetDb:
     @pytest.mark.asyncio
     async def test_get_db_as_context_manager(self) -> None:
         """Test using get_db in async context manager style."""
-        from leadr.common import database
-
         generator = get_db()
         try:
             async for session in generator:
@@ -306,8 +301,6 @@ class TestGetDb:
     @pytest.mark.asyncio
     async def test_get_db_session_is_usable(self) -> None:
         """Test that the yielded session can be used for database operations."""
-        from leadr.common import database
-
         generator = get_db()
         try:
             async for session in generator:

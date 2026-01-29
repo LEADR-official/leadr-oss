@@ -5,7 +5,7 @@ from enum import Enum
 
 from pydantic import Field
 
-from leadr.common.domain.ids import DeviceID, NonceID
+from leadr.common.domain.ids import IdentityID, NonceID
 from leadr.common.domain.models import Entity
 
 
@@ -33,7 +33,7 @@ class Nonce(Entity):
         default_factory=NonceID,
         description="Unique nonce identifier",
     )
-    device_id: DeviceID = Field(description="Device that owns this nonce")
+    identity_id: IdentityID = Field(description="Identity that owns this nonce")
     nonce_value: str = Field(description="Unique nonce value (UUID string)")
     expires_at: datetime = Field(description="Nonce expiration timestamp")
     used_at: datetime | None = Field(default=None, description="When nonce was consumed")

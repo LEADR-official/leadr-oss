@@ -1,4 +1,4 @@
-"""Tests for Device, DeviceSession, and Nonce ORM models."""
+"""Tests for Device and Nonce ORM models."""
 
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
@@ -9,10 +9,21 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.adapters.orm import AccountORM
-from leadr.auth.adapters.orm import DeviceORM, DeviceSessionORM, DeviceStatusEnum, NonceORM
-from leadr.auth.domain.device import Device, DeviceSession, DeviceStatus
+from leadr.auth.adapters.orm import (
+    DeviceORM,
+    DeviceStatusEnum,
+    IdentityORM,
+    NonceORM,
+)
+from leadr.auth.domain.device import Device, DeviceStatus
 from leadr.auth.domain.nonce import Nonce, NonceStatus
-from leadr.common.domain.ids import AccountID, DeviceID, DeviceSessionID, GameID, NonceID
+from leadr.common.domain.ids import (
+    AccountID,
+    DeviceID,
+    GameID,
+    IdentityID,
+    NonceID,
+)
 from leadr.games.adapters.orm import GameORM
 
 
@@ -232,156 +243,10 @@ class TestDeviceORM:
 
 
 @pytest.mark.asyncio
-class TestDeviceSessionORM:
-    """Test suite for DeviceSession ORM model."""
-
-    async def test_create_device_session(self, db_session: AsyncSession, device_orm: DeviceORM):
-        """Test creating a device session in the database."""
-        # Create session
-        session_id = uuid4()
-        now = datetime.now(UTC)
-        expires_at = now + timedelta(hours=1)
-
-        session = DeviceSessionORM(
-            id=session_id,
-            device_id=device_orm.id,
-            access_token_hash="hashed_token_value",
-            refresh_token_hash="refresh_hash",
-            token_version=1,
-            expires_at=expires_at,
-            refresh_expires_at=now + timedelta(days=30),
-            ip_address="192.168.1.1",
-            user_agent="Mozilla/5.0",
-        )
-
-        db_session.add(session)
-        await db_session.commit()
-        await db_session.refresh(session)
-
-        assert session.id == session_id
-        assert session.device_id == device_orm.id
-        assert session.access_token_hash == "hashed_token_value"
-        assert session.expires_at == expires_at
-        assert session.ip_address == "192.168.1.1"
-        assert session.user_agent == "Mozilla/5.0"
-        assert session.revoked_at is None
-        assert session.created_at is not None
-        assert session.updated_at is not None
-
-    async def test_device_session_cascades_on_device_delete(
-        self, db_session: AsyncSession, device_orm: DeviceORM, device_session_orm: DeviceSessionORM
-    ):
-        """Test that sessions are deleted when their device is deleted."""
-        session_id = device_session_orm.id
-
-        # Delete device
-        await db_session.delete(device_orm)
-        await db_session.commit()
-
-        # Session should be gone
-        result = await db_session.get(DeviceSessionORM, session_id)
-        assert result is None
-
-    async def test_device_session_optional_fields(self, device_session_orm: DeviceSessionORM):
-        """Test that optional fields (ip_address, user_agent, revoked_at) can be null."""
-        # Fixture includes ip_address and user_agent, but revoked_at should be None
-        assert device_session_orm.revoked_at is None
-
-    async def test_device_session_access_token_hash_indexed(
-        self, db_session: AsyncSession, device_orm: DeviceORM
-    ):
-        """Test that access_token_hash is indexed for fast lookups."""
-        # This test verifies the index exists by checking we can create
-        # sessions with different hashes quickly
-        # Create multiple sessions
-        for i in range(5):
-            session = DeviceSessionORM(
-                device_id=device_orm.id,
-                access_token_hash=f"hash_{i}",
-                refresh_token_hash=f"refresh_hash_{i}",
-                token_version=1,
-                expires_at=datetime.now(UTC) + timedelta(hours=1),
-                refresh_expires_at=datetime.now(UTC) + timedelta(days=30),
-            )
-            db_session.add(session)
-
-        await db_session.commit()
-        # If index exists, this should be fast
-
-    async def test_device_session_to_domain_conversion(self, db_session: AsyncSession):
-        """Test converting DeviceSession ORM to domain entity."""
-        now = datetime.now(UTC)
-        expires_at = now + timedelta(hours=1)
-        session_id = uuid4()
-        device_id = uuid4()
-
-        session_orm = DeviceSessionORM(
-            id=session_id,
-            device_id=device_id,
-            access_token_hash="hashed_token",
-            refresh_token_hash="refresh_hash",
-            token_version=1,
-            expires_at=expires_at,
-            refresh_expires_at=now + timedelta(days=30),
-            ip_address="10.0.0.1",
-            user_agent="Test Agent",
-            revoked_at=None,
-            created_at=now,
-            updated_at=now,
-        )
-
-        # Convert to domain
-        session_domain = session_orm.to_domain()
-
-        assert isinstance(session_domain, DeviceSession)
-        assert session_domain.id == session_id
-        assert session_domain.device_id == device_id
-        assert session_domain.access_token_hash == "hashed_token"
-        assert session_domain.expires_at == expires_at
-        assert session_domain.ip_address == "10.0.0.1"
-        assert session_domain.user_agent == "Test Agent"
-        assert session_domain.revoked_at is None
-
-    async def test_device_session_from_domain_conversion(self, db_session: AsyncSession):
-        """Test converting DeviceSession domain to ORM model."""
-        now = datetime.now(UTC)
-        expires_at = now + timedelta(hours=1)
-        session_id = DeviceSessionID(uuid4())
-        device_id = DeviceID(uuid4())
-        revoked_at = now + timedelta(minutes=30)
-
-        session_domain = DeviceSession(
-            id=session_id,
-            device_id=device_id,
-            access_token_hash="hashed_token",
-            refresh_token_hash="refresh_hash",
-            token_version=1,
-            expires_at=expires_at,
-            refresh_expires_at=now + timedelta(days=30),
-            ip_address="192.168.1.100",
-            user_agent="Chrome",
-            revoked_at=revoked_at,
-            created_at=now,
-            updated_at=now,
-        )
-
-        # Convert to ORM
-        session_orm = DeviceSessionORM.from_domain(session_domain)
-
-        assert session_orm.id == session_id.uuid
-        assert session_orm.device_id == device_id.uuid
-        assert session_orm.access_token_hash == "hashed_token"
-        assert session_orm.expires_at == expires_at
-        assert session_orm.ip_address == "192.168.1.100"
-        assert session_orm.user_agent == "Chrome"
-        assert session_orm.revoked_at == revoked_at
-
-
-@pytest.mark.asyncio
 class TestNonceORM:
     """Test suite for Nonce ORM model."""
 
-    async def test_create_nonce(self, db_session: AsyncSession, device_orm: DeviceORM):
+    async def test_create_nonce(self, db_session: AsyncSession, identity_orm: IdentityORM):
         """Test creating a nonce in the database."""
         # Create nonce
         nonce_id = uuid4()
@@ -390,7 +255,7 @@ class TestNonceORM:
 
         nonce = NonceORM(
             id=nonce_id,
-            device_id=device_orm.id,
+            identity_id=identity_orm.id,
             nonce_value=nonce_value,
             expires_at=expires_at,
             status="pending",
@@ -401,7 +266,7 @@ class TestNonceORM:
         await db_session.refresh(nonce)
 
         assert nonce.id == nonce_id
-        assert nonce.device_id == device_orm.id
+        assert nonce.identity_id == identity_orm.id
         assert nonce.nonce_value == nonce_value
         assert nonce.expires_at == expires_at
         assert nonce.status == "pending"
@@ -419,7 +284,7 @@ class TestNonceORM:
         """Test that nonce_value must be unique."""
         # Try to create second nonce with same nonce_value
         nonce2 = NonceORM(
-            device_id=nonce_orm.device_id,
+            identity_id=nonce_orm.identity_id,
             nonce_value=nonce_orm.nonce_value,  # Duplicate
             expires_at=datetime.now(UTC) + timedelta(seconds=60),
         )
@@ -428,14 +293,14 @@ class TestNonceORM:
         with pytest.raises(IntegrityError):
             await db_session.commit()
 
-    async def test_nonce_cascades_on_device_delete(
-        self, db_session: AsyncSession, device_orm: DeviceORM, nonce_orm: NonceORM
+    async def test_nonce_cascades_on_identity_delete(
+        self, db_session: AsyncSession, identity_orm: IdentityORM, nonce_orm: NonceORM
     ):
-        """Test that nonces are deleted when their device is deleted."""
+        """Test that nonces are deleted when their identity is deleted."""
         nonce_id = nonce_orm.id
 
-        # Delete device
-        await db_session.delete(device_orm)
+        # Delete identity
+        await db_session.delete(identity_orm)
         await db_session.commit()
 
         # Nonce should be gone
@@ -448,12 +313,12 @@ class TestNonceORM:
         expires_at = now + timedelta(seconds=60)
         used_at = now + timedelta(seconds=30)
         nonce_id = uuid4()
-        device_id = uuid4()
+        identity_id = uuid4()
         nonce_value = str(uuid4())
 
         nonce_orm = NonceORM(
             id=nonce_id,
-            device_id=device_id,
+            identity_id=identity_id,
             nonce_value=nonce_value,
             expires_at=expires_at,
             used_at=used_at,
@@ -467,7 +332,7 @@ class TestNonceORM:
 
         assert isinstance(nonce_domain, Nonce)
         assert nonce_domain.id == nonce_id
-        assert nonce_domain.device_id == device_id
+        assert nonce_domain.identity_id == identity_id
         assert nonce_domain.nonce_value == nonce_value
         assert nonce_domain.expires_at == expires_at
         assert nonce_domain.used_at == used_at
@@ -478,12 +343,12 @@ class TestNonceORM:
         now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=60)
         nonce_id = NonceID(uuid4())
-        device_id = DeviceID(uuid4())
+        identity_id = IdentityID(uuid4())
         nonce_value = str(uuid4())
 
         nonce_domain = Nonce(
             id=nonce_id,
-            device_id=device_id,
+            identity_id=identity_id,
             nonce_value=nonce_value,
             expires_at=expires_at,
             status=NonceStatus.PENDING,
@@ -495,7 +360,7 @@ class TestNonceORM:
         nonce_orm = NonceORM.from_domain(nonce_domain)
 
         assert nonce_orm.id == nonce_id.uuid
-        assert nonce_orm.device_id == device_id.uuid
+        assert nonce_orm.identity_id == identity_id.uuid
         assert nonce_orm.nonce_value == nonce_value
         assert nonce_orm.expires_at == expires_at
         assert nonce_orm.status == "pending"
