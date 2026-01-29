@@ -11,6 +11,7 @@ from leadr.auth.dependencies import (
     ClientAuthContextDep,
     ClientAuthContextWithNonceDep,
 )
+from leadr.auth.services.dependencies import IdentityServiceDep
 from leadr.boards.domain.board import BoardType
 from leadr.boards.domain.board_state import BoardState
 from leadr.boards.domain.run_entry import RunEntry
@@ -41,6 +42,7 @@ async def create_score_client(
     board_service: BoardServiceDep,
     background_tasks: BackgroundTasks,
     auth: ClientAuthContextWithNonceDep,
+    identity_service: IdentityServiceDep,
     pre_create_hook: PreCreateScoreHookDep,
     post_create_hook: PostCreateScoreHookDep,
 ) -> ScoreClientResponse:
@@ -76,9 +78,12 @@ async def create_score_client(
     # Identity derived from authenticated session
     identity = auth.identity
 
-    # Update identity display name if provided in request
+    # Persist identity display name if it changed
     if score_request.player_name and identity.display_name != score_request.player_name:
-        identity.display_name = score_request.player_name
+        identity = await identity_service.update_identity(
+            identity_id=identity.id,
+            display_name=score_request.player_name,
+        )
 
     await pre_create_hook(score_request, auth, background_tasks)
 
@@ -108,7 +113,7 @@ async def create_score_client(
             identity_id=identity.id,
             value=value,
             delta=delta,
-            player_name=score_request.player_name,
+            player_name=identity.display_name or score_request.player_name,
             timezone=timezone,
             country=country,
             city=city,

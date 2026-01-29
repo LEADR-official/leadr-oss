@@ -1860,3 +1860,71 @@ class TestScoreRoutesClient:
         assert ranks2 == [6, 7, 8, 9, 10], (
             f"Second page: expected ranks [6, 7, 8, 9, 10], got {ranks2}"
         )
+
+    async def test_create_score_persists_display_name_to_identity(
+        self, client: AsyncClient, db_session
+    ):
+        """Test that submitting a score with player_name persists it to identity.display_name."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Account", slug="test-identity-dn")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="High Scores",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        # Start session via API (creates device and identity)
+        fingerprint = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        session_response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": str(game.id),
+                "client_fingerprint": fingerprint,
+                "platform": "ios",
+            },
+        )
+        assert session_response.status_code == 201
+        session_data = session_response.json()
+        access_token = session_data["access_token"]
+        identity_id = session_data["identity_id"]
+
+        # Identity should have no display_name initially
+        assert session_data["display_name"] is None
+
+        # Generate nonce
+        nonce_response = await client.get(
+            "/client/nonce",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        assert nonce_response.status_code == 200
+        nonce_value = nonce_response.json()["nonce_value"]
+
+        # Submit score with player_name
+        response = await client.post(
+            "/client/scores",
+            json={
+                "board_id": str(board.id),
+                "value": 1000.0,
+                "player_name": "CoolPlayer",
+            },
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "leadr-client-nonce": nonce_value,
+            },
+        )
+        assert response.status_code == 201
+        assert response.json()["player_name"] == "CoolPlayer"
+
+        # Verify identity.display_name was persisted in the database
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity = await identity_service.get_identity(IdentityID(identity_id))
+        assert identity is not None
+        assert identity.display_name == "CoolPlayer"
