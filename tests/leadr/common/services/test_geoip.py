@@ -1,12 +1,15 @@
 """Tests for GeoIP service."""
 
+import io
 import os
+import tarfile
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import httpx
+import maxminddb
 import pytest
 
 from leadr.common.geoip import GeoInfo, GeoIPService
@@ -65,9 +68,11 @@ class TestGeoIPService:
             mock_tar.__exit__.return_value = None
             mock_tarfile.return_value = mock_tar
 
-            # Mock database reader
-            mock_reader = Mock()
+            # Mock database reader (used both as context manager in validation and directly)
+            mock_reader = MagicMock()
             mock_open_db.return_value = mock_reader
+            mock_reader.__enter__ = Mock(return_value=mock_reader)
+            mock_reader.__exit__ = Mock(return_value=False)
 
             service = GeoIPService(**geoip_config)
             await service.initialize()
@@ -198,9 +203,11 @@ class TestGeoIPService:
             mock_tar.__exit__.return_value = None
             mock_tarfile.return_value = mock_tar
 
-            # Mock database reader
-            mock_reader = Mock()
+            # Mock database reader (used both as context manager in validation and directly)
+            mock_reader = MagicMock()
             mock_open_db.return_value = mock_reader
+            mock_reader.__enter__ = Mock(return_value=mock_reader)
+            mock_reader.__exit__ = Mock(return_value=False)
 
             service = GeoIPService(**geoip_config)
             await service.initialize()
@@ -457,3 +464,81 @@ class TestGeoInfo:
         assert geo_info.timezone is None
         assert geo_info.country == "US"
         assert geo_info.city is None
+
+
+class TestGetGeoInfoInvalidDatabase:
+    """Tests for get_geo_info handling of corrupted databases."""
+
+    def test_returns_none_on_invalid_database_error(self, geoip_config) -> None:
+        service = GeoIPService(**geoip_config)
+        mock_reader = MagicMock()
+        mock_reader.get.side_effect = maxminddb.InvalidDatabaseError(
+            "Invalid data type arguments: 95"
+        )
+        service._city_reader = mock_reader
+
+        result = service.get_geo_info("8.8.8.8")
+
+        assert result is None
+
+    def test_disables_reader_on_invalid_database_error(self, geoip_config) -> None:
+        service = GeoIPService(**geoip_config)
+        mock_reader = MagicMock()
+        mock_reader.get.side_effect = maxminddb.InvalidDatabaseError(
+            "Invalid data type arguments: 95"
+        )
+        service._city_reader = mock_reader
+
+        service.get_geo_info("8.8.8.8")
+
+        assert service._city_reader is None
+
+    def test_subsequent_calls_skip_lookup_after_corruption(self, geoip_config) -> None:
+        service = GeoIPService(**geoip_config)
+        mock_reader = MagicMock()
+        mock_reader.get.side_effect = maxminddb.InvalidDatabaseError(
+            "Invalid data type arguments: 95"
+        )
+        service._city_reader = mock_reader
+
+        service.get_geo_info("8.8.8.8")
+        result = service.get_geo_info("1.1.1.1")
+
+        assert result is None
+        mock_reader.get.assert_called_once()
+
+
+class TestDownloadAndExtractValidation:
+    """Tests for database validation after download."""
+
+    @pytest.mark.asyncio
+    async def test_corrupted_download_is_deleted(self, tmp_path: Path) -> None:
+        config = {
+            "account_id": "test",
+            "license_key": "test",
+            "city_db_url": "http://example.com/city",
+            "country_db_url": "http://example.com/country",
+            "database_path": tmp_path,
+        }
+        service = GeoIPService(**config)
+
+        # Build a tar.gz containing a fake corrupt mmdb
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+            data = b"not a valid mmdb file"
+            info = tarfile.TarInfo(name="GeoLite2-City/GeoLite2-City.mmdb")
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+        tar_bytes = buf.getvalue()
+
+        mock_response = MagicMock()
+        mock_response.content = tar_bytes
+        mock_response.raise_for_status = MagicMock()
+
+        mock_client = MagicMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        await service._download_and_extract(mock_client, "http://example.com", "GeoLite2-City.mmdb")
+
+        target_path = tmp_path / "GeoLite2-City.mmdb"
+        assert not target_path.exists()

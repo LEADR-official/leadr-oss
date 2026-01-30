@@ -234,6 +234,15 @@ class GeoIPService:
         # Clean up tar.gz file
         tar_gz_path.unlink()
 
+        # Validate database integrity
+        try:
+            with maxminddb.open_database(str(target_path)) as reader:
+                reader.get("8.8.8.8")
+        except Exception:
+            logger.error("Downloaded database %s is corrupted, removing", target_filename)
+            target_path.unlink(missing_ok=True)
+            return
+
     def get_geo_info(self, ip_address: str) -> GeoInfo | None:
         """Look up geolocation information for an IP address.
 
@@ -252,6 +261,13 @@ class GeoIPService:
             result = self._city_reader.get(ip_address)
         except ValueError:
             logger.warning("Invalid IP address format for GeoIP lookup: %s", ip_address)
+            return None
+        except maxminddb.InvalidDatabaseError:
+            logger.error(
+                "GeoIP city database is corrupted - disabling GeoIP lookups. "
+                "Restart the application to re-download the database."
+            )
+            self._city_reader = None
             return None
 
         # IP not found in database
