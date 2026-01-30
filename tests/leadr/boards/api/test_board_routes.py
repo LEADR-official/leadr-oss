@@ -374,7 +374,7 @@ class TestBoardRoutes:
         )
 
         assert response.status_code == 400
-        assert "game_slug parameter is required" in response.json()["error"]
+        assert "game_id parameter is required" in response.json()["error"]
 
     async def test_list_boards_filter_by_slug_and_game_slug(
         self, client: AsyncClient, db_session, test_api_key
@@ -940,3 +940,129 @@ class TestBoardClientRoutes:
         data = response.json()
         board_ids = [b["id"] for b in data["data"]]
         assert str(board.id) in board_ids
+
+    async def test_list_boards_client_slug_filter_without_game_id(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test Client API can filter by slug without providing game_id (uses auth.game_id)."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-client-slug-no-gameid",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id, name="Test Game", slug="client-slug-game"
+        )
+
+        # Create device session
+        fingerprint = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        session_response = await client.post(
+            "/client/sessions",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "display_name": "TestPlayer",
+                "client_fingerprint": fingerprint,
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+        assert session_response.status_code == 201
+        access_token = session_response.json()["access_token"]
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Slug Board",
+            slug="my-slug-board",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        response = await client.get(
+            "/client/boards?slug=my-slug-board",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        assert data["data"][0]["id"] == str(board.id)
+
+    async def test_list_boards_client_does_not_accept_game_id(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test Client API does not accept game_id query parameter."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-client-no-gameid-param",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        fingerprint = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        session_response = await client.post(
+            "/client/sessions",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "display_name": "TestPlayer",
+                "client_fingerprint": fingerprint,
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+        assert session_response.status_code == 201
+        access_token = session_response.json()["access_token"]
+
+        # game_id should be ignored (not a recognized param), request still succeeds
+        response = await client.get(
+            f"/client/boards?game_id={game.id}",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        # The param is silently ignored by FastAPI (not declared), so it still works
+        assert response.status_code == 200
+
+    async def test_list_boards_client_does_not_accept_game_slug(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test Client API does not accept game_slug query parameter."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-client-no-gameslug-param",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id, name="Test Game", slug="no-gameslug-param"
+        )
+
+        fingerprint = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        session_response = await client.post(
+            "/client/sessions",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "display_name": "TestPlayer",
+                "client_fingerprint": fingerprint,
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+        assert session_response.status_code == 201
+        access_token = session_response.json()["access_token"]
+
+        # game_slug should be ignored (not a recognized param)
+        response = await client.get(
+            "/client/boards?game_slug=no-gameslug-param",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        # The param is silently ignored, so it returns all boards for the game
+        assert response.status_code == 200

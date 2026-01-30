@@ -251,7 +251,7 @@ async def handle_list_boards(
     if slug is not None and game_id is None:
         raise HTTPException(
             status_code=400,
-            detail="game_slug parameter is required when filtering by board slug",
+            detail="game_id parameter is required when filtering by board slug",
         )
 
     # Unified query path for all filter combinations
@@ -413,12 +413,8 @@ async def list_boards_client(
     service: BoardServiceDep,
     game_service: GameServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
-    game_id: Annotated[GameID | None, Query(description="Filter by game ID")] = None,
     code: Annotated[str | None, Query(description="Filter by short code")] = None,
-    game_slug: Annotated[str | None, Query(description="Filter by game slug")] = None,
-    slug: Annotated[
-        str | None, Query(description="Filter by board slug (requires game_slug)")
-    ] = None,
+    slug: Annotated[str | None, Query(description="Filter by board slug")] = None,
     is_published: Annotated[bool | None, Query(description="Filter by published status")] = None,
     starts_before: Annotated[
         datetime | None, Query(description="Filter boards starting before this time (ISO 8601)")
@@ -435,17 +431,15 @@ async def list_boards_client(
 ) -> PaginatedResponse[BoardResponse]:
     """List boards (Client API).
 
-    Account ID is automatically derived from the authenticated device's account.
+    Account ID and game ID are automatically derived from the authenticated client session.
     Clients can optionally filter by various criteria to find specific boards.
 
     Filtering:
-    - Use ?game_id={id} or ?game_slug={slug} to filter boards by game
-    - Use ?game_slug={game_slug}&slug={slug} to find a specific board within a game
+    - Use ?slug={slug} to find a specific board within the authenticated game
     - Use ?code={code} to filter boards by short code
     - Use ?is_published=true/false to filter by published status
     - Use ?starts_before=<datetime>&starts_after=<datetime> for start date range
     - Use ?ends_before=<datetime>&ends_after=<datetime> for end date range
-    - Note: board slug filter requires game_slug parameter
 
     Pagination:
     - Default: 20 items per page, sorted by created_at:desc,id:asc
@@ -455,8 +449,8 @@ async def list_boards_client(
 
     Example:
         GET /v1/client/boards?code=WEEKLY-CHALLENGE&limit=50
-        GET /v1/client/boards?game_slug=my-game&is_published=true
-        GET /v1/client/boards?game_slug=my-game&slug=weekly-challenge
+        GET /v1/client/boards?slug=weekly-challenge
+        GET /v1/client/boards?is_published=true
         GET /v1/client/boards?starts_after=2025-01-01T00:00:00Z
 
     Args:
@@ -464,10 +458,8 @@ async def list_boards_client(
         service: Injected board service dependency.
         game_service: Injected game service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
-        game_id: Optional game ID to filter boards by.
         code: Optional short code to filter boards by.
-        game_slug: Optional game slug to filter boards by game (resolves to game_id).
-        slug: Optional board slug to filter by specific board (requires game_slug).
+        slug: Optional board slug to filter by specific board.
         is_published: Optional filter for published status.
         starts_before: Optional filter for boards starting before this time.
         starts_after: Optional filter for boards starting after this time.
@@ -478,8 +470,7 @@ async def list_boards_client(
         PaginatedResponse with boards and pagination metadata.
 
     Raises:
-        400: Invalid cursor, sort field, cursor state mismatch, or slug without game_slug.
-        404: Game or board not found when using slug filters.
+        400: Invalid cursor, sort field, or cursor state mismatch.
     """
     return await handle_list_boards(
         auth=auth,
@@ -487,9 +478,9 @@ async def list_boards_client(
         game_service=game_service,
         pagination=pagination,
         account_id=auth.account_id,
-        game_id=game_id,
+        game_id=auth.game_id,
         code=code,
-        game_slug=game_slug,
+        game_slug=None,
         slug=slug,
         is_active=True,  # Clients can't access inactive boards
         is_published=is_published,
