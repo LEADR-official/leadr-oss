@@ -15,6 +15,15 @@ from leadr.logging import get_logger
 
 logger = logging.getLogger(__name__)
 
+MAX_HEADER_LOG_LENGTH = 256
+
+
+def _sanitise_header(value: str | None) -> str | None:
+    """Sanitise and truncate a header value for safe logging."""
+    if not value:
+        return None
+    return value[:MAX_HEADER_LOG_LENGTH]
+
 
 class AccessLogMiddleware(BaseHTTPMiddleware):
     """Middleware to log HTTP requests with timing information.
@@ -24,6 +33,8 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
     - status_code: HTTP response status
     - duration_ms: Request processing time in milliseconds
     - client_ip: Client IP address (from headers or direct connection)
+    - LEADR-Client header
+    - User-Agent header
 
     Example log output (JSON format):
         {"event": "GET /v1/health", "status_code": 200, "duration_ms": 12.5, ...}
@@ -69,6 +80,8 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             status_code=response.status_code,
             duration_ms=round(duration_ms, 2),
             client_ip=extract_client_ip(request),
+            leadr_client=_sanitise_header(request.headers.get("leadr-client")),
+            user_agent=_sanitise_header(request.headers.get("user-agent")),
         )
 
         return response

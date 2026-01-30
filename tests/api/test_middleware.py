@@ -470,3 +470,165 @@ class TestAccessLogMiddleware:
         second_call = mock_logger.info.call_args_list[1]
         assert second_call[0][1] == "POST"
         assert second_call[0][2] == "/second"
+
+    @pytest.mark.asyncio
+    async def test_logs_leadr_client_header(self):
+        """Test that middleware logs LEADR-Client header as structured field."""
+        app = FastAPI()
+        mock_logger = Mock()
+
+        app.add_middleware(AccessLogMiddleware, logger=mock_logger)
+
+        @app.get("/test")
+        async def test_route():
+            return JSONResponse({"ok": True})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            await client.get(
+                "/test",
+                headers={
+                    "LEADR-Client": "unity-sdk; v=1.2.0; runtime=mono; platform=windows; arch=x64"
+                },
+            )
+
+        kwargs = mock_logger.info.call_args[1]
+        assert (
+            kwargs["leadr_client"] == "unity-sdk; v=1.2.0; runtime=mono; platform=windows; arch=x64"
+        )
+
+    @pytest.mark.asyncio
+    async def test_logs_user_agent_header(self):
+        """Test that middleware logs User-Agent header as structured field."""
+        app = FastAPI()
+        mock_logger = Mock()
+
+        app.add_middleware(AccessLogMiddleware, logger=mock_logger)
+
+        @app.get("/test")
+        async def test_route():
+            return JSONResponse({"ok": True})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            await client.get("/test", headers={"User-Agent": "MyGame/1.0"})
+
+        kwargs = mock_logger.info.call_args[1]
+        assert kwargs["user_agent"] == "MyGame/1.0"
+
+    @pytest.mark.asyncio
+    async def test_logs_none_when_leadr_client_absent(self):
+        """Test that middleware logs None when LEADR-Client header is absent."""
+        app = FastAPI()
+        mock_logger = Mock()
+
+        app.add_middleware(AccessLogMiddleware, logger=mock_logger)
+
+        @app.get("/test")
+        async def test_route():
+            return JSONResponse({"ok": True})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            await client.get("/test")
+
+        kwargs = mock_logger.info.call_args[1]
+        assert kwargs["leadr_client"] is None
+
+    @pytest.mark.asyncio
+    async def test_logs_none_when_user_agent_absent(self):
+        """Test that middleware logs None when User-Agent header is absent."""
+        app = FastAPI()
+        mock_logger = Mock()
+
+        app.add_middleware(AccessLogMiddleware, logger=mock_logger)
+
+        @app.get("/test")
+        async def test_route():
+            return JSONResponse({"ok": True})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            await client.get("/test", headers={"User-Agent": ""})
+
+        kwargs = mock_logger.info.call_args[1]
+        assert kwargs["user_agent"] is None
+
+    @pytest.mark.asyncio
+    async def test_truncates_long_leadr_client_header(self):
+        """Test that LEADR-Client values exceeding 256 chars are truncated."""
+        app = FastAPI()
+        mock_logger = Mock()
+
+        app.add_middleware(AccessLogMiddleware, logger=mock_logger)
+
+        @app.get("/test")
+        async def test_route():
+            return JSONResponse({"ok": True})
+
+        long_value = "a" * 500
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            await client.get("/test", headers={"LEADR-Client": long_value})
+
+        kwargs = mock_logger.info.call_args[1]
+        assert len(kwargs["leadr_client"]) == 256
+
+    @pytest.mark.asyncio
+    async def test_truncates_long_user_agent_header(self):
+        """Test that User-Agent values exceeding 256 chars are truncated."""
+        app = FastAPI()
+        mock_logger = Mock()
+
+        app.add_middleware(AccessLogMiddleware, logger=mock_logger)
+
+        @app.get("/test")
+        async def test_route():
+            return JSONResponse({"ok": True})
+
+        long_value = "b" * 500
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            await client.get("/test", headers={"User-Agent": long_value})
+
+        kwargs = mock_logger.info.call_args[1]
+        assert len(kwargs["user_agent"]) == 256
+
+    @pytest.mark.asyncio
+    async def test_leadr_client_malformed_does_not_crash(self):
+        """Test that malformed LEADR-Client header does not crash the middleware."""
+        app = FastAPI()
+        mock_logger = Mock()
+
+        app.add_middleware(AccessLogMiddleware, logger=mock_logger)
+
+        @app.get("/test")
+        async def test_route():
+            return JSONResponse({"ok": True})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.get(
+                "/test",
+                headers={"LEADR-Client": ";;;===;;;===&&&***" * 10},
+            )
+
+        assert response.status_code == 200
+        kwargs = mock_logger.info.call_args[1]
+        assert "leadr_client" in kwargs
