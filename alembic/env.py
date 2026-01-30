@@ -34,7 +34,7 @@ from leadr.registration.adapters.orm import (  # noqa: F401
 )
 from leadr.scores.adapters.orm import ScoreEventORM, ScoreFlagORM, ScoreSubmissionMetaORM  # noqa: F401
 
-# Import for database configuration (removed - using build_direct_database_url from above)
+# Import for database configuration
 from leadr.common.orm import Base
 from leadr.common.database import _get_connect_args, build_direct_database_url  # noqa: E402
 

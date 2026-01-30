@@ -31,13 +31,15 @@ class BaseService(ABC, Generic[DomainEntityT, RepositoryT]):
     - Consistent error handling
     """
 
-    def __init__(self, session: AsyncSession):
-        """Initialize service with database session.
+    def __init__(self, session: AsyncSession, repository: RepositoryT | None = None):
+        """Initialize service with database session and optional repository.
 
         Args:
             session: SQLAlchemy async session for database operations
+            repository: Optional pre-built repository instance. If provided, skips
+                       _create_repository(). Useful for injecting mock repositories in tests.
         """
-        self.repository = self._create_repository(session)
+        self.repository = repository if repository is not None else self._create_repository(session)
 
     @abstractmethod
     def _create_repository(self, session: AsyncSession) -> RepositoryT:

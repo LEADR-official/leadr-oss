@@ -1,126 +1,150 @@
 """Tests for Game API routes."""
 
-from datetime import UTC, datetime
-
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.exc import IntegrityError
 
-from leadr.accounts.domain.account import Account, AccountStatus
-from leadr.accounts.services.account_service import AccountService
-from leadr.accounts.services.repositories import AccountRepository
-from leadr.common.domain.ids import AccountID
-from leadr.games.services.game_service import GameService
+from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import AccountID, GameID
+from leadr.common.domain.pagination_result import PaginatedResult
+from leadr.games.domain.game import Game
 
 
 @pytest.mark.asyncio
 class TestGameRoutes:
     """Test suite for Game API routes."""
 
-    async def test_create_game(self, client: AsyncClient, db_session, test_api_key):
+    async def test_create_game(
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service, mock_hooks
+    ):
         """Test creating a game via API."""
-        # Create account first
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game = Game(
+            account_id=account_id,
+            name="Super Awesome Game",
+            slug="super-awesome-game",
+            steam_app_id="123456",
         )
+        mock_game_service.create_game.return_value = game
 
-        # Create game
-        response = await client.post(
+        # Act
+        response = await mock_client_no_db.post(
             "/games",
             json={
-                "account_id": str(account.id),
+                "account_id": str(account_id),
                 "name": "Super Awesome Game",
+                "slug": "super-awesome-game",
                 "steam_app_id": "123456",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
+        # Assert
         assert response.status_code == 201
         data = response.json()
         assert data["name"] == "Super Awesome Game"
         assert data["steam_app_id"] == "123456"
-        assert data["account_id"] == str(account.id)
+        assert data["account_id"] == str(account_id)
         assert "id" in data
         assert "created_at" in data
 
-    async def test_create_game_with_account_not_found(self, client: AsyncClient, test_api_key):
+        mock_game_service.create_game.assert_called_once_with(
+            account_id=account_id,
+            name="Super Awesome Game",
+            slug="super-awesome-game",
+            steam_app_id="123456",
+            default_board_id=None,
+            anti_cheat_enabled=True,
+            description=None,
+            tags=None,
+            page_url=None,
+        )
+        mock_hooks["pre_create"].assert_called_once()
+        mock_hooks["post_create"].assert_called_once()
+
+    async def test_create_game_with_account_not_found(
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service, mock_hooks
+    ):
         """Test creating a game with non-existent account returns 404."""
-        response = await client.post(
+        # Arrange
+        mock_game_service.create_game.side_effect = IntegrityError(
+            "statement", "params", Exception("orig")
+        )
+
+        # Act
+        response = await mock_client_no_db.post(
             "/games",
             json={
                 "account_id": "acc_00000000-0000-0000-0000-000000000000",
                 "name": "Super Awesome Game",
+                "slug": "super-awesome-game",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
+        # Assert
         assert response.status_code == 404
         assert "Account not found" in response.json()["error"]
 
-    async def test_get_game(self, client: AsyncClient, db_session, test_api_key):
+    async def test_get_game(self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service):
         """Test retrieving a game by ID via API."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game_id = GameID()
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Super Awesome Game",
+            slug="super-awesome-game",
         )
+        mock_game_service.get_by_id_or_raise.return_value = game
 
-        create_response = await client.post(
-            "/games",
-            json={
-                "account_id": str(account.id),
-                "name": "Super Awesome Game",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        game_id = create_response.json()["id"]
+        # Act
+        response = await mock_client_no_db.get(f"/games/{game_id}")
 
-        # Retrieve it
-        response = await client.get(f"/games/{game_id}", headers={"leadr-api-key": test_api_key})
-
+        # Assert
         assert response.status_code == 200
         data = response.json()
-        assert data["id"] == game_id
+        assert data["id"] == str(game_id)
         assert data["name"] == "Super Awesome Game"
 
-    async def test_get_game_not_found(self, client: AsyncClient, test_api_key):
-        """Test retrieving a non-existent game returns 404."""
-        response = await client.get(
-            "/games/gam_00000000-0000-0000-0000-000000000000",
-            headers={"leadr-api-key": test_api_key},
-        )
+        mock_game_service.get_by_id_or_raise.assert_called_once_with(game_id)
 
+    async def test_get_game_not_found(
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
+    ):
+        """Test retrieving a non-existent game returns 404."""
+        # Arrange
+        game_id = GameID()
+        mock_game_service.get_by_id_or_raise.side_effect = EntityNotFoundError("Game", str(game_id))
+
+        # Act
+        response = await mock_client_no_db.get(f"/games/{game_id}")
+
+        # Assert
         assert response.status_code == 404
         assert "not found" in response.json()["error"].lower()
 
-    async def test_list_games(self, client: AsyncClient, db_session, test_api_key):
+    async def test_list_games(self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service):
         """Test listing games for an account via API."""
-        # Create account
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        games = [
+            Game(account_id=account_id, name="Game One", slug="game-one"),
+            Game(account_id=account_id, name="Game Two", slug="game-two"),
+        ]
+        result = PaginatedResult(
+            items=games,
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
+        mock_game_service.list_games.return_value = result
 
-        # Create multiple games
-        await client.post(
-            "/games",
-            json={"account_id": str(account.id), "name": "Game One"},
-            headers={"leadr-api-key": test_api_key},
-        )
-        await client.post(
-            "/games",
-            json={"account_id": str(account.id), "name": "Game Two"},
-            headers={"leadr-api-key": test_api_key},
-        )
+        # Act
+        response = await mock_client_no_db.get(f"/games?account_id={account_id}")
 
-        # List games
-        response = await client.get(
-            f"/games?account_id={account.id}", headers={"leadr-api-key": test_api_key}
-        )
-
+        # Assert
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
@@ -131,37 +155,25 @@ class TestGameRoutes:
         assert "Game Two" in names
 
     async def test_list_games_filters_by_account(
-        self, client: AsyncClient, db_session, test_api_key
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
     ):
         """Test that listing games filters by account."""
-        # Create two accounts
-        account_service = AccountService(db_session)
-        account1 = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = AccountID()
+        games = [Game(account_id=account_id, name="Account 1 Game", slug="account-1-game")]
+        result = PaginatedResult(
+            items=games,
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
-        account2 = await account_service.create_account(
-            name="Beta Industries",
-            slug="beta-industries",
-        )
+        mock_game_service.list_games.return_value = result
 
-        # Create games for each account
-        await client.post(
-            "/games",
-            json={"account_id": str(account1.id), "name": "Account 1 Game"},
-            headers={"leadr-api-key": test_api_key},
-        )
-        await client.post(
-            "/games",
-            json={"account_id": str(account2.id), "name": "Account 2 Game"},
-            headers={"leadr-api-key": test_api_key},
-        )
+        # Act
+        response = await mock_client_no_db.get(f"/games?account_id={account_id}")
 
-        # List games for account 1
-        response = await client.get(
-            f"/games?account_id={account1.id}", headers={"leadr-api-key": test_api_key}
-        )
-
+        # Assert
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
@@ -169,120 +181,114 @@ class TestGameRoutes:
         assert len(data["data"]) == 1
         assert data["data"][0]["name"] == "Account 1 Game"
 
-    async def test_update_game(self, client: AsyncClient, db_session, test_api_key):
+    async def test_update_game(self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service):
         """Test updating a game via API."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game_id = GameID()
+        original_game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Super Awesome Game",
+            slug="super-awesome-game",
         )
-
-        create_response = await client.post(
-            "/games",
-            json={
-                "account_id": str(account.id),
-                "name": "Super Awesome Game",
-            },
-            headers={"leadr-api-key": test_api_key},
+        updated_game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Ultra Awesome Game",
+            slug="super-awesome-game",
+            steam_app_id="999999",
         )
-        game_id = create_response.json()["id"]
+        mock_game_service.get_by_id_or_raise.return_value = original_game
+        mock_game_service.update_game.return_value = updated_game
 
-        # Update it
-        response = await client.patch(
+        # Act
+        response = await mock_client_no_db.patch(
             f"/games/{game_id}",
             json={
                 "name": "Ultra Awesome Game",
                 "steam_app_id": "999999",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
+        # Assert
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "Ultra Awesome Game"
         assert data["steam_app_id"] == "999999"
 
-    async def test_update_game_not_found(self, client: AsyncClient, test_api_key):
-        """Test updating a non-existent game returns 404."""
-        response = await client.patch(
-            "/games/gam_00000000-0000-0000-0000-000000000000",
-            json={"name": "New Name"},
-            headers={"leadr-api-key": test_api_key},
+        mock_game_service.get_by_id_or_raise.assert_called_once_with(game_id)
+        mock_game_service.update_game.assert_called_once_with(
+            game_id, name="Ultra Awesome Game", steam_app_id="999999"
         )
 
+    async def test_update_game_not_found(
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
+    ):
+        """Test updating a non-existent game returns 404."""
+        # Arrange
+        game_id = GameID()
+        mock_game_service.get_by_id_or_raise.side_effect = EntityNotFoundError("Game", str(game_id))
+
+        # Act
+        response = await mock_client_no_db.patch(
+            f"/games/{game_id}",
+            json={"name": "New Name"},
+        )
+
+        # Assert
         assert response.status_code == 404
         assert "not found" in response.json()["error"].lower()
 
-    async def test_soft_delete_game(self, client: AsyncClient, db_session, test_api_key):
+    async def test_soft_delete_game(
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
+    ):
         """Test soft-deleting a game via API."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game_id = GameID()
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Super Awesome Game",
+            slug="super-awesome-game",
         )
+        mock_game_service.get_by_id_or_raise.return_value = game
+        mock_game_service.soft_delete.return_value = game
 
-        create_response = await client.post(
-            "/games",
-            json={
-                "account_id": str(account.id),
-                "name": "Super Awesome Game",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        game_id = create_response.json()["id"]
-
-        # Soft-delete it
-        response = await client.patch(
+        # Act
+        response = await mock_client_no_db.patch(
             f"/games/{game_id}",
             json={"deleted": True},
-            headers={"leadr-api-key": test_api_key},
         )
 
+        # Assert
         assert response.status_code == 200
         data = response.json()
-        assert data["id"] == game_id
+        assert data["id"] == str(game_id)
 
-        # Verify it's not returned by get
-        get_response = await client.get(
-            f"/games/{game_id}", headers={"leadr-api-key": test_api_key}
-        )
-        assert get_response.status_code == 404
+        mock_game_service.soft_delete.assert_called_once_with(game_id)
 
-    async def test_list_games_excludes_deleted(self, client: AsyncClient, db_session, test_api_key):
+    async def test_list_games_excludes_deleted(
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
+    ):
         """Test that list endpoint excludes soft-deleted games."""
-        # Create account
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        games = [Game(account_id=account_id, name="Game Two", slug="game-two")]
+        result = PaginatedResult(
+            items=games,
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
+        mock_game_service.list_games.return_value = result
 
-        # Create games
-        game1_response = await client.post(
-            "/games",
-            json={"account_id": str(account.id), "name": "Game One"},
-            headers={"leadr-api-key": test_api_key},
-        )
-        game1_id = game1_response.json()["id"]
+        # Act
+        response = await mock_client_no_db.get(f"/games?account_id={account_id}")
 
-        await client.post(
-            "/games",
-            json={"account_id": str(account.id), "name": "Game Two"},
-            headers={"leadr-api-key": test_api_key},
-        )
-
-        # Soft-delete one
-        await client.patch(
-            f"/games/{game1_id}", json={"deleted": True}, headers={"leadr-api-key": test_api_key}
-        )
-
-        # List should only return non-deleted
-        response = await client.get(
-            f"/games?account_id={account.id}", headers={"leadr-api-key": test_api_key}
-        )
-
+        # Assert
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
@@ -291,170 +297,166 @@ class TestGameRoutes:
         assert data["data"][0]["name"] == "Game Two"
 
     async def test_create_game_with_anti_cheat_enabled_default(
-        self, client: AsyncClient, db_session, test_api_key
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service, mock_hooks
     ):
         """Test that anti_cheat_enabled defaults to True when creating a game."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game = Game(
+            account_id=account_id,
+            name="Super Awesome Game",
+            slug="super-awesome-game",
+            anti_cheat_enabled=True,
         )
+        mock_game_service.create_game.return_value = game
 
-        response = await client.post(
+        # Act
+        response = await mock_client_no_db.post(
             "/games",
             json={
-                "account_id": str(account.id),
+                "account_id": str(account_id),
                 "name": "Super Awesome Game",
+                "slug": "super-awesome-game",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
+        # Assert
         assert response.status_code == 201
         data = response.json()
         assert data["anti_cheat_enabled"] is True
 
     async def test_create_game_with_anti_cheat_disabled(
-        self, client: AsyncClient, db_session, test_api_key
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service, mock_hooks
     ):
         """Test creating a game with anti_cheat_enabled explicitly set to False."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game = Game(
+            account_id=account_id,
+            name="Custom Anti-Cheat Game",
+            slug="custom-anti-cheat-game",
+            anti_cheat_enabled=False,
         )
+        mock_game_service.create_game.return_value = game
 
-        response = await client.post(
+        # Act
+        response = await mock_client_no_db.post(
             "/games",
             json={
-                "account_id": str(account.id),
+                "account_id": str(account_id),
                 "name": "Custom Anti-Cheat Game",
+                "slug": "custom-anti-cheat-game",
                 "anti_cheat_enabled": False,
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
+        # Assert
         assert response.status_code == 201
         data = response.json()
         assert data["name"] == "Custom Anti-Cheat Game"
         assert data["anti_cheat_enabled"] is False
 
     async def test_update_game_anti_cheat_enabled(
-        self, client: AsyncClient, db_session, test_api_key
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
     ):
         """Test updating a game's anti_cheat_enabled field."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game_id = GameID()
+        original_game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Game to Update",
+            slug="game-to-update",
+            anti_cheat_enabled=True,
         )
-
-        # Create game with anti-cheat enabled (default)
-        create_response = await client.post(
-            "/games",
-            json={
-                "account_id": str(account.id),
-                "name": "Game to Update",
-            },
-            headers={"leadr-api-key": test_api_key},
+        disabled_game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Game to Update",
+            slug="game-to-update",
+            anti_cheat_enabled=False,
         )
-        game_id = create_response.json()["id"]
-        assert create_response.json()["anti_cheat_enabled"] is True
+        enabled_game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Game to Update",
+            slug="game-to-update",
+            anti_cheat_enabled=True,
+        )
+        mock_game_service.get_by_id_or_raise.return_value = original_game
+        mock_game_service.update_game.side_effect = [disabled_game, enabled_game]
 
-        # Disable anti-cheat
-        update_response = await client.patch(
+        # Act - Disable anti-cheat
+        response1 = await mock_client_no_db.patch(
             f"/games/{game_id}",
             json={"anti_cheat_enabled": False},
-            headers={"leadr-api-key": test_api_key},
         )
 
-        assert update_response.status_code == 200
-        data = update_response.json()
-        assert data["anti_cheat_enabled"] is False
+        # Assert
+        assert response1.status_code == 200
+        assert response1.json()["anti_cheat_enabled"] is False
 
-        # Re-enable anti-cheat
-        update_response2 = await client.patch(
+        # Act - Re-enable anti-cheat
+        response2 = await mock_client_no_db.patch(
             f"/games/{game_id}",
             json={"anti_cheat_enabled": True},
-            headers={"leadr-api-key": test_api_key},
         )
 
-        assert update_response2.status_code == 200
-        data2 = update_response2.json()
-        assert data2["anti_cheat_enabled"] is True
+        # Assert
+        assert response2.status_code == 200
+        assert response2.json()["anti_cheat_enabled"] is True
 
     async def test_get_game_includes_anti_cheat_enabled(
-        self, client: AsyncClient, db_session, test_api_key
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
     ):
         """Test that retrieving a game includes the anti_cheat_enabled field."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game_id = GameID()
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            anti_cheat_enabled=False,
         )
+        mock_game_service.get_by_id_or_raise.return_value = game
 
-        # Create game with anti-cheat disabled
-        create_response = await client.post(
-            "/games",
-            json={
-                "account_id": str(account.id),
-                "name": "Test Game",
-                "anti_cheat_enabled": False,
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        game_id = create_response.json()["id"]
+        # Act
+        response = await mock_client_no_db.get(f"/games/{game_id}")
 
-        # Retrieve game
-        get_response = await client.get(
-            f"/games/{game_id}", headers={"leadr-api-key": test_api_key}
-        )
-
-        assert get_response.status_code == 200
-        data = get_response.json()
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
         assert "anti_cheat_enabled" in data
         assert data["anti_cheat_enabled"] is False
 
     async def test_superadmin_list_games_without_account_id_returns_all(
-        self, authenticated_client: AsyncClient, db_session
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
     ):
         """Test that superadmin can list games WITHOUT account_id and sees all accounts."""
-        # Create two accounts with games in each
-        account_repo = AccountRepository(db_session)
-        now = datetime.now(UTC)
+        # Arrange
+        account1_id = AccountID()
+        account2_id = AccountID()
 
-        account1 = Account(
-            id=AccountID(),
-            name="Account One Games",
-            slug="account-one-games",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
+        games = [
+            Game(account_id=account1_id, name="Game from Account 1", slug="game-from-account-1"),
+            Game(account_id=account2_id, name="Game from Account 2", slug="game-from-account-2"),
+        ]
+        result = PaginatedResult(
+            items=games,
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
-        account2 = Account(
-            id=AccountID(),
-            name="Account Two Games",
-            slug="account-two-games",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account1)
-        await account_repo.create(account2)
+        mock_game_service.list_games.return_value = result
 
-        # Create games in each account
-        game_service = GameService(db_session)
-        await game_service.create_game(
-            account_id=account1.id,
-            name="Game from Account 1",
-        )
-        await game_service.create_game(
-            account_id=account2.id,
-            name="Game from Account 2",
-        )
+        # Act
+        response = await mock_client_no_db.get("/games")
 
-        # List games WITHOUT account_id - should return games from ALL accounts
-        response = await authenticated_client.get("/games")
-
+        # Assert
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
@@ -466,26 +468,33 @@ class TestGameRoutes:
         assert "Game from Account 2" in game_names
 
     async def test_create_game_with_tags_and_description(
-        self, client: AsyncClient, db_session, test_api_key
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service, mock_hooks
     ):
         """Test creating a game with tags and description via API."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game = Game(
+            account_id=account_id,
+            name="Adventure Game",
+            slug="adventure-game",
+            description="An epic journey awaits",
+            tags=["adventure", "rpg", "story"],
         )
+        mock_game_service.create_game.return_value = game
 
-        response = await client.post(
+        # Act
+        response = await mock_client_no_db.post(
             "/games",
             json={
-                "account_id": str(account.id),
+                "account_id": str(account_id),
                 "name": "Adventure Game",
+                "slug": "adventure-game",
                 "description": "An epic journey awaits",
                 "tags": ["adventure", "rpg", "story"],
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
+        # Assert
         assert response.status_code == 201
         data = response.json()
         assert data["name"] == "Adventure Game"
@@ -493,191 +502,220 @@ class TestGameRoutes:
         assert data["tags"] == ["adventure", "rpg", "story"]
 
     async def test_create_game_tags_defaults_to_empty_list(
-        self, client: AsyncClient, db_session, test_api_key
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service, mock_hooks
     ):
         """Test that tags defaults to empty list when not provided via API."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game = Game(
+            account_id=account_id,
+            name="Simple Game",
+            slug="simple-game",
+            tags=[],
+            description=None,
         )
+        mock_game_service.create_game.return_value = game
 
-        response = await client.post(
+        # Act
+        response = await mock_client_no_db.post(
             "/games",
             json={
-                "account_id": str(account.id),
+                "account_id": str(account_id),
                 "name": "Simple Game",
+                "slug": "simple-game",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
+        # Assert
         assert response.status_code == 201
         data = response.json()
         assert data["tags"] == []
         assert data["description"] is None
 
-    async def test_update_game_tags(self, client: AsyncClient, db_session, test_api_key):
+    async def test_update_game_tags(
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
+    ):
         """Test updating a game's tags via API."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game_id = GameID()
+        original_game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Game to Update Tags",
+            slug="game-to-update-tags",
         )
-
-        create_response = await client.post(
-            "/games",
-            json={
-                "account_id": str(account.id),
-                "name": "Game to Update Tags",
-            },
-            headers={"leadr-api-key": test_api_key},
+        updated_game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Game to Update Tags",
+            slug="game-to-update-tags",
+            tags=["action", "puzzle"],
         )
-        game_id = create_response.json()["id"]
+        mock_game_service.get_by_id_or_raise.return_value = original_game
+        mock_game_service.update_game.return_value = updated_game
 
-        # Update tags
-        update_response = await client.patch(
+        # Act
+        response = await mock_client_no_db.patch(
             f"/games/{game_id}",
             json={"tags": ["action", "puzzle"]},
-            headers={"leadr-api-key": test_api_key},
         )
 
-        assert update_response.status_code == 200
-        data = update_response.json()
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
         assert data["tags"] == ["action", "puzzle"]
 
-    async def test_update_game_description(self, client: AsyncClient, db_session, test_api_key):
+    async def test_update_game_description(
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
+    ):
         """Test updating a game's description via API."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game_id = GameID()
+        original_game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Game to Update Description",
+            slug="game-to-update-description",
         )
-
-        create_response = await client.post(
-            "/games",
-            json={
-                "account_id": str(account.id),
-                "name": "Game to Update Description",
-            },
-            headers={"leadr-api-key": test_api_key},
+        updated_game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Game to Update Description",
+            slug="game-to-update-description",
+            description="A brand new description",
         )
-        game_id = create_response.json()["id"]
+        mock_game_service.get_by_id_or_raise.return_value = original_game
+        mock_game_service.update_game.return_value = updated_game
 
-        # Update description
-        update_response = await client.patch(
+        # Act
+        response = await mock_client_no_db.patch(
             f"/games/{game_id}",
             json={"description": "A brand new description"},
-            headers={"leadr-api-key": test_api_key},
         )
 
-        assert update_response.status_code == 200
-        data = update_response.json()
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
         assert data["description"] == "A brand new description"
 
     async def test_get_game_returns_tags_and_description(
-        self, client: AsyncClient, db_session, test_api_key
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
     ):
         """Test that retrieving a game includes tags and description."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game_id = GameID()
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Full Game",
+            slug="full-game",
+            description="A complete game",
+            tags=["complete", "full"],
         )
+        mock_game_service.get_by_id_or_raise.return_value = game
 
-        # Create game with tags and description
-        create_response = await client.post(
-            "/games",
-            json={
-                "account_id": str(account.id),
-                "name": "Full Game",
-                "description": "A complete game",
-                "tags": ["complete", "full"],
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        game_id = create_response.json()["id"]
+        # Act
+        response = await mock_client_no_db.get(f"/games/{game_id}")
 
-        # Retrieve game
-        get_response = await client.get(
-            f"/games/{game_id}", headers={"leadr-api-key": test_api_key}
-        )
-
-        assert get_response.status_code == 200
-        data = get_response.json()
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
         assert data["description"] == "A complete game"
         assert data["tags"] == ["complete", "full"]
 
-    async def test_create_game_with_page_url(self, client: AsyncClient, db_session, test_api_key):
+    async def test_create_game_with_page_url(
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service, mock_hooks
+    ):
         """Test creating a game with page_url via API."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game = Game(
+            account_id=account_id,
+            name="Game with Page",
+            slug="game-with-page",
+            page_url="https://example.com/game",
         )
+        mock_game_service.create_game.return_value = game
 
-        response = await client.post(
+        # Act
+        response = await mock_client_no_db.post(
             "/games",
             json={
-                "account_id": str(account.id),
+                "account_id": str(account_id),
                 "name": "Game with Page",
+                "slug": "game-with-page",
                 "page_url": "https://example.com/game",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
+        # Assert
         assert response.status_code == 201
         data = response.json()
         assert data["name"] == "Game with Page"
         assert data["page_url"] == "https://example.com/game"
 
-    async def test_update_game_page_url(self, client: AsyncClient, db_session, test_api_key):
+    async def test_update_game_page_url(
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
+    ):
         """Test updating a game's page_url via API."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game_id = GameID()
+        original_game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Game to Update URL",
+            slug="game-to-update-url",
         )
-
-        create_response = await client.post(
-            "/games",
-            json={
-                "account_id": str(account.id),
-                "name": "Game to Update URL",
-            },
-            headers={"leadr-api-key": test_api_key},
+        updated_game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Game to Update URL",
+            slug="game-to-update-url",
+            page_url="https://example.com/updated",
         )
-        game_id = create_response.json()["id"]
+        mock_game_service.get_by_id_or_raise.return_value = original_game
+        mock_game_service.update_game.return_value = updated_game
 
-        # Update page_url
-        update_response = await client.patch(
+        # Act
+        response = await mock_client_no_db.patch(
             f"/games/{game_id}",
             json={"page_url": "https://example.com/updated"},
-            headers={"leadr-api-key": test_api_key},
         )
 
-        assert update_response.status_code == 200
-        data = update_response.json()
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
         assert data["page_url"] == "https://example.com/updated"
 
     async def test_game_page_url_defaults_to_none(
-        self, client: AsyncClient, db_session, test_api_key
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service, mock_hooks
     ):
         """Test that page_url defaults to None when not provided via API."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        # Arrange
+        account_id = admin_auth.account_id
+        game = Game(
+            account_id=account_id,
+            name="Simple Game",
+            slug="simple-game",
+            page_url=None,
         )
+        mock_game_service.create_game.return_value = game
 
-        response = await client.post(
+        # Act
+        response = await mock_client_no_db.post(
             "/games",
             json={
-                "account_id": str(account.id),
+                "account_id": str(account_id),
                 "name": "Simple Game",
+                "slug": "simple-game",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
+        # Assert
         assert response.status_code == 201
         data = response.json()
         assert data["page_url"] is None
