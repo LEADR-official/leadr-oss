@@ -1,15 +1,11 @@
-"""Tests for API Key API routes - superadmin optional account_id."""
-
-from datetime import UTC, datetime
+"""Tests for API Key API routes - unit tests with mocked services."""
 
 import pytest
 from httpx import AsyncClient
 
-from leadr.accounts.domain.account import Account, AccountStatus
-from leadr.accounts.services.dependencies import get_user_service
-from leadr.accounts.services.repositories import AccountRepository
-from leadr.auth.services.dependencies import get_api_key_service
-from leadr.common.domain.ids import AccountID
+from leadr.auth.domain.api_key import APIKey
+from leadr.common.api.pagination import PaginatedResult
+from leadr.common.domain.ids import AccountID, APIKeyID, UserID
 
 
 @pytest.mark.asyncio
@@ -17,60 +13,44 @@ class TestSuperadminOptionalAccountId:
     """Test suite for superadmin optional account_id on list endpoints."""
 
     async def test_superadmin_list_api_keys_without_account_id_returns_all(
-        self, authenticated_client: AsyncClient, db_session
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_api_key_service,
     ):
         """Test that superadmin can list API keys WITHOUT account_id and sees all accounts."""
-        # Create two accounts with API keys in each
-        account_repo = AccountRepository(db_session)
-        now = datetime.now(UTC)
+        # Create mock API keys from two accounts
+        account1_id = AccountID()
+        account2_id = AccountID()
 
-        account1 = Account(
-            id=AccountID(),
-            name="Account One",
-            slug="account-one-apikeys",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        account2 = Account(
-            id=AccountID(),
-            name="Account Two",
-            slug="account-two-apikeys",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account1)
-        await account_repo.create(account2)
-
-        # Create users and API keys in each account
-        user_service = await get_user_service(db_session)
-        api_key_service = await get_api_key_service(db_session)
-
-        user1 = await user_service.create_user(
-            account_id=account1.id,
-            email="apikey-user1@account1.com",
-            display_name="API Key User 1",
-        )
-        user2 = await user_service.create_user(
-            account_id=account2.id,
-            email="apikey-user2@account2.com",
-            display_name="API Key User 2",
-        )
-
-        await api_key_service.create_api_key(
-            account_id=account1.id,
-            user_id=user1.id,
+        api_key1 = APIKey(
+            id=APIKeyID(),
+            account_id=account1_id,
+            user_id=UserID(),
             name="Account 1 Key",
+            key_hash="hash1",
+            key_prefix="ldr_test1",
         )
-        await api_key_service.create_api_key(
-            account_id=account2.id,
-            user_id=user2.id,
+        api_key2 = APIKey(
+            id=APIKeyID(),
+            account_id=account2_id,
+            user_id=UserID(),
             name="Account 2 Key",
+            key_hash="hash2",
+            key_prefix="ldr_test2",
+        )
+
+        # Mock service to return both keys
+        mock_api_key_service.list_api_keys.return_value = PaginatedResult(
+            items=[api_key1, api_key2],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
 
         # List API keys WITHOUT account_id - should return keys from ALL accounts
-        response = await authenticated_client.get("/api-keys")
+        response = await mock_client_no_db.get("/api-keys")
 
         assert response.status_code == 200
         data = response.json()
@@ -81,3 +61,8 @@ class TestSuperadminOptionalAccountId:
         key_names = {k["name"] for k in data["data"]}
         assert "Account 1 Key" in key_names
         assert "Account 2 Key" in key_names
+
+        # Verify service was called with account_id=None (superadmin sees all)
+        mock_api_key_service.list_api_keys.assert_called_once()
+        call_kwargs = mock_api_key_service.list_api_keys.call_args.kwargs
+        assert call_kwargs["account_id"] is None

@@ -1,46 +1,57 @@
 """Tests for Board API routes."""
 
-import logging
 from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.exc import IntegrityError
 
-from leadr.accounts.domain.account import Account, AccountStatus
-from leadr.accounts.services.account_service import AccountService
-from leadr.accounts.services.repositories import AccountRepository
-from leadr.boards.services.board_service import BoardService
-from leadr.common.domain.ids import AccountID
-from leadr.games.services.game_service import GameService
-
-logger = logging.getLogger(__name__)
+from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.ids import AccountID, BoardID, GameID
+from leadr.common.domain.pagination_result import PaginatedResult
+from leadr.games.domain.game import Game
 
 
 @pytest.mark.asyncio
 class TestBoardRoutes:
     """Test suite for Board API routes."""
 
-    async def test_create_board(self, client: AsyncClient, db_session, test_api_key):
+    async def test_create_board(
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+        mock_board_hooks,
+    ):
         """Test creating a board via API."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = admin_auth.account_id
+        game_id = GameID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
+        # Mock service response
+        created_board = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
+            name="Speed Run Board",
+            slug="speed-run-board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
+        mock_board_service.create_board.return_value = created_board
+        mock_board_ratio_config_service.create_ratio_config.return_value = None
 
         # Create board
-        response = await client.post(
+        response = await mock_client_no_db.post(
             "/boards",
             json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
+                "account_id": str(account_id),
+                "game_id": str(game_id),
                 "name": "Speed Run Board",
                 "icon": "trophy",
                 "short_code": "SR2025",
@@ -49,41 +60,58 @@ class TestBoardRoutes:
                 "sort_direction": "ASCENDING",
                 "keep_strategy": "BEST",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 201
         data = response.json()
         assert data["name"] == "Speed Run Board"
         assert data["short_code"] == "SR2025"
-        assert data["account_id"] == str(account.id)
-        assert data["game_id"] == str(game.id)
+        assert data["account_id"] == str(account_id)
+        assert data["game_id"] == str(game_id)
         assert "id" in data
         assert "created_at" in data
 
+        # Verify service was called correctly
+        mock_board_service.create_board.assert_called_once()
+        call_kwargs = mock_board_service.create_board.call_args.kwargs
+        assert call_kwargs["account_id"] == account_id
+        assert call_kwargs["game_id"] == game_id
+        assert call_kwargs["name"] == "Speed Run Board"
+
     async def test_create_board_with_optional_fields(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+        mock_board_hooks,
     ):
         """Test creating a board with optional fields via API."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = admin_auth.account_id
+        game_id = GameID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
+        created_board = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
+            name="Speed Run Board",
+            slug="speed-run-board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST,
+            tags=["speedrun", "no-damage"],
+            template_name="Speed Run Template",
         )
+        mock_board_service.create_board.return_value = created_board
 
-        # Create board with optional fields
-        response = await client.post(
+        response = await mock_client_no_db.post(
             "/boards",
             json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
+                "account_id": str(account_id),
+                "game_id": str(game_id),
                 "name": "Speed Run Board",
                 "icon": "trophy",
                 "short_code": "SR2025",
@@ -94,7 +122,6 @@ class TestBoardRoutes:
                 "tags": ["speedrun", "no-damage"],
                 "template_name": "Speed Run Template",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 201
@@ -103,62 +130,72 @@ class TestBoardRoutes:
         assert data["template_name"] == "Speed Run Template"
 
     async def test_create_board_with_minimal_fields(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+        mock_board_hooks,
     ):
         """Test creating a board with minimal required fields using defaults."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = admin_auth.account_id
+        game_id = GameID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
+        created_board = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
+            name="Minimal Board",
+            slug="minimal-board",
+            short_code="ABCDE",
+            icon="fa-crown",
+            unit=None,
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
+        mock_board_service.create_board.return_value = created_board
 
-        # Create board with only required fields (name)
-        # Other fields should use defaults from the schema
-        response = await client.post(
+        response = await mock_client_no_db.post(
             "/boards",
             json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
+                "account_id": str(account_id),
+                "game_id": str(game_id),
                 "name": "Minimal Board",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 201
         data = response.json()
         assert data["name"] == "Minimal Board"
-        # short_code should be auto-generated (5 uppercase alphanumeric chars)
         assert data["short_code"] is not None
         assert len(data["short_code"]) == 5
-        # Verify defaults were applied
-        assert data["icon"] == "fa-crown"  # Default icon
-        assert data["unit"] is None  # Default unit (None)
-        assert data["is_active"] is True  # Default active state
-        assert data["sort_direction"] == "DESCENDING"  # Default sort direction
-        assert data["keep_strategy"] == "BEST"  # Default keep strategy
+        assert data["icon"] == "fa-crown"
+        assert data["unit"] is None
+        assert data["is_active"] is True
+        assert data["sort_direction"] == "DESCENDING"
+        assert data["keep_strategy"] == "BEST"
 
     async def test_create_board_with_game_not_found(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+        mock_board_hooks,
     ):
         """Test creating a board with non-existent game returns 404."""
-        # Create account
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        account_id = admin_auth.account_id
+
+        # Mock IntegrityError (foreign key violation)
+        mock_board_service.create_board.side_effect = IntegrityError(
+            "statement", "params", Exception("orig")
         )
 
-        response = await client.post(
+        response = await mock_client_no_db.post(
             "/boards",
             json={
-                "account_id": str(account.id),
+                "account_id": str(account_id),
                 "game_id": "gam_00000000-0000-0000-0000-000000000000",
                 "name": "Invalid Board",
                 "icon": "star",
@@ -168,40 +205,31 @@ class TestBoardRoutes:
                 "sort_direction": "DESCENDING",
                 "keep_strategy": "BEST",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 404
         assert "not found" in response.json()["error"].lower()
 
     async def test_create_board_with_game_from_different_account(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+        mock_board_hooks,
     ):
         """Test creating a board with game from different account returns 400."""
-        # Create two accounts
-        account_service = AccountService(db_session)
-        account1 = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-        account2 = await account_service.create_account(
-            name="Beta Industries",
-            slug="beta-industries",
-        )
+        account_id = admin_auth.account_id
+        game_id = GameID()
 
-        # Create game for account1
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account1.id,
-            name="Account 1 Game",
-        )
+        # Mock ValueError for account mismatch
+        mock_board_service.create_board.side_effect = ValueError("Game does not belong to account")
 
-        # Try to create board for account2 with account1's game
-        response = await client.post(
+        response = await mock_client_no_db.post(
             "/boards",
             json={
-                "account_id": str(account2.id),
-                "game_id": str(game.id),
+                "account_id": str(account_id),
+                "game_id": str(game_id),
                 "name": "Invalid Board",
                 "icon": "star",
                 "short_code": "INVALID",
@@ -210,115 +238,127 @@ class TestBoardRoutes:
                 "sort_direction": "DESCENDING",
                 "keep_strategy": "BEST",
             },
-            headers={"leadr-api-key": test_api_key},
         )
-
-        logger.warning(response.json())
 
         assert response.status_code == 400
         assert "does not belong to account" in response.json()["error"].lower()
 
-    async def test_get_board(self, client: AsyncClient, db_session, test_api_key):
+    async def test_get_board(
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+    ):
         """Test retrieving a board by ID via API."""
-        # Create account, game, and board
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = admin_auth.account_id
+        board_id = BoardID()
+        game_id = GameID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Speed Run Board",
+            slug="speed-run-board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
+        mock_board_service.get_by_id_or_raise.return_value = board
+        mock_board_ratio_config_service.get_by_board_id.return_value = None
 
-        create_response = await client.post(
-            "/boards",
-            json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
-                "name": "Speed Run Board",
-                "icon": "trophy",
-                "short_code": "SR2025",
-                "unit": "seconds",
-                "is_active": True,
-                "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        board_id = create_response.json()["id"]
-
-        # Retrieve it
-        response = await client.get(f"/boards/{board_id}", headers={"leadr-api-key": test_api_key})
+        response = await mock_client_no_db.get(f"/boards/{board_id}")
 
         assert response.status_code == 200
         data = response.json()
-        assert data["id"] == board_id
+        assert data["id"] == str(board_id)
         assert data["name"] == "Speed Run Board"
 
-    async def test_get_board_not_found(self, client: AsyncClient, test_api_key):
+    async def test_get_board_not_found(
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+    ):
         """Test retrieving a non-existent board returns 404."""
-        response = await client.get(
-            "/boards/brd_00000000-0000-0000-0000-000000000000",
-            headers={"leadr-api-key": test_api_key},
+        board_id = BoardID()
+        mock_board_service.get_by_id_or_raise.side_effect = EntityNotFoundError(
+            "Board", str(board_id)
         )
+
+        response = await mock_client_no_db.get(f"/boards/{board_id}")
 
         assert response.status_code == 404
         assert "not found" in response.json()["error"].lower()
 
-    async def test_list_boards_by_code(self, client: AsyncClient, db_session, test_api_key):
+    async def test_list_boards_by_code(
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_game_service,
+    ):
         """Test listing boards filtered by short code via API."""
-        # Create account, game, and board
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        account_id = admin_auth.account_id
+        board_id = BoardID()
+        game_id = GameID()
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Speed Run Board",
+            slug="speed-run-board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
+        result = PaginatedResult(
+            items=[board],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
+        mock_board_service.list_boards.return_value = result
 
-        create_response = await client.post(
-            "/boards",
-            json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
-                "name": "Speed Run Board",
-                "icon": "trophy",
-                "short_code": "SR2025",
-                "unit": "seconds",
-                "is_active": True,
-                "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        board_id = create_response.json()["id"]
-
-        # Retrieve by short code using query parameter (must include account_id after refactor)
-        response = await client.get(
-            f"/boards?code=SR2025&account_id={account.id}",
-            headers={"leadr-api-key": test_api_key},
-        )
+        response = await mock_client_no_db.get(f"/boards?code=SR2025&account_id={account_id}")
 
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
         assert "pagination" in data
         assert len(data["data"]) == 1
-        assert data["data"][0]["id"] == board_id
+        assert data["data"][0]["id"] == str(board_id)
         assert data["data"][0]["short_code"] == "SR2025"
 
-    async def test_list_boards_by_code_not_found(self, client: AsyncClient, test_api_key):
+    async def test_list_boards_by_code_not_found(
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_game_service,
+    ):
         """Test listing boards by non-existent short code returns empty list."""
-        response = await client.get(
-            "/boards?code=NONEXISTENT", headers={"leadr-api-key": test_api_key}
+        result = PaginatedResult(
+            items=[],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
+        mock_board_service.list_boards.return_value = result
+
+        response = await mock_client_no_db.get("/boards?code=NONEXISTENT")
 
         assert response.status_code == 200
         data = response.json()
@@ -327,129 +367,98 @@ class TestBoardRoutes:
         assert len(data["data"]) == 0
 
     async def test_list_boards_by_account_and_code(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_game_service,
     ):
         """Test listing boards filtered by both account_id and code."""
-        # Create two accounts
-        account_service = AccountService(db_session)
-        account1 = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-        account2 = await account_service.create_account(
-            name="Beta Industries",
-            slug="beta-industries",
+        account_id = AccountID()
+        board_id = BoardID()
+        game_id = GameID()
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Account 2 Board",
+            slug="account-2-board",
+            icon="trophy",
+            short_code="CODE2",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create games for each account
-        game_service = GameService(db_session)
-        game1 = await game_service.create_game(
-            account_id=account1.id,
-            name="Game 1",
+        result = PaginatedResult(
+            items=[board],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
-        game2 = await game_service.create_game(
-            account_id=account2.id,
-            name="Game 2",
-        )
+        mock_board_service.list_boards.return_value = result
 
-        # Create boards with different short codes for each account
-        await client.post(
-            "/boards",
-            json={
-                "account_id": str(account1.id),
-                "game_id": str(game1.id),
-                "name": "Account 1 Board",
-                "icon": "star",
-                "short_code": "CODE1",
-                "unit": "points",
-                "is_active": True,
-                "sort_direction": "DESCENDING",
-                "keep_strategy": "BEST",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        board2_response = await client.post(
-            "/boards",
-            json={
-                "account_id": str(account2.id),
-                "game_id": str(game2.id),
-                "name": "Account 2 Board",
-                "icon": "trophy",
-                "short_code": "CODE2",
-                "unit": "seconds",
-                "is_active": True,
-                "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        board2_id = board2_response.json()["id"]
-
-        # List boards filtering by both account2 and CODE2
-        response = await client.get(
-            f"/boards?account_id={account2.id}&code=CODE2",
-            headers={"leadr-api-key": test_api_key},
-        )
+        response = await mock_client_no_db.get(f"/boards?account_id={account_id}&code=CODE2")
 
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
         assert "pagination" in data
         assert len(data["data"]) == 1
-        assert data["data"][0]["id"] == board2_id
+        assert data["data"][0]["id"] == str(board_id)
         assert data["data"][0]["name"] == "Account 2 Board"
 
-    async def test_list_boards(self, client: AsyncClient, db_session, test_api_key):
+    async def test_list_boards(
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_game_service,
+    ):
         """Test listing boards for an account via API."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        account_id = admin_auth.account_id
+        game_id = GameID()
+
+        board1 = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
+            name="Board One",
+            slug="board-one",
+            icon="star",
+            short_code="B001",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+        board2 = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
+            name="Board Two",
+            slug="board-two",
+            icon="trophy",
+            short_code="B002",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
+        result = PaginatedResult(
+            items=[board1, board2],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
+        mock_board_service.list_boards.return_value = result
 
-        # Create multiple boards
-        await client.post(
-            "/boards",
-            json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
-                "name": "Board One",
-                "icon": "star",
-                "short_code": "B001",
-                "unit": "points",
-                "is_active": True,
-                "sort_direction": "DESCENDING",
-                "keep_strategy": "BEST",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        await client.post(
-            "/boards",
-            json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
-                "name": "Board Two",
-                "icon": "trophy",
-                "short_code": "B002",
-                "unit": "seconds",
-                "is_active": True,
-                "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-
-        # List boards
-        response = await client.get(
-            f"/boards?account_id={account.id}", headers={"leadr-api-key": test_api_key}
-        )
+        response = await mock_client_no_db.get(f"/boards?account_id={account_id}")
 
         assert response.status_code == 200
         data = response.json()
@@ -460,78 +469,65 @@ class TestBoardRoutes:
         assert "Board One" in names
         assert "Board Two" in names
 
-    async def test_list_boards_requires_account_id_or_code(self, client: AsyncClient, test_api_key):
+    async def test_list_boards_requires_account_id_or_code(
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_game_service,
+    ):
         """Test that listing boards defaults to authenticated user's account."""
-        response = await client.get("/boards", headers={"leadr-api-key": test_api_key})
+        result = PaginatedResult(
+            items=[],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+        mock_board_service.list_boards.return_value = result
 
-        # After refactor, account_id defaults to auth.account_id instead of requiring explicit param
+        response = await mock_client_no_db.get("/boards")
+
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
         assert "pagination" in data
 
     async def test_list_boards_filters_by_account(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_game_service,
     ):
         """Test that listing boards filters by account."""
-        # Create two accounts
-        account_service = AccountService(db_session)
-        account1 = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-        account2 = await account_service.create_account(
-            name="Beta Industries",
-            slug="beta-industries",
+        account1_id = AccountID()
+        game_id = GameID()
+
+        board = Board(
+            id=BoardID(),
+            account_id=account1_id,
+            game_id=game_id,
+            name="Account 1 Board",
+            slug="account-1-board",
+            icon="star",
+            short_code="A1B1",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Create games for each account
-        game_service = GameService(db_session)
-        game1 = await game_service.create_game(
-            account_id=account1.id,
-            name="Game 1",
+        result = PaginatedResult(
+            items=[board],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
-        game2 = await game_service.create_game(
-            account_id=account2.id,
-            name="Game 2",
-        )
+        mock_board_service.list_boards.return_value = result
 
-        # Create boards for each account
-        await client.post(
-            "/boards",
-            json={
-                "account_id": str(account1.id),
-                "game_id": str(game1.id),
-                "name": "Account 1 Board",
-                "icon": "star",
-                "short_code": "A1B1",
-                "unit": "points",
-                "is_active": True,
-                "sort_direction": "DESCENDING",
-                "keep_strategy": "BEST",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        await client.post(
-            "/boards",
-            json={
-                "account_id": str(account2.id),
-                "game_id": str(game2.id),
-                "name": "Account 2 Board",
-                "icon": "trophy",
-                "short_code": "A2B1",
-                "unit": "seconds",
-                "is_active": True,
-                "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-
-        # List boards for account 1
-        response = await client.get(
-            f"/boards?account_id={account1.id}", headers={"leadr-api-key": test_api_key}
-        )
+        response = await mock_client_no_db.get(f"/boards?account_id={account1_id}")
 
         assert response.status_code == 200
         data = response.json()
@@ -540,174 +536,180 @@ class TestBoardRoutes:
         assert len(data["data"]) == 1
         assert data["data"][0]["name"] == "Account 1 Board"
 
-    async def test_update_board(self, client: AsyncClient, db_session, test_api_key):
+    async def test_update_board(
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+    ):
         """Test updating a board via API."""
-        # Create account, game, and board
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        account_id = admin_auth.account_id
+        board_id = BoardID()
+        game_id = GameID()
+
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Speed Run Board",
+            slug="speed-run-board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+        updated_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Updated Speed Run Board",
+            slug="speed-run-board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=False,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
+        mock_board_service.get_by_id_or_raise.return_value = existing_board
+        mock_board_service.update_board.return_value = updated_board
+        mock_board_ratio_config_service.get_by_board_id.return_value = None
 
-        create_response = await client.post(
-            "/boards",
-            json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
-                "name": "Speed Run Board",
-                "icon": "trophy",
-                "short_code": "SR2025",
-                "unit": "seconds",
-                "is_active": True,
-                "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        board_id = create_response.json()["id"]
-
-        # Update it
-        response = await client.patch(
+        response = await mock_client_no_db.patch(
             f"/boards/{board_id}",
             json={
                 "name": "Updated Speed Run Board",
                 "is_active": False,
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "Updated Speed Run Board"
         assert data["is_active"] is False
-        assert data["icon"] == "trophy"  # Unchanged
+        assert data["icon"] == "trophy"
 
-    async def test_update_board_not_found(self, client: AsyncClient, test_api_key):
+    async def test_update_board_not_found(
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+    ):
         """Test updating a non-existent board returns 404."""
-        response = await client.patch(
-            "/boards/brd_00000000-0000-0000-0000-000000000000",
+        board_id = BoardID()
+        mock_board_service.get_by_id_or_raise.side_effect = EntityNotFoundError(
+            "Board", str(board_id)
+        )
+
+        response = await mock_client_no_db.patch(
+            f"/boards/{board_id}",
             json={"name": "New Name"},
-            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 404
         assert "not found" in response.json()["error"].lower()
 
-    async def test_soft_delete_board(self, client: AsyncClient, db_session, test_api_key):
+    async def test_soft_delete_board(
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+    ):
         """Test soft-deleting a board via API."""
-        # Create account, game, and board
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        account_id = admin_auth.account_id
+        board_id = BoardID()
+        game_id = GameID()
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Speed Run Board",
+            slug="speed-run-board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+        deleted_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Speed Run Board",
+            slug="speed-run-board",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST,
+            deleted_at=datetime.now(UTC),
         )
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
+        mock_board_service.get_by_id_or_raise.return_value = board
+        mock_board_service.soft_delete.return_value = deleted_board
 
-        create_response = await client.post(
-            "/boards",
-            json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
-                "name": "Speed Run Board",
-                "icon": "trophy",
-                "short_code": "SR2025",
-                "unit": "seconds",
-                "is_active": True,
-                "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        board_id = create_response.json()["id"]
-
-        # Soft-delete it
-        response = await client.patch(
+        # Soft-delete
+        response = await mock_client_no_db.patch(
             f"/boards/{board_id}",
             json={"deleted": True},
-            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert data["id"] == board_id
+        assert data["id"] == str(board_id)
 
-        # Verify it's not returned by get
-        get_response = await client.get(
-            f"/boards/{board_id}", headers={"leadr-api-key": test_api_key}
+        # Verify get raises EntityNotFoundError after delete
+        mock_board_service.get_by_id_or_raise.side_effect = EntityNotFoundError(
+            "Board", str(board_id)
         )
+        get_response = await mock_client_no_db.get(f"/boards/{board_id}")
         assert get_response.status_code == 404
 
     async def test_list_boards_excludes_deleted(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_game_service,
     ):
         """Test that list endpoint excludes soft-deleted boards."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        account_id = admin_auth.account_id
+        game_id = GameID()
+
+        # Only the non-deleted board is in the result
+        board = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
+            name="Board Two",
+            slug="board-two",
+            icon="trophy",
+            short_code="B002",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
+        result = PaginatedResult(
+            items=[board],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
+        mock_board_service.list_boards.return_value = result
 
-        # Create boards
-        board1_response = await client.post(
-            "/boards",
-            json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
-                "name": "Board One",
-                "icon": "star",
-                "short_code": "B001",
-                "unit": "points",
-                "is_active": True,
-                "sort_direction": "DESCENDING",
-                "keep_strategy": "BEST",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        board1_id = board1_response.json()["id"]
-
-        await client.post(
-            "/boards",
-            json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
-                "name": "Board Two",
-                "icon": "trophy",
-                "short_code": "B002",
-                "unit": "seconds",
-                "is_active": True,
-                "sort_direction": "ASCENDING",
-                "keep_strategy": "BEST",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-
-        # Soft-delete one
-        await client.patch(
-            f"/boards/{board1_id}", json={"deleted": True}, headers={"leadr-api-key": test_api_key}
-        )
-
-        # List should only return non-deleted
-        response = await client.get(
-            f"/boards?account_id={account.id}", headers={"leadr-api-key": test_api_key}
-        )
+        response = await mock_client_no_db.get(f"/boards?account_id={account_id}")
 
         assert response.status_code == 200
         data = response.json()
@@ -717,28 +719,37 @@ class TestBoardRoutes:
         assert data["data"][0]["name"] == "Board Two"
 
     async def test_create_board_with_custom_slug(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+        mock_board_hooks,
     ):
         """Test creating a board with a custom slug."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = admin_auth.account_id
+        game_id = GameID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
+        created_board = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
+            name="Speed Run Board",
+            slug="custom-speedrun-slug",
+            icon="trophy",
+            short_code="SR2025",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.ASCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
+        mock_board_service.create_board.return_value = created_board
 
-        # Create board with custom slug
-        response = await client.post(
+        response = await mock_client_no_db.post(
             "/boards",
             json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
+                "account_id": str(account_id),
+                "game_id": str(game_id),
                 "name": "Speed Run Board",
                 "slug": "custom-speedrun-slug",
                 "icon": "trophy",
@@ -748,7 +759,6 @@ class TestBoardRoutes:
                 "sort_direction": "ASCENDING",
                 "keep_strategy": "BEST",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 201
@@ -757,28 +767,37 @@ class TestBoardRoutes:
         assert data["name"] == "Speed Run Board"
 
     async def test_create_board_auto_generates_slug_when_not_provided(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+        mock_board_hooks,
     ):
         """Test that slug is auto-generated from name when not provided."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = admin_auth.account_id
+        game_id = GameID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
+        created_board = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
+            name="My Awesome Board",
+            slug="my-awesome-board",
+            icon="trophy",
+            short_code="MAB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
+        mock_board_service.create_board.return_value = created_board
 
-        # Create board without slug
-        response = await client.post(
+        response = await mock_client_no_db.post(
             "/boards",
             json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
+                "account_id": str(account_id),
+                "game_id": str(game_id),
                 "name": "My Awesome Board",
                 "icon": "trophy",
                 "short_code": "MAB2025",
@@ -787,38 +806,35 @@ class TestBoardRoutes:
                 "sort_direction": "DESCENDING",
                 "keep_strategy": "BEST",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 201
         data = response.json()
-        # Should be auto-generated from "My Awesome Board" -> "my-awesome-board"
         assert data["slug"] == "my-awesome-board"
         assert data["name"] == "My Awesome Board"
 
     async def test_create_board_with_invalid_slug_format(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+        mock_board_hooks,
     ):
         """Test creating a board with invalid slug format returns 400."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        account_id = admin_auth.account_id
+        game_id = GameID()
+
+        # Mock service raises ValueError for invalid slug (domain validation)
+        mock_board_service.create_board.side_effect = ValueError(
+            "Board slug must be lowercase alphanumeric with hyphens"
         )
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Try to create board with invalid slug (uppercase, special chars)
-        response = await client.post(
+        response = await mock_client_no_db.post(
             "/boards",
             json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
+                "account_id": str(account_id),
+                "game_id": str(game_id),
                 "name": "Invalid Slug Board",
                 "slug": "Invalid_Slug!",
                 "icon": "trophy",
@@ -828,36 +844,46 @@ class TestBoardRoutes:
                 "sort_direction": "DESCENDING",
                 "keep_strategy": "BEST",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
+        # Domain validation error returns 400
         assert response.status_code == 400
-        error_msg = response.json()["error"].lower()
-        assert "slug" in error_msg
+        error_data = response.json()
+        assert "slug" in error_data["error"].lower()
 
     async def test_create_board_with_duplicate_slug_fails(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+        mock_board_hooks,
     ):
         """Test creating boards with duplicate slug in same account+game fails."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = admin_auth.account_id
+        game_id = GameID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
+        # First board succeeds
+        first_board = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
+            name="First Board",
+            slug="my-unique-slug",
+            icon="trophy",
+            short_code="FIRST",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
+        mock_board_service.create_board.return_value = first_board
 
-        # Create first board with slug
-        response1 = await client.post(
+        response1 = await mock_client_no_db.post(
             "/boards",
             json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
+                "account_id": str(account_id),
+                "game_id": str(game_id),
                 "name": "First Board",
                 "slug": "my-unique-slug",
                 "icon": "trophy",
@@ -867,17 +893,17 @@ class TestBoardRoutes:
                 "sort_direction": "DESCENDING",
                 "keep_strategy": "BEST",
             },
-            headers={"leadr-api-key": test_api_key},
         )
-
         assert response1.status_code == 201
 
-        # Try to create second board with same slug (should fail)
-        response2 = await client.post(
+        # Second board fails (duplicate slug)
+        mock_board_service.create_board.side_effect = ValueError("Slug already exists")
+
+        response2 = await mock_client_no_db.post(
             "/boards",
             json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
+                "account_id": str(account_id),
+                "game_id": str(game_id),
                 "name": "Second Board",
                 "slug": "my-unique-slug",
                 "icon": "star",
@@ -887,109 +913,109 @@ class TestBoardRoutes:
                 "sort_direction": "DESCENDING",
                 "keep_strategy": "BEST",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
-        # Should fail due to unique constraint
         assert response2.status_code == 400
 
     async def test_superadmin_list_boards_without_account_id_returns_all(
-        self, authenticated_client: AsyncClient, db_session
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_game_service,
     ):
         """Test that superadmin can list boards WITHOUT account_id and sees all accounts."""
-        # Create two accounts with boards in each
-        account_repo = AccountRepository(db_session)
-        now = datetime.now(UTC)
+        account1_id = AccountID()
+        account2_id = AccountID()
+        game1_id = GameID()
+        game2_id = GameID()
 
-        account1 = Account(
-            id=AccountID(),
-            name="Account One Boards",
-            slug="account-one-boards",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        account2 = Account(
-            id=AccountID(),
-            name="Account Two Boards",
-            slug="account-two-boards",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account1)
-        await account_repo.create(account2)
-
-        # Create games and boards for each account
-        game_service = GameService(db_session)
-        game1 = await game_service.create_game(
-            account_id=account1.id,
-            name="Game Board 1",
-        )
-        game2 = await game_service.create_game(
-            account_id=account2.id,
-            name="Game Board 2",
-        )
-
-        board_service = BoardService(db_session)
-        await board_service.create_board(
-            account_id=account1.id,
-            game_id=game1.id,
+        board1 = Board(
+            id=BoardID(),
+            account_id=account1_id,
+            game_id=game1_id,
             name="Board from Account 1",
+            slug="board-from-account-1",
             icon="trophy",
             short_code="BRD1A1",
             unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
-        await board_service.create_board(
-            account_id=account2.id,
-            game_id=game2.id,
+        board2 = Board(
+            id=BoardID(),
+            account_id=account2_id,
+            game_id=game2_id,
             name="Board from Account 2",
+            slug="board-from-account-2",
             icon="star",
             short_code="BRD2A2",
             unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # List boards WITHOUT account_id - should return boards from ALL accounts
-        response = await authenticated_client.get("/boards")
+        result = PaginatedResult(
+            items=[board1, board2],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+        mock_board_service.list_boards.return_value = result
+
+        response = await mock_client_no_db.get("/boards")
 
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
         assert "pagination" in data
 
-        # Should contain boards from both accounts
         board_names = {b["name"] for b in data["data"]}
         assert "Board from Account 1" in board_names
         assert "Board from Account 2" in board_names
 
     async def test_create_board_with_description(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+        mock_board_hooks,
     ):
         """Test creating a board with description via API."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = admin_auth.account_id
+        game_id = GameID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
+        created_board = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
+            name="Speed Run Board",
+            slug="speed-run-board",
+            icon="trophy",
+            short_code="SRDAPI",
+            unit="seconds",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+            description="Complete the level as fast as possible",
         )
+        mock_board_service.create_board.return_value = created_board
 
-        response = await client.post(
+        response = await mock_client_no_db.post(
             "/boards",
             json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
+                "account_id": str(account_id),
+                "game_id": str(game_id),
                 "name": "Speed Run Board",
                 "icon": "trophy",
                 "short_code": "SRDAPI",
                 "unit": "seconds",
                 "description": "Complete the level as fast as possible",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 201
@@ -997,39 +1023,53 @@ class TestBoardRoutes:
         assert data["name"] == "Speed Run Board"
         assert data["description"] == "Complete the level as fast as possible"
 
-    async def test_update_board_description(self, client: AsyncClient, db_session, test_api_key):
+    async def test_update_board_description(
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+    ):
         """Test updating a board's description via API."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        account_id = admin_auth.account_id
+        board_id = BoardID()
+        game_id = GameID()
+
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Board to Update",
+            slug="board-to-update",
+            icon="trophy",
+            short_code="UPDDSC",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+        updated_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Board to Update",
+            slug="board-to-update",
+            icon="trophy",
+            short_code="UPDDSC",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+            description="A brand new description",
         )
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
+        mock_board_service.get_by_id_or_raise.return_value = existing_board
+        mock_board_service.update_board.return_value = updated_board
+        mock_board_ratio_config_service.get_by_board_id.return_value = None
 
-        create_response = await client.post(
-            "/boards",
-            json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
-                "name": "Board to Update",
-                "icon": "trophy",
-                "short_code": "UPDDSC",
-                "unit": "points",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        board_id = create_response.json()["id"]
-
-        # Update description
-        update_response = await client.patch(
+        update_response = await mock_client_no_db.patch(
             f"/boards/{board_id}",
             json={"description": "A brand new description"},
-            headers={"leadr-api-key": test_api_key},
         )
 
         assert update_response.status_code == 200
@@ -1037,32 +1077,43 @@ class TestBoardRoutes:
         assert data["description"] == "A brand new description"
 
     async def test_board_description_defaults_to_none(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_board_ratio_config_service,
+        mock_board_hooks,
     ):
         """Test that description defaults to None when not provided via API."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = admin_auth.account_id
+        game_id = GameID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
+        created_board = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
+            name="Simple Board",
+            slug="simple-board",
+            icon="star",
+            short_code="SMPBRD",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+            description=None,
         )
+        mock_board_service.create_board.return_value = created_board
 
-        response = await client.post(
+        response = await mock_client_no_db.post(
             "/boards",
             json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
+                "account_id": str(account_id),
+                "game_id": str(game_id),
                 "name": "Simple Board",
                 "icon": "star",
                 "short_code": "SMPBRD",
                 "unit": "points",
             },
-            headers={"leadr-api-key": test_api_key},
         )
 
         assert response.status_code == 201
@@ -1070,51 +1121,46 @@ class TestBoardRoutes:
         assert data["description"] is None
 
     async def test_list_boards_by_slug_via_admin_api(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_game_service,
     ):
         """Test listing boards filtered by slug via admin API."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = admin_auth.account_id
+        game_id = GameID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
+        game = Game(
+            id=game_id,
+            account_id=account_id,
             name="Test Game",
             slug="test-game",
         )
+        mock_game_service.get_game_by_slug.return_value = game
 
-        # Create boards with different slugs
-        await client.post(
-            "/boards",
-            json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
-                "name": "Weekly Challenge",
-                "slug": "weekly",
-                "short_code": "WEEK1",
-            },
-            headers={"leadr-api-key": test_api_key},
-        )
-        await client.post(
-            "/boards",
-            json={
-                "account_id": str(account.id),
-                "game_id": str(game.id),
-                "name": "Monthly Challenge",
-                "slug": "monthly",
-                "short_code": "MONTH1",
-            },
-            headers={"leadr-api-key": test_api_key},
+        board = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
+            name="Weekly Challenge",
+            slug="weekly",
+            short_code="WEEK1",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Filter by slug using game_slug
-        response = await client.get(
-            "/boards?game_slug=test-game&slug=weekly",
-            headers={"leadr-api-key": test_api_key},
+        result = PaginatedResult(
+            items=[board],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
+        mock_board_service.list_boards.return_value = result
+
+        response = await mock_client_no_db.get("/boards?game_slug=test-game&slug=weekly")
 
         assert response.status_code == 200
         data = response.json()
@@ -1123,67 +1169,72 @@ class TestBoardRoutes:
         assert data["data"][0]["name"] == "Weekly Challenge"
 
     async def test_list_boards_by_slug_requires_game_slug(
-        self, client: AsyncClient, db_session, test_api_key
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_game_service,
     ):
         """Test that filtering by slug without game_slug returns 400."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = admin_auth.account_id
 
-        # Try to filter by slug without game_slug
-        response = await client.get(
-            f"/boards?account_id={account.id}&slug=weekly",
-            headers={"leadr-api-key": test_api_key},
-        )
+        response = await mock_client_no_db.get(f"/boards?account_id={account_id}&slug=weekly")
 
         assert response.status_code == 400
         assert "game_slug" in response.json()["error"].lower()
 
     async def test_list_boards_by_slug_returns_multiple_for_admin(
-        self, authenticated_client: AsyncClient, db_session
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_game_service,
     ):
         """Test that admin can see multiple boards with same slug (active + inactive)."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = admin_auth.account_id
+        game_id = GameID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
+        game = Game(
+            id=game_id,
+            account_id=account_id,
             name="Test Game",
             slug="test-game",
         )
+        mock_game_service.get_game_by_slug.return_value = game
 
-        board_service = BoardService(db_session)
-
-        # Create inactive board (old week)
-        await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board1 = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
             name="Week 1",
             slug="weekly",
             short_code="WEEK1",
             is_active=False,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
-
-        # Create active board (current week)
-        await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board2 = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
             name="Week 2",
             slug="weekly",
             short_code="WEEK2",
             is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Admin without is_active filter should see both
-        response = await authenticated_client.get(
-            "/boards?game_slug=test-game&slug=weekly",
+        result = PaginatedResult(
+            items=[board1, board2],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
+        mock_board_service.list_boards.return_value = result
+
+        response = await mock_client_no_db.get("/boards?game_slug=test-game&slug=weekly")
 
         assert response.status_code == 200
         data = response.json()
@@ -1193,47 +1244,48 @@ class TestBoardRoutes:
         assert "Week 2" in names
 
     async def test_list_boards_by_slug_admin_with_is_active_filter(
-        self, authenticated_client: AsyncClient, db_session
+        self,
+        mock_client_no_db: AsyncClient,
+        admin_auth,
+        mock_board_service,
+        mock_game_service,
     ):
         """Test that admin can filter by slug AND is_active to get single result."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = admin_auth.account_id
+        game_id = GameID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
+        game = Game(
+            id=game_id,
+            account_id=account_id,
             name="Test Game",
             slug="test-game",
         )
+        mock_game_service.get_game_by_slug.return_value = game
 
-        board_service = BoardService(db_session)
-
-        # Create inactive board
-        await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Week 1 (Old)",
-            slug="weekly",
-            short_code="WEEK1",
-            is_active=False,
-        )
-
-        # Create active board
-        await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        # Only return the active board
+        board = Board(
+            id=BoardID(),
+            account_id=account_id,
+            game_id=game_id,
             name="Week 2 (Current)",
             slug="weekly",
             short_code="WEEK2",
             is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Admin with is_active=true should see only active board
-        response = await authenticated_client.get(
-            "/boards?game_slug=test-game&slug=weekly&is_active=true",
+        result = PaginatedResult(
+            items=[board],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+        mock_board_service.list_boards.return_value = result
+
+        response = await mock_client_no_db.get(
+            "/boards?game_slug=test-game&slug=weekly&is_active=true"
         )
 
         assert response.status_code == 200

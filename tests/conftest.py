@@ -29,7 +29,13 @@ from leadr.accounts.domain.user import User
 from leadr.accounts.services.dependencies import get_user_service
 from leadr.accounts.services.repositories import AccountRepository, UserRepository
 from leadr.auth.adapters.orm import APIKeyORM  # noqa: F401
+from leadr.auth.dependencies import (
+    AdminAuthContext,
+    ClientAuthContext,
+)
+from leadr.auth.domain.api_key import APIKey
 from leadr.auth.domain.device import Device
+from leadr.auth.domain.identity import Identity, IdentityKind
 from leadr.auth.services.dependencies import get_api_key_service
 from leadr.auth.services.repositories import DeviceRepository
 from leadr.boards.adapters.orm import BoardORM  # noqa: F401
@@ -38,9 +44,11 @@ from leadr.boards.services.repositories import BoardRepository
 from leadr.common.database import get_db
 from leadr.common.domain.ids import (
     AccountID,
+    APIKeyID,
     BoardID,
     DeviceID,
     GameID,
+    IdentityID,
     UserID,
 )
 from leadr.common.orm import Base
@@ -64,6 +72,105 @@ from tests.fixtures import *  # noqa: F403, F401
 def mock_session() -> MagicMock:
     """Create a mock database session for unit tests that don't need real DB."""
     return MagicMock(spec=AsyncSession)
+
+
+# ---------------------------------------------------------------------------
+# Shared fixtures for isolated API unit tests (no database)
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture
+async def mock_client_no_db(test_app) -> AsyncGenerator[AsyncClient, None]:
+    """Create an async test client that blocks all database access.
+
+    Any service or dependency that attempts to use the database session
+    will raise RuntimeError, ensuring tests are fully isolated.
+    """
+
+    async def noop_get_db() -> AsyncGenerator[AsyncSession, None]:
+        raise RuntimeError("Unit tests must not use the database")
+        yield  # noqa: RET503 — unreachable, keeps it an async generator
+
+    test_app.dependency_overrides[get_db] = noop_get_db
+
+    async with AsyncClient(
+        transport=ASGITransport(app=test_app),
+        base_url=f"http://testserver{settings.API_PREFIX}",
+    ) as c:
+        yield c
+
+    test_app.dependency_overrides.clear()
+
+
+def make_admin_auth(
+    account_id: AccountID | None = None,
+    is_superadmin: bool = True,
+) -> AdminAuthContext:
+    """Factory for creating mock AdminAuthContext instances.
+
+    Args:
+        account_id: Account ID. Auto-generated if not provided.
+        is_superadmin: Whether the user is a superadmin.
+    """
+    account_id = account_id or AccountID()
+    user_id = UserID()
+
+    user = User(
+        id=user_id,
+        account_id=account_id,
+        email="test@example.com",
+        display_name="Test User",
+        super_admin=is_superadmin,
+    )
+
+    api_key = APIKey(
+        id=APIKeyID(),
+        account_id=account_id,
+        user_id=user_id,
+        name="Test Key",
+        key_hash="fakehash",
+        key_prefix="ldr_test",
+    )
+
+    return AdminAuthContext(
+        account_id=account_id,
+        user=user,
+        api_key=api_key,
+    )
+
+
+def make_client_auth(
+    account_id: AccountID | None = None,
+    game_id: GameID | None = None,
+    identity_id: IdentityID | None = None,
+    test_mode: bool = False,
+) -> ClientAuthContext:
+    """Factory for creating mock ClientAuthContext instances.
+
+    Args:
+        account_id: Account ID. Auto-generated if not provided.
+        game_id: Game ID. Auto-generated if not provided.
+        identity_id: Identity ID. Auto-generated if not provided.
+        test_mode: Whether the session is in test mode.
+    """
+    account_id = account_id or AccountID()
+    game_id = game_id or GameID()
+    identity_id = identity_id or IdentityID()
+
+    identity = Identity(
+        id=identity_id,
+        account_id=account_id,
+        game_id=game_id,
+        kind=IdentityKind.DEVICE,
+        external_key="test-device-key",
+        display_name="Player1",
+    )
+
+    return ClientAuthContext(
+        account_id=account_id,
+        identity=identity,
+        test_mode=test_mode,
+    )
 
 
 @pytest.fixture(scope="session", autouse=True)

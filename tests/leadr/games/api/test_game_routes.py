@@ -3,8 +3,8 @@
 import pytest
 from httpx import AsyncClient
 
-from leadr.accounts.services.account_service import AccountService
-from leadr.games.services.game_service import GameService
+from leadr.common.domain.ids import GameID
+from leadr.games.domain.game import Game
 
 
 @pytest.mark.asyncio
@@ -12,105 +12,121 @@ class TestGameRoutesPartialUpdate:
     """Test suite for Game PATCH endpoint partial update behavior."""
 
     async def test_patch_clears_nullable_field_when_sent_as_null(
-        self, authenticated_client: AsyncClient, db_session
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
     ):
         """Test that PATCH with explicit null clears a nullable field.
 
         When a client sends {"description": null}, the description field
         should be cleared (set to NULL in database), not left unchanged.
         """
-        # Create account and game with description
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account-null",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
+        # Arrange
+        account_id = admin_auth.account_id
+        game_id = GameID()
+        game_with_description = Game(
+            id=game_id,
+            account_id=account_id,
             name="Test Game",
+            slug="test-game",
             description="Initial description",
         )
+        game_cleared = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            description=None,
+        )
+        mock_game_service.get_by_id_or_raise.return_value = game_with_description
+        mock_game_service.update_game.return_value = game_cleared
 
-        # Verify game has description
-        assert game.description == "Initial description"
-
-        # PATCH with null description - should clear it
-        response = await authenticated_client.patch(
-            f"/games/{game.id}",
+        # Act
+        response = await mock_client_no_db.patch(
+            f"/games/{game_id}",
             json={"description": None},
         )
 
+        # Assert
         assert response.status_code == 200
         data = response.json()
-
-        # This assertion will FAIL with current implementation
-        # because null is treated the same as "not provided"
         assert data["description"] is None, (
             f"Expected description to be cleared to null, but got: {data['description']!r}"
         )
 
+        mock_game_service.update_game.assert_called_once_with(game_id, description=None)
+
     async def test_patch_omitted_field_remains_unchanged(
-        self, authenticated_client: AsyncClient, db_session
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
     ):
         """Test that PATCH with omitted field leaves it unchanged.
 
         When a client sends {"name": "New Name"} without description,
         the description should remain at its original value.
         """
-        # Create account and game with description
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account-omit",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
+        # Arrange
+        account_id = admin_auth.account_id
+        game_id = GameID()
+        original_game = Game(
+            id=game_id,
+            account_id=account_id,
             name="Test Game",
+            slug="test-game",
             description="Keep this description",
         )
+        updated_game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Updated Game Name",
+            slug="test-game",
+            description="Keep this description",
+        )
+        mock_game_service.get_by_id_or_raise.return_value = original_game
+        mock_game_service.update_game.return_value = updated_game
 
-        # PATCH only name - description should remain unchanged
-        response = await authenticated_client.patch(
-            f"/games/{game.id}",
+        # Act
+        response = await mock_client_no_db.patch(
+            f"/games/{game_id}",
             json={"name": "Updated Game Name"},
         )
 
+        # Assert
         assert response.status_code == 200
         data = response.json()
-
-        # Name should be updated
         assert data["name"] == "Updated Game Name"
-
-        # Description should remain unchanged
         assert data["description"] == "Keep this description"
 
+        mock_game_service.update_game.assert_called_once_with(game_id, name="Updated Game Name")
+
     async def test_patch_multiple_nullable_fields_can_be_cleared(
-        self, authenticated_client: AsyncClient, db_session
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
     ):
         """Test clearing multiple nullable fields in single PATCH."""
-        # Create account and game with multiple optional fields
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account-multi",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
+        # Arrange
+        account_id = admin_auth.account_id
+        game_id = GameID()
+        game_with_fields = Game(
+            id=game_id,
+            account_id=account_id,
             name="Test Game",
+            slug="test-game",
             description="Has description",
             steam_app_id="12345",
             page_url="https://example.com",
         )
+        game_cleared = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug="test-game",
+            description=None,
+            steam_app_id=None,
+            page_url=None,
+        )
+        mock_game_service.get_by_id_or_raise.return_value = game_with_fields
+        mock_game_service.update_game.return_value = game_cleared
 
-        # Clear multiple fields
-        response = await authenticated_client.patch(
-            f"/games/{game.id}",
+        # Act
+        response = await mock_client_no_db.patch(
+            f"/games/{game_id}",
             json={
                 "description": None,
                 "steam_app_id": None,
@@ -118,46 +134,56 @@ class TestGameRoutesPartialUpdate:
             },
         )
 
+        # Assert
         assert response.status_code == 200
         data = response.json()
-
-        # All fields should be cleared
         assert data["description"] is None
         assert data["steam_app_id"] is None
         assert data["page_url"] is None
 
+        mock_game_service.update_game.assert_called_once_with(
+            game_id, description=None, steam_app_id=None, page_url=None
+        )
+
     async def test_patch_mix_of_clear_and_update(
-        self, authenticated_client: AsyncClient, db_session
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service
     ):
         """Test PATCH with mix of clearing some fields and updating others."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Test Account",
-            slug="test-account-mix",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
+        # Arrange
+        account_id = admin_auth.account_id
+        game_id = GameID()
+        original_game = Game(
+            id=game_id,
+            account_id=account_id,
             name="Original Name",
+            slug="test-game",
             description="Original description",
         )
+        updated_game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="New Name",
+            slug="test-game",
+            description=None,
+        )
+        mock_game_service.get_by_id_or_raise.return_value = original_game
+        mock_game_service.update_game.return_value = updated_game
 
-        # Update name, clear description
-        response = await authenticated_client.patch(
-            f"/games/{game.id}",
+        # Act
+        response = await mock_client_no_db.patch(
+            f"/games/{game_id}",
             json={
                 "name": "New Name",
                 "description": None,
             },
         )
 
+        # Assert
         assert response.status_code == 200
         data = response.json()
-
-        # Name should be updated
         assert data["name"] == "New Name"
-
-        # Description should be cleared
         assert data["description"] is None
+
+        mock_game_service.update_game.assert_called_once_with(
+            game_id, name="New Name", description=None
+        )
