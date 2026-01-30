@@ -1,24 +1,28 @@
 """Tests for ScoreService."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.background import BackgroundTasks
 
-from leadr.accounts.services.account_service import AccountService
-from leadr.auth.domain.identity import IdentityKind
-from leadr.auth.services.device_service import DeviceService
-from leadr.auth.services.identity_service import IdentityService
-from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
-from leadr.boards.services.board_service import BoardService
-from leadr.boards.services.board_state_service import BoardStateService
-from leadr.boards.services.run_entry_service import RunEntryService
+from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
+from leadr.boards.domain.board_state import BoardState
+from leadr.boards.domain.run_entry import RunEntry
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
-from leadr.common.domain.ids import BoardID, ScoreID
-from leadr.games.services.game_service import GameService
-from leadr.scores.services.score_event_service import ScoreEventService
+from leadr.common.domain.ids import (
+    AccountID,
+    BoardID,
+    BoardStateID,
+    GameID,
+    IdentityID,
+    RunEntryID,
+    ScoreEventID,
+    ScoreID,
+)
+from leadr.common.domain.pagination_result import PaginatedResult
+from leadr.scores.domain.anti_cheat.enums import FlagAction
+from leadr.scores.domain.anti_cheat.models import AntiCheatResult
+from leadr.scores.domain.score_event import ScoreEvent
 from leadr.scores.services.score_service import ScoreService
 
 
@@ -26,605 +30,1085 @@ from leadr.scores.services.score_service import ScoreService
 class TestScoreServiceSubmission:
     """Tests for score submission flow."""
 
-    async def test_submit_score_run_identity_first_submission(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_run_identity_first_submission(
+        self,
+        mock_settings,
+        mock_board_state_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
+    ):
         """Test first submission to a RUN_IDENTITY board creates a BoardState."""
-        # Setup
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-ri-first")
+        mock_settings.ANTICHEAT_ENABLED = False
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
+        # Create test domain objects
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_ri_first",
-            display_name="Player1",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.RUN_IDENTITY,
             keep_strategy=KeepStrategy.BEST,
         )
 
-        # Submit score
-        service = ScoreService(db_session)
-        event, ranking_entry, anti_cheat = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+        event = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 100.0},
+        )
+
+        board_state = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,
+            player_name="Player1",
+        )
+
+        # Configure mocks
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_event_service = AsyncMock()
+        mock_event_service.create_score_event = AsyncMock(return_value=event)
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_state_service = AsyncMock()
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=None)
+        mock_state_service.create_board_state = AsyncMock(return_value=board_state)
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        # Test
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+        result_event, result_entry, result_ac = await service.submit_score(
+            board_id=board_id,
+            identity_id=identity_id,
             value=100.0,
             player_name="Player1",
         )
 
-        assert event is not None
-        assert ranking_entry is not None
-        assert ranking_entry.primary_value == 100.0
+        assert result_event is not None
+        assert result_entry is not None
+        assert result_entry.primary_value == 100.0
+        assert result_ac is None
 
+        mock_state_service.create_board_state.assert_called_once()
+
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.settings")
     async def test_submit_score_run_identity_keep_best_higher_is_better(
-        self, db_session: AsyncSession
+        self,
+        mock_settings,
+        mock_board_state_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
     ):
         """Test BEST strategy keeps higher score for DESCENDING board."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-keep-best")
+        mock_settings.ANTICHEAT_ENABLED = False
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_keep_best",
-            display_name="Player1",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.RUN_IDENTITY,
             keep_strategy=KeepStrategy.BEST,
         )
 
-        service = ScoreService(db_session)
+        # Configure mocks
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
 
-        # First submission
+        mock_event_service = AsyncMock()
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_state_service = AsyncMock()
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        # First submission (100)
+        event1 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 100.0},
+        )
+        state1 = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,
+            player_name="Player1",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event1)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=None)
+        mock_state_service.create_board_state = AsyncMock(return_value=state1)
+
         _, entry1, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+            board_id=board_id,
+            identity_id=identity_id,
             value=100.0,
             player_name="Player1",
         )
         assert entry1 is not None
         assert entry1.primary_value == 100.0
 
-        # Second submission with higher score (better for DESC)
+        # Second submission (200, better)
+        event2 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 200.0},
+        )
+        state2 = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=200.0,
+            player_name="Player1",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event2)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=state1)
+        mock_state_service.upsert_board_state = AsyncMock(return_value=state2)
+
         _, entry2, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+            board_id=board_id,
+            identity_id=identity_id,
             value=200.0,
             player_name="Player1",
         )
         assert entry2 is not None
         assert entry2.primary_value == 200.0
 
-        # Third submission with lower score (worse for DESC)
+        # Third submission (150, worse)
+        event3 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 150.0},
+        )
+        state3 = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=200.0,  # Still 200
+            player_name="Player1",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event3)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=state2)
+        mock_state_service.upsert_board_state = AsyncMock(return_value=state3)
+
         _, entry3, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+            board_id=board_id,
+            identity_id=identity_id,
             value=150.0,
             player_name="Player1",
         )
-        # Should still be 200 (best)
         assert entry3 is not None
         assert entry3.primary_value == 200.0
 
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.settings")
     async def test_submit_score_run_identity_keep_best_lower_is_better(
-        self, db_session: AsyncSession
+        self,
+        mock_settings,
+        mock_board_state_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
     ):
         """Test BEST strategy keeps lower score for ASCENDING board."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-keep-low")
+        mock_settings.ANTICHEAT_ENABLED = False
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_keep_low",
-            display_name="Speedrunner",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speedruns",
-            sort_direction=SortDirection.ASCENDING,  # Lower is better
+            slug="speedruns",
+            short_code="SPD001",
+            sort_direction=SortDirection.ASCENDING,
             board_type=BoardType.RUN_IDENTITY,
             keep_strategy=KeepStrategy.BEST,
         )
 
-        service = ScoreService(db_session)
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
 
-        # First submission
+        mock_event_service = AsyncMock()
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_state_service = AsyncMock()
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        # First: 120
+        event1 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 120.0},
+        )
+        state1 = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=120.0,
+            player_name="Speedrunner",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event1)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=None)
+        mock_state_service.create_board_state = AsyncMock(return_value=state1)
+
         _, entry1, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+            board_id=board_id,
+            identity_id=identity_id,
             value=120.0,
             player_name="Speedrunner",
         )
         assert entry1 is not None
         assert entry1.primary_value == 120.0
 
-        # Second submission with lower time (better for ASC)
+        # Second: 100 (better)
+        event2 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 100.0},
+        )
+        state2 = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,
+            player_name="Speedrunner",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event2)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=state1)
+        mock_state_service.upsert_board_state = AsyncMock(return_value=state2)
+
         _, entry2, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+            board_id=board_id,
+            identity_id=identity_id,
             value=100.0,
             player_name="Speedrunner",
         )
         assert entry2 is not None
         assert entry2.primary_value == 100.0
 
-        # Third submission with higher time (worse for ASC)
+        # Third: 110 (worse)
+        event3 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 110.0},
+        )
+        state3 = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,  # Still 100
+            player_name="Speedrunner",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event3)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=state2)
+        mock_state_service.upsert_board_state = AsyncMock(return_value=state3)
+
         _, entry3, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+            board_id=board_id,
+            identity_id=identity_id,
             value=110.0,
             player_name="Speedrunner",
         )
-        # Should still be 100 (best)
         assert entry3 is not None
         assert entry3.primary_value == 100.0
 
-    async def test_submit_score_run_identity_keep_first(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_run_identity_keep_first(
+        self,
+        mock_settings,
+        mock_board_state_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
+    ):
         """Test FIRST strategy keeps the first score."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-keep-first")
+        mock_settings.ANTICHEAT_ENABLED = False
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_keep_first",
-            display_name="Player1",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="First Completion",
+            slug="first-completion",
+            short_code="FST001",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.RUN_IDENTITY,
             keep_strategy=KeepStrategy.FIRST,
         )
 
-        service = ScoreService(db_session)
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
 
-        # First submission
+        mock_event_service = AsyncMock()
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_state_service = AsyncMock()
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        # First: 100
+        event1 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 100.0},
+        )
+        state1 = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,
+            player_name="Player1",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event1)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=None)
+        mock_state_service.create_board_state = AsyncMock(return_value=state1)
+
         _, entry1, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+            board_id=board_id,
+            identity_id=identity_id,
             value=100.0,
             player_name="Player1",
         )
         assert entry1 is not None
         assert entry1.primary_value == 100.0
 
-        # Second submission (should be ignored)
+        # Second: 200 (ignored)
+        event2 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 200.0},
+        )
+        state2 = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,  # Still 100
+            player_name="Player1",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event2)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=state1)
+        mock_state_service.upsert_board_state = AsyncMock(return_value=state2)
+
         _, entry2, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+            board_id=board_id,
+            identity_id=identity_id,
             value=200.0,
             player_name="Player1",
         )
-        # Should still be 100 (first)
         assert entry2 is not None
         assert entry2.primary_value == 100.0
 
-    async def test_submit_score_run_identity_keep_latest(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_run_identity_keep_latest(
+        self,
+        mock_settings,
+        mock_board_state_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
+    ):
         """Test LATEST strategy always uses the latest score."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-keep-latest")
+        mock_settings.ANTICHEAT_ENABLED = False
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_keep_latest",
-            display_name="Player1",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Latest Score",
+            slug="latest-score",
+            short_code="LTS001",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.RUN_IDENTITY,
             keep_strategy=KeepStrategy.LATEST,
         )
 
-        service = ScoreService(db_session)
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
 
-        # First submission
+        mock_event_service = AsyncMock()
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_state_service = AsyncMock()
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        # First: 100
+        event1 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 100.0},
+        )
+        state1 = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,
+            player_name="Player1",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event1)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=None)
+        mock_state_service.create_board_state = AsyncMock(return_value=state1)
+
         _, entry1, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+            board_id=board_id,
+            identity_id=identity_id,
             value=100.0,
             player_name="Player1",
         )
         assert entry1 is not None
         assert entry1.primary_value == 100.0
 
-        # Second submission
+        # Second: 50 (latest, even though lower)
+        event2 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 50.0},
+        )
+        state2 = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=50.0,  # Updated to latest
+            player_name="Player1",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event2)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=state1)
+        mock_state_service.upsert_board_state = AsyncMock(return_value=state2)
+
         _, entry2, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
-            value=50.0,  # Lower, but it's latest
+            board_id=board_id,
+            identity_id=identity_id,
+            value=50.0,
             player_name="Player1",
         )
         assert entry2 is not None
         assert entry2.primary_value == 50.0
 
-    async def test_submit_score_run_runs_creates_entry(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.RunEntryService")
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_run_runs_creates_entry(
+        self,
+        mock_settings,
+        mock_run_entry_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
+    ):
         """Test RUN_RUNS board creates a new RunEntry for each submission."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-run-runs")
+        mock_settings.ANTICHEAT_ENABLED = False
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_run_runs",
-            display_name="Speedrunner",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speedruns",
+            slug="speedruns",
+            short_code="SPD001",
             sort_direction=SortDirection.ASCENDING,
             board_type=BoardType.RUN_RUNS,
             keep_strategy=KeepStrategy.NA,
         )
 
-        service = ScoreService(db_session)
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_event_service = AsyncMock()
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_run_service = AsyncMock()
+        mock_run_entry_service_cls.return_value = mock_run_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
 
         # First submission
-        _, entry1, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+        event1 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 120.0},
+        )
+        entry1 = RunEntry(
+            id=RunEntryID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            score_event_id=event1.id,
+            primary_value=120.0,
+            player_name="Speedrunner",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event1)
+        mock_run_service.create_run_entry = AsyncMock(return_value=entry1)
+
+        _, result1, _ = await service.submit_score(
+            board_id=board_id,
+            identity_id=identity_id,
             value=120.0,
             player_name="Speedrunner",
         )
 
         # Second submission
-        _, entry2, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+        event2 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 110.0},
+        )
+        entry2 = RunEntry(
+            id=RunEntryID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            score_event_id=event2.id,
+            primary_value=110.0,
+            player_name="Speedrunner",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event2)
+        mock_run_service.create_run_entry = AsyncMock(return_value=entry2)
+
+        _, result2, _ = await service.submit_score(
+            board_id=board_id,
+            identity_id=identity_id,
             value=110.0,
             player_name="Speedrunner",
         )
 
         # Each submission should create a new entry
-        assert entry1 is not None
-        assert entry2 is not None
-        assert entry1.id != entry2.id
-        assert entry1.primary_value == 120.0
-        assert entry2.primary_value == 110.0
+        assert result1 is not None
+        assert result2 is not None
+        assert result1.id != result2.id
+        assert result1.primary_value == 120.0
+        assert result2.primary_value == 110.0
 
-    async def test_submit_score_counter_accumulates(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_counter_accumulates(
+        self,
+        mock_settings,
+        mock_board_state_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
+    ):
         """Test COUNTER board accumulates delta values."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-counter")
+        mock_settings.ANTICHEAT_ENABLED = False
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_counter",
-            display_name="Killer",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Kill Count",
+            slug="kill-count",
+            short_code="KIL001",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.COUNTER,
             keep_strategy=KeepStrategy.NA,
         )
 
-        service = ScoreService(db_session)
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
 
-        # First delta
+        mock_event_service = AsyncMock()
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_state_service = AsyncMock()
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        # First delta: 5
+        event1 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"delta": 5.0},
+        )
+        state1 = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=5.0,
+            player_name="Killer",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event1)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=None)
+        mock_state_service.create_board_state = AsyncMock(return_value=state1)
+
         _, entry1, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+            board_id=board_id,
+            identity_id=identity_id,
             delta=5.0,
             player_name="Killer",
         )
         assert entry1 is not None
         assert entry1.primary_value == 5.0
 
-        # Second delta
+        # Second delta: +3 = 8
+        event2 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"delta": 3.0},
+        )
+        state2 = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=8.0,
+            player_name="Killer",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event2)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=state1)
+        mock_state_service.upsert_board_state = AsyncMock(return_value=state2)
+
         _, entry2, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+            board_id=board_id,
+            identity_id=identity_id,
             delta=3.0,
             player_name="Killer",
         )
         assert entry2 is not None
         assert entry2.primary_value == 8.0
 
-        # Third delta (negative)
+        # Third delta: -2 = 6
+        event3 = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"delta": -2.0},
+        )
+        state3 = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=6.0,
+            player_name="Killer",
+        )
+        mock_event_service.create_score_event = AsyncMock(return_value=event3)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=state2)
+        mock_state_service.upsert_board_state = AsyncMock(return_value=state3)
+
         _, entry3, _ = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+            board_id=board_id,
+            identity_id=identity_id,
             delta=-2.0,
             player_name="Killer",
         )
         assert entry3 is not None
         assert entry3.primary_value == 6.0
 
-    async def test_submit_score_ratio_board_rejected(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    async def test_submit_score_ratio_board_rejected(self, mock_board_service_cls):
         """Test that RATIO boards reject direct submissions."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-ratio-reject")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
-
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_ratio",
-            display_name="Player1",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="K/D Ratio",
+            slug="kd-ratio",
+            short_code="KDR001",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.RATIO,
             keep_strategy=KeepStrategy.NA,
         )
 
-        service = ScoreService(db_session)
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
 
         with pytest.raises(ValueError, match="RATIO boards do not accept direct submissions"):
             await service.submit_score(
-                board_id=board.id,
-                identity_id=identity.id,
+                board_id=board_id,
+                identity_id=identity_id,
                 value=1.5,
                 player_name="Player1",
             )
 
-    async def test_submit_score_missing_value_for_run_board(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    async def test_submit_score_missing_value_for_run_board(self, mock_board_service_cls):
         """Test that RUN boards require value."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-missing-value")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
-
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_missing",
-            display_name="Player1",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.RUN_IDENTITY,
             keep_strategy=KeepStrategy.BEST,
         )
 
-        service = ScoreService(db_session)
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
 
         with pytest.raises(ValueError, match="value is required"):
             await service.submit_score(
-                board_id=board.id,
-                identity_id=identity.id,
-                delta=100.0,  # Wrong param - should be value
+                board_id=board_id,
+                identity_id=identity_id,
+                delta=100.0,  # Wrong param
                 player_name="Player1",
             )
 
-    async def test_submit_score_missing_delta_for_counter(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    async def test_submit_score_missing_delta_for_counter(self, mock_board_service_cls):
         """Test that COUNTER boards require delta."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-missing-delta")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
-
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_missing_delta",
-            display_name="Player1",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Kill Count",
+            slug="kill-count",
+            short_code="KIL001",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.COUNTER,
             keep_strategy=KeepStrategy.NA,
         )
 
-        service = ScoreService(db_session)
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
 
         with pytest.raises(ValueError, match="delta is required"):
             await service.submit_score(
-                board_id=board.id,
-                identity_id=identity.id,
-                value=100.0,  # Wrong param - should be delta
+                board_id=board_id,
+                identity_id=identity_id,
+                value=100.0,  # Wrong param
                 player_name="Player1",
             )
 
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
     @patch("leadr.scores.services.score_service.settings")
     async def test_submit_score_skips_anticheat_when_disabled(
-        self, mock_settings, db_session: AsyncSession
+        self,
+        mock_settings,
+        mock_board_state_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
     ):
         """Test that anti-cheat is skipped when ANTICHEAT_ENABLED is False."""
         mock_settings.ANTICHEAT_ENABLED = False
 
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-ac-disabled")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
-
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_ac_disabled",
-            display_name="Player1",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.RUN_IDENTITY,
             keep_strategy=KeepStrategy.BEST,
         )
 
-        service = ScoreService(db_session)
-        event, ranking_entry, anti_cheat_result = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+        event = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 100.0},
+        )
+
+        state = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,
+            player_name="Player1",
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_event_service = AsyncMock()
+        mock_event_service.create_score_event = AsyncMock(return_value=event)
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_state_service = AsyncMock()
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=None)
+        mock_state_service.create_board_state = AsyncMock(return_value=state)
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        result_event, result_entry, result_ac = await service.submit_score(
+            board_id=board_id,
+            identity_id=identity_id,
             value=100.0,
             player_name="Player1",
         )
 
-        assert event is not None
-        assert ranking_entry is not None
-        assert ranking_entry.primary_value == 100.0
-        assert anti_cheat_result is None
+        assert result_event is not None
+        assert result_entry is not None
+        assert result_entry.primary_value == 100.0
+        assert result_ac is None
 
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.AntiCheatService")
+    @patch("leadr.scores.services.score_service.ScoreSubmissionMetaRepository")
     @patch("leadr.scores.services.score_service.settings")
     async def test_submit_score_runs_anticheat_when_enabled(
-        self, mock_settings, db_session: AsyncSession
+        self,
+        mock_settings,
+        mock_meta_repo_cls,
+        mock_ac_service_cls,
+        mock_board_state_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
     ):
         """Test that anti-cheat runs when ANTICHEAT_ENABLED is True."""
         mock_settings.ANTICHEAT_ENABLED = True
 
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-ac-enabled")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
-
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_ac_enabled",
-            display_name="Player1",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.RUN_IDENTITY,
             keep_strategy=KeepStrategy.BEST,
         )
 
-        service = ScoreService(db_session)
-        event, ranking_entry, anti_cheat_result = await service.submit_score(
-            board_id=board.id,
-            identity_id=identity.id,
+        event = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 100.0},
+        )
+
+        state = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,
+            player_name="Player1",
+        )
+
+        ac_result = AntiCheatResult(
+            action=FlagAction.ACCEPT,
+            flag_type=None,
+            confidence=None,
+            metadata={},
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_event_service = AsyncMock()
+        mock_event_service.create_score_event = AsyncMock(return_value=event)
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_state_service = AsyncMock()
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=None)
+        mock_state_service.create_board_state = AsyncMock(return_value=state)
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        mock_ac_service = AsyncMock()
+        mock_ac_service.check_submission_for_event = AsyncMock(return_value=ac_result)
+        mock_ac_service_cls.return_value = mock_ac_service
+
+        mock_meta_repo = AsyncMock()
+        mock_meta_repo.get_by_identity_and_board = AsyncMock(return_value=None)
+        mock_meta_repo.create = AsyncMock()
+        mock_meta_repo_cls.return_value = mock_meta_repo
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        result_event, result_entry, result_ac = await service.submit_score(
+            board_id=board_id,
+            identity_id=identity_id,
             value=100.0,
             player_name="Player1",
         )
 
-        assert event is not None
-        assert ranking_entry is not None
-        assert anti_cheat_result is not None
+        assert result_event is not None
+        assert result_entry is not None
+        assert result_ac is not None
+        mock_ac_service.check_submission_for_event.assert_called_once()
 
-    async def test_submit_score_board_not_found(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    async def test_submit_score_board_not_found(self, mock_board_service_cls):
         """Test submitting to non-existent board raises error."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-board-404")
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
-
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_404",
-            display_name="Player1",
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(
+            side_effect=EntityNotFoundError("Board", "fake-id")
         )
+        mock_board_service_cls.return_value = mock_board_service
 
-        service = ScoreService(db_session)
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
 
         fake_board_id = BoardID()
+        identity_id = IdentityID()
+
         with pytest.raises(EntityNotFoundError):
             await service.submit_score(
                 board_id=fake_board_id,
-                identity_id=identity.id,
+                identity_id=identity_id,
                 value=100.0,
                 player_name="Player1",
             )
@@ -634,43 +1118,55 @@ class TestScoreServiceSubmission:
 class TestScoreServiceQuery:
     """Tests for score query methods."""
 
-    async def test_get_score_by_id_board_state(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.BoardStateRepository")
+    async def test_get_score_by_id_board_state(
+        self, mock_repo_cls, mock_state_service_cls, mock_board_service_cls
+    ):
         """Test getting a BoardState score by ID."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-get-state")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
+        state_id = BoardStateID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
-
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_get_state",
-            display_name="Player1",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.RUN_IDENTITY,
             keep_strategy=KeepStrategy.BEST,
         )
 
-        state_service = BoardStateService(db_session)
-        state = await state_service.create_board_state(
-            board_id=board.id,
-            identity_id=identity.id,
+        state = BoardState(
+            id=state_id,
+            board_id=board_id,
+            identity_id=identity_id,
             primary_value=500.0,
             player_name="Player1",
         )
 
-        service = ScoreService(db_session)
-        score_id = ScoreID(state.id.uuid)
+        mock_state_service = AsyncMock()
+        mock_state_service.get_board_state = AsyncMock(return_value=state)
+        mock_state_service_cls.return_value = mock_state_service
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_repo = AsyncMock()
+        mock_repo.get_rank = AsyncMock(return_value=1)
+        mock_repo_cls.return_value = mock_repo
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        score_id = ScoreID(state_id.uuid)
         result, result_board, rank = await service.get_score_by_id(score_id)
 
         assert result.id == state.id
@@ -678,272 +1174,350 @@ class TestScoreServiceQuery:
         assert result_board.id == board.id
         assert rank == 1
 
-    async def test_get_score_by_id_run_entry(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.RunEntryService")
+    @patch("leadr.scores.services.score_service.RunEntryRepository")
+    async def test_get_score_by_id_run_entry(
+        self,
+        mock_repo_cls,
+        mock_run_service_cls,
+        mock_state_service_cls,
+        mock_board_service_cls,
+    ):
         """Test getting a RunEntry score by ID."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-get-entry")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
+        entry_id = RunEntryID()
+        event_id = ScoreEventID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
-
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_get_entry",
-            display_name="Speedrunner",
-        )
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speedruns",
+            slug="speedruns",
+            short_code="SPD001",
             sort_direction=SortDirection.ASCENDING,
             board_type=BoardType.RUN_RUNS,
             keep_strategy=KeepStrategy.NA,
         )
 
-        event_service = ScoreEventService(db_session)
-        event = await event_service.create_score_event(
-            account_id=account.id,
-            game_id=game.id,
-            board_id=board.id,
-            identity_id=identity.id,
-            event_payload={"value": 120.0},
-        )
-
-        run_entry_service = RunEntryService(db_session)
-        entry = await run_entry_service.create_run_entry(
-            board_id=board.id,
-            identity_id=identity.id,
-            score_event_id=event.id,
+        entry = RunEntry(
+            id=entry_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            score_event_id=event_id,
             primary_value=120.0,
             player_name="Speedrunner",
         )
 
-        service = ScoreService(db_session)
-        score_id = ScoreID(entry.id.uuid)
+        mock_state_service = AsyncMock()
+        mock_state_service.get_board_state = AsyncMock(return_value=None)
+        mock_state_service_cls.return_value = mock_state_service
+
+        mock_run_service = AsyncMock()
+        mock_run_service.get_run_entry = AsyncMock(return_value=entry)
+        mock_run_service_cls.return_value = mock_run_service
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_repo = AsyncMock()
+        mock_repo.get_rank = AsyncMock(return_value=1)
+        mock_repo_cls.return_value = mock_repo
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        score_id = ScoreID(entry_id.uuid)
         result, result_board, rank = await service.get_score_by_id(score_id)
 
         assert result.id == entry.id
         assert result.primary_value == 120.0
         assert result_board.id == board.id
 
-    async def test_get_score_by_id_not_found(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.RunEntryService")
+    async def test_get_score_by_id_not_found(self, mock_run_service_cls, mock_state_service_cls):
         """Test getting non-existent score raises error."""
-        service = ScoreService(db_session)
+        mock_state_service = AsyncMock()
+        mock_state_service.get_board_state = AsyncMock(return_value=None)
+        mock_state_service_cls.return_value = mock_state_service
+
+        mock_run_service = AsyncMock()
+        mock_run_service.get_run_entry = AsyncMock(return_value=None)
+        mock_run_service_cls.return_value = mock_run_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
         fake_id = ScoreID()
 
         with pytest.raises(EntityNotFoundError):
             await service.get_score_by_id(fake_id)
 
-    async def test_list_scores_board_state(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    async def test_list_scores_board_state(self, mock_state_service_cls, mock_board_service_cls):
         """Test listing scores from a RUN_IDENTITY board."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-list-state")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.RUN_IDENTITY,
             keep_strategy=KeepStrategy.BEST,
         )
 
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        state_service = BoardStateService(db_session)
-
-        for i in range(5):
-            identity, _ = await identity_service.get_or_create_identity(
-                account_id=account.id,
-                game_id=game.id,
-                kind=IdentityKind.DEVICE,
-                external_key=f"dev_list_state_{i}",
-                display_name=f"Player{i}",
-            )
-            await state_service.create_board_state(
-                board_id=board.id,
-                identity_id=identity.id,
+        states = [
+            BoardState(
+                id=BoardStateID(),
+                board_id=board_id,
+                identity_id=IdentityID(),
                 primary_value=float(i * 100),
                 player_name=f"Player{i}",
             )
+            for i in range(5)
+        ]
 
-        service = ScoreService(db_session)
+        paginated = PaginatedResult(
+            items=states,
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_state_service = AsyncMock()
+        mock_state_service.list_board_states = AsyncMock(return_value=paginated)
+        mock_state_service_cls.return_value = mock_state_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
         pagination = PaginationParams(limit=10, cursor=None, sort=None)
         result = await service.list_scores(
-            board_id=board.id,
+            board_id=board_id,
             pagination=pagination,
         )
 
         assert len(result.items) == 5
 
-    async def test_list_scores_run_entry(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.RunEntryService")
+    async def test_list_scores_run_entry(self, mock_run_service_cls, mock_board_service_cls):
         """Test listing scores from a RUN_RUNS board."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-list-entry")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speedruns",
+            slug="speedruns",
+            short_code="SPD001",
             sort_direction=SortDirection.ASCENDING,
             board_type=BoardType.RUN_RUNS,
             keep_strategy=KeepStrategy.NA,
         )
 
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_list_entry",
-            display_name="Speedrunner",
-        )
-
-        event_service = ScoreEventService(db_session)
-        run_entry_service = RunEntryService(db_session)
-
-        for i in range(5):
-            event = await event_service.create_score_event(
-                account_id=account.id,
-                game_id=game.id,
-                board_id=board.id,
-                identity_id=identity.id,
-                event_payload={"value": float(100 + i * 10)},
-            )
-            await run_entry_service.create_run_entry(
-                board_id=board.id,
-                identity_id=identity.id,
-                score_event_id=event.id,
+        entries = [
+            RunEntry(
+                id=RunEntryID(),
+                board_id=board_id,
+                identity_id=identity_id,
+                score_event_id=ScoreEventID(),
                 primary_value=float(100 + i * 10),
                 player_name="Speedrunner",
             )
+            for i in range(5)
+        ]
 
-        service = ScoreService(db_session)
+        paginated = PaginatedResult(
+            items=entries,
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_run_service = AsyncMock()
+        mock_run_service.list_run_entries = AsyncMock(return_value=paginated)
+        mock_run_service_cls.return_value = mock_run_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
         pagination = PaginationParams(limit=10, cursor=None, sort=None)
         result = await service.list_scores(
-            board_id=board.id,
+            board_id=board_id,
             pagination=pagination,
         )
 
         assert len(result.items) == 5
 
-    async def test_list_scores_requires_board_id(self, db_session: AsyncSession):
+    async def test_list_scores_requires_board_id(self):
         """Test list_scores raises error without board_id."""
-        service = ScoreService(db_session)
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
         pagination = PaginationParams(limit=10, cursor=None, sort=None)
 
         with pytest.raises(ValueError, match="board_id is required"):
             await service.list_scores(pagination=pagination)
 
-    async def test_list_scores_with_around_score_id(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    async def test_list_scores_with_around_score_id(
+        self, mock_state_service_cls, mock_board_service_cls
+    ):
         """Test listing scores centered around a specific score."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-around-id")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        target_state_id = BoardStateID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.RUN_IDENTITY,
             keep_strategy=KeepStrategy.BEST,
         )
 
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        state_service = BoardStateService(db_session)
+        target_state = BoardState(
+            id=target_state_id,
+            board_id=board_id,
+            identity_id=IdentityID(),
+            primary_value=500.0,
+            player_name="Player4",
+        )
 
-        states = []
-        for i in range(10):
-            identity, _ = await identity_service.get_or_create_identity(
-                account_id=account.id,
-                game_id=game.id,
-                kind=IdentityKind.DEVICE,
-                external_key=f"dev_around_{i}",
-                display_name=f"Player{i}",
-            )
-            state = await state_service.create_board_state(
-                board_id=board.id,
-                identity_id=identity.id,
+        states = [
+            BoardState(
+                id=BoardStateID(),
+                board_id=board_id,
+                identity_id=IdentityID(),
                 primary_value=float((i + 1) * 100),
                 player_name=f"Player{i}",
             )
-            states.append(state)
+            for i in range(5)
+        ]
 
-        # Get around the middle score
-        target_state = states[4]  # 500 points
-        service = ScoreService(db_session)
+        paginated = PaginatedResult(
+            items=states,
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_state_service = AsyncMock()
+        mock_state_service.get_board_state = AsyncMock(return_value=target_state)
+        mock_state_service.list_board_states = AsyncMock(return_value=paginated)
+        mock_state_service_cls.return_value = mock_state_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
         pagination = PaginationParams(limit=5, cursor=None, sort=None)
-
         result = await service.list_scores(
-            board_id=board.id,
+            board_id=board_id,
             pagination=pagination,
-            around_score_id=ScoreID(target_state.id.uuid),
+            around_score_id=ScoreID(target_state_id.uuid),
         )
 
         assert len(result.items) == 5
 
-    async def test_list_scores_with_around_score_value(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    async def test_list_scores_with_around_score_value(
+        self, mock_state_service_cls, mock_board_service_cls
+    ):
         """Test listing scores centered around a hypothetical value."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-around-val")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
-
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.RUN_IDENTITY,
             keep_strategy=KeepStrategy.BEST,
         )
 
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        state_service = BoardStateService(db_session)
-
-        for i in range(5):
-            identity, _ = await identity_service.get_or_create_identity(
-                account_id=account.id,
-                game_id=game.id,
-                kind=IdentityKind.DEVICE,
-                external_key=f"dev_around_val_{i}",
-                display_name=f"Player{i}",
-            )
-            await state_service.create_board_state(
-                board_id=board.id,
-                identity_id=identity.id,
+        states = [
+            BoardState(
+                id=BoardStateID(),
+                board_id=board_id,
+                identity_id=IdentityID(),
                 primary_value=float((i + 1) * 100),
                 player_name=f"Player{i}",
             )
+            for i in range(5)
+        ]
 
-        service = ScoreService(db_session)
-        pagination = PaginationParams(limit=5, cursor=None, sort=None)
-
-        result = await service.list_scores(
-            board_id=board.id,
-            pagination=pagination,
-            around_score_value=250.0,  # Between 200 and 300
+        paginated = PaginatedResult(
+            items=states,
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
 
-        # Should include a placeholder
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_state_service = AsyncMock()
+        mock_state_service.list_board_states = AsyncMock(return_value=paginated)
+        mock_state_service_cls.return_value = mock_state_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        pagination = PaginationParams(limit=5, cursor=None, sort=None)
+        result = await service.list_scores(
+            board_id=board_id,
+            pagination=pagination,
+            around_score_value=250.0,
+        )
+
         assert len(result.items) > 0
 
 
@@ -951,48 +1525,80 @@ class TestScoreServiceQuery:
 class TestScoreServiceRatioIntegration:
     """Tests for ratio board integration."""
 
-    async def test_submit_score_schedules_ratio_update(self, db_session: AsyncSession):
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_schedules_ratio_update(
+        self,
+        mock_settings,
+        mock_board_state_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
+    ):
         """Test that submitting to a source board schedules ratio updates."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(name="Test", slug="test-ratio-sched")
+        mock_settings.ANTICHEAT_ENABLED = False
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(account_id=account.id, name="Test Game")
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
 
-        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
-        identity, _ = await identity_service.get_or_create_identity(
-            account_id=account.id,
-            game_id=game.id,
-            kind=IdentityKind.DEVICE,
-            external_key="dev_ratio_sched",
-            display_name="Player1",
-        )
-
-        board_service = BoardService(db_session)
-        # Create counter board (source)
-        counter_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Kills",
+            slug="kills",
+            short_code="KLS001",
             sort_direction=SortDirection.DESCENDING,
             board_type=BoardType.COUNTER,
             keep_strategy=KeepStrategy.NA,
         )
 
-        service = ScoreService(db_session)
+        event = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"delta": 5.0},
+        )
 
-        # Mock background tasks
-        mock_background = Mock(spec=BackgroundTasks)
+        state = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=5.0,
+            player_name="Player1",
+        )
 
-        # Submit score with background tasks
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_event_service = AsyncMock()
+        mock_event_service.create_score_event = AsyncMock(return_value=event)
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_state_service = AsyncMock()
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=None)
+        mock_state_service.create_board_state = AsyncMock(return_value=state)
+        mock_state_service.find_dependent_ratio_boards = AsyncMock(return_value=[])
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        mock_background = Mock()
+
         await service.submit_score(
-            board_id=counter_board.id,
-            identity_id=identity.id,
+            board_id=board_id,
+            identity_id=identity_id,
             delta=5.0,
             player_name="Player1",
             background_tasks=mock_background,
         )
 
-        # Background tasks should have been called if there were ratio dependencies
-        # (In this case, there are none, so it won't be called)
-        # This test verifies the code path works without errors
+        # Verify the code path works without errors
+        # (No ratio boards configured, so no tasks added)

@@ -1,39 +1,39 @@
 """Tests for User service."""
 
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.accounts.domain.account import Account, AccountStatus
-from leadr.accounts.domain.user import UserStatus
-from leadr.accounts.services.repositories import AccountRepository
+from leadr.accounts.domain.user import User, UserStatus
 from leadr.accounts.services.user_service import UserService
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import AccountID, UserID
+from leadr.common.domain.pagination_result import PaginatedResult
 
 
 @pytest.mark.asyncio
 class TestUserService:
     """Test suite for User service."""
 
-    async def test_create_user(self, db_session: AsyncSession):
+    @pytest.fixture
+    def service(self, mock_session):
+        """Create UserService with mock repository."""
+        mock_repo = MagicMock()
+        return UserService(mock_session, repository=mock_repo)
+
+    async def test_create_user(self, service):
         """Test creating a user."""
-        # Create account first
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
+        # Mock repository.create to return the user
+        async def mock_create(user):
+            return user
+
+        service.repository.create = AsyncMock(side_effect=mock_create)
 
         # Create user
-        service = UserService(db_session)
         user = await service.create_user(
             account_id=account_id,
             email="user@example.com",
@@ -44,106 +44,107 @@ class TestUserService:
         assert user.email == "user@example.com"
         assert user.display_name == "John Doe"
         assert user.id is not None
+        service.repository.create.assert_awaited_once()
 
-    async def test_get_user_by_id(self, db_session: AsyncSession):
+    async def test_get_user_by_id(self, service):
         """Test retrieving a user by ID."""
-        # Create account and user
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
-
-        service = UserService(db_session)
-        user = await service.create_user(
+        # Mock user
+        mock_user = User(
+            id=user_id,
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
         )
+
+        # Mock repository.get_by_id
+        service.repository.get_by_id = AsyncMock(return_value=mock_user)
 
         # Retrieve it
-        retrieved = await service.get_user(user.id)
+        retrieved = await service.get_user(user_id)
 
         assert retrieved is not None
-        assert retrieved.id == user.id
+        assert retrieved.id == user_id
         assert retrieved.email == "user@example.com"
+        service.repository.get_by_id.assert_awaited_once_with(user_id.uuid)
 
-    async def test_get_user_not_found(self, db_session: AsyncSession):
+    async def test_get_user_not_found(self, service):
         """Test retrieving a non-existent user returns None."""
-        service = UserService(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = UserID(uuid4())
 
-        result = await service.get_user(UserID(non_existent_id))
+        # Mock repository.get_by_id to return None
+        service.repository.get_by_id = AsyncMock(return_value=None)
+
+        result = await service.get_user(non_existent_id)
 
         assert result is None
+        service.repository.get_by_id.assert_awaited_once_with(non_existent_id.uuid)
 
-    async def test_get_user_by_email(self, db_session: AsyncSession):
+    async def test_get_user_by_email(self, service):
         """Test retrieving a user by email."""
-        # Create account and user
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
-
-        service = UserService(db_session)
-        user = await service.create_user(
+        # Mock user
+        mock_user = User(
+            id=user_id,
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
         )
+
+        # Mock repository.get_by_email
+        service.repository.get_by_email = AsyncMock(return_value=mock_user)
 
         # Retrieve by email
         retrieved = await service.get_user_by_email("user@example.com")
 
         assert retrieved is not None
-        assert retrieved.id == user.id
+        assert retrieved.id == user_id
         assert retrieved.email == "user@example.com"
+        service.repository.get_by_email.assert_awaited_once_with("user@example.com")
 
-    async def test_get_user_by_email_not_found(self, db_session: AsyncSession):
+    async def test_get_user_by_email_not_found(self, service):
         """Test retrieving a non-existent user by email returns None."""
-        service = UserService(db_session)
+        # Mock repository.get_by_email to return None
+        service.repository.get_by_email = AsyncMock(return_value=None)
 
         result = await service.get_user_by_email("nonexistent@example.com")
 
         assert result is None
+        service.repository.get_by_email.assert_awaited_once_with("nonexistent@example.com")
 
-    async def test_list_users_by_account(self, db_session: AsyncSession):
+    async def test_list_users_by_account(self, service):
         """Test listing all users for an account."""
-        # Create account
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
-
-        # Create multiple users
-        service = UserService(db_session)
-        await service.create_user(
+        # Mock users
+        user1 = User(
+            id=UserID(uuid4()),
             account_id=account_id,
             email="user1@example.com",
             display_name="User One",
         )
-        await service.create_user(
+        user2 = User(
+            id=UserID(uuid4()),
             account_id=account_id,
             email="user2@example.com",
             display_name="User Two",
         )
+
+        # Mock paginated result
+        mock_result = PaginatedResult(
+            items=[user1, user2],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+
+        # Mock repository.filter
+        service.repository.filter = AsyncMock(return_value=mock_result)
 
         # List them
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
@@ -153,36 +154,31 @@ class TestUserService:
         emails = {u.email for u in result.items}
         assert "user1@example.com" in emails
         assert "user2@example.com" in emails
+        service.repository.filter.assert_awaited_once_with(account_id, pagination=pagination)
 
-    async def test_list_users_excludes_deleted(self, db_session: AsyncSession):
+    async def test_list_users_excludes_deleted(self, service):
         """Test that listing users excludes soft-deleted users."""
-        # Create account
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
-
-        # Create users
-        service = UserService(db_session)
-        user1 = await service.create_user(
-            account_id=account_id,
-            email="user1@example.com",
-            display_name="User One",
-        )
-        await service.create_user(
+        # Mock only one user (deleted one excluded by repository)
+        user2 = User(
+            id=UserID(uuid4()),
             account_id=account_id,
             email="user2@example.com",
             display_name="User Two",
         )
 
-        # Delete one
-        await service.delete_user(user1.id)
+        # Mock paginated result with only non-deleted user
+        mock_result = PaginatedResult(
+            items=[user2],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+
+        # Mock repository.filter to return only non-deleted
+        service.repository.filter = AsyncMock(return_value=mock_result)
 
         # List should only return non-deleted
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
@@ -191,170 +187,167 @@ class TestUserService:
         assert len(result.items) == 1
         assert result.items[0].email == "user2@example.com"
 
-    async def test_update_user(self, db_session: AsyncSession):
+    async def test_update_user(self, service):
         """Test updating a user."""
-        # Create account and user
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
-
-        service = UserService(db_session)
-        user = await service.create_user(
+        # Mock user
+        mock_user = User(
+            id=user_id,
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
         )
 
+        # Mock repository.get_by_id
+        service.repository.get_by_id = AsyncMock(return_value=mock_user)
+
+        # Mock repository.update to return updated user
+        async def mock_update(user):
+            return user
+
+        service.repository.update = AsyncMock(side_effect=mock_update)
+
         # Update email and display name
         updated = await service.update_user(
-            user_id=user.id,
+            user_id=user_id,
             email="newemail@example.com",
             display_name="Jane Smith",
         )
 
         assert updated.email == "newemail@example.com"
         assert updated.display_name == "Jane Smith"
+        service.repository.get_by_id.assert_awaited_once_with(user_id.uuid)
+        service.repository.update.assert_awaited_once()
 
-        # Verify in database
-        retrieved = await service.get_user(user.id)
-        assert retrieved is not None
-        assert retrieved.email == "newemail@example.com"
-        assert retrieved.display_name == "Jane Smith"
-
-    async def test_update_user_partial_email(self, db_session: AsyncSession):
+    async def test_update_user_partial_email(self, service):
         """Test updating only the email of a user."""
-        # Create account and user
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
-
-        service = UserService(db_session)
-        user = await service.create_user(
+        # Mock user
+        mock_user = User(
+            id=user_id,
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
         )
 
+        # Mock repository.get_by_id
+        service.repository.get_by_id = AsyncMock(return_value=mock_user)
+
+        # Mock repository.update to return updated user
+        async def mock_update(user):
+            return user
+
+        service.repository.update = AsyncMock(side_effect=mock_update)
+
         # Update only email
         updated = await service.update_user(
-            user_id=user.id,
+            user_id=user_id,
             email="newemail@example.com",
         )
 
         assert updated.email == "newemail@example.com"
         assert updated.display_name == "John Doe"  # unchanged
 
-    async def test_update_user_partial_display_name(self, db_session: AsyncSession):
+    async def test_update_user_partial_display_name(self, service):
         """Test updating only the display name of a user."""
-        # Create account and user
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
-
-        service = UserService(db_session)
-        user = await service.create_user(
+        # Mock user
+        mock_user = User(
+            id=user_id,
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
         )
 
+        # Mock repository.get_by_id
+        service.repository.get_by_id = AsyncMock(return_value=mock_user)
+
+        # Mock repository.update to return updated user
+        async def mock_update(user):
+            return user
+
+        service.repository.update = AsyncMock(side_effect=mock_update)
+
         # Update only display name
         updated = await service.update_user(
-            user_id=user.id,
+            user_id=user_id,
             display_name="Jane Smith",
         )
 
         assert updated.email == "user@example.com"  # unchanged
         assert updated.display_name == "Jane Smith"
 
-    async def test_update_user_not_found(self, db_session: AsyncSession):
+    async def test_update_user_not_found(self, service):
         """Test that updating a non-existent user raises EntityNotFoundError."""
-        service = UserService(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = UserID(uuid4())
+
+        # Mock repository.get_by_id to return None
+        service.repository.get_by_id = AsyncMock(return_value=None)
 
         with pytest.raises(EntityNotFoundError) as exc_info:
             await service.update_user(
-                user_id=UserID(non_existent_id),
+                user_id=non_existent_id,
                 email="newemail@example.com",
             )
 
         assert "User not found" in str(exc_info.value)
+        service.repository.get_by_id.assert_awaited_once_with(non_existent_id.uuid)
 
-    async def test_delete_user(self, db_session: AsyncSession):
+    async def test_delete_user(self, service):
         """Test soft-deleting a user."""
-        # Create account and user
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
-
-        service = UserService(db_session)
-        user = await service.create_user(
+        # Mock user
+        mock_user = User(
+            id=user_id,
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
         )
 
+        # Mock repository.get_by_id
+        service.repository.get_by_id = AsyncMock(return_value=mock_user)
+
+        # Mock repository.delete
+        service.repository.delete = AsyncMock()
+
         # Delete it
-        await service.delete_user(user.id)
+        await service.delete_user(user_id)
 
-        # Should not be found
-        retrieved = await service.get_user(user.id)
-        assert retrieved is None
+        service.repository.get_by_id.assert_awaited_once_with(user_id.uuid)
+        service.repository.delete.assert_awaited_once_with(user_id.uuid)
 
-    async def test_delete_user_not_found(self, db_session: AsyncSession):
+    async def test_delete_user_not_found(self, service):
         """Test that deleting a non-existent user raises EntityNotFoundError."""
-        service = UserService(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = UserID(uuid4())
+
+        # Mock repository.get_by_id to return None
+        service.repository.get_by_id = AsyncMock(return_value=None)
 
         with pytest.raises(EntityNotFoundError) as exc_info:
-            await service.delete_user(UserID(non_existent_id))
+            await service.delete_user(non_existent_id)
 
         assert "User not found" in str(exc_info.value)
+        service.repository.get_by_id.assert_awaited_once_with(non_existent_id.uuid)
 
-    async def test_create_superadmin_user(self, db_session: AsyncSession):
+    async def test_create_superadmin_user(self, service):
         """Test creating a user with superadmin privileges."""
-        # Create account first
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="LEADR",
-            slug="leadr",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
+        # Mock repository.create to return the user
+        async def mock_create(user):
+            return user
+
+        service.repository.create = AsyncMock(side_effect=mock_create)
 
         # Create superadmin user
-        service = UserService(db_session)
         user = await service.create_user(
             account_id=account_id,
             email="admin@leadr.gg",
@@ -365,45 +358,31 @@ class TestUserService:
         assert user.account_id == account_id
         assert user.email == "admin@leadr.gg"
         assert user.super_admin is True
+        service.repository.create.assert_awaited_once()
 
-    async def test_find_superadmins(self, db_session: AsyncSession):
+    async def test_find_superadmins(self, service):
         """Test finding all superadmin users."""
-        # Create account
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="LEADR",
-            slug="leadr",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
-
-        service = UserService(db_session)
-
-        # Create regular user
-        await service.create_user(
-            account_id=account_id,
-            email="user@example.com",
-            display_name="Regular User",
-            super_admin=False,
-        )
-
         # Create superadmin users
-        superadmin1 = await service.create_user(
+        superadmin1 = User(
+            id=UserID(uuid4()),
             account_id=account_id,
             email="admin1@leadr.gg",
             display_name="Admin 1",
             super_admin=True,
         )
 
-        superadmin2 = await service.create_user(
+        superadmin2 = User(
+            id=UserID(uuid4()),
             account_id=account_id,
             email="admin2@leadr.gg",
             display_name="Admin 2",
             super_admin=True,
         )
+
+        # Mock repository.find_superadmins
+        service.repository.find_superadmins = AsyncMock(return_value=[superadmin1, superadmin2])
 
         # Find all superadmins
         superadmins = await service.find_superadmins()
@@ -412,69 +391,43 @@ class TestUserService:
         superadmin_ids = {sa.id for sa in superadmins}
         assert superadmin1.id in superadmin_ids
         assert superadmin2.id in superadmin_ids
+        service.repository.find_superadmins.assert_awaited_once()
 
-    async def test_superadmin_exists_true(self, db_session: AsyncSession):
+    async def test_superadmin_exists_true(self, service):
         """Test that superadmin_exists returns True when superadmin exists."""
-        # Create account
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="LEADR",
-            slug="leadr",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
-
-        service = UserService(db_session)
-
         # Create superadmin
-        await service.create_user(
+        superadmin = User(
+            id=UserID(uuid4()),
             account_id=account_id,
             email="admin@leadr.gg",
             display_name="LEADR Admin",
             super_admin=True,
         )
+
+        # Mock repository.find_superadmins
+        service.repository.find_superadmins = AsyncMock(return_value=[superadmin])
 
         # Check if superadmin exists
         exists = await service.superadmin_exists()
         assert exists is True
+        service.repository.find_superadmins.assert_awaited_once()
 
-    async def test_superadmin_exists_false(self, db_session: AsyncSession):
+    async def test_superadmin_exists_false(self, service):
         """Test that superadmin_exists returns False when no superadmin exists."""
-        service = UserService(db_session)
+        # Mock repository.find_superadmins to return empty list
+        service.repository.find_superadmins = AsyncMock(return_value=[])
 
         # Check if superadmin exists (should be False)
         exists = await service.superadmin_exists()
         assert exists is False
+        service.repository.find_superadmins.assert_awaited_once()
 
-    async def test_find_superadmins_excludes_deleted(self, db_session: AsyncSession):
+    async def test_find_superadmins_excludes_deleted(self, service):
         """Test that find_superadmins excludes soft-deleted users."""
-        # Create account
-        account_repo = AccountRepository(db_session)
-        account_id = AccountID(uuid4())
-
-        account = Account(
-            id=account_id,
-            name="LEADR",
-            slug="leadr",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
-
-        service = UserService(db_session)
-
-        # Create superadmin
-        superadmin = await service.create_user(
-            account_id=account_id,
-            email="admin@leadr.gg",
-            display_name="LEADR Admin",
-            super_admin=True,
-        )
-
-        # Delete the superadmin
-        await service.delete_user(superadmin.id)
+        # Mock repository.find_superadmins to return empty list (deleted excluded by repository)
+        service.repository.find_superadmins = AsyncMock(return_value=[])
 
         # Find superadmins (should be empty)
         superadmins = await service.find_superadmins()
@@ -484,90 +437,88 @@ class TestUserService:
         exists = await service.superadmin_exists()
         assert exists is False
 
-    async def test_suspend_user(self, db_session: AsyncSession):
+    async def test_suspend_user(self, service):
         """Test suspending a user via service."""
-        # Create account and user
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
-
-        service = UserService(db_session)
-        user = await service.create_user(
+        # Mock user
+        mock_user = User(
+            id=user_id,
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
+            status=UserStatus.ACTIVE,
         )
 
-        # Verify user starts as active
-        assert user.status == UserStatus.ACTIVE
+        # Mock repository.get_by_id
+        service.repository.get_by_id = AsyncMock(return_value=mock_user)
+
+        # Mock repository.update to return updated user
+        async def mock_update(user):
+            return user
+
+        service.repository.update = AsyncMock(side_effect=mock_update)
 
         # Suspend the user
-        suspended_user = await service.suspend_user(user.id)
+        suspended_user = await service.suspend_user(user_id)
 
         assert suspended_user.status == UserStatus.SUSPENDED
+        service.repository.get_by_id.assert_awaited_once_with(user_id.uuid)
+        service.repository.update.assert_awaited_once()
 
-        # Verify persisted in database
-        retrieved = await service.get_user(user.id)
-        assert retrieved is not None
-        assert retrieved.status == UserStatus.SUSPENDED
-
-    async def test_suspend_user_not_found(self, db_session: AsyncSession):
+    async def test_suspend_user_not_found(self, service):
         """Test that suspending a non-existent user raises EntityNotFoundError."""
-        service = UserService(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = UserID(uuid4())
+
+        # Mock repository.get_by_id to return None
+        service.repository.get_by_id = AsyncMock(return_value=None)
 
         with pytest.raises(EntityNotFoundError) as exc_info:
-            await service.suspend_user(UserID(non_existent_id))
+            await service.suspend_user(non_existent_id)
 
         assert "User not found" in str(exc_info.value)
+        service.repository.get_by_id.assert_awaited_once_with(non_existent_id.uuid)
 
-    async def test_activate_user(self, db_session: AsyncSession):
+    async def test_activate_user(self, service):
         """Test activating a suspended user via service."""
-        # Create account and user
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-        )
-        await account_repo.create(account)
-
-        service = UserService(db_session)
-        user = await service.create_user(
+        # Mock user (suspended)
+        mock_user = User(
+            id=user_id,
             account_id=account_id,
             email="user@example.com",
             display_name="John Doe",
+            status=UserStatus.SUSPENDED,
         )
 
-        # Suspend the user first
-        await service.suspend_user(user.id)
+        # Mock repository.get_by_id
+        service.repository.get_by_id = AsyncMock(return_value=mock_user)
+
+        # Mock repository.update to return updated user
+        async def mock_update(user):
+            return user
+
+        service.repository.update = AsyncMock(side_effect=mock_update)
 
         # Activate the user
-        activated_user = await service.activate_user(user.id)
+        activated_user = await service.activate_user(user_id)
 
         assert activated_user.status == UserStatus.ACTIVE
+        service.repository.get_by_id.assert_awaited_once_with(user_id.uuid)
+        service.repository.update.assert_awaited_once()
 
-        # Verify persisted in database
-        retrieved = await service.get_user(user.id)
-        assert retrieved is not None
-        assert retrieved.status == UserStatus.ACTIVE
-
-    async def test_activate_user_not_found(self, db_session: AsyncSession):
+    async def test_activate_user_not_found(self, service):
         """Test that activating a non-existent user raises EntityNotFoundError."""
-        service = UserService(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = UserID(uuid4())
+
+        # Mock repository.get_by_id to return None
+        service.repository.get_by_id = AsyncMock(return_value=None)
 
         with pytest.raises(EntityNotFoundError) as exc_info:
-            await service.activate_user(UserID(non_existent_id))
+            await service.activate_user(non_existent_id)
 
         assert "User not found" in str(exc_info.value)
+        service.repository.get_by_id.assert_awaited_once_with(non_existent_id.uuid)

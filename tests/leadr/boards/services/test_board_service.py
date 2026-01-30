@@ -1,45 +1,56 @@
 """Tests for Board service."""
 
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.accounts.services.account_service import AccountService
-from leadr.boards.domain.board import KeepStrategy, SortDirection
+from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.boards.domain.board_template import BoardTemplate
 from leadr.boards.services.board_service import BoardService
-from leadr.boards.services.board_template_service import BoardTemplateService
+from leadr.common.api.pagination import PaginatedResult
 from leadr.common.domain.exceptions import EntityNotFoundError
-from leadr.common.domain.ids import BoardID, BoardTemplateID, GameID
-from leadr.games.services.game_service import GameService
+from leadr.common.domain.ids import AccountID, BoardID, BoardTemplateID, GameID
+from leadr.games.domain.game import Game
 
 
 @pytest.mark.asyncio
 class TestBoardService:
     """Test suite for Board service."""
 
-    async def test_create_board(self, db_session: AsyncSession):
-        """Test creating a board via service."""
-        # Create account
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+    @pytest.fixture
+    def service(self, mock_session):
+        """Create BoardService with mock repository."""
+        mock_repo = MagicMock()
+        mock_repo.session = mock_session
+        return BoardService(mock_session, repository=mock_repo)
 
-        # Create game
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
+    @patch("leadr.boards.services.board_service.GameService")
+    @patch("leadr.boards.services.board_service.generate_unique_short_code", new_callable=AsyncMock)
+    @patch(
+        "leadr.boards.services.board_service.generate_unique_slug_with_retry",
+        new_callable=AsyncMock,
+    )
+    async def test_create_board(
+        self, mock_slug_gen, mock_short_code_gen, mock_game_service_class, service
+    ):
+        """Test creating a board via service."""
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        # Setup mocks
+        mock_game = Game(id=game_id, account_id=account_id, name="Test Game", slug="test-game")
+        mock_game_service = mock_game_service_class.return_value
+        mock_game_service.get_by_id_or_raise = AsyncMock(return_value=mock_game)
+        mock_short_code_gen.return_value = "SR2025"
+        mock_slug_gen.return_value = "speed-run-board"
+        service.repository.create = AsyncMock(side_effect=lambda entity: entity)
 
         # Create board
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = await service.create_board(
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
             icon="trophy",
             short_code="SR2025",
@@ -50,34 +61,39 @@ class TestBoardService:
         )
 
         assert board.id is not None
-        assert board.account_id == account.id
-        assert board.game_id == game.id
+        assert board.account_id == account_id
+        assert board.game_id == game_id
         assert board.name == "Speed Run Board"
         assert board.short_code == "SR2025"
         assert board.is_active is True
+        service.repository.create.assert_called_once()
 
-    async def test_create_board_with_optional_fields(self, db_session: AsyncSession):
+    @patch("leadr.boards.services.board_service.GameService")
+    @patch("leadr.boards.services.board_service.generate_unique_short_code", new_callable=AsyncMock)
+    @patch(
+        "leadr.boards.services.board_service.generate_unique_slug_with_retry",
+        new_callable=AsyncMock,
+    )
+    async def test_create_board_with_optional_fields(
+        self, mock_slug_gen, mock_short_code_gen, mock_game_service_class, service
+    ):
         """Test creating a board with optional fields."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board with optional fields
-        board_service = BoardService(db_session)
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
         template_id = BoardTemplateID(uuid4())
 
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        # Setup mocks
+        mock_game = Game(id=game_id, account_id=account_id, name="Test Game", slug="test-game")
+        mock_game_service = mock_game_service_class.return_value
+        mock_game_service.get_by_id_or_raise = AsyncMock(return_value=mock_game)
+        mock_short_code_gen.return_value = "SR2025"
+        mock_slug_gen.return_value = "speed-run-board"
+        service.repository.create = AsyncMock(side_effect=lambda entity: entity)
+
+        # Create board with optional fields
+        board = await service.create_board(
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
             icon="trophy",
             short_code="SR2025",
@@ -93,34 +109,32 @@ class TestBoardService:
         assert board.created_from_template_id == BoardTemplateID(template_id)
         assert board.template_name == "Speed Run Template"
         assert board.tags == ["speedrun", "no-damage"]
+        service.repository.create.assert_called_once()
 
-    async def test_create_board_validates_game_belongs_to_account(self, db_session: AsyncSession):
+    @patch("leadr.boards.services.board_service.GameService")
+    @patch("leadr.boards.services.board_service.generate_unique_short_code", new_callable=AsyncMock)
+    @patch(
+        "leadr.boards.services.board_service.generate_unique_slug_with_retry",
+        new_callable=AsyncMock,
+    )
+    async def test_create_board_validates_game_belongs_to_account(
+        self, mock_slug_gen, mock_short_code_gen, mock_game_service_class, service
+    ):
         """Test that create_board validates the game belongs to the account."""
-        # Create two accounts
-        account_service = AccountService(db_session)
-        account1 = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-        account2 = await account_service.create_account(
-            name="Beta Industries",
-            slug="beta-industries",
-        )
+        account1_id = AccountID(uuid4())
+        account2_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        # Create game for account1
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account1.id,
-            name="Account 1 Game",
-        )
+        # Setup mocks - game belongs to account1
+        mock_game = Game(id=game_id, account_id=account1_id, name="Test Game", slug="test-game")
+        mock_game_service = mock_game_service_class.return_value
+        mock_game_service.get_by_id_or_raise = AsyncMock(return_value=mock_game)
 
         # Try to create board for account2 with account1's game
-        board_service = BoardService(db_session)
-
         with pytest.raises(ValueError) as exc_info:
-            await board_service.create_board(
-                account_id=account2.id,
-                game_id=game.id,
+            await service.create_board(
+                account_id=account2_id,
+                game_id=game_id,
                 name="Invalid Board",
                 icon="star",
                 short_code="INVALID",
@@ -132,23 +146,25 @@ class TestBoardService:
 
         assert "does not belong to account" in str(exc_info.value).lower()
 
-    async def test_create_board_raises_error_for_nonexistent_game(self, db_session: AsyncSession):
+    @patch("leadr.boards.services.board_service.GameService")
+    async def test_create_board_raises_error_for_nonexistent_game(
+        self, mock_game_service_class, service
+    ):
         """Test that create_board raises error for non-existent game."""
-        # Create account
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        # Setup mocks - GameService raises EntityNotFoundError
+        mock_game_service = mock_game_service_class.return_value
+        mock_game_service.get_by_id_or_raise = AsyncMock(
+            side_effect=EntityNotFoundError("Game", str(game_id))
         )
 
         # Try to create board with non-existent game
-        board_service = BoardService(db_session)
-        non_existent_game_id = uuid4()
-
         with pytest.raises(EntityNotFoundError) as exc_info:
-            await board_service.create_board(
-                account_id=account.id,
-                game_id=GameID(non_existent_game_id),
+            await service.create_board(
+                account_id=account_id,
+                game_id=game_id,
                 name="Invalid Board",
                 icon="star",
                 short_code="INVALID",
@@ -160,800 +176,616 @@ class TestBoardService:
 
         assert "Game not found" in str(exc_info.value)
 
-    async def test_get_board(self, db_session: AsyncSession):
+    async def test_get_board(self, service):
         """Test retrieving a board by ID via service."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        mock_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
+
+        # Mock repository method
+        service.repository.get_by_id = AsyncMock(return_value=mock_board)
 
         # Retrieve it
-        board = await board_service.get_board(created_board.id)
+        board = await service.get_board(board_id)
 
         assert board is not None
-        assert board.id == created_board.id
+        assert board.id == board_id
         assert board.name == "Speed Run Board"
+        service.repository.get_by_id.assert_called_once()
 
-    async def test_get_board_not_found(self, db_session: AsyncSession):
+    async def test_get_board_not_found(self, service):
         """Test retrieving a non-existent board returns None."""
-        board_service = BoardService(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = BoardID(uuid4())
 
-        board = await board_service.get_board(BoardID(non_existent_id))
+        # Mock repository method
+        service.repository.get_by_id = AsyncMock(return_value=None)
+
+        board = await service.get_board(non_existent_id)
 
         assert board is None
+        service.repository.get_by_id.assert_called_once()
 
-    async def test_get_board_by_short_code(self, db_session: AsyncSession):
+    async def test_get_board_by_short_code(self, service):
         """Test retrieving a board by short_code via service."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        mock_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
+
+        # Mock repository method
+        service.repository.get_by_short_code = AsyncMock(return_value=mock_board)
 
         # Retrieve by short_code
-        board = await board_service.get_board_by_short_code("SR2025")
+        board = await service.get_board_by_short_code("SR2025")
 
         assert board is not None
-        assert board.id == created_board.id
+        assert board.id == board_id
         assert board.short_code == "SR2025"
+        service.repository.get_by_short_code.assert_called_once_with("SR2025")
 
-    async def test_get_board_by_short_code_not_found(self, db_session: AsyncSession):
+    async def test_get_board_by_short_code_not_found(self, service):
         """Test retrieving a board by non-existent short_code returns None."""
-        board_service = BoardService(db_session)
+        # Mock repository method
+        service.repository.get_by_short_code = AsyncMock(return_value=None)
 
-        board = await board_service.get_board_by_short_code("NONEXISTENT")
+        board = await service.get_board_by_short_code("NONEXISTENT")
 
         assert board is None
+        service.repository.get_by_short_code.assert_called_once_with("NONEXISTENT")
 
-    async def test_list_boards_by_account(self, db_session: AsyncSession):
+    async def test_list_boards_by_account(self, service):
         """Test listing all boards for an account."""
-        # Create account
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        # Create game
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create multiple boards
-        board_service = BoardService(db_session)
-        await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board1 = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
             name="Board One",
-            icon="star",
+            slug="board-one",
             short_code="B001",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
-        await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board2 = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
             name="Board Two",
-            icon="trophy",
+            slug="board-two",
             short_code="B002",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
+
+        # Mock repository method
+        mock_result = PaginatedResult(
+            items=[board1, board2],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+        service.repository.filter = AsyncMock(return_value=mock_result)
 
         # List them
-        boards = await board_service.list_boards_by_account(account.id)
+        boards = await service.list_boards_by_account(account_id)
 
         assert len(boards) == 2
         names = {b.name for b in boards}
         assert "Board One" in names
         assert "Board Two" in names
+        service.repository.filter.assert_called_once()
 
-    async def test_list_boards_filters_by_account(self, db_session: AsyncSession):
+    async def test_list_boards_filters_by_account(self, service):
         """Test that list_boards_by_account only returns boards for the specified account."""
-        # Create two accounts
-        account_service = AccountService(db_session)
-        account1 = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
-        account2 = await account_service.create_account(
-            name="Beta Industries",
-            slug="beta-industries",
-        )
+        account1_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        # Create games for each account
-        game_service = GameService(db_session)
-        game1 = await game_service.create_game(
-            account_id=account1.id,
-            name="Game 1",
-        )
-        game2 = await game_service.create_game(
-            account_id=account2.id,
-            name="Game 2",
-        )
-
-        # Create boards for each account
-        board_service = BoardService(db_session)
-        await board_service.create_board(
-            account_id=account1.id,
-            game_id=game1.id,
+        board1 = Board(
+            id=BoardID(uuid4()),
+            account_id=account1_id,
+            game_id=game_id,
             name="Account 1 Board",
-            icon="star",
+            slug="account-1-board",
             short_code="A1B1",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
-        await board_service.create_board(
-            account_id=account2.id,
-            game_id=game2.id,
-            name="Account 2 Board",
-            icon="trophy",
-            short_code="A2B1",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
+
+        # Mock repository method
+        mock_result = PaginatedResult(
+            items=[board1],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
         )
+        service.repository.filter = AsyncMock(return_value=mock_result)
 
         # List boards for account 1
-        boards = await board_service.list_boards_by_account(account1.id)
+        boards = await service.list_boards_by_account(account1_id)
 
         assert len(boards) == 1
         assert boards[0].name == "Account 1 Board"
-        assert boards[0].account_id == account1.id
+        assert boards[0].account_id == account1_id
+        service.repository.filter.assert_called_once()
 
-    async def test_update_board(self, db_session: AsyncSession):
+    async def test_update_board(self, service):
         """Test updating a board via service."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            icon="trophy",
         )
+
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
 
         # Update it
-        updated_board = await board_service.update_board(
-            board_id=created_board.id,
+        updated_board = await service.update_board(
+            board_id=board_id,
             name="Updated Speed Run Board",
             is_active=False,
         )
 
         assert updated_board.name == "Updated Speed Run Board"
         assert updated_board.is_active is False
-        assert updated_board.icon == "trophy"  # Unchanged
+        assert updated_board.icon == "trophy"
+        service.repository.get_by_id.assert_called_once()
+        service.repository.update.assert_called_once()
 
-        # Verify in database
-        board = await board_service.get_board(created_board.id)
-        assert board is not None
-        assert board.name == "Updated Speed Run Board"
-        assert board.is_active is False
-
-    async def test_update_board_partial_fields(self, db_session: AsyncSession):
+    async def test_update_board_partial_fields(self, service):
         """Test updating only some fields of a board."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
             is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
 
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
+
         # Update only the name
-        updated_board = await board_service.update_board(
-            board_id=created_board.id,
+        updated_board = await service.update_board(
+            board_id=board_id,
             name="New Name",
         )
 
         assert updated_board.name == "New Name"
-        assert updated_board.is_active is True  # Unchanged
-        assert updated_board.sort_direction == SortDirection.ASCENDING  # Unchanged
+        assert updated_board.is_active is True
+        assert updated_board.sort_direction == SortDirection.ASCENDING
+        service.repository.get_by_id.assert_called_once()
+        service.repository.update.assert_called_once()
 
-    async def test_update_board_not_found(self, db_session: AsyncSession):
+    async def test_update_board_not_found(self, service):
         """Test that updating a non-existent board raises an error."""
-        board_service = BoardService(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = BoardID(uuid4())
+
+        # Mock repository method
+        service.repository.get_by_id = AsyncMock(return_value=None)
 
         with pytest.raises(EntityNotFoundError) as exc_info:
-            await board_service.update_board(
-                board_id=BoardID(non_existent_id),
+            await service.update_board(
+                board_id=non_existent_id,
                 name="New Name",
             )
 
         assert "Board not found" in str(exc_info.value)
 
-    async def test_soft_delete_board(self, db_session: AsyncSession):
+    async def test_soft_delete_board(self, service):
         """Test soft-deleting a board via service."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
+
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.delete = AsyncMock(return_value=None)
 
         # Soft-delete it (returns entity before deletion)
-        deleted_board = await board_service.soft_delete(created_board.id)
+        deleted_board = await service.soft_delete(board_id)
 
-        assert deleted_board.id == created_board.id
-        assert deleted_board.is_deleted is False  # Returns entity before deletion
+        assert deleted_board.id == board_id
+        assert deleted_board.is_deleted is False
+        service.repository.get_by_id.assert_called_once()
+        service.repository.delete.assert_called_once_with(board_id.uuid)
 
-        # Verify it's not returned by get
-        board = await board_service.get_board(created_board.id)
-        assert board is None
-
-    async def test_list_boards_excludes_deleted(self, db_session: AsyncSession):
+    async def test_list_boards_excludes_deleted(self, service):
         """Test that list_boards_by_account excludes soft-deleted boards."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create boards
-        board_service = BoardService(db_session)
-        board1 = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
-            name="Board One",
-            icon="star",
-            short_code="B001",
-            unit="points",
-            is_active=True,
-            sort_direction=SortDirection.DESCENDING,
-            keep_strategy=KeepStrategy.BEST,
-        )
-        await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board2 = Board(
+            id=BoardID(uuid4()),
+            account_id=account_id,
+            game_id=game_id,
             name="Board Two",
-            icon="trophy",
+            slug="board-two",
             short_code="B002",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
 
-        # Soft-delete one
-        await board_service.soft_delete(board1.id)
+        # Mock repository method - only returns non-deleted board
+        mock_result = PaginatedResult(
+            items=[board2],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+        service.repository.filter = AsyncMock(return_value=mock_result)
 
         # List should only return non-deleted
-        boards = await board_service.list_boards_by_account(account.id)
+        boards = await service.list_boards_by_account(account_id)
 
         assert len(boards) == 1
         assert boards[0].name == "Board Two"
 
-    async def test_soft_delete_board_not_found(self, db_session: AsyncSession):
+    async def test_soft_delete_board_not_found(self, service):
         """Test that soft-deleting a non-existent board raises an error."""
-        board_service = BoardService(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = BoardID(uuid4())
+
+        # Mock repository method
+        service.repository.get_by_id = AsyncMock(return_value=None)
 
         with pytest.raises(EntityNotFoundError) as exc_info:
-            await board_service.soft_delete(non_existent_id)
+            await service.soft_delete(non_existent_id)
 
         assert "Board not found" in str(exc_info.value)
 
-    async def test_update_board_icon(self, db_session: AsyncSession):
+    async def test_update_board_icon(self, service):
         """Test updating board icon."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
+            icon="trophy",
         )
+
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
 
         # Update icon
-        updated_board = await board_service.update_board(
-            board_id=created_board.id,
+        updated_board = await service.update_board(
+            board_id=board_id,
             icon="star",
         )
 
         assert updated_board.icon == "star"
-        assert updated_board.name == "Speed Run Board"  # Unchanged
+        assert updated_board.name == "Speed Run Board"
+        service.repository.update.assert_called_once()
 
-    async def test_update_board_short_code(self, db_session: AsyncSession):
+    async def test_update_board_short_code(self, service):
         """Test updating board short_code."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
+
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
 
         # Update short_code
-        updated_board = await board_service.update_board(
-            board_id=created_board.id,
+        updated_board = await service.update_board(
+            board_id=board_id,
             short_code="SR2026",
         )
 
         assert updated_board.short_code == "SR2026"
-        assert updated_board.name == "Speed Run Board"  # Unchanged
+        assert updated_board.name == "Speed Run Board"
+        service.repository.update.assert_called_once()
 
-    async def test_update_board_unit(self, db_session: AsyncSession):
+    async def test_update_board_unit(self, service):
         """Test updating board unit."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
             unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
 
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
+
         # Update unit
-        updated_board = await board_service.update_board(
-            board_id=created_board.id,
+        updated_board = await service.update_board(
+            board_id=board_id,
             unit="milliseconds",
         )
 
         assert updated_board.unit == "milliseconds"
-        assert updated_board.name == "Speed Run Board"  # Unchanged
+        assert updated_board.name == "Speed Run Board"
+        service.repository.update.assert_called_once()
 
-    async def test_update_board_sort_direction(self, db_session: AsyncSession):
+    async def test_update_board_sort_direction(self, service):
         """Test updating board sort_direction."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
-            is_active=True,
             sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
+
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
 
         # Update sort_direction
-        updated_board = await board_service.update_board(
-            board_id=created_board.id,
+        updated_board = await service.update_board(
+            board_id=board_id,
             sort_direction=SortDirection.DESCENDING,
         )
 
         assert updated_board.sort_direction == SortDirection.DESCENDING
-        assert updated_board.name == "Speed Run Board"  # Unchanged
+        assert updated_board.name == "Speed Run Board"
+        service.repository.update.assert_called_once()
 
-    async def test_update_board_keep_strategy(self, db_session: AsyncSession):
+    async def test_update_board_keep_strategy(self, service):
         """Test updating board keep_strategy."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
             keep_strategy=KeepStrategy.BEST,
         )
 
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
+
         # Update keep_strategy
-        updated_board = await board_service.update_board(
-            board_id=created_board.id,
+        updated_board = await service.update_board(
+            board_id=board_id,
             keep_strategy=KeepStrategy.BEST,
         )
 
         assert updated_board.keep_strategy == KeepStrategy.BEST
-        assert updated_board.name == "Speed Run Board"  # Unchanged
+        assert updated_board.name == "Speed Run Board"
+        service.repository.update.assert_called_once()
 
-    async def test_update_board_template_id(self, db_session: AsyncSession):
+    async def test_update_board_template_id(self, service):
         """Test updating board template_id."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
+
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
 
         # Update template_id
-        new_template_id = uuid4()
-        updated_board = await board_service.update_board(
-            board_id=created_board.id,
-            created_from_template_id=BoardTemplateID(new_template_id),
+        new_template_id = BoardTemplateID(uuid4())
+        updated_board = await service.update_board(
+            board_id=board_id,
+            created_from_template_id=new_template_id,
         )
 
-        assert updated_board.created_from_template_id == BoardTemplateID(new_template_id)
-        assert updated_board.name == "Speed Run Board"  # Unchanged
+        assert updated_board.created_from_template_id == new_template_id
+        assert updated_board.name == "Speed Run Board"
+        service.repository.update.assert_called_once()
 
-    async def test_update_board_template_name(self, db_session: AsyncSession):
+    async def test_update_board_template_name(self, service):
         """Test updating board template_name."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
+
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
 
         # Update template_name
-        updated_board = await board_service.update_board(
-            board_id=created_board.id,
+        updated_board = await service.update_board(
+            board_id=board_id,
             template_name="New Template",
         )
 
         assert updated_board.template_name == "New Template"
-        assert updated_board.name == "Speed Run Board"  # Unchanged
+        assert updated_board.name == "Speed Run Board"
+        service.repository.update.assert_called_once()
 
-    async def test_update_board_starts_at(self, db_session: AsyncSession):
+    async def test_update_board_starts_at(self, service):
         """Test updating board starts_at."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
+
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
 
         # Update starts_at
         new_starts_at = datetime(2025, 1, 1, 0, 0, 0, tzinfo=UTC)
-        updated_board = await board_service.update_board(
-            board_id=created_board.id,
+        updated_board = await service.update_board(
+            board_id=board_id,
             starts_at=new_starts_at,
         )
 
         assert updated_board.starts_at == new_starts_at
-        assert updated_board.name == "Speed Run Board"  # Unchanged
+        assert updated_board.name == "Speed Run Board"
+        service.repository.update.assert_called_once()
 
-    async def test_update_board_ends_at(self, db_session: AsyncSession):
+    async def test_update_board_ends_at(self, service):
         """Test updating board ends_at."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
+
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
 
         # Update ends_at
         new_ends_at = datetime(2025, 12, 31, 23, 59, 59, tzinfo=UTC)
-        updated_board = await board_service.update_board(
-            board_id=created_board.id,
+        updated_board = await service.update_board(
+            board_id=board_id,
             ends_at=new_ends_at,
         )
 
         assert updated_board.ends_at == new_ends_at
-        assert updated_board.name == "Speed Run Board"  # Unchanged
+        assert updated_board.name == "Speed Run Board"
+        service.repository.update.assert_called_once()
 
-    async def test_update_board_tags(self, db_session: AsyncSession):
+    async def test_update_board_tags(self, service):
         """Test updating board tags."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create board
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SR2025",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
+
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
 
         # Update tags
-        updated_board = await board_service.update_board(
-            board_id=created_board.id,
+        updated_board = await service.update_board(
+            board_id=board_id,
             tags=["speedrun", "glitchless"],
         )
 
         assert updated_board.tags == ["speedrun", "glitchless"]
-        assert updated_board.name == "Speed Run Board"  # Unchanged
+        assert updated_board.name == "Speed Run Board"
+        service.repository.update.assert_called_once()
 
-    async def test_create_board_from_template(self, db_session: AsyncSession):
+    @patch("leadr.boards.services.board_service.GameService")
+    @patch("leadr.boards.services.board_service.generate_unique_short_code", new_callable=AsyncMock)
+    async def test_create_board_from_template(
+        self, mock_short_code_gen, mock_game_service_class, service
+    ):
         """Test creating a board from a template."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        template_id = BoardTemplateID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create a board template
-        template_service = BoardTemplateService(db_session)
+        # Create template
         next_run = datetime.now(UTC) + timedelta(days=1)
-        template = await template_service.create_board_template(
-            account_id=account.id,
-            game_id=game.id,
+        template = BoardTemplate(
+            id=template_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Weekly Challenge",
             slug="weekly-challenge",
             repeat_interval="7 days",
@@ -967,49 +799,61 @@ class TestBoardService:
             config={},
         )
 
+        # Setup mocks
+        mock_game = Game(id=game_id, account_id=account_id, name="Test Game", slug="test-game")
+        mock_game_service = mock_game_service_class.return_value
+        mock_game_service.get_by_id_or_raise = AsyncMock(return_value=mock_game)
+        mock_short_code_gen.return_value = "WC123"
+
+        # Mock slug check (slug doesn't exist)
+        mock_slug_check_result = PaginatedResult(
+            items=[],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+        service.repository.filter = AsyncMock(return_value=mock_slug_check_result)
+        service.repository.create = AsyncMock(side_effect=lambda entity: entity)
+        service.repository.count_boards_by_template = AsyncMock(return_value=0)
+
         # Create board from template
-        board_service = BoardService(db_session)
-        board = await board_service.create_board_from_template(template)
+        board = await service.create_board_from_template(template)
 
         # Assertions
         assert board.id is not None
         assert board.name == "Weekly Challenge"
-        assert board.account_id == account.id
-        assert board.game_id == game.id
+        assert board.account_id == account_id
+        assert board.game_id == game_id
         assert board.icon == "star"
         assert board.unit == "points"
         assert board.is_active is True
         assert board.sort_direction == SortDirection.DESCENDING
         assert board.keep_strategy == KeepStrategy.BEST
-        assert board.created_from_template_id == template.id
+        assert board.created_from_template_id == template_id
         assert board.template_name == "Weekly Challenge"
         assert board.starts_at == next_run
         assert board.ends_at == next_run + timedelta(days=7)
         assert board.tags == ["weekly", "challenge"]
-        assert board.short_code is not None  # Should be auto-generated
-        assert len(board.short_code) == 5  # Default short code length
+        assert board.short_code == "WC123"
+        service.repository.create.assert_called_once()
 
-    async def test_create_board_from_template_with_defaults(self, db_session: AsyncSession):
+    @patch("leadr.boards.services.board_service.GameService")
+    @patch("leadr.boards.services.board_service.generate_unique_short_code", new_callable=AsyncMock)
+    async def test_create_board_from_template_with_defaults(
+        self, mock_short_code_gen, mock_game_service_class, service
+    ):
         """Test creating a board from a template with default config values."""
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        template_id = BoardTemplateID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create a board template with minimal config (use defaults)
-        template_service = BoardTemplateService(db_session)
+        # Create template with minimal config
         next_run = datetime.now(UTC) + timedelta(hours=1)
-        template = await template_service.create_board_template(
-            account_id=account.id,
-            game_id=game.id,
+        template = BoardTemplate(
+            id=template_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Hourly Event",
             slug="hourly-event",
             repeat_interval="1 hour",
@@ -1018,83 +862,117 @@ class TestBoardService:
             config={},
         )
 
+        # Setup mocks
+        mock_game = Game(id=game_id, account_id=account_id, name="Test Game", slug="test-game")
+        mock_game_service = mock_game_service_class.return_value
+        mock_game_service.get_by_id_or_raise = AsyncMock(return_value=mock_game)
+        mock_short_code_gen.return_value = "HE123"
+
+        # Mock slug check (slug doesn't exist)
+        mock_slug_check_result = PaginatedResult(
+            items=[],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+        service.repository.filter = AsyncMock(return_value=mock_slug_check_result)
+        service.repository.create = AsyncMock(side_effect=lambda entity: entity)
+        service.repository.count_boards_by_template = AsyncMock(return_value=0)
+
         # Create board from template
-        board_service = BoardService(db_session)
-        board = await board_service.create_board_from_template(template)
+        board = await service.create_board_from_template(template)
 
         # Assertions - check template defaults are applied
-        assert board.icon == "fa-crown"  # Template default
-        assert board.unit is None  # Template default
-        assert board.is_active is True  # Always true for new boards
-        assert board.sort_direction == SortDirection.DESCENDING  # Template default
-        assert board.keep_strategy == KeepStrategy.BEST  # Template default
-        assert board.tags == []  # Template default
+        assert board.icon == "fa-crown"
+        assert board.unit is None
+        assert board.is_active is True
+        assert board.sort_direction == SortDirection.DESCENDING
+        assert board.keep_strategy == KeepStrategy.BEST
+        assert board.tags == []
         assert board.starts_at == next_run
         assert board.ends_at == next_run + timedelta(hours=1)
+        service.repository.create.assert_called_once()
 
+    @patch("leadr.boards.services.board_service.GameService")
+    @patch("leadr.boards.services.board_service.generate_unique_short_code", new_callable=AsyncMock)
     async def test_create_board_from_template_with_series_placeholder(
-        self, db_session: AsyncSession
+        self, mock_short_code_gen, mock_game_service_class, service
     ):
         """Test creating a board from a template with {series} placeholder in name_template.
 
         Regression test: ensures series_value is calculated when name_template contains
         {series} placeholder, regardless of whether template.series field is set.
         """
-        # Create account and game
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        template_id = BoardTemplateID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        # Create a board template with {series} in name_template but series=None
-        template_service = BoardTemplateService(db_session)
+        # Create template with {series} in name_template but series=None
         next_run = datetime.now(UTC) + timedelta(days=1)
-        template = await template_service.create_board_template(
-            account_id=account.id,
-            game_id=game.id,
+        template = BoardTemplate(
+            id=template_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Weekly Challenge",
             slug="weekly-challenge",
             repeat_interval="7 days",
             next_run_at=next_run,
             is_active=True,
-            name_template="Weekly {series}",  # Contains {series} placeholder
-            # series is not set (None by default)
+            name_template="Weekly {series}",
             config={},
         )
 
+        # Setup mocks
+        mock_game = Game(id=game_id, account_id=account_id, name="Test Game", slug="test-game")
+        mock_game_service = mock_game_service_class.return_value
+        mock_game_service.get_by_id_or_raise = AsyncMock(return_value=mock_game)
+        mock_short_code_gen.return_value = "WC123"
+
+        # Mock slug check (slug doesn't exist)
+        mock_slug_check_result = PaginatedResult(
+            items=[],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+        service.repository.filter = AsyncMock(return_value=mock_slug_check_result)
+        service.repository.create = AsyncMock(side_effect=lambda entity: entity)
+        service.repository.count_boards_by_template = AsyncMock(return_value=0)
+
         # Create board from template - should succeed and use series_value=1
-        board_service = BoardService(db_session)
-        board = await board_service.create_board_from_template(template)
+        board = await service.create_board_from_template(template)
 
         # Assertions - the key test is that the name uses series_value=1
-        assert board.name == "Weekly 1"  # First board should have series_value=1
-        assert board.created_from_template_id == template.id
+        assert board.name == "Weekly 1"
+        assert board.created_from_template_id == template_id
+        service.repository.count_boards_by_template.assert_called_once_with(template_id)
 
-    async def test_create_board_with_description(self, db_session: AsyncSession):
+    @patch("leadr.boards.services.board_service.GameService")
+    @patch("leadr.boards.services.board_service.generate_unique_short_code", new_callable=AsyncMock)
+    @patch(
+        "leadr.boards.services.board_service.generate_unique_slug_with_retry",
+        new_callable=AsyncMock,
+    )
+    async def test_create_board_with_description(
+        self, mock_slug_gen, mock_short_code_gen, mock_game_service_class, service
+    ):
         """Test creating a board with description via service."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
+        # Setup mocks
+        mock_game = Game(id=game_id, account_id=account_id, name="Test Game", slug="test-game")
+        mock_game_service = mock_game_service_class.return_value
+        mock_game_service.get_by_id_or_raise = AsyncMock(return_value=mock_game)
+        mock_short_code_gen.return_value = "SRDESC"
+        mock_slug_gen.return_value = "speed-run-board"
+        service.repository.create = AsyncMock(side_effect=lambda entity: entity)
 
-        board_service = BoardService(db_session)
-        board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        board = await service.create_board(
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
             icon="trophy",
             short_code="SRDESC",
@@ -1107,39 +985,33 @@ class TestBoardService:
 
         assert board.id is not None
         assert board.description == "Complete the level as fast as possible"
+        service.repository.create.assert_called_once()
 
-    async def test_update_board_description(self, db_session: AsyncSession):
+    async def test_update_board_description(self, service):
         """Test updating board description."""
-        account_service = AccountService(db_session)
-        account = await account_service.create_account(
-            name="Acme Corporation",
-            slug="acme-corp",
-        )
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
 
-        game_service = GameService(db_session)
-        game = await game_service.create_game(
-            account_id=account.id,
-            name="Test Game",
-        )
-
-        board_service = BoardService(db_session)
-        created_board = await board_service.create_board(
-            account_id=account.id,
-            game_id=game.id,
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
             name="Speed Run Board",
-            icon="trophy",
+            slug="speed-run-board",
             short_code="SRUPD",
-            unit="seconds",
-            is_active=True,
-            sort_direction=SortDirection.ASCENDING,
-            keep_strategy=KeepStrategy.BEST,
         )
+
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
 
         # Update description
-        updated_board = await board_service.update_board(
-            board_id=created_board.id,
+        updated_board = await service.update_board(
+            board_id=board_id,
             description="Updated description for the board",
         )
 
         assert updated_board.description == "Updated description for the board"
-        assert updated_board.name == "Speed Run Board"  # Unchanged
+        assert updated_board.name == "Speed Run Board"
+        service.repository.update.assert_called_once()

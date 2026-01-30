@@ -5,6 +5,7 @@ import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -57,6 +58,12 @@ from leadr.scores.adapters.orm import ScoreFlagORM, ScoreSubmissionMetaORM  # no
 
 # Import all ORM fixtures from fixtures module
 from tests.fixtures import *  # noqa: F403, F401
+
+
+@pytest.fixture
+def mock_session() -> MagicMock:
+    """Create a mock database session for unit tests that don't need real DB."""
+    return MagicMock(spec=AsyncSession)
 
 
 @pytest.fixture(scope="session", autouse=True)

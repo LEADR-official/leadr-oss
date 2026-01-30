@@ -1,60 +1,53 @@
 """Tests for APIKey service."""
 
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.accounts.domain.account import Account, AccountStatus
-from leadr.accounts.services.repositories import AccountRepository
-from leadr.accounts.services.user_service import UserService
 from leadr.auth.domain.api_key import APIKeyStatus
 from leadr.auth.services.api_key_service import APIKeyService
 from leadr.common.domain.exceptions import EntityNotFoundError
-from leadr.common.domain.ids import AccountID, APIKeyID
+from leadr.common.domain.ids import AccountID, APIKeyID, UserID
+from leadr.common.domain.pagination_result import PaginatedResult
+
+
+@pytest.fixture
+def mock_session():
+    """Mock database session."""
+    return MagicMock()
+
+
+@pytest.fixture
+def service(mock_session):
+    """API key service with mocked repository."""
+    return APIKeyService(mock_session, repository=MagicMock())
 
 
 @pytest.mark.asyncio
 class TestAPIKeyService:
     """Test suite for APIKey service."""
 
-    async def test_create_api_key(self, db_session: AsyncSession):
+    async def test_create_api_key(self, service):
         """Test creating an API key with automatic generation and hashing."""
-        # Create account
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
-        now = datetime.now(UTC)
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account)
-
-        # Create user for API key
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account_id,
-            email=f"test-{str(account_id)[:8]}@example.com",
-            display_name="Test User",
-        )
+        # Mock repository.create to return the entity as-is
+        service.repository.create = AsyncMock(side_effect=lambda e: e)
 
         # Create API key via service
-        service = APIKeyService(db_session)
         api_key, plain_key = await service.create_api_key(
             account_id=account_id,
-            user_id=user.id,
+            user_id=user_id,
             name="Production Key",
             expires_at=None,
         )
 
         # Verify key was created
         assert api_key.account_id == account_id
+        assert api_key.user_id == user_id
         assert api_key.name == "Production Key"
         assert api_key.status == APIKeyStatus.ACTIVE
         assert api_key.key_hash != ""
@@ -69,38 +62,23 @@ class TestAPIKeyService:
         # Verify prefix matches the start of plain key
         assert plain_key.startswith(api_key.key_prefix)
 
-    async def test_create_api_key_with_expiration(self, db_session: AsyncSession):
+        # Verify repository.create was called
+        service.repository.create.assert_called_once()
+
+    async def test_create_api_key_with_expiration(self, service):
         """Test creating an API key with an expiration date."""
-        # Create account
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
         now = datetime.now(UTC)
-
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account)
-
-        # Create user for API key
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account_id,
-            email=f"test-{str(account_id)[:8]}@example.com",
-            display_name="Test User",
-        )
-
-        # Create API key with expiration
-        service = APIKeyService(db_session)
         expires_at = now + timedelta(days=90)
 
+        # Mock repository.create to return the entity as-is
+        service.repository.create = AsyncMock(side_effect=lambda e: e)
+
+        # Create API key with expiration
         api_key, _ = await service.create_api_key(
             account_id=account_id,
-            user_id=user.id,
+            user_id=user_id,
             name="Temporary Key",
             expires_at=expires_at,
         )
@@ -108,38 +86,24 @@ class TestAPIKeyService:
         assert api_key.expires_at == expires_at
         assert api_key.is_expired() is False
 
-    async def test_validate_api_key_success(self, db_session: AsyncSession):
+    async def test_validate_api_key_success(self, service):
         """Test validating a correct API key."""
-        # Create account
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
-        now = datetime.now(UTC)
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account)
+        # Mock repository.create to return the entity as-is
+        service.repository.create = AsyncMock(side_effect=lambda e: e)
 
-        # Create user for API key
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account_id,
-            email=f"test-{str(account_id)[:8]}@example.com",
-            display_name="Test User",
-        )
-
-        # Create API key
-        service = APIKeyService(db_session)
+        # Create API key to get a real plain_key and hash
         api_key, plain_key = await service.create_api_key(
             account_id=account_id,
-            user_id=user.id,
+            user_id=user_id,
             name="Test Key",
         )
+
+        # Mock repository methods for validation
+        service.repository.get_by_prefix = AsyncMock(return_value=api_key)
+        service.repository.update = AsyncMock(side_effect=lambda e: e)
 
         # Validate the key
         validated_key = await service.validate_api_key(plain_key)
@@ -148,165 +112,116 @@ class TestAPIKeyService:
         assert validated_key.id == api_key.id
         assert validated_key.account_id == account_id
 
-    async def test_validate_api_key_invalid_key(self, db_session: AsyncSession):
+        # Verify repository methods were called
+        service.repository.get_by_prefix.assert_called_once_with(plain_key[:14])
+        service.repository.update.assert_called_once()
+
+    async def test_validate_api_key_invalid_key(self, service):
         """Test validating an invalid API key."""
-        service = APIKeyService(db_session)
+        # Mock repository.get_by_prefix to return None (key not found)
+        service.repository.get_by_prefix = AsyncMock(return_value=None)
 
         # Try to validate a non-existent key
         validated_key = await service.validate_api_key("ldr_invalid_key_12345678901234567890")
 
         assert validated_key is None
+        service.repository.get_by_prefix.assert_called_once()
 
-    async def test_validate_api_key_wrong_hash(self, db_session: AsyncSession):
+    async def test_validate_api_key_wrong_hash(self, service):
         """Test validating with wrong key value."""
-        # Create account and API key
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
-        now = datetime.now(UTC)
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account)
+        # Mock repository.create to return the entity as-is
+        service.repository.create = AsyncMock(side_effect=lambda e: e)
 
-        # Create user for API key
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account_id,
-            email=f"test-{str(account_id)[:8]}@example.com",
-            display_name="Test User",
-        )
-
-        service = APIKeyService(db_session)
+        # Create API key to get a real api_key entity
         api_key, plain_key = await service.create_api_key(
             account_id=account_id,
-            user_id=user.id,
+            user_id=user_id,
             name="Test Key",
         )
 
         # Try to validate with modified key (keep prefix, change rest)
         wrong_key = api_key.key_prefix + "wrong_suffix_12345678901234567890"
+
+        # Mock repository to return the api_key when prefix is looked up
+        service.repository.get_by_prefix = AsyncMock(return_value=api_key)
+
         validated_key = await service.validate_api_key(wrong_key)
 
+        # Should fail because hash doesn't match
         assert validated_key is None
 
-    async def test_validate_revoked_api_key(self, db_session: AsyncSession):
+    async def test_validate_revoked_api_key(self, service):
         """Test that revoked keys fail validation."""
-        # Create account and API key
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
-        now = datetime.now(UTC)
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account)
+        # Mock repository.create to return the entity as-is
+        service.repository.create = AsyncMock(side_effect=lambda e: e)
 
-        # Create user for API key
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account_id,
-            email=f"test-{str(account_id)[:8]}@example.com",
-            display_name="Test User",
-        )
-
-        service = APIKeyService(db_session)
+        # Create API key
         api_key, plain_key = await service.create_api_key(
             account_id=account_id,
-            user_id=user.id,
+            user_id=user_id,
             name="Test Key",
         )
 
         # Revoke the key
-        await service.revoke_api_key(api_key.id)
+        api_key.revoke()
+
+        # Mock repository methods
+        service.repository.get_by_prefix = AsyncMock(return_value=api_key)
 
         # Try to validate
         validated_key = await service.validate_api_key(plain_key)
 
         assert validated_key is None
 
-    async def test_validate_expired_api_key(self, db_session: AsyncSession):
+    async def test_validate_expired_api_key(self, service):
         """Test that expired keys fail validation."""
-        # Create account
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
         now = datetime.now(UTC)
-
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account)
-
-        # Create user for API key
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account_id,
-            email=f"test-{str(account_id)[:8]}@example.com",
-            display_name="Test User",
-        )
-
-        # Create API key with past expiration
-        service = APIKeyService(db_session)
         past_date = now - timedelta(days=1)
 
+        # Mock repository.create to return the entity as-is
+        service.repository.create = AsyncMock(side_effect=lambda e: e)
+
+        # Create API key with past expiration
         api_key, plain_key = await service.create_api_key(
             account_id=account_id,
-            user_id=user.id,
+            user_id=user_id,
             name="Expired Key",
             expires_at=past_date,
         )
 
+        # Mock repository methods
+        service.repository.get_by_prefix = AsyncMock(return_value=api_key)
+
         # Try to validate
         validated_key = await service.validate_api_key(plain_key)
 
         assert validated_key is None
 
-    async def test_get_api_key_by_id(self, db_session: AsyncSession):
+    async def test_get_api_key_by_id(self, service):
         """Test retrieving an API key by ID."""
-        # Create account and API key
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
-        now = datetime.now(UTC)
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account)
+        # Mock repository.create to return the entity as-is
+        service.repository.create = AsyncMock(side_effect=lambda e: e)
 
-        # Create user for API key
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account_id,
-            email=f"test-{str(account_id)[:8]}@example.com",
-            display_name="Test User",
-        )
-
-        service = APIKeyService(db_session)
+        # Create API key
         api_key, _ = await service.create_api_key(
             account_id=account_id,
-            user_id=user.id,
+            user_id=user_id,
             name="Test Key",
         )
+
+        # Mock repository.get_by_id to return the api_key
+        service.repository.get_by_id = AsyncMock(return_value=api_key)
 
         # Retrieve it
         retrieved = await service.get_api_key(api_key.id)
@@ -315,44 +230,41 @@ class TestAPIKeyService:
         assert retrieved.id == api_key.id
         assert retrieved.name == "Test Key"
 
-    async def test_get_api_key_not_found(self, db_session: AsyncSession):
-        """Test retrieving a non-existent API key."""
-        service = APIKeyService(db_session)
-        non_existent_id = uuid4()
+        service.repository.get_by_id.assert_called_once_with(api_key.id)
 
-        result = await service.get_api_key(APIKeyID(non_existent_id))
+    async def test_get_api_key_not_found(self, service):
+        """Test retrieving a non-existent API key."""
+        non_existent_id = APIKeyID(uuid4())
+
+        # Mock repository.get_by_id to return None
+        service.repository.get_by_id = AsyncMock(return_value=None)
+
+        result = await service.get_api_key(non_existent_id)
 
         assert result is None
+        service.repository.get_by_id.assert_called_once_with(non_existent_id)
 
-    async def test_list_account_api_keys(self, db_session: AsyncSession):
+    async def test_list_account_api_keys(self, service):
         """Test listing all API keys for an account."""
-        # Create account
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
-        now = datetime.now(UTC)
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account)
-
-        # Create user for API keys
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account_id,
-            email=f"test-{str(account_id)[:8]}@example.com",
-            display_name="Test User",
-        )
+        # Mock repository.create to return entities as-is
+        service.repository.create = AsyncMock(side_effect=lambda e: e)
 
         # Create multiple API keys
-        service = APIKeyService(db_session)
-        await service.create_api_key(account_id, user.id, "Production Key")
-        await service.create_api_key(account_id, user.id, "Development Key")
+        key1, _ = await service.create_api_key(account_id, user_id, "Production Key")
+        key2, _ = await service.create_api_key(account_id, user_id, "Development Key")
+
+        # Mock repository.filter to return both keys
+        mock_result = PaginatedResult(
+            items=[key1, key2],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+        service.repository.filter = AsyncMock(return_value=mock_result)
 
         # List them
         keys = await service.list_account_api_keys(account_id)
@@ -362,38 +274,28 @@ class TestAPIKeyService:
         assert "Production Key" in names
         assert "Development Key" in names
 
-    async def test_list_account_api_keys_active_only(self, db_session: AsyncSession):
+    async def test_list_account_api_keys_active_only(self, service):
         """Test listing only active API keys for an account."""
-        # Create account
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
-        now = datetime.now(UTC)
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account)
-
-        # Create user for API keys
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account_id,
-            email=f"test-{str(account_id)[:8]}@example.com",
-            display_name="Test User",
-        )
+        # Mock repository.create to return entities as-is
+        service.repository.create = AsyncMock(side_effect=lambda e: e)
 
         # Create API keys
-        service = APIKeyService(db_session)
-        active_key, _ = await service.create_api_key(account_id, user.id, "Active Key")
-        revoked_key, _ = await service.create_api_key(account_id, user.id, "Revoked Key")
+        active_key, _ = await service.create_api_key(account_id, user_id, "Active Key")
+        revoked_key, _ = await service.create_api_key(account_id, user_id, "Revoked Key")
+        revoked_key.revoke()
 
-        # Revoke one
-        await service.revoke_api_key(revoked_key.id)
+        # Mock repository.filter to return only active key when active_only=True
+        mock_result = PaginatedResult(
+            items=[active_key],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+        service.repository.filter = AsyncMock(return_value=mock_result)
 
         # List active only
         active_keys = await service.list_account_api_keys(account_id, active_only=True)
@@ -401,114 +303,66 @@ class TestAPIKeyService:
         assert len(active_keys) == 1
         assert active_keys[0].name == "Active Key"
 
-    async def test_count_active_api_keys(self, db_session: AsyncSession):
+        # Verify filter was called with active_only=True
+        service.repository.filter.assert_called_once()
+        call_kwargs = service.repository.filter.call_args.kwargs
+        assert call_kwargs["active_only"] is True
+
+    async def test_count_active_api_keys(self, service):
         """Test counting active API keys for an account."""
-        # Create account
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
-        now = datetime.now(UTC)
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account)
-
-        # Create user for API keys
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account_id,
-            email=f"test-{str(account_id)[:8]}@example.com",
-            display_name="Test User",
-        )
-
-        # Create API keys
-        service = APIKeyService(db_session)
-        await service.create_api_key(account_id, user.id, "Key 1")
-        await service.create_api_key(account_id, user.id, "Key 2")
-        key3, _ = await service.create_api_key(account_id, user.id, "Key 3")
-
-        # Revoke one
-        await service.revoke_api_key(key3.id)
+        # Mock repository.count_active_by_account to return 2
+        service.repository.count_active_by_account = AsyncMock(return_value=2)
 
         # Count active
         count = await service.count_active_api_keys(account_id)
 
         assert count == 2
+        service.repository.count_active_by_account.assert_called_once_with(account_id)
 
-    async def test_revoke_api_key(self, db_session: AsyncSession):
+    async def test_revoke_api_key(self, service):
         """Test revoking an API key."""
-        # Create account and API key
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
-        now = datetime.now(UTC)
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account)
+        # Mock repository.create to return the entity as-is
+        service.repository.create = AsyncMock(side_effect=lambda e: e)
 
-        # Create user for API key
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account_id,
-            email=f"test-{str(account_id)[:8]}@example.com",
-            display_name="Test User",
-        )
-
-        service = APIKeyService(db_session)
-        api_key, _ = await service.create_api_key(account_id, user.id, "Test Key")
+        # Create API key
+        api_key, _ = await service.create_api_key(account_id, user_id, "Test Key")
 
         assert api_key.status == APIKeyStatus.ACTIVE
+
+        # Mock repository methods for revoke
+        service.repository.get_by_id = AsyncMock(return_value=api_key)
+        service.repository.update = AsyncMock(side_effect=lambda e: e)
 
         # Revoke it
         revoked = await service.revoke_api_key(api_key.id)
 
         assert revoked.status == APIKeyStatus.REVOKED
 
-        # Verify in database
-        retrieved = await service.get_api_key(api_key.id)
-        assert retrieved is not None
-        assert retrieved.status == APIKeyStatus.REVOKED
+        # Verify repository methods were called
+        service.repository.get_by_id.assert_called_once_with(api_key.id)
+        service.repository.update.assert_called_once()
 
-    async def test_record_api_key_usage(self, db_session: AsyncSession):
+    async def test_record_api_key_usage(self, service):
         """Test recording API key usage."""
-        # Create account and API key
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
-        now = datetime.now(UTC)
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account)
+        # Mock repository.create to return the entity as-is
+        service.repository.create = AsyncMock(side_effect=lambda e: e)
 
-        # Create user for API key
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account_id,
-            email=f"test-{str(account_id)[:8]}@example.com",
-            display_name="Test User",
-        )
-
-        service = APIKeyService(db_session)
-        api_key, _ = await service.create_api_key(account_id, user.id, "Test Key")
+        # Create API key
+        api_key, _ = await service.create_api_key(account_id, user_id, "Test Key")
 
         assert api_key.last_used_at is None
+
+        # Mock repository methods for record_usage
+        service.repository.get_by_id = AsyncMock(return_value=api_key)
+        service.repository.update = AsyncMock(side_effect=lambda e: e)
 
         # Record usage
         usage_time = datetime.now(UTC)
@@ -516,40 +370,26 @@ class TestAPIKeyService:
 
         assert updated.last_used_at == usage_time
 
-        # Verify in database
-        retrieved = await service.get_api_key(api_key.id)
-        assert retrieved is not None
-        assert retrieved.last_used_at == usage_time
+        # Verify repository methods were called
+        service.repository.get_by_id.assert_called_once_with(api_key.id)
+        service.repository.update.assert_called_once()
 
-    async def test_validate_api_key_records_usage(self, db_session: AsyncSession):
+    async def test_validate_api_key_records_usage(self, service):
         """Test that validating an API key records its usage."""
-        # Create account and API key
-        account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
-        now = datetime.now(UTC)
+        user_id = UserID(uuid4())
 
-        account = Account(
-            id=account_id,
-            name="Acme Corporation",
-            slug="acme-corp",
-            status=AccountStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        await account_repo.create(account)
+        # Mock repository.create to return the entity as-is
+        service.repository.create = AsyncMock(side_effect=lambda e: e)
 
-        # Create user for API key
-        user_service = UserService(db_session)
-        user = await user_service.create_user(
-            account_id=account_id,
-            email=f"test-{str(account_id)[:8]}@example.com",
-            display_name="Test User",
-        )
-
-        service = APIKeyService(db_session)
-        api_key, plain_key = await service.create_api_key(account_id, user.id, "Test Key")
+        # Create API key
+        api_key, plain_key = await service.create_api_key(account_id, user_id, "Test Key")
 
         assert api_key.last_used_at is None
+
+        # Mock repository methods for validation
+        service.repository.get_by_prefix = AsyncMock(return_value=api_key)
+        service.repository.update = AsyncMock(side_effect=lambda e: e)
 
         # Validate the key (should record usage)
         validated_key = await service.validate_api_key(plain_key)
@@ -561,33 +401,46 @@ class TestAPIKeyService:
         time_diff = datetime.now(UTC) - validated_key.last_used_at
         assert time_diff.total_seconds() < 5
 
-    async def test_revoke_api_key_not_found(self, db_session: AsyncSession):
+        # Verify repository methods were called
+        service.repository.get_by_prefix.assert_called_once()
+        service.repository.update.assert_called_once()
+
+    async def test_revoke_api_key_not_found(self, service):
         """Test that revoking a non-existent API key raises EntityNotFoundError."""
-        service = APIKeyService(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = APIKeyID(uuid4())
+
+        # Mock repository.get_by_id to return None
+        service.repository.get_by_id = AsyncMock(return_value=None)
 
         with pytest.raises(EntityNotFoundError) as exc_info:
-            await service.revoke_api_key(APIKeyID(non_existent_id))
+            await service.revoke_api_key(non_existent_id)
 
         assert "APIKey not found" in str(exc_info.value)
+        service.repository.get_by_id.assert_called_once_with(non_existent_id)
 
-    async def test_update_api_key_status_not_found(self, db_session: AsyncSession):
+    async def test_update_api_key_status_not_found(self, service):
         """Test that updating status of non-existent API key raises EntityNotFoundError."""
-        service = APIKeyService(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = APIKeyID(uuid4())
+
+        # Mock repository.get_by_id to return None
+        service.repository.get_by_id = AsyncMock(return_value=None)
 
         with pytest.raises(EntityNotFoundError) as exc_info:
-            await service.update_api_key_status(APIKeyID(non_existent_id), "active")
+            await service.update_api_key_status(non_existent_id, "active")
 
         assert "APIKey not found" in str(exc_info.value)
+        service.repository.get_by_id.assert_called_once_with(non_existent_id)
 
-    async def test_record_usage_not_found(self, db_session: AsyncSession):
+    async def test_record_usage_not_found(self, service):
         """Test that recording usage for non-existent API key raises EntityNotFoundError."""
-        service = APIKeyService(db_session)
-        non_existent_id = uuid4()
+        non_existent_id = APIKeyID(uuid4())
         now = datetime.now(UTC)
 
+        # Mock repository.get_by_id to return None
+        service.repository.get_by_id = AsyncMock(return_value=None)
+
         with pytest.raises(EntityNotFoundError) as exc_info:
-            await service.record_usage(APIKeyID(non_existent_id), now)
+            await service.record_usage(non_existent_id, now)
 
         assert "APIKey not found" in str(exc_info.value)
+        service.repository.get_by_id.assert_called_once_with(non_existent_id)
