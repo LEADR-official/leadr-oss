@@ -234,12 +234,15 @@ class GeoIPService:
         # Clean up tar.gz file
         tar_gz_path.unlink()
 
-        # Validate database integrity
+        # Validate database integrity with multiple IPs across different tree branches
         try:
             with maxminddb.open_database(str(target_path)) as reader:
-                reader.get("8.8.8.8")
+                for test_ip in ("8.8.8.8", "1.1.1.1", "10.0.1.2", "203.0.113.1", "198.51.100.1"):
+                    reader.get(test_ip)
         except Exception:
-            logger.error("Downloaded database %s is corrupted, removing", target_filename)
+            logger.error(
+                "GeoIP database validation failed for %s, removing downloaded file", target_filename
+            )
             target_path.unlink(missing_ok=True)
             return
 
@@ -264,10 +267,12 @@ class GeoIPService:
             return None
         except maxminddb.InvalidDatabaseError:
             logger.error(
-                "GeoIP city database is corrupted - disabling GeoIP lookups. "
-                "Restart the application to re-download the database."
+                "GeoIP city database is corrupted - disabling lookups and removing corrupt file. "
+                "Database will be re-downloaded on next restart."
             )
             self._city_reader = None
+            corrupt_path = self.database_path / "GeoLite2-City.mmdb"
+            corrupt_path.unlink(missing_ok=True)
             return None
 
         # IP not found in database

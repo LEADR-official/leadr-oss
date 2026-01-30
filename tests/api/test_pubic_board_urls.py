@@ -241,7 +241,7 @@ class TestBoardURLs:
         # Check for error message in either "detail" or "error" key
         error_msg = response_data.get("detail") or response_data.get("error", "")
         assert error_msg, f"No error message found in response: {response_data}"
-        assert "game_slug parameter is required" in str(error_msg).lower()
+        assert "game_id parameter is required" in str(error_msg).lower()
 
     async def test_nonexistent_game_slug_returns_404(
         self, client: AsyncClient, account_with_boards: tuple[str, Account, Game, list[Board]]

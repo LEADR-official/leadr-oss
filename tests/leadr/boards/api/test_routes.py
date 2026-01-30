@@ -1181,7 +1181,7 @@ class TestBoardRoutes:
         response = await mock_client_no_db.get(f"/boards?account_id={account_id}&slug=weekly")
 
         assert response.status_code == 400
-        assert "game_slug" in response.json()["error"].lower()
+        assert "game_id" in response.json()["error"].lower()
 
     async def test_list_boards_by_slug_returns_multiple_for_admin(
         self,

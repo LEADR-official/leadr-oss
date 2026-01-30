@@ -493,6 +493,30 @@ class TestGetGeoInfoInvalidDatabase:
 
         assert service._city_reader is None
 
+    def test_deletes_corrupt_db_file_on_invalid_database_error(self, tmp_path: Path) -> None:
+        config = {
+            "account_id": "test",
+            "license_key": "test",
+            "city_db_url": "http://example.com/city",
+            "country_db_url": "http://example.com/country",
+            "database_path": tmp_path,
+        }
+        service = GeoIPService(**config)
+        mock_reader = MagicMock()
+        mock_reader.get.side_effect = maxminddb.InvalidDatabaseError(
+            "Invalid data type arguments: 95"
+        )
+        service._city_reader = mock_reader
+
+        # Create a fake corrupt db file on disk
+        corrupt_file = tmp_path / "GeoLite2-City.mmdb"
+        corrupt_file.write_bytes(b"corrupt data")
+        assert corrupt_file.exists()
+
+        service.get_geo_info("8.8.8.8")
+
+        assert not corrupt_file.exists()
+
     def test_subsequent_calls_skip_lookup_after_corruption(self, geoip_config) -> None:
         service = GeoIPService(**geoip_config)
         mock_reader = MagicMock()
@@ -539,6 +563,57 @@ class TestDownloadAndExtractValidation:
         mock_client.get = AsyncMock(return_value=mock_response)
 
         await service._download_and_extract(mock_client, "http://example.com", "GeoLite2-City.mmdb")
+
+        target_path = tmp_path / "GeoLite2-City.mmdb"
+        assert not target_path.exists()
+
+    @pytest.mark.asyncio
+    async def test_validation_checks_multiple_ips(self, tmp_path: Path) -> None:
+        """Database that passes first IP but fails on subsequent IPs should be deleted."""
+        config = {
+            "account_id": "test",
+            "license_key": "test",
+            "city_db_url": "http://example.com/city",
+            "country_db_url": "http://example.com/country",
+            "database_path": tmp_path,
+        }
+        service = GeoIPService(**config)
+
+        # Create a tar.gz with a fake mmdb that we'll mock validation for
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+            data = b"fake mmdb content"
+            info = tarfile.TarInfo(name="GeoLite2-City/GeoLite2-City.mmdb")
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+        tar_bytes = buf.getvalue()
+
+        mock_response = MagicMock()
+        mock_response.content = tar_bytes
+        mock_response.raise_for_status = MagicMock()
+
+        mock_client = MagicMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        # Mock open_database to return a reader that fails on the second IP
+        call_count = 0
+
+        def side_effect(ip: str):
+            nonlocal call_count
+            call_count += 1
+            if call_count >= 2:
+                raise maxminddb.InvalidDatabaseError("Invalid data type arguments: 95")
+            return None
+
+        mock_reader = MagicMock()
+        mock_reader.get.side_effect = side_effect
+        mock_reader.__enter__ = MagicMock(return_value=mock_reader)
+        mock_reader.__exit__ = MagicMock(return_value=False)
+
+        with patch("leadr.common.geoip.maxminddb.open_database", return_value=mock_reader):
+            await service._download_and_extract(
+                mock_client, "http://example.com", "GeoLite2-City.mmdb"
+            )
 
         target_path = tmp_path / "GeoLite2-City.mmdb"
         assert not target_path.exists()

@@ -154,6 +154,10 @@ class GeoIPMiddleware(BaseHTTPMiddleware):
         request.state.geo_country = None
         request.state.geo_city = None
 
+        # Skip geo lookup for health endpoints
+        if request.url.path.startswith("/v1/health"):
+            return await call_next(request)
+
         try:
             # Get GeoIP service
             geoip_service = self._get_geoip_service(request)

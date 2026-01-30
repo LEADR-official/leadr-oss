@@ -204,6 +204,32 @@ class TestGeoIPMiddleware:
         mock_geoip_service.get_geo_info.assert_called_once_with("8.8.4.4")
 
     @pytest.mark.asyncio
+    async def test_skips_geo_lookup_for_health_endpoints(self):
+        """Test that middleware skips GeoIP lookup for health check endpoints."""
+        app = FastAPI()
+
+        mock_geoip_service = Mock()
+
+        app.add_middleware(GeoIPMiddleware, geoip_service=mock_geoip_service)
+
+        @app.get("/v1/health")
+        async def health_route(request: Request):
+            return JSONResponse({"status": "ok"})
+
+        @app.get("/v1/health/live")
+        async def health_live_route(request: Request):
+            return JSONResponse({"status": "ok"})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            await client.get("/v1/health", headers={"X-Real-IP": "8.8.8.8"})
+            await client.get("/v1/health/live", headers={"X-Real-IP": "8.8.8.8"})
+
+        mock_geoip_service.get_geo_info.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_handles_geo_lookup_failure_gracefully(self):
         """Test that middleware handles geo lookup failures without crashing."""
         app = FastAPI()
