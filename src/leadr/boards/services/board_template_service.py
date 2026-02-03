@@ -15,6 +15,9 @@ from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.games.services.game_service import GameService
+from leadr.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
@@ -157,7 +160,11 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             is_published=is_published,
         )
 
-        return await self.repository.create(template)
+        created_template = await self.repository.create(template)
+        logger.info(
+            "Board template created", template_id=str(created_template.id), game_id=str(game_id)
+        )
+        return created_template
 
     async def get_board_template(self, template_id: BoardTemplateID) -> BoardTemplate | None:
         """Get a board template by its ID.

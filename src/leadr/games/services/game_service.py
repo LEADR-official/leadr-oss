@@ -11,6 +11,9 @@ from leadr.common.services import BaseService
 from leadr.common.utils.slug import generate_unique_slug_with_retry
 from leadr.games.domain.game import Game
 from leadr.games.services.repositories import GameRepository
+from leadr.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class GameService(BaseService[Game, GameRepository]):
@@ -98,7 +101,11 @@ class GameService(BaseService[Game, GameRepository]):
             page_url=page_url,
         )
 
-        return await self.repository.create(game)
+        created_game = await self.repository.create(game)
+        logger.info(
+            "Game created", game_id=str(created_game.id), account_id=str(account_id), slug=slug
+        )
+        return created_game
 
     async def get_game(self, game_id: GameID) -> Game | None:
         """Get a game by its ID.

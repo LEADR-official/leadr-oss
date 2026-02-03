@@ -8,9 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID
 from leadr.common.domain.pagination_result import PaginatedResult
+from leadr.logging import get_logger
 from leadr.registration.domain.jam_code import JamCode
 from leadr.registration.domain.jam_code_redemption import JamCodeRedemption
 from leadr.registration.services.repositories import JamCodeRedemptionRepository, JamCodeRepository
+
+logger = get_logger(__name__)
 
 
 class JamCodeService:
@@ -82,6 +85,7 @@ class JamCodeService:
         await self.redemption_repository.create(redemption)
         await self.db.commit()
 
+        logger.info("Jam code redeemed", code=jam_code.code, account_id=str(account_id))
         return redemption
 
     async def create_jam_code(
@@ -123,6 +127,7 @@ class JamCodeService:
         await self.jam_code_repository.create(jam_code)
         await self.db.commit()
 
+        logger.info("Jam code created", code=code)
         return jam_code
 
     async def get_jam_code_by_id(self, jam_code_id: UUID) -> JamCode | None:

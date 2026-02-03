@@ -10,8 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.common.domain.ids import UserID
 from leadr.config import settings
 from leadr.infra.email import EmailService
+from leadr.logging import get_logger
 from leadr.registration.domain.verification_code import VerificationCode, VerificationCodeType
 from leadr.registration.services.repositories import VerificationCodeRepository
+
+logger = get_logger(__name__)
 
 
 class VerificationService:
@@ -58,6 +61,7 @@ class VerificationService:
 
         # Send verification email
         await self.email_service.send_verification_code(email, code)
+        logger.info("Verification code sent", email=email)
 
     async def create_invite_code(self, email: str, user_id: UserID) -> VerificationCode:
         """Create an invite verification code for an existing user.
@@ -133,9 +137,11 @@ class VerificationService:
                 verification_type="invite",
                 user_id=verification_code.user_id,
             )
+            logger.info("Email verified", email=email, code_type="invite")
             return token, VerificationCodeType.INVITE
         else:
             token = self._generate_verification_token(email, verification_type="registration")
+            logger.info("Email verified", email=email, code_type="registration")
             return token, VerificationCodeType.REGISTRATION
 
     def validate_verification_token(self, token: str) -> str:

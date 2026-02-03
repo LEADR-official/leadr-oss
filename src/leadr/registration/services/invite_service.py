@@ -1,7 +1,5 @@
 """Invite service for managing user invitations to accounts."""
 
-import logging
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.user import User, UserStatus
@@ -9,9 +7,10 @@ from leadr.accounts.services.account_service import AccountService
 from leadr.accounts.services.user_service import UserService
 from leadr.common.domain.ids import AccountID
 from leadr.infra.email import EmailService
+from leadr.logging import get_logger
 from leadr.registration.services.verification_service import VerificationService
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class InviteService:
@@ -82,7 +81,7 @@ class InviteService:
 
             # Resend invite for existing invited user
             user = existing_user
-            logger.info("Resending invite to existing invited user: %s", email)
+            logger.info("Resending invite to existing invited user", email=email)
         else:
             # Create new user with INVITED status
             if display_name is None or not display_name.strip():
@@ -96,7 +95,7 @@ class InviteService:
             )
             user = await self.user_service.repository.create(user)
             await self.db.commit()
-            logger.info("Created invited user: %s", email)
+            logger.info("Invited user created", email=email, user_id=str(user.id))
 
         # Create invite verification code (invalidates old codes)
         verification_code = await self.verification_service.create_invite_code(
@@ -111,9 +110,9 @@ class InviteService:
                 account_name=account.name,
                 code=verification_code.code,
             )
-            logger.info("Sent invite email to: %s", email)
+            logger.info("Invite email sent", email=email)
         except Exception as e:
-            logger.warning("Failed to send invite email to %s: %s", email, e)
+            logger.warning("Failed to send invite email", email=email, error=str(e))
             # Don't fail the invite if email sending fails
             # The user can request a resend
 

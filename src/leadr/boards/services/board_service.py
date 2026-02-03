@@ -15,9 +15,12 @@ from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.common.utils.slug import generate_unique_slug_with_retry
 from leadr.games.services.game_service import GameService
+from leadr.logging import get_logger
 
 if TYPE_CHECKING:
     from leadr.boards.domain.board_template import BoardTemplate
+
+logger = get_logger(__name__)
 
 
 class BoardService(BaseService[Board, BoardRepository]):
@@ -164,7 +167,9 @@ class BoardService(BaseService[Board, BoardRepository]):
             description=description,
         )
 
-        return await self.repository.create(board)
+        created_board = await self.repository.create(board)
+        logger.info("Board created", board_id=str(created_board.id), game_id=str(game_id))
+        return created_board
 
     async def create_board_from_template(self, template: "BoardTemplate") -> Board:
         """Create a new board from a board template.

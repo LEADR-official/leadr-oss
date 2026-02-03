@@ -13,8 +13,11 @@ from leadr.auth.services.api_key_service import APIKeyService
 from leadr.common.domain.ids import AccountID, UserID
 from leadr.common.utils.slug import generate_slug
 from leadr.infra.email import EmailService
+from leadr.logging import get_logger
 from leadr.registration.services.jam_code_service import JamCodeService
 from leadr.registration.services.verification_service import VerificationService
+
+logger = get_logger(__name__)
 
 
 class RegistrationService:
@@ -139,6 +142,7 @@ class RegistrationService:
         # Activate the user
         user.activate()
         user = await self.user_service.repository.update(user)
+        logger.info("Invited user activated", user_id=str(user.id), email=user.email)
 
         # Get the account
         account = await self.account_service.get_by_id_or_raise(AccountID(user.account_id.uuid))
@@ -149,6 +153,7 @@ class RegistrationService:
             user_id=user.id,
             name=f"{user.display_name}'s Key",
         )
+        logger.info("API key created for invited user", user_id=str(user.id))
 
         await self.db.commit()
 
@@ -160,8 +165,9 @@ class RegistrationService:
                 account_name=account.name,
                 account_slug=account.slug,
             )
-        except Exception:  # noqa: S110
-            pass
+            logger.info("Welcome email sent", email=user.email)
+        except Exception as e:
+            logger.warning("Failed to send welcome email", email=user.email, error=str(e))
 
         return account, user, plain_api_key
 
@@ -206,6 +212,7 @@ class RegistrationService:
             name=account_name,
             slug=account_slug,
         )
+        logger.info("Account created", account_id=str(account.id), slug=account_slug)
 
         # Determine display name: use provided or fall back to email prefix
         # Treat None, empty string, or whitespace-only as "not provided"
@@ -220,6 +227,7 @@ class RegistrationService:
             display_name=user_display_name,
             is_owner=True,
         )
+        logger.info("User created as account owner", user_id=str(user.id), email=email)
 
         # Create API key
         api_key, plain_api_key = await self.api_key_service.create_api_key(
@@ -227,6 +235,7 @@ class RegistrationService:
             user_id=user.id,
             name="CLI API Key",
         )
+        logger.info("API key created", user_id=str(user.id))
 
         # Redeem jam code if provided
         if jam_code_entity:
@@ -234,6 +243,11 @@ class RegistrationService:
                 jam_code=jam_code_entity,
                 account_id=account.id,
                 meta=jam_code_meta,
+            )
+            logger.info(
+                "Jam code redeemed during registration",
+                code=jam_code_entity.code,
+                account_id=str(account.id),
             )
 
         # Send welcome email (don't block on this)
@@ -244,9 +258,9 @@ class RegistrationService:
                 account_name=account_name,
                 account_slug=account_slug,
             )
-        except Exception:  # noqa: S110
-            # Log error but don't fail registration if email fails
-            pass
+            logger.info("Welcome email sent", email=email)
+        except Exception as e:
+            logger.warning("Failed to send welcome email", email=email, error=str(e))
 
         return account, user, plain_api_key
 
