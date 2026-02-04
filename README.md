@@ -40,19 +40,23 @@ Whether you're building a retro arcade game, puzzle platformer, or competitive m
 
 **Our fully managed and scalable hosted version of LEADR - just integrate LEADR via one of our SDKs.**
 
-Download the CLI and run `leadr register` to get started:
+Download the LEADR app and run `leadr register` to get started:
+
+#### Windows
+
+Download the latest LEADR App version here: https://leadr.gg/download/windows
+
+Double click the .exe and follow the instructions.
 
 #### MacOS / Linux
 
 ```bash
-curl -sSL https://leadr.gg/cli/install.sh | bash
+curl -sSL https://leadr.gg/download/install.sh | bash
 ```
 
-#### Windows / Manual isntall
+#### Manual install
 
-Download binaries from the [Releases page](https://github.com/LEADR-official/leadr-cli-releases/releases).
-
-Double click the .exe and follow the instructions.
+Download binaries from the [Releases page](https://github.com/LEADR-official/leadr-releases/releases).
 
 See the [LEADR docs](https://docs.leadr.gg/latest/) for more information and [quick start](https://docs.leadr.gg/latest/quick-start/) guides.
 
