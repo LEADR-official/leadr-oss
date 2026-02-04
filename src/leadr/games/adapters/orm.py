@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import ARRAY, ForeignKey, String, UniqueConstraint
+from sqlalchemy import ARRAY, ForeignKey, Index, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from leadr.common.orm import Base
@@ -23,7 +23,13 @@ class GameORM(Base):
 
     __tablename__ = "games"
     __table_args__ = (
-        UniqueConstraint("account_id", "name", name="uq_account_game_name"),
+        Index(
+            "ix_game_account_name_active",
+            "account_id",
+            "name",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
         UniqueConstraint("slug", name="uq_game_slug"),
     )
 

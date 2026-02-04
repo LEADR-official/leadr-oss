@@ -16,6 +16,9 @@ from leadr.games.api.game_schemas import (
     GameUpdateRequest,
 )
 from leadr.games.services.dependencies import GameServiceDep
+from leadr.logging import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -65,7 +68,18 @@ async def create_game(
             tags=request.tags,
             page_url=request.page_url,
         )
-    except IntegrityError:
+    except IntegrityError as e:
+        logger.warning("IntegrityError creating game", exc_info=e)
+        constraint = getattr(e.orig, "constraint_name", None) if e.orig else None
+        if constraint == "ix_game_account_name_active":
+            raise HTTPException(
+                status_code=409,
+                detail="A game with this name already exists in this account",
+            ) from None
+        elif constraint == "uq_game_slug":
+            raise HTTPException(
+                status_code=409, detail="A game with this slug already exists"
+            ) from None
         raise HTTPException(status_code=404, detail="Account not found") from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None

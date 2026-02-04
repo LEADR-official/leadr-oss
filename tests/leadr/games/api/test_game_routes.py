@@ -1,10 +1,78 @@
-"""Tests for Game API routes - PATCH partial update behavior."""
+"""Tests for Game API routes."""
+
+from unittest.mock import MagicMock
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.exc import IntegrityError
 
-from leadr.common.domain.ids import GameID
+from leadr.common.domain.ids import AccountID, GameID
 from leadr.games.domain.game import Game
+
+
+def _make_integrity_error(constraint_name: str) -> IntegrityError:
+    """Create an IntegrityError with a specific constraint name, mimicking asyncpg."""
+    orig = MagicMock()
+    orig.constraint_name = constraint_name
+    return IntegrityError("INSERT INTO games ...", {}, orig)
+
+
+@pytest.mark.asyncio
+class TestCreateGameIntegrityErrors:
+    """Test that create_game differentiates IntegrityError constraint types."""
+
+    async def test_create_game_duplicate_name_returns_409(
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service, mock_hooks
+    ):
+        """Duplicate (account_id, name) on active games should return 409, not 404."""
+        mock_game_service.create_game.side_effect = _make_integrity_error(
+            "ix_game_account_name_active"
+        )
+
+        response = await mock_client_no_db.post(
+            "/games",
+            json={
+                "account_id": str(admin_auth.account_id),
+                "name": "Pong",
+            },
+        )
+
+        assert response.status_code == 409
+        assert "name already exists" in response.json()["error"].lower()
+
+    async def test_create_game_duplicate_slug_returns_409(
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service, mock_hooks
+    ):
+        """Duplicate slug should return 409, not 404."""
+        mock_game_service.create_game.side_effect = _make_integrity_error("uq_game_slug")
+
+        response = await mock_client_no_db.post(
+            "/games",
+            json={
+                "account_id": str(admin_auth.account_id),
+                "name": "Pong",
+            },
+        )
+
+        assert response.status_code == 409
+        assert "slug already exists" in response.json()["error"].lower()
+
+    async def test_create_game_invalid_account_returns_404(
+        self, mock_client_no_db: AsyncClient, admin_auth, mock_game_service, mock_hooks
+    ):
+        """FK violation (account doesn't exist) should return 404."""
+        mock_game_service.create_game.side_effect = _make_integrity_error("games_account_id_fkey")
+
+        response = await mock_client_no_db.post(
+            "/games",
+            json={
+                "account_id": str(AccountID()),
+                "name": "Pong",
+            },
+        )
+
+        assert response.status_code == 404
+        assert "account not found" in response.json()["error"].lower()
 
 
 @pytest.mark.asyncio

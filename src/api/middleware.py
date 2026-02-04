@@ -73,16 +73,21 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
 
         duration_ms = (time.perf_counter() - start_time) * 1000
 
-        self._logger.info(
-            "%s %s",
-            request.method,
-            request.url.path,
-            status_code=response.status_code,
-            duration_ms=round(duration_ms, 2),
-            client_ip=extract_client_ip(request),
-            leadr_client=_sanitise_header(request.headers.get("leadr-client")),
-            user_agent=_sanitise_header(request.headers.get("user-agent")),
+        log_kwargs = {
+            "status_code": response.status_code,
+            "duration_ms": round(duration_ms, 2),
+            "client_ip": extract_client_ip(request),
+            "leadr_client": _sanitise_header(request.headers.get("leadr-client")),
+            "user_agent": _sanitise_header(request.headers.get("user-agent")),
+        }
+        log_method = (
+            self._logger.error
+            if response.status_code >= 500
+            else self._logger.warning
+            if response.status_code >= 400
+            else self._logger.info
         )
+        log_method("%s %s", request.method, request.url.path, **log_kwargs)
 
         return response
 
