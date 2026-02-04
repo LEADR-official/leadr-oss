@@ -73,8 +73,8 @@ class GameService(BaseService[Game, GameRepository]):
         if slug is None:
             # Auto-generate unique slug from name with collision handling
             async def check_slug_exists(slug_to_check: str) -> bool:
-                """Check if slug exists globally."""
-                existing = await self.repository.get_by_slug(slug_to_check)
+                """Check if slug exists globally (including soft-deleted games)."""
+                existing = await self.repository.get_by_slug(slug_to_check, include_deleted=True)
                 return existing is not None
 
             slug = await generate_unique_slug_with_retry(
@@ -85,7 +85,7 @@ class GameService(BaseService[Game, GameRepository]):
         else:
             # Use provided slug - validation will happen in Game domain model
             # Check for global uniqueness constraint violation
-            existing = await self.repository.get_by_slug(slug)
+            existing = await self.repository.get_by_slug(slug, include_deleted=True)
             if existing is not None:
                 raise ValueError(f"A game with slug '{slug}' already exists")
 

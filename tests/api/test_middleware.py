@@ -392,9 +392,9 @@ class TestAccessLogMiddleware:
 
         assert response.status_code == 500
 
-        # Verify logger was called with 500 status
-        mock_logger.info.assert_called_once()
-        kwargs = mock_logger.info.call_args[1]
+        # Verify logger.error was called for 500 status
+        mock_logger.error.assert_called_once()
+        kwargs = mock_logger.error.call_args[1]
         assert kwargs["status_code"] == 500
         assert "duration_ms" in kwargs
 

@@ -410,6 +410,28 @@ class TestGameService:
         assert retrieved_game.tags == ["tag1", "tag2", "tag3"]
         service.repository.get_by_id.assert_called_once()
 
+    async def test_create_game_slug_skips_soft_deleted_slugs(self, service):
+        """Slug generation must detect soft-deleted slugs to avoid uq_game_slug violation."""
+        account_id = AccountID(uuid4())
+
+        # "pong" exists (active), "pong-2" exists (soft-deleted but still holds the slug)
+        async def mock_get_by_slug(slug: str, include_deleted: bool = False) -> Game | None:
+            active_slugs = {"pong"}
+            deleted_slugs = {"pong-2"}
+            if slug in active_slugs:
+                return Game(id=GameID(uuid4()), account_id=account_id, name="Pong", slug=slug)
+            if include_deleted and slug in deleted_slugs:
+                return Game(id=GameID(uuid4()), account_id=account_id, name="Pong", slug=slug)
+            return None
+
+        service.repository.get_by_slug = mock_get_by_slug
+        service.repository.create = AsyncMock(side_effect=lambda entity: entity)
+
+        game = await service.create_game(account_id=account_id, name="Pong")
+
+        # Should skip "pong" (active) and "pong-2" (deleted) and land on "pong-3"
+        assert game.slug == "pong-3"
+
     async def test_create_game_with_page_url(self, service):
         """Test creating a game with page_url via service."""
         account_id = AccountID(uuid4())

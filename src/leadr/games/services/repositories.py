@@ -64,19 +64,21 @@ class GameRepository(BaseRepository[Game, GameORM]):
         """Get the ORM model class."""
         return GameORM
 
-    async def get_by_slug(self, slug: str) -> Game | None:
+    async def get_by_slug(self, slug: str, include_deleted: bool = False) -> Game | None:
         """Get game by slug (globally unique lookup).
 
         Args:
             slug: The game slug to search for.
+            include_deleted: If True, include soft-deleted games. Use this for
+                uniqueness checks since the slug constraint is global.
 
         Returns:
             Game domain entity if found, None otherwise.
         """
-        query = select(GameORM).where(
-            GameORM.slug == slug,
-            GameORM.deleted_at.is_(None),
-        )
+        query = select(GameORM).where(GameORM.slug == slug)
+
+        if not include_deleted:
+            query = query.where(GameORM.deleted_at.is_(None))
 
         result = await self.session.execute(query)
         orm = result.scalar_one_or_none()
