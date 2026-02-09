@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
-from leadr.boards.domain.interval_parser import parse_interval_to_timedelta
+from leadr.boards.domain.interval_parser import parse_interval
 from leadr.boards.services.repositories import BoardRepository
 from leadr.boards.services.short_code_generator import generate_unique_short_code
 from leadr.common.api.pagination import PaginationParams
@@ -207,7 +207,7 @@ class BoardService(BaseService[Board, BoardRepository]):
 
         # Parse interval to calculate time boundaries
         # Use template boundaries if set, otherwise derive from interval
-        duration = parse_interval_to_timedelta(template.repeat_interval)
+        duration = parse_interval(template.repeat_interval)
         starts_at = template.starts_at if template.starts_at else template.next_run_at
         ends_at = template.ends_at if template.ends_at else (starts_at + duration)
 

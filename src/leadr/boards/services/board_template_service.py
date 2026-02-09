@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.boards.domain.board import KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
-from leadr.boards.domain.interval_parser import parse_interval_to_timedelta
+from leadr.boards.domain.interval_parser import parse_interval
 from leadr.boards.services.repositories import BoardTemplateRepository
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
@@ -268,7 +268,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         template = await self.get_by_id_or_raise(template_id)
 
         # Parse interval and add to current next_run_at
-        duration = parse_interval_to_timedelta(template.repeat_interval)
+        duration = parse_interval(template.repeat_interval)
         template.next_run_at = template.next_run_at + duration
 
         return await self.repository.update(template)

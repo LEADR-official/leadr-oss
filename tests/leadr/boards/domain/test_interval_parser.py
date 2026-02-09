@@ -1,96 +1,95 @@
 """Tests for PostgreSQL interval parsing."""
 
-from datetime import timedelta
-
 import pytest
+from dateutil.relativedelta import relativedelta
 
-from leadr.boards.domain.interval_parser import parse_interval_to_timedelta
+from leadr.boards.domain.interval_parser import parse_interval
 
 
-class TestParseIntervalToTimedelta:
-    """Tests for parse_interval_to_timedelta function."""
+class TestParseInterval:
+    """Tests for parse_interval function."""
 
     def test_parse_days(self):
         """Test parsing days interval."""
-        result = parse_interval_to_timedelta("7 days")
-        assert result == timedelta(days=7)
+        result = parse_interval("7 days")
+        assert result == relativedelta(days=7)
 
     def test_parse_single_day(self):
         """Test parsing single day interval."""
-        result = parse_interval_to_timedelta("1 day")
-        assert result == timedelta(days=1)
+        result = parse_interval("1 day")
+        assert result == relativedelta(days=1)
 
     def test_parse_weeks(self):
         """Test parsing weeks interval."""
-        result = parse_interval_to_timedelta("2 weeks")
-        assert result == timedelta(weeks=2)
+        result = parse_interval("2 weeks")
+        assert result == relativedelta(weeks=2)
 
     def test_parse_single_week(self):
         """Test parsing single week interval."""
-        result = parse_interval_to_timedelta("1 week")
-        assert result == timedelta(weeks=1)
+        result = parse_interval("1 week")
+        assert result == relativedelta(weeks=1)
+
+    def test_parse_months(self):
+        """Test parsing months interval."""
+        result = parse_interval("3 months")
+        assert result == relativedelta(months=3)
+
+    def test_parse_single_month(self):
+        """Test parsing single month interval."""
+        result = parse_interval("1 month")
+        assert result == relativedelta(months=1)
+
+    def test_parse_years(self):
+        """Test parsing years interval."""
+        result = parse_interval("2 years")
+        assert result == relativedelta(years=2)
+
+    def test_parse_single_year(self):
+        """Test parsing single year interval."""
+        result = parse_interval("1 year")
+        assert result == relativedelta(years=1)
 
     def test_parse_hours(self):
         """Test parsing hours interval."""
-        result = parse_interval_to_timedelta("24 hours")
-        assert result == timedelta(hours=24)
+        result = parse_interval("24 hours")
+        assert result == relativedelta(hours=24)
 
     def test_parse_single_hour(self):
         """Test parsing single hour interval."""
-        result = parse_interval_to_timedelta("1 hour")
-        assert result == timedelta(hours=1)
-
-    def test_parse_minutes(self):
-        """Test parsing minutes interval."""
-        result = parse_interval_to_timedelta("30 minutes")
-        assert result == timedelta(minutes=30)
-
-    def test_parse_single_minute(self):
-        """Test parsing single minute interval."""
-        result = parse_interval_to_timedelta("1 minute")
-        assert result == timedelta(minutes=1)
-
-    def test_parse_seconds(self):
-        """Test parsing seconds interval."""
-        result = parse_interval_to_timedelta("60 seconds")
-        assert result == timedelta(seconds=60)
-
-    def test_parse_single_second(self):
-        """Test parsing single second interval."""
-        result = parse_interval_to_timedelta("1 second")
-        assert result == timedelta(seconds=1)
+        result = parse_interval("1 hour")
+        assert result == relativedelta(hours=1)
 
     def test_parse_with_extra_whitespace(self):
         """Test parsing with extra whitespace."""
-        result = parse_interval_to_timedelta("  7   days  ")
-        assert result == timedelta(days=7)
+        result = parse_interval("  7   days  ")
+        assert result == relativedelta(days=7)
 
     def test_parse_invalid_format_missing_unit(self):
         """Test error on invalid format with missing unit."""
         with pytest.raises(ValueError, match="Invalid interval format"):
-            parse_interval_to_timedelta("7")
+            parse_interval("7")
 
     def test_parse_invalid_format_no_parts(self):
         """Test error on empty interval."""
         with pytest.raises(ValueError, match="Invalid interval format"):
-            parse_interval_to_timedelta("")
+            parse_interval("")
 
     def test_parse_invalid_amount(self):
         """Test error on non-numeric amount."""
         with pytest.raises(ValueError, match="Invalid amount"):
-            parse_interval_to_timedelta("abc days")
+            parse_interval("abc days")
 
     def test_parse_unsupported_unit(self):
         """Test error on unsupported time unit."""
         with pytest.raises(ValueError, match="Unsupported time unit"):
-            parse_interval_to_timedelta("1 month")
+            parse_interval("1 fortnight")
 
     def test_parse_large_amount(self):
         """Test parsing large amounts."""
-        result = parse_interval_to_timedelta("365 days")
-        assert result == timedelta(days=365)
+        result = parse_interval("365 days")
+        assert result == relativedelta(days=365)
 
     def test_parse_negative_amount(self):
         """Test parsing negative amounts (allowed by parser)."""
-        result = parse_interval_to_timedelta("-7 days")
-        assert result == timedelta(days=-7)
+        result = parse_interval("-7 days")
+        assert result == relativedelta(days=-7)
