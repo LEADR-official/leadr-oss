@@ -12,12 +12,12 @@
 
 ## Game Features
 
-- **Completely Cross Platform** - No need to individually integrate Steam Workshop, Unity Cloud, Google Play Services...
+- **Cross Platform** - No need to individually integrate Steam Workshop, Unity Cloud, Google Play Services...
 - **Developer Friendly** - The best docs. The clearest SDKs. Actual interest in the community
 - **Anti-cheat by Default** - Secure and sophisticated server implementation to minimise and help triage abuse
 - **We Do Leaderboards** - Different modes, levels, difficulties, geographies, units, sorting and more
 - **Seasons & Temporary Boards** - Automated leaderboards that reset or disable based on date & time
-- **More Than Just Scores** - Store ghost replay data, share live-updating web pages, track player progress, and more
+- **More Than Just Scores** - Store replay data, share live-updating web pages, track player progress and more
 
 ## Software Features
 
@@ -32,8 +32,8 @@
 ## LEADR Cloud Features
 
 - **Free Tier Available** - Start in seconds at no cost, only pay when you need studio-grade features
-- **Sleep Easy** - LEADR's cloud infrastructure is ready for your game to go viral - that's one less thing for your to worry about
-- **Beautiful Web Views** - Make your leaderboards more useful, with automatically generated, shareable, modern pages
+- **Scales With Your Audience** - LEADR's infrastructure is ready for your game to go viral
+- **Beautiful Web Views** - Make your leaderboards visible, with auto-generated, shareable, modern pages
 - **More coming soon** - LEADR is under active development and [we've got lots planned](https://docs.leadr.gg/latest/roadmap/)...
 
 ## Quick Start
@@ -66,7 +66,8 @@ See the [self-hosting docs](https://docs.leadr.gg/latest/api/self_host/) for con
 
 - **[Quick Start](https://docs.leadr.gg/latest/quick-start/)** - Create your account and first leaderboard
 - **[SDKs](https://docs.leadr.gg/latest/sdks/)** - Integrate LEADR into your game (Godot, Unity, REST API)
-- **[Full Documentation](https://docs.leadr.gg/latest)** - Explore all features and configuration options
+- **[Join the Community!](https://discord.gg/RMUukcAxSZ){"target"="\_blank"}** - Get support and inspiration on the LEADR Discord
+- **[Full Documentation](https://docs.leadr.gg/latest/features)** - Explore all features
 
 ______________________________________________________________________
 
