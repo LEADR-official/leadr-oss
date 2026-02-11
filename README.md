@@ -6,29 +6,32 @@
 
 **Cross-platform leaderboards for game developers**. Add feature-rich leaderboards to your game on any platform, any engine, and unify all your players in one place. Open-source, with built-in anti-cheat and more, without trying to be your entire backend.
 
+> **New to LEADR?** Follow the [Quick Start guide](https://docs.leadr.gg/latest/quick-start/)
+> to create your account and set up your first leaderboard.
+
 ## Game Features
 
-- **Completely Cross Platform** - No need to individually integrate Steam, Unity Cloud, Google Play Services...
+- **Completely Cross Platform** - No need to individually integrate Steam Workshop, Unity Cloud, Google Play Services...
 - **Developer Friendly** - The best docs. The clearest SDKs. Actual interest in the community
 - **Anti-cheat by Default** - Secure and sophisticated server implementation to minimise and help triage abuse
 - **We Do Leaderboards** - Different modes, levels, difficulties, geographies, units, sorting and more
 - **Seasons & Temporary Boards** - Automated leaderboards that reset or disable based on date & time
-- **More Than Just Scores** - Store ghost replay data, integrate your boards,
+- **More Than Just Scores** - Store ghost replay data, share live-updating web pages, track player progress, and more
 
 ## Software Features
 
 - **Open-Source Core** - LEADR's cloud service is built on this very same open-source core
 - **Fully documented** - Clear, complete, developer-friendly docs
 - **Docker Ready** - Deploy to any cloud platform in minutes
-- **Zero Config** - Works out of the box
 - **Secure & Scalable** - Built to the latest industry standards by expert backend software developers (sadly we're better at making web apps than games)
 
 > [!TIP]
-> Don't want the hassle of deploying it yourself? Get started for free at https://www.leadr.gg
+> Don't want the hassle of deploying it yourself? Get started for free at [https://docs.leadr.gg/latest/quick-start](https://docs.leadr.gg/latest/quick-start)
 
 ## LEADR Cloud Features
 
-- **Free Tier Available** - Get started in seconds at no cost, only pay when your game explodes
+- **Free Tier Available** - Start in seconds at no cost, only pay when you need studio-grade features
+- **Sleep Easy** - LEADR's cloud infrastructure is ready for your game to go viral - that's one less thing for your to worry about
 - **Beautiful Web Views** - Make your leaderboards more useful, with automatically generated, shareable, modern pages
 - **More coming soon** - LEADR is under active development and [we've got lots planned](https://docs.leadr.gg/latest/roadmap/)...
 
@@ -36,29 +39,19 @@
 
 ### LEADR Cloud
 
-**Our fully managed and scalable hosted version of LEADR - just integrate LEADR via one of our SDKs.**
+Follow the [Quick Start guide](https://docs.leadr.gg/latest/quick-start/) to create your account and first leaderboard.
 
-Download the LEADR app and run `leadr register` to get started:
+Think docs are overated? Download LEADR app and forge your own path:
 
-#### Windows
+**Windows:** [Download the LEADR App](https://leadr.gg/download/windows)
 
-Download the latest LEADR App version here: https://leadr.gg/download/windows
-
-Double click the .exe and follow the instructions.
-
-#### MacOS / Linux
+**macOS / Linux:**
 
 ```bash
 curl -sSL https://leadr.gg/download/install.sh | bash
 ```
 
-#### Manual install
-
-Download binaries from the [Releases page](https://github.com/LEADR-official/leadr-releases/releases).
-
-See the [LEADR docs](https://docs.leadr.gg/latest/) for more information and [quick start](https://docs.leadr.gg/latest/quick-start/) guides.
-
-### Self host
+### Self-host
 
 Deploy our prebuilt & production-ready image to your preferred cloud host:
 
@@ -66,7 +59,13 @@ Deploy our prebuilt & production-ready image to your preferred cloud host:
 ghcr.io/LEADR-official/leadr-oss:latest
 ```
 
-Check out the [self hosting docs](https://docs.leadr.gg/latest/api/self_host/) for more info.
+See the [self-hosting docs](https://docs.leadr.gg/latest/api/self_host/) for configuration and deployment guides.
+
+## What's Next
+
+- **[Quick Start](https://docs.leadr.gg/latest/quick-start/)** - Create your account and first leaderboard
+- **[SDKs](https://docs.leadr.gg/latest/sdks/)** - Integrate LEADR into your game (Godot, Unity, REST API)
+- **[Full Documentation](https://docs.leadr.gg/latest)** - Explore all features and configuration options
 
 ______________________________________________________________________
 
@@ -141,6 +140,14 @@ We follow test-driven development:
 1. Ensure all tests pass
 1. Ensure all CI checks pass
 1. Make a PR
+
+______________________________________________________________________
+
+## Need Help?
+
+- [Documentation](https://docs.leadr.gg)
+- [Discord](https://discord.gg/RMUukcAxSZ)
+- [Report an issue](https://github.com/LEADR-official/leadr-oss/issues)
 
 ______________________________________________________________________
 
