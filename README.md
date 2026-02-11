@@ -2,6 +2,7 @@
 
 ![GitHub Tag](https://img.shields.io/github/v/tag/LEADR-Official/leadr-oss?color=FF007A)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/LEADR-Official/leadr-oss)
+[![Tests Passing](https://github.com/LEADR-official/leadr-oss/actions/workflows/ci.yaml/badge.svg)](https://github.com/LEADR-official/leadr-oss/actions/workflows/ci.yaml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 **Cross-platform leaderboards for game developers**. Add feature-rich leaderboards to your game on any platform, any engine, and unify all your players in one place. Open-source, with built-in anti-cheat and more, without trying to be your entire backend.
