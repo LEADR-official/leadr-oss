@@ -1,11 +1,16 @@
 You've been invited to join {account_name} on LEADR!
 
-To get started, install the LEADR CLI: https://docs.leadr.gg/latest/quick-start/#download-the-cli
+To accept your invitation:
 
-Then run "leadr register" and enter your verification code when prompted.
+1. Install the LEADR app: https://docs.leadr.gg/latest/guides/install/
+2. Run the app, select **[r] Register** from the main menu, and choose the **Accept an invite** option
+3. Enter your email ({email}) and the verification code below
 
 Your verification code: {code}
 
-This code expires in 24 hours.
+(This invite code expires in 24 hours)
+
+
+Need help joining? https://docs.leadr.gg/latest/guides/join/
 
 {footer}

@@ -1,5 +1,6 @@
 ---
-LEADR - Cross-platform leaderboards for indie game developers
+
+LEADR - Cross-platform leaderboards for game developers
 https://www.leadr.gg
 
 Need help? https://discord.gg/RMUukcAxSZ

@@ -1,6 +1,6 @@
 Verify your LEADR account
 
-Welcome to LEADR! Please use the following verification code to complete your registration:
+Please use the following verification code to complete your registration:
 
 {code}
 

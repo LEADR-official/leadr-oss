@@ -1,15 +1,10 @@
-Welcome to LEADR, {user_name}!
+Welcome to LEADR, {user_name}
 
-The {account_name} account has been successfully created. You're now ready to add leaderboards to your games!
+Your {account_name} account is ready, let's add some leaderboards to your game!
 
-Next Steps:
-- Check your API key (stored securely in your CLI)
-- Create your first game
-- Set up leaderboards
-- Start submitting scores!
+What's next:
 
-Need help?
-- Check out our documentation: https://docs.leadr.gg
-- Join the Discord: https://discord.gg/RMUukcAxSZ
+1. Create a game: https://docs.leadr.gg/latest/guides/create-game/
+2. Add LEADR to your game: https://docs.leadr.gg/latest/sdks/
 
 {footer}
