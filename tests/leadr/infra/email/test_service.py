@@ -378,7 +378,7 @@ class TestEmailServiceConvenienceMethods:
 
         service = EmailService(provider=mock_provider, db=db_session)
 
-        service._load_template = Mock(return_value="Welcome {display_name}!")
+        service._load_template = Mock(return_value="Welcome {user_name}!")
         service._footer = ""
 
         response = await service.send_welcome_email(
@@ -463,3 +463,114 @@ class TestEmailServiceUtilityMethods:
 
         assert service.validate_provider_config() is True
         mock_provider.validate_config.assert_called_once()
+
+
+@pytest.mark.asyncio
+class TestEmailTemplateIntegration:
+    """Integration tests that verify email templates work with service code.
+
+    These tests use real template files (no mocking of _load_template) to catch
+    mismatches between template variables and service code.
+    """
+
+    @patch("leadr.infra.email.service.settings")
+    async def test_welcome_email_template_integration(
+        self, mock_settings, db_session: AsyncSession
+    ):
+        """Verify welcome email template variables match service code."""
+        mock_settings.ENV = "TEST"
+        mock_settings.TESTING_EMAIL = "test@leadr.gg"
+        mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
+
+        mock_provider = Mock()
+        mock_provider.send.return_value = {"id": "msg-123"}
+
+        service = EmailService(provider=mock_provider, db=db_session)
+        # Don't mock _load_template - use real templates
+
+        # Should not raise KeyError if template variables match service code
+        await service.send_welcome_email(
+            to="user@example.com",
+            user_name="Test User",
+            account_name="TestCo",
+            account_slug="testco",
+        )
+
+        # Verify email body contains expected content from real template
+        email_arg = mock_provider.send.call_args[0][0]
+        assert "Test User" in email_arg.body
+        assert "TestCo" in email_arg.body
+
+    @patch("leadr.infra.email.service.settings")
+    async def test_verification_code_template_integration(
+        self, mock_settings, db_session: AsyncSession
+    ):
+        """Verify verification code template variables match service code."""
+        mock_settings.ENV = "TEST"
+        mock_settings.TESTING_EMAIL = "test@leadr.gg"
+        mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
+
+        mock_provider = Mock()
+        mock_provider.send.return_value = {"id": "msg-123"}
+
+        service = EmailService(provider=mock_provider, db=db_session)
+
+        # Should not raise KeyError
+        await service.send_verification_code(
+            to="user@example.com",
+            code="ABC123",
+        )
+
+        email_arg = mock_provider.send.call_args[0][0]
+        assert "ABC123" in email_arg.body
+
+    @patch("leadr.infra.email.service.settings")
+    async def test_notification_email_template_integration(
+        self, mock_settings, db_session: AsyncSession
+    ):
+        """Verify notification email template variables match service code."""
+        mock_settings.ENV = "TEST"
+        mock_settings.TESTING_EMAIL = "test@leadr.gg"
+        mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
+
+        mock_provider = Mock()
+        mock_provider.send.return_value = {"id": "msg-123"}
+
+        service = EmailService(provider=mock_provider, db=db_session)
+
+        # Should not raise KeyError
+        await service.send_notification_email(
+            to="user@example.com",
+            subject="Important Update",
+            message="Your account has been upgraded!",
+        )
+
+        email_arg = mock_provider.send.call_args[0][0]
+        assert "Your account has been upgraded!" in email_arg.body
+
+    @patch("leadr.infra.email.service.settings")
+    async def test_invite_email_template_integration(self, mock_settings, db_session: AsyncSession):
+        """Verify invite email template variables match service code."""
+        mock_settings.ENV = "TEST"
+        mock_settings.TESTING_EMAIL = "test@leadr.gg"
+        mock_settings.MAILGUN_DOMAIN = "mg.leadr.gg"
+        mock_settings.default_from_email = "noreply@mg.leadr.gg"
+
+        mock_provider = Mock()
+        mock_provider.send.return_value = {"id": "msg-123"}
+
+        service = EmailService(provider=mock_provider, db=db_session)
+
+        # Should not raise KeyError
+        await service.send_invite_email(
+            to="invited@example.com",
+            account_name="TestCo",
+            code="XYZ789",
+        )
+
+        email_arg = mock_provider.send.call_args[0][0]
+        assert "TestCo" in email_arg.body
+        assert "XYZ789" in email_arg.body

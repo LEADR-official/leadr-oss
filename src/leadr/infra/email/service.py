@@ -161,9 +161,7 @@ class EmailService:
         """Send a welcome email after successful LEADR registration."""
         subject = f"Welcome to LEADR, {account_name}!"
         template = self._load_template("welcome")
-        body = template.format(
-            display_name=user_name, account_name=account_name, footer=self._footer
-        )
+        body = template.format(user_name=user_name, account_name=account_name, footer=self._footer)
 
         return await self.send_email(
             to=to,
