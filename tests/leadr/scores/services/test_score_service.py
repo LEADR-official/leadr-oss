@@ -1378,16 +1378,6 @@ class TestScoreServiceQuery:
 
         assert len(result.items) == 5
 
-    async def test_list_scores_requires_board_id(self):
-        """Test list_scores raises error without board_id."""
-        mock_session = AsyncMock()
-        service = ScoreService(mock_session)
-
-        pagination = PaginationParams(limit=10, cursor=None, sort=None)
-
-        with pytest.raises(ValueError, match="board_id is required"):
-            await service.list_scores(pagination=pagination)
-
     @patch("leadr.scores.services.score_service.BoardService")
     @patch("leadr.scores.services.score_service.BoardStateService")
     async def test_list_scores_with_around_score_id(

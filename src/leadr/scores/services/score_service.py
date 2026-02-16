@@ -719,8 +719,8 @@ class ScoreService:
 
     async def list_scores(
         self,
+        board_id: BoardID,
         account_id: AccountID | None = None,
-        board_id: BoardID | None = None,
         game_id: GameID | None = None,
         identity_id: IdentityID | None = None,
         is_test: bool | None = None,
@@ -734,8 +734,8 @@ class ScoreService:
         Delegates to BoardStateService or RunEntryService based on board type.
 
         Args:
-            account_id: Account ID to filter by (for authorization).
-            board_id: Board ID to filter by (required for most use cases).
+            board_id: Board ID to list scores for.
+            account_id: Optional account ID to filter by (for authorization).
             game_id: Optional game ID filter.
             identity_id: Optional identity ID filter.
             is_test: Optional filter for test scores.
@@ -745,13 +745,7 @@ class ScoreService:
 
         Returns:
             PaginatedResult containing BoardState or RunEntry objects.
-
-        Raises:
-            ValueError: If board_id is not provided (required for list queries).
         """
-        if board_id is None:
-            raise ValueError("board_id is required for listing scores")
-
         board_service = BoardService(self.session)
         board = await board_service.get_by_id_or_raise(board_id)
 

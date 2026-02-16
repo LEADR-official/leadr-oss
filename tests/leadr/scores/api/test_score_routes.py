@@ -154,9 +154,10 @@ class TestScoreRoutesAdmin:
         # Act
         response = await mock_client_no_db.get("/scores")
 
-        # Assert
-        assert response.status_code == 400
-        assert "board_id is required" in response.json()["error"]
+        # Assert - FastAPI returns 422 for missing required query parameters
+        assert response.status_code == 422
+        errors = response.json()["error"]
+        assert any(err["loc"] == ["query", "board_id"] for err in errors)
 
     async def test_list_scores_board_not_found(
         self,
@@ -278,22 +279,6 @@ class TestScoreRoutesAdmin:
         assert response.status_code == 400
         assert "cursor" in response.json()["error"].lower()
 
-    async def test_list_scores_around_score_id_requires_board_id(
-        self,
-        mock_client_no_db: AsyncClient,
-        admin_auth,
-        mock_score_service,
-        mock_board_service,
-    ):
-        """Test that around_score_id requires board_id."""
-        # Act
-        response = await mock_client_no_db.get(
-            "/scores?around_score_id=scr_00000000-0000-0000-0000-000000000000"
-        )
-
-        # Assert
-        assert response.status_code == 400
-
     async def test_list_scores_around_score_value(
         self,
         mock_client_no_db: AsyncClient,
@@ -341,20 +326,6 @@ class TestScoreRoutesAdmin:
         placeholders = [d for d in data["data"] if d.get("is_placeholder")]
         assert len(placeholders) == 1
         assert placeholders[0]["value"] == 250.0
-
-    async def test_list_scores_around_score_value_requires_board_id(
-        self,
-        mock_client_no_db: AsyncClient,
-        admin_auth,
-        mock_score_service,
-        mock_board_service,
-    ):
-        """Test that around_score_value requires board_id."""
-        # Act
-        response = await mock_client_no_db.get("/scores?around_score_value=100")
-
-        # Assert
-        assert response.status_code == 400
 
     async def test_list_scores_around_score_value_and_cursor_mutually_exclusive(
         self,
