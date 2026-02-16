@@ -766,6 +766,43 @@ class TestScoreRoutesClient:
         assert len(data["data"]) == 1
         assert data["data"][0]["player_name"] == "TestPlayer"
 
+    async def test_list_scores_client_identity_id_me_resolves_to_current_identity(
+        self,
+        mock_client_no_db: AsyncClient,
+        client_auth,
+        mock_score_service,
+        mock_board_service,
+    ):
+        """Test that identity_id=me resolves to the authenticated identity."""
+        # Arrange
+        board = make_board(account_id=client_auth.account_id, game_id=client_auth.game_id)
+        mock_board_service.get_by_id.return_value = board
+
+        identity_id = client_auth.identity.id
+        state = make_board_state(
+            board_id=board.id,
+            identity_id=identity_id,
+            primary_value=500.0,
+            player_name="TestPlayer",
+            rank=1,
+        )
+
+        result = make_paginated_result(items=[state])
+        mock_score_service.list_scores.return_value = result
+
+        # Act - pass "me" as identity_id
+        response = await mock_client_no_db.get(f"/client/scores?board_id={board.id}&identity_id=me")
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        assert data["data"][0]["player_name"] == "TestPlayer"
+
+        # Verify "me" was resolved to the actual identity_id
+        call_kwargs = mock_score_service.list_scores.call_args.kwargs
+        assert call_kwargs["identity_id"] == identity_id
+
     async def test_list_scores_client_run_runs_board(
         self,
         mock_client_no_db: AsyncClient,

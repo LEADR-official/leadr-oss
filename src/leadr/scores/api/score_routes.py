@@ -1,6 +1,6 @@
 """API routes for score management."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy.exc import IntegrityError
@@ -661,7 +661,10 @@ async def list_scores_client(
     board_service: BoardServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     board_id: BoardID | None = None,
-    identity_id: IdentityID | None = None,
+    identity_id: Annotated[
+        IdentityID | Literal["me"] | None,
+        Query(description="Identity ID to filter by, or 'me' for current identity"),
+    ] = None,
     around_score_id: Annotated[
         ScoreID | None, Query(description="Center results around this score ID")
     ] = None,
@@ -695,13 +698,14 @@ async def list_scores_client(
         GET /client/scores?board_id=brd_123&limit=50&sort=value:desc,created_at:asc
         GET /client/scores?board_id=brd_123&around_score_id=scr_456&limit=11
         GET /client/scores?board_id=brd_123&around_score_value=1500&limit=11
+        GET /client/scores?identity_id=me (filter to current authenticated identity)
 
     Args:
         auth: Authentication context with user info.
         service: Injected score service dependency.
         pagination: Pagination parameters (cursor, limit, sort).
         board_id: Optional board ID to filter by.
-        identity_id: Optional identity ID to filter by (e.g., to get "my scores").
+        identity_id: Optional identity ID to filter by, or "me" for current identity.
         around_score_id: Optional score ID to center results around.
         around_score_value: Optional value to center results around (with placeholder).
 
@@ -713,6 +717,9 @@ async def list_scores_client(
         403: User does not have access to the specified account.
         404: around_score_id score not found.
     """
+    # Resolve "me" to the authenticated identity's ID
+    resolved_identity_id = auth.identity.id if identity_id == "me" else identity_id
+
     return await handle_list_scores(  # type: ignore[return-value]
         auth,
         service,
@@ -721,7 +728,7 @@ async def list_scores_client(
         auth.account_id,
         board_id,
         auth.game_id,
-        identity_id,
+        resolved_identity_id,
         auth.test_mode,
         around_score_id,
         around_score_value,
