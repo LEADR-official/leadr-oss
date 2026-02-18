@@ -92,6 +92,16 @@ class BoardORM(Base):
             unique=True,
             postgresql_where="is_active = true AND deleted_at IS NULL",
         ),
+        Index("ix_boards_account_deleted_created", "account_id", "deleted_at", "created_at", "id"),
+        Index("ix_boards_account_deleted_updated", "account_id", "deleted_at", "updated_at", "id"),
+        Index(
+            "ix_boards_account_game_deleted_created",
+            "account_id",
+            "game_id",
+            "deleted_at",
+            "created_at",
+            "id",
+        ),
     )
 
     account_id: Mapped[UUID] = mapped_column(
@@ -109,9 +119,9 @@ class BoardORM(Base):
     icon: Mapped[str | None] = mapped_column(String, nullable=True)
     short_code: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     unit: Mapped[str | None] = mapped_column(String, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, index=True)
     is_published: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default=sa.text("true")
+        Boolean, nullable=False, default=True, server_default=sa.text("true"), index=True
     )
     sort_direction: Mapped[str] = mapped_column(String, nullable=False)
     board_type: Mapped[BoardTypeEnum] = mapped_column(
@@ -138,7 +148,9 @@ class BoardORM(Base):
         default=KeepStrategyEnum.BEST,
         server_default="BEST",
     )
-    created_from_template_id: Mapped[UUID | None] = mapped_column(nullable=True, default=None)
+    created_from_template_id: Mapped[UUID | None] = mapped_column(
+        nullable=True, default=None, index=True
+    )
     template_name: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     starts_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
@@ -220,8 +232,10 @@ class BoardTemplateORM(Base):
     config: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"
     )
-    next_run_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    next_run_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, index=True)
     is_published: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=sa.text("true")
     )
@@ -234,6 +248,28 @@ class BoardTemplateORM(Base):
             "series",
             unique=True,
             postgresql_where=sa.text("series IS NOT NULL"),
+        ),
+        Index(
+            "ix_board_templates_account_deleted_created",
+            "account_id",
+            "deleted_at",
+            "created_at",
+            "id",
+        ),
+        Index(
+            "ix_board_templates_account_deleted_updated",
+            "account_id",
+            "deleted_at",
+            "updated_at",
+            "id",
+        ),
+        Index(
+            "ix_board_templates_account_game_deleted_created",
+            "account_id",
+            "game_id",
+            "deleted_at",
+            "created_at",
+            "id",
         ),
     )
 

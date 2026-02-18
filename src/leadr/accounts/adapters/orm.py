@@ -3,7 +3,7 @@
 import enum
 from uuid import UUID
 
-from sqlalchemy import Enum, ForeignKey, String
+from sqlalchemy import Enum, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from leadr.common.orm import Base
@@ -32,6 +32,11 @@ class AccountORM(Base):
     """
 
     __tablename__ = "accounts"
+    __table_args__ = (
+        Index("ix_accounts_deleted_created", "deleted_at", "created_at", "id"),
+        Index("ix_accounts_deleted_updated", "deleted_at", "updated_at", "id"),
+        Index("ix_accounts_deleted_name", "deleted_at", "name", "id"),
+    )
 
     name: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     slug: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
@@ -45,6 +50,7 @@ class AccountORM(Base):
         nullable=False,
         default=AccountStatusEnum.ACTIVE,
         server_default="active",
+        index=True,
     )
 
     # Relationships
@@ -61,6 +67,10 @@ class UserORM(Base):
     """
 
     __tablename__ = "users"
+    __table_args__ = (
+        Index("ix_users_account_deleted_created", "account_id", "deleted_at", "created_at", "id"),
+        Index("ix_users_account_deleted_updated", "account_id", "deleted_at", "updated_at", "id"),
+    )
 
     account_id: Mapped[UUID] = mapped_column(
         ForeignKey("accounts.id", ondelete="CASCADE"),
@@ -69,8 +79,12 @@ class UserORM(Base):
     )
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String, nullable=False)
-    super_admin: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
-    is_owner: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
+    super_admin: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default="false", index=True
+    )
+    is_owner: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default="false", index=True
+    )
     status: Mapped[UserStatusEnum] = mapped_column(
         Enum(
             UserStatusEnum,

@@ -31,6 +31,9 @@ class GameORM(Base):
             postgresql_where=text("deleted_at IS NULL"),
         ),
         UniqueConstraint("slug", name="uq_game_slug"),
+        Index("ix_games_account_deleted_created", "account_id", "deleted_at", "created_at", "id"),
+        Index("ix_games_account_deleted_updated", "account_id", "deleted_at", "updated_at", "id"),
+        Index("ix_games_account_deleted_name", "account_id", "deleted_at", "name", "id"),
     )
 
     account_id: Mapped[UUID] = mapped_column(
