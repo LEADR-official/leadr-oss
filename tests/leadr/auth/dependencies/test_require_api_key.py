@@ -5,7 +5,7 @@ from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
@@ -31,6 +31,7 @@ class TestRequireAdminAuth:
         identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_admin_auth(
@@ -39,6 +40,7 @@ class TestRequireAdminAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=None,
                 authorization=None,
                 leadr_client_nonce=None,
@@ -84,6 +86,7 @@ class TestRequireAdminAuth:
         identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_admin_auth(
@@ -92,6 +95,7 @@ class TestRequireAdminAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key="ldr_invalidkey123456",
                 authorization=None,
                 leadr_client_nonce=None,
@@ -138,6 +142,7 @@ class TestRequireAdminAuth:
         identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
+        background_tasks = BackgroundTasks()
 
         result = await require_admin_auth(
             request=mock_request,
@@ -145,6 +150,7 @@ class TestRequireAdminAuth:
             user_service=user_service,
             identity_service=identity_service,
             nonce_service=nonce_service,
+            background_tasks=background_tasks,
             api_key=plain_key,
             authorization=None,
             leadr_client_nonce=None,
@@ -198,6 +204,7 @@ class TestRequireAdminAuth:
         identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_admin_auth(
@@ -206,6 +213,7 @@ class TestRequireAdminAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=plain_key,
                 authorization=None,
                 leadr_client_nonce=None,
@@ -257,6 +265,7 @@ class TestRequireAdminAuth:
         identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_admin_auth(
@@ -265,6 +274,7 @@ class TestRequireAdminAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=plain_key,
                 authorization=None,
                 leadr_client_nonce=None,
@@ -316,6 +326,7 @@ class TestRequireAdminAuth:
         identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_admin_auth(
@@ -324,6 +335,7 @@ class TestRequireAdminAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=plain_key,
                 authorization=None,
                 leadr_client_nonce=None,
@@ -332,8 +344,8 @@ class TestRequireAdminAuth:
         assert exc_info.value.status_code == 401
         assert "invalid" in exc_info.value.detail.lower()
 
-    async def test_valid_key_updates_last_used_at(self, db_session: AsyncSession):
-        """Test that using a valid API key updates the last_used_at timestamp."""
+    async def test_valid_key_schedules_background_update_when_stale(self, db_session: AsyncSession):
+        """Test that using a stale API key schedules a background task to update last_used_at."""
         # Create account
         account_repo = AccountRepository(db_session)
         account_id = AccountID(uuid4())
@@ -366,13 +378,14 @@ class TestRequireAdminAuth:
             expires_at=None,
         )
 
-        # Verify last_used_at is None initially
+        # Verify last_used_at is None initially (which means it's "stale")
         assert api_key.last_used_at is None
 
-        # Use the dependency
+        # Use the dependency with BackgroundTasks
         identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
         nonce_service = NonceService(db_session)
         mock_request = Mock()
+        background_tasks = BackgroundTasks()
 
         await require_admin_auth(
             request=mock_request,
@@ -380,10 +393,16 @@ class TestRequireAdminAuth:
             user_service=user_service,
             identity_service=identity_service,
             nonce_service=nonce_service,
+            background_tasks=background_tasks,
             api_key=plain_key,
             authorization=None,
             leadr_client_nonce=None,
         )
+
+        # Background task was scheduled - execute it
+        assert len(background_tasks.tasks) == 1
+        task = background_tasks.tasks[0]
+        await task.func(*task.args, **task.kwargs)
 
         # Refresh the key from DB to get updated timestamp
         updated_key = await api_key_service.get_by_id_or_raise(api_key.id)
@@ -391,3 +410,70 @@ class TestRequireAdminAuth:
         # Verify last_used_at was updated
         assert updated_key.last_used_at is not None
         assert updated_key.last_used_at > now
+
+    async def test_valid_key_skips_update_when_recently_used(self, db_session: AsyncSession):
+        """Test that a recently used API key does not schedule a background update."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-recent-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
+        # Create API key
+        api_key_service = APIKeyService(db_session)
+        api_key, plain_key = await api_key_service.create_api_key(
+            account_id=account_id,
+            user_id=user.id,
+            name="Test Key",
+            expires_at=None,
+        )
+
+        # Set last_used_at to recent time (1 minute ago - within 5 minute threshold)
+        recent_time = now - timedelta(minutes=1)
+        await api_key_service.record_usage(api_key.id, recent_time)
+
+        # Verify last_used_at is set
+        updated_api_key = await api_key_service.get_by_id_or_raise(api_key.id)
+        assert updated_api_key.last_used_at == recent_time
+
+        # Use the dependency with BackgroundTasks
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        nonce_service = NonceService(db_session)
+        mock_request = Mock()
+        background_tasks = BackgroundTasks()
+
+        await require_admin_auth(
+            request=mock_request,
+            api_key_service=api_key_service,
+            user_service=user_service,
+            identity_service=identity_service,
+            nonce_service=nonce_service,
+            background_tasks=background_tasks,
+            api_key=plain_key,
+            authorization=None,
+            leadr_client_nonce=None,
+        )
+
+        # No background task should be scheduled since last_used_at is recent
+        assert len(background_tasks.tasks) == 0
+
+        # Verify last_used_at was NOT updated (still the same recent_time)
+        final_key = await api_key_service.get_by_id_or_raise(api_key.id)
+        assert final_key.last_used_at == recent_time

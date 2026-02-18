@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.domain.account import Account, AccountStatus
@@ -32,6 +32,7 @@ class TestAdminAPIDisabled:
         identity_service = IdentityService(db_session, device_service=device_service)
         nonce_service = NonceService(db_session)
         mock_request = Mock()
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_admin_auth(
@@ -40,6 +41,7 @@ class TestAdminAPIDisabled:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key="ldr_test123",
                 authorization=None,
                 leadr_client_nonce=None,
@@ -95,6 +97,7 @@ class TestUserNotFoundEdgeCase:
         identity_service = IdentityService(db_session, device_service=device_service)
         nonce_service = NonceService(db_session)
         mock_request = Mock()
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_admin_auth(
@@ -103,10 +106,13 @@ class TestUserNotFoundEdgeCase:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=plain_key,
                 authorization=None,
                 leadr_client_nonce=None,
             )
 
         assert exc_info.value.status_code == 401
-        assert "User" in exc_info.value.detail or "not found" in exc_info.value.detail.lower()
+        # With the JOIN optimization, deleted users result in the same generic error
+        # as invalid keys (better security - doesn't reveal why auth failed)
+        assert "invalid" in exc_info.value.detail.lower()

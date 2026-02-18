@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
-from fastapi import Depends, Header, HTTPException, Query, Request
+from fastapi import BackgroundTasks, Depends, Header, HTTPException, Query, Request
 
 from leadr.accounts.domain.user import User
 from leadr.accounts.services.dependencies import UserServiceDep
@@ -267,6 +267,7 @@ class AuthContextDependency:
         user_service: UserServiceDep,
         identity_service: IdentityServiceDep,
         nonce_service: NonceServiceDep,
+        background_tasks: BackgroundTasks,
         query_account_id: Annotated[AccountID | None, Query(alias="account_id")] = None,
         api_key: Annotated[str | None, Header(alias="leadr-api-key")] = None,
         authorization: Annotated[str | None, Header()] = None,
@@ -334,6 +335,7 @@ class AuthContextDependency:
                 api_key_service=api_key_service,
                 user_service=user_service,
                 request=request,
+                background_tasks=background_tasks,
             )
 
             # Check superadmin requirement
@@ -385,16 +387,21 @@ class AuthContextDependency:
         api_key_service: APIKeyServiceDep,
         user_service: UserServiceDep,
         request: Request,
+        background_tasks: BackgroundTasks,
     ) -> AdminAuthContext:
         """Validate admin API key authentication.
 
-        Validates the API key and fetches the associated user.
+        Validates the API key and fetches the associated user in a single JOIN
+        query for optimal performance. Schedules a background task to update
+        last_used_at if the key hasn't been used recently (based on
+        API_KEY_USAGE_UPDATE_THRESHOLD_SECONDS).
 
         Args:
             api_key: The API key string.
             api_key_service: API key service for validation.
-            user_service: User service for fetching user.
+            user_service: User service (unused - kept for signature compatibility).
             request: FastAPI request object for checking HTTP method.
+            background_tasks: FastAPI BackgroundTasks for scheduling async work.
 
         Returns:
             AdminAuthContext with guaranteed user and api_key fields.
@@ -402,22 +409,22 @@ class AuthContextDependency:
         Raises:
             HTTPException: 401 if API key is invalid or user not found.
         """
-        # Validate API key
-        validated_key = await api_key_service.validate_api_key(api_key)
+        # Validate API key and fetch user in a single JOIN query
+        result = await api_key_service.validate_api_key_with_user(api_key)
 
-        if validated_key is None:
+        if result is None:
             raise HTTPException(
                 status_code=401,
                 detail="Invalid or expired API key",
             )
 
-        # Fetch the user associated with the API key
-        user = await user_service.get_user(validated_key.user_id)
+        validated_key, user = result
 
-        if user is None:
-            raise HTTPException(
-                status_code=401,
-                detail="User associated with API key not found",
+        # Schedule background update of last_used_at if stale
+        if api_key_service.should_update_usage(validated_key):
+            background_tasks.add_task(
+                api_key_service.record_usage_async,
+                validated_key.id,
             )
 
         return AdminAuthContext(

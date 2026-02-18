@@ -10,6 +10,7 @@ from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.repositories import AccountRepository
 from leadr.accounts.services.user_service import UserService
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
+from leadr.auth.services.api_key_service import APIKeyService
 from leadr.auth.services.repositories import APIKeyRepository
 from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.ids import AccountID, APIKeyID
@@ -566,3 +567,106 @@ class TestAPIKeyRepository:
         assert retrieved is not None
         assert retrieved.expires_at == expires_at
         assert retrieved.is_expired() is False
+
+    async def test_get_by_prefix_with_user_returns_both_entities(self, db_session: AsyncSession):
+        """Test getting API key and user in a single query."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
+        # Create API key
+        api_key_repo = APIKeyRepository(db_session)
+        key_id = APIKeyID(uuid4())
+
+        api_key = APIKey(
+            id=key_id,
+            account_id=account_id,
+            user_id=user.id,
+            name="Test Key",
+            key_hash="hash",
+            key_prefix="ldr_jointest1",
+            created_at=now,
+            updated_at=now,
+        )
+        await api_key_repo.create(api_key)
+
+        # Retrieve by prefix with user in single query
+        result = await api_key_repo.get_by_prefix_with_user("ldr_jointest1")
+
+        assert result is not None
+        retrieved_key, retrieved_user = result
+        assert retrieved_key.id == key_id
+        assert retrieved_key.key_prefix == "ldr_jointest1"
+        assert retrieved_user.id == user.id
+        assert retrieved_user.email == f"test-{str(account_id)[:8]}@example.com"
+        assert retrieved_user.display_name == "Test User"
+
+    async def test_get_by_prefix_with_user_not_found(self, db_session: AsyncSession):
+        """Test that non-existent prefix returns None."""
+        api_key_repo = APIKeyRepository(db_session)
+
+        result = await api_key_repo.get_by_prefix_with_user("ldr_nonexistent")
+
+        assert result is None
+
+    async def test_get_by_prefix_with_user_excludes_soft_deleted(self, db_session: AsyncSession):
+        """Test that soft-deleted API keys are not returned."""
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create user for API key
+        user_service = UserService(db_session)
+        user = await user_service.create_user(
+            account_id=account_id,
+            email=f"test-{str(account_id)[:8]}@example.com",
+            display_name="Test User",
+        )
+
+        # Create API key via service (to get a proper key)
+        api_key_service = APIKeyService(db_session)
+        api_key, plain_key = await api_key_service.create_api_key(
+            account_id=account_id,
+            user_id=user.id,
+            name="Test Key",
+            expires_at=None,
+        )
+
+        # Soft delete via service
+        await api_key_service.soft_delete(api_key.id)
+
+        # Try to retrieve - should return None
+        api_key_repo = APIKeyRepository(db_session)
+        result = await api_key_repo.get_by_prefix_with_user(api_key.key_prefix)
+
+        assert result is None

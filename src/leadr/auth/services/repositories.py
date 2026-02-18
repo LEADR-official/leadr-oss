@@ -7,6 +7,8 @@ from typing import Any
 
 from sqlalchemy import delete, select
 
+from leadr.accounts.adapters.orm import UserORM
+from leadr.accounts.domain.user import User, UserStatus
 from leadr.auth.adapters.orm import (
     APIKeyORM,
     APIKeyStatusEnum,
@@ -85,6 +87,46 @@ class APIKeyRepository(BaseRepository[APIKey, APIKeyORM]):
     async def get_by_prefix(self, key_prefix: str) -> APIKey | None:
         """Get API key by prefix, returns None if not found or soft-deleted."""
         return await self._get_by_field("key_prefix", key_prefix)
+
+    async def get_by_prefix_with_user(self, key_prefix: str) -> tuple[APIKey, User] | None:
+        """Get API key and associated user in a single query.
+
+        This method performs a JOIN between api_keys and users tables to retrieve
+        both entities in one database round-trip, reducing auth latency.
+
+        Args:
+            key_prefix: The API key prefix to search for.
+
+        Returns:
+            A tuple of (APIKey, User) if found and neither soft-deleted, None otherwise.
+        """
+        stmt = (
+            select(APIKeyORM, UserORM)
+            .join(UserORM, APIKeyORM.user_id == UserORM.id)
+            .where(APIKeyORM.key_prefix == key_prefix)
+            .where(APIKeyORM.deleted_at.is_(None))
+            .where(UserORM.deleted_at.is_(None))
+        )
+        result = await self.session.execute(stmt)
+        row = result.one_or_none()
+        if row is None:
+            return None
+
+        api_key_orm, user_orm = row
+        api_key = self._to_domain(api_key_orm)
+        user = User(
+            id=UserID(user_orm.id),
+            account_id=AccountID(user_orm.account_id),
+            email=user_orm.email,
+            display_name=user_orm.display_name,
+            super_admin=user_orm.super_admin,
+            is_owner=user_orm.is_owner,
+            status=UserStatus(user_orm.status.value),
+            created_at=user_orm.created_at,
+            updated_at=user_orm.updated_at,
+            deleted_at=user_orm.deleted_at,
+        )
+        return api_key, user
 
     async def filter(
         self,

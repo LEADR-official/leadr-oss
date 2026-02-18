@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.accounts.services.user_service import UserService
@@ -47,6 +47,7 @@ class TestClientOnlyAuth:
 
         # Create dependency requiring client auth
         require_client_auth = AuthContextDependency(require_admin=False, require_client=True)
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_client_auth(
@@ -55,6 +56,7 @@ class TestClientOnlyAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=None,
                 authorization="Bearer test_token",
                 leadr_client_nonce=None,
@@ -72,6 +74,7 @@ class TestClientOnlyAuth:
         mock_request = Mock()
 
         require_client_auth = AuthContextDependency(require_admin=False, require_client=True)
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_client_auth(
@@ -80,6 +83,7 @@ class TestClientOnlyAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=None,
                 authorization=None,
                 leadr_client_nonce=None,
@@ -97,6 +101,7 @@ class TestClientOnlyAuth:
         mock_request = Mock()
 
         require_client_auth = AuthContextDependency(require_admin=False, require_client=True)
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_client_auth(
@@ -105,6 +110,7 @@ class TestClientOnlyAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=None,
                 authorization="InvalidFormat",
                 leadr_client_nonce=None,
@@ -125,6 +131,7 @@ class TestClientOnlyAuth:
 
         # Mock validate_identity_token to return None (invalid token)
         identity_service.validate_identity_token = AsyncMock(return_value=None)
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_client_auth(
@@ -133,6 +140,7 @@ class TestClientOnlyAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=None,
                 authorization="Bearer invalid_token",
                 leadr_client_nonce=None,
@@ -160,6 +168,7 @@ class TestClientOnlyAuth:
         game_id = GameID()
         mock_identity = _create_mock_identity(account_id, game_id)
         identity_service.validate_identity_token = AsyncMock(return_value=mock_identity)
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_client_with_nonce(
@@ -168,6 +177,7 @@ class TestClientOnlyAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=None,
                 authorization="Bearer valid_token",
                 leadr_client_nonce=None,
@@ -198,6 +208,7 @@ class TestClientOnlyAuth:
         nonce_service.validate_and_consume_nonce = AsyncMock(
             side_effect=ValueError("Nonce not found")
         )
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_client_with_nonce(
@@ -206,6 +217,7 @@ class TestClientOnlyAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=None,
                 authorization="Bearer valid_token",
                 leadr_client_nonce="invalid_nonce",
@@ -236,6 +248,7 @@ class TestClientOnlyAuth:
         nonce_service.validate_and_consume_nonce = AsyncMock(
             side_effect=ValueError("Nonce does not belong to this identity")
         )
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_client_with_nonce(
@@ -244,6 +257,7 @@ class TestClientOnlyAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=None,
                 authorization="Bearer valid_token",
                 leadr_client_nonce="wrong_identity_nonce",
@@ -274,6 +288,7 @@ class TestClientOnlyAuth:
         nonce_service.validate_and_consume_nonce = AsyncMock(
             side_effect=ValueError("Nonce already used")
         )
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_client_with_nonce(
@@ -282,6 +297,7 @@ class TestClientOnlyAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=None,
                 authorization="Bearer valid_token",
                 leadr_client_nonce="used_nonce",
@@ -312,6 +328,7 @@ class TestClientOnlyAuth:
         nonce_service.validate_and_consume_nonce = AsyncMock(
             side_effect=ValueError("Nonce expired")
         )
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_client_with_nonce(
@@ -320,6 +337,7 @@ class TestClientOnlyAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=None,
                 authorization="Bearer valid_token",
                 leadr_client_nonce="expired_nonce",
@@ -348,6 +366,7 @@ class TestClientOnlyAuth:
 
         # Mock valid nonce
         nonce_service.validate_and_consume_nonce = AsyncMock(return_value=None)
+        background_tasks = BackgroundTasks()
 
         result = await require_client_with_nonce(
             request=mock_request,
@@ -355,6 +374,7 @@ class TestClientOnlyAuth:
             user_service=user_service,
             identity_service=identity_service,
             nonce_service=nonce_service,
+            background_tasks=background_tasks,
             api_key=None,
             authorization="Bearer valid_token",
             leadr_client_nonce="valid_nonce",
@@ -387,12 +407,14 @@ class TestClientOnlyAuth:
         identity_service.validate_identity_token = AsyncMock(return_value=mock_identity)
 
         # Call with debug enabled
+        background_tasks = BackgroundTasks()
         result = await require_client(
             request=mock_request,
             api_key_service=api_key_service,
             user_service=user_service,
             identity_service=identity_service,
             nonce_service=nonce_service,
+            background_tasks=background_tasks,
             api_key=None,
             authorization="Bearer valid_token",
             leadr_client_nonce=None,
@@ -425,6 +447,7 @@ class TestClientOnlyAuth:
         nonce_service.validate_and_consume_nonce = AsyncMock(
             side_effect=ValueError("Some unexpected error")
         )
+        background_tasks = BackgroundTasks()
 
         with pytest.raises(HTTPException) as exc_info:
             await require_client_with_nonce(
@@ -433,6 +456,7 @@ class TestClientOnlyAuth:
                 user_service=user_service,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
+                background_tasks=background_tasks,
                 api_key=None,
                 authorization="Bearer valid_token",
                 leadr_client_nonce="some_nonce",

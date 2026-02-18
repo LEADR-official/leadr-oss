@@ -143,6 +143,10 @@ class CommonSettings(BaseSettings):
         default="your-super-secret-api-key-pepper-change-in-production",
         description="Secret pepper for API key hashing. MUST be changed in production.",
     )
+    API_KEY_USAGE_UPDATE_THRESHOLD_SECONDS: int = Field(
+        default=300,
+        description="Only update API key last_used_at if older than this (default: 5 minutes)",
+    )
 
     # Superadmin Bootstrap Configuration
     SUPERADMIN_ACCOUNT_NAME: str = Field(

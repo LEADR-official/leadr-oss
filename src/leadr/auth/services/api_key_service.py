@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.accounts.domain.user import User
 from leadr.auth.domain.api_key import APIKey, APIKeyStatus
 from leadr.auth.services.api_key_crypto import generate_api_key, hash_api_key, verify_api_key
 from leadr.auth.services.repositories import APIKeyRepository
@@ -148,7 +149,10 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         2. Verifies the hash matches
         3. Checks if key is active (not revoked)
         4. Checks if key is not expired
-        5. Records usage timestamp if valid
+
+        Note: This method does NOT update last_used_at. The caller should check
+        should_update_usage() and schedule record_usage_async() via background task
+        if needed.
 
         Args:
             plain_key: The plain API key string to validate.
@@ -182,12 +186,96 @@ class APIKeyService(BaseService[APIKey, APIKeyRepository]):
         if not api_key.is_valid():
             return None
 
-        # Record usage
+        return api_key
+
+    async def validate_api_key_with_user(self, plain_key: str) -> tuple[APIKey, User] | None:
+        """Validate an API key and return both the key and associated user.
+
+        This method performs a single JOIN query to retrieve both the API key
+        and user in one database round-trip, reducing auth latency.
+
+        Performs the following checks:
+        1. Extracts prefix and looks up key + user in database via JOIN
+        2. Verifies the hash matches
+        3. Checks if key is active (not revoked)
+        4. Checks if key is not expired
+
+        Note: This method does NOT update last_used_at. The caller should check
+        should_update_usage() and schedule record_usage_async() via background task
+        if needed.
+
+        Args:
+            plain_key: The plain API key string to validate.
+
+        Returns:
+            A tuple of (APIKey, User) if valid, None otherwise.
+
+        Example:
+            >>> result = await service.validate_api_key_with_user("ldr_abc123...")
+            >>> if result:
+            ...     api_key, user = result
+            ...     print(f"Valid key for user {user.email}")
+            ... else:
+            ...     print("Invalid or expired key")
+        """
+        # Extract prefix for lookup
+        if len(plain_key) < 14:
+            return None
+
+        key_prefix = plain_key[:14]
+
+        # Look up key and user by prefix in single query
+        result = await self.repository.get_by_prefix_with_user(key_prefix)
+        if not result:
+            return None
+
+        api_key, user = result
+
+        # Verify hash matches
+        if not verify_api_key(plain_key, api_key.key_hash, settings.API_KEY_SECRET):
+            return None
+
+        # Check if key is valid (active and not expired)
+        if not api_key.is_valid():
+            return None
+
+        return api_key, user
+
+    def should_update_usage(self, api_key: APIKey) -> bool:
+        """Check if last_used_at needs updating based on configurable threshold.
+
+        Returns True if:
+        - last_used_at is None (never used before), or
+        - last_used_at is older than API_KEY_USAGE_UPDATE_THRESHOLD_SECONDS
+
+        Args:
+            api_key: The API key to check.
+
+        Returns:
+            True if usage should be updated, False otherwise.
+        """
+        if api_key.last_used_at is None:
+            return True
+        elapsed = (datetime.now(UTC) - api_key.last_used_at).total_seconds()
+        return elapsed > settings.API_KEY_USAGE_UPDATE_THRESHOLD_SECONDS
+
+    async def record_usage_async(self, key_id: APIKeyID) -> None:
+        """Record API key usage asynchronously (for background tasks).
+
+        This method is designed to be called as a background task. It silently
+        handles missing keys to avoid errors in background processing.
+
+        Args:
+            key_id: The ID of the API key that was used.
+        """
+        api_key = await self.repository.get_by_id(key_id)
+        if api_key is None:
+            # Key was deleted between validation and background task execution
+            return
+
         now = datetime.now(UTC)
         api_key.record_usage(now)
         await self.repository.update(api_key)
-
-        return api_key
 
     async def get_api_key(self, key_id: APIKeyID) -> APIKey | None:
         """Get an API key by its ID.

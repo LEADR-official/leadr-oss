@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from fastapi import BackgroundTasks
 
 from leadr.auth.dependencies import AuthContextDependency
 
@@ -61,6 +62,7 @@ class TestAuthContextDependencyInit:
         mock_user_service = AsyncMock()
         mock_identity_service = AsyncMock()
         mock_nonce_service = AsyncMock()
+        background_tasks = BackgroundTasks()
 
         # This should hit the safety fallback
         with pytest.raises(
@@ -72,6 +74,7 @@ class TestAuthContextDependencyInit:
                 user_service=mock_user_service,
                 identity_service=mock_identity_service,
                 nonce_service=mock_nonce_service,
+                background_tasks=background_tasks,
                 api_key=None,
                 authorization=None,
                 leadr_client_nonce=None,

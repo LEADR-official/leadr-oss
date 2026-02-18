@@ -6,11 +6,14 @@ from uuid import uuid4
 
 import pytest
 
-from leadr.auth.domain.api_key import APIKeyStatus
+from leadr.accounts.domain.user import User
+from leadr.auth.domain.api_key import APIKey, APIKeyStatus
+from leadr.auth.services.api_key_crypto import hash_api_key
 from leadr.auth.services.api_key_service import APIKeyService
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import AccountID, APIKeyID, UserID
 from leadr.common.domain.pagination_result import PaginatedResult
+from leadr.config import settings
 
 
 @pytest.fixture
@@ -103,7 +106,6 @@ class TestAPIKeyService:
 
         # Mock repository methods for validation
         service.repository.get_by_prefix = AsyncMock(return_value=api_key)
-        service.repository.update = AsyncMock(side_effect=lambda e: e)
 
         # Validate the key
         validated_key = await service.validate_api_key(plain_key)
@@ -112,9 +114,10 @@ class TestAPIKeyService:
         assert validated_key.id == api_key.id
         assert validated_key.account_id == account_id
 
-        # Verify repository methods were called
+        # Verify repository.get_by_prefix was called
+        # Note: validate_api_key no longer updates last_used_at synchronously
+        # The caller is responsible for scheduling background updates
         service.repository.get_by_prefix.assert_called_once_with(plain_key[:14])
-        service.repository.update.assert_called_once()
 
     async def test_validate_api_key_invalid_key(self, service):
         """Test validating an invalid API key."""
@@ -374,8 +377,12 @@ class TestAPIKeyService:
         service.repository.get_by_id.assert_called_once_with(api_key.id)
         service.repository.update.assert_called_once()
 
-    async def test_validate_api_key_records_usage(self, service):
-        """Test that validating an API key records its usage."""
+    async def test_validate_api_key_does_not_update_last_used_at(self, service):
+        """Test that validate_api_key does not update last_used_at synchronously.
+
+        The caller is responsible for checking should_update_usage() and scheduling
+        a background task via record_usage_async() if needed.
+        """
         account_id = AccountID(uuid4())
         user_id = UserID(uuid4())
 
@@ -389,21 +396,18 @@ class TestAPIKeyService:
 
         # Mock repository methods for validation
         service.repository.get_by_prefix = AsyncMock(return_value=api_key)
-        service.repository.update = AsyncMock(side_effect=lambda e: e)
+        service.repository.update = AsyncMock()
 
-        # Validate the key (should record usage)
+        # Validate the key (should NOT record usage synchronously)
         validated_key = await service.validate_api_key(plain_key)
 
         assert validated_key is not None
-        assert validated_key.last_used_at is not None
+        # last_used_at should still be None since we don't update synchronously
+        assert validated_key.last_used_at is None
 
-        # Verify the timestamp is recent (within last 5 seconds)
-        time_diff = datetime.now(UTC) - validated_key.last_used_at
-        assert time_diff.total_seconds() < 5
-
-        # Verify repository methods were called
+        # Verify get_by_prefix was called but update was NOT called
         service.repository.get_by_prefix.assert_called_once()
-        service.repository.update.assert_called_once()
+        service.repository.update.assert_not_called()
 
     async def test_revoke_api_key_not_found(self, service):
         """Test that revoking a non-existent API key raises EntityNotFoundError."""
@@ -444,3 +448,241 @@ class TestAPIKeyService:
 
         assert "APIKey not found" in str(exc_info.value)
         service.repository.get_by_id.assert_called_once_with(non_existent_id)
+
+    def test_should_update_usage_returns_true_when_last_used_is_none(self, service):
+        """Test that should_update_usage returns True when last_used_at is None."""
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
+
+        api_key = APIKey(
+            account_id=account_id,
+            user_id=user_id,
+            name="Test Key",
+            key_hash="hash",
+            key_prefix="ldr_test12345",
+            last_used_at=None,
+        )
+
+        assert service.should_update_usage(api_key) is True
+
+    def test_should_update_usage_returns_true_when_last_used_is_stale(self, service):
+        """Test that should_update_usage returns True when last_used_at is older than threshold."""
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
+
+        # Set last_used_at to 10 minutes ago (threshold is 5 minutes by default)
+        stale_time = datetime.now(UTC) - timedelta(minutes=10)
+
+        api_key = APIKey(
+            account_id=account_id,
+            user_id=user_id,
+            name="Test Key",
+            key_hash="hash",
+            key_prefix="ldr_test12345",
+            last_used_at=stale_time,
+        )
+
+        assert service.should_update_usage(api_key) is True
+
+    def test_should_update_usage_returns_false_when_last_used_is_recent(self, service):
+        """Test that should_update_usage returns False when last_used_at is recent."""
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
+
+        # Set last_used_at to 1 minute ago (threshold is 5 minutes by default)
+        recent_time = datetime.now(UTC) - timedelta(minutes=1)
+
+        api_key = APIKey(
+            account_id=account_id,
+            user_id=user_id,
+            name="Test Key",
+            key_hash="hash",
+            key_prefix="ldr_test12345",
+            last_used_at=recent_time,
+        )
+
+        assert service.should_update_usage(api_key) is False
+
+    async def test_record_usage_async_updates_last_used_at(self, service):
+        """Test that record_usage_async updates last_used_at for existing key."""
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
+
+        api_key = APIKey(
+            account_id=account_id,
+            user_id=user_id,
+            name="Test Key",
+            key_hash="hash",
+            key_prefix="ldr_test12345",
+            last_used_at=None,
+        )
+
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=api_key)
+        service.repository.update = AsyncMock(side_effect=lambda e: e)
+
+        # Call record_usage_async
+        await service.record_usage_async(api_key.id)
+
+        # Verify last_used_at was updated
+        service.repository.get_by_id.assert_called_once_with(api_key.id)
+        service.repository.update.assert_called_once()
+
+        # Get the updated api_key passed to update
+        updated_key = service.repository.update.call_args[0][0]
+        assert updated_key.last_used_at is not None
+        time_diff = datetime.now(UTC) - updated_key.last_used_at
+        assert time_diff.total_seconds() < 5
+
+    async def test_record_usage_async_silently_ignores_missing_key(self, service):
+        """Test that record_usage_async does not raise error for non-existent key."""
+        non_existent_id = APIKeyID(uuid4())
+
+        # Mock repository.get_by_id to return None
+        service.repository.get_by_id = AsyncMock(return_value=None)
+        service.repository.update = AsyncMock()
+
+        # Should not raise - background tasks should fail silently
+        await service.record_usage_async(non_existent_id)
+
+        service.repository.get_by_id.assert_called_once_with(non_existent_id)
+        service.repository.update.assert_not_called()
+
+    async def test_validate_api_key_with_user_returns_both_entities(self, service):
+        """Test that validate_api_key_with_user returns both APIKey and User."""
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
+        plain_key = "ldr_valid_key_for_testing"
+        key_hash = hash_api_key(plain_key, settings.API_KEY_SECRET)
+
+        api_key = APIKey(
+            account_id=account_id,
+            user_id=user_id,
+            name="Test Key",
+            key_hash=key_hash,
+            key_prefix=plain_key[:14],
+            status=APIKeyStatus.ACTIVE,
+        )
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="test@example.com",
+            display_name="Test User",
+        )
+
+        # Mock repository method
+        service.repository.get_by_prefix_with_user = AsyncMock(return_value=(api_key, user))
+
+        result = await service.validate_api_key_with_user(plain_key)
+
+        assert result is not None
+        returned_key, returned_user = result
+        assert returned_key.id == api_key.id
+        assert returned_user.id == user_id
+        assert returned_user.email == "test@example.com"
+
+    async def test_validate_api_key_with_user_returns_none_for_invalid_key(self, service):
+        """Test that validate_api_key_with_user returns None for invalid key."""
+        # Mock repository method to return None (key not found)
+        service.repository.get_by_prefix_with_user = AsyncMock(return_value=None)
+
+        result = await service.validate_api_key_with_user("ldr_invalid_key")
+
+        assert result is None
+
+    async def test_validate_api_key_with_user_returns_none_for_short_key(self, service):
+        """Test that validate_api_key_with_user returns None for short key."""
+        result = await service.validate_api_key_with_user("ldr_short")
+
+        assert result is None
+
+    async def test_validate_api_key_with_user_returns_none_for_wrong_hash(self, service):
+        """Test that validate_api_key_with_user returns None when hash doesn't match."""
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
+        plain_key = "ldr_valid_key_for_testing"
+        # Use wrong hash
+        wrong_hash = hash_api_key("different_key", settings.API_KEY_SECRET)
+
+        api_key = APIKey(
+            account_id=account_id,
+            user_id=user_id,
+            name="Test Key",
+            key_hash=wrong_hash,
+            key_prefix=plain_key[:14],
+            status=APIKeyStatus.ACTIVE,
+        )
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="test@example.com",
+            display_name="Test User",
+        )
+
+        service.repository.get_by_prefix_with_user = AsyncMock(return_value=(api_key, user))
+
+        result = await service.validate_api_key_with_user(plain_key)
+
+        assert result is None
+
+    async def test_validate_api_key_with_user_returns_none_for_revoked_key(self, service):
+        """Test that validate_api_key_with_user returns None for revoked key."""
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
+        plain_key = "ldr_valid_key_for_testing"
+        key_hash = hash_api_key(plain_key, settings.API_KEY_SECRET)
+
+        api_key = APIKey(
+            account_id=account_id,
+            user_id=user_id,
+            name="Test Key",
+            key_hash=key_hash,
+            key_prefix=plain_key[:14],
+            status=APIKeyStatus.REVOKED,
+        )
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="test@example.com",
+            display_name="Test User",
+        )
+
+        service.repository.get_by_prefix_with_user = AsyncMock(return_value=(api_key, user))
+
+        result = await service.validate_api_key_with_user(plain_key)
+
+        assert result is None
+
+    async def test_validate_api_key_with_user_returns_none_for_expired_key(self, service):
+        """Test that validate_api_key_with_user returns None for expired key."""
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
+        plain_key = "ldr_valid_key_for_testing"
+        key_hash = hash_api_key(plain_key, settings.API_KEY_SECRET)
+        expired_time = datetime.now(UTC) - timedelta(days=1)
+
+        api_key = APIKey(
+            account_id=account_id,
+            user_id=user_id,
+            name="Test Key",
+            key_hash=key_hash,
+            key_prefix=plain_key[:14],
+            status=APIKeyStatus.ACTIVE,
+            expires_at=expired_time,
+        )
+
+        user = User(
+            id=user_id,
+            account_id=account_id,
+            email="test@example.com",
+            display_name="Test User",
+        )
+
+        service.repository.get_by_prefix_with_user = AsyncMock(return_value=(api_key, user))
+
+        result = await service.validate_api_key_with_user(plain_key)
+
+        assert result is None
