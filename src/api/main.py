@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from starlette.types import Lifespan
 
-from api.middleware import AccessLogMiddleware, GeoIPMiddleware
+from api.middleware import AccessLogMiddleware
 from api.routes import router as api_router
 from leadr.accounts.api.account_routes import router as account_router
 from leadr.accounts.api.user_routes import router as user_router
@@ -182,10 +182,7 @@ def create_app(
     app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, catchall_exception_handler)  # type: ignore[arg-type]
 
-    # Add middleware (order matters - last added runs first)
-    # GeoIP middleware runs first to attach geo data
-    app.add_middleware(GeoIPMiddleware, dev_override_ip=settings.DEV_OVERRIDE_IP)
-    # Access log middleware runs last (outermost) to capture full request timing
+    # Add middleware
     app.add_middleware(AccessLogMiddleware)
 
     # Create public and admin routers with separate authentication requirements

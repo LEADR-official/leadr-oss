@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
@@ -18,6 +18,7 @@ from leadr.boards.domain.run_entry import RunEntry
 from leadr.boards.services.dependencies import BoardServiceDep
 from leadr.common.api.hooks import PostCreateScoreHookDep, PreCreateScoreHookDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
+from leadr.common.dependencies import GeoInfoDep
 from leadr.common.domain.cursor import Cursor, CursorValidationError, PaginationDirection
 from leadr.common.domain.ids import AccountID, BoardID, GameID, IdentityID, ScoreID
 from leadr.scores.api.score_schemas import (
@@ -37,7 +38,7 @@ client_router = APIRouter()
 @client_router.post("/scores", status_code=status.HTTP_201_CREATED)
 async def create_score_client(
     score_request: ScoreClientCreateRequest,
-    request: Request,
+    geo: GeoInfoDep,
     service: ScoreServiceDep,
     board_service: BoardServiceDep,
     background_tasks: BackgroundTasks,
@@ -53,7 +54,7 @@ async def create_score_client(
 
     Args:
         score_request: Score creation details including board_id, player_name, and value.
-        request: FastAPI request object for accessing geo data.
+        geo: GeoIP information extracted from client IP address.
         service: Injected score service dependency.
         board_service: Injected board service for board lookup.
         background_tasks: FastAPI background tasks for async metadata updates.
@@ -70,10 +71,10 @@ async def create_score_client(
             match board's game).
         403: Score rejected by anti-cheat (rate limit exceeded).
     """
-    # Get geo data populated by GeoIP middleware
-    timezone = getattr(request.state, "geo_timezone", None)
-    country = getattr(request.state, "geo_country", None)
-    city = getattr(request.state, "geo_city", None)
+    # Get geo data from GeoIP dependency
+    timezone = geo.timezone
+    country = geo.country
+    city = geo.city
 
     # Identity derived from authenticated session
     identity = auth.identity
