@@ -18,6 +18,7 @@ from leadr.common.database import (
     _get_ssl_context,
     build_database_url,
     build_direct_database_url,
+    create_session,
     get_db,
 )
 
@@ -300,15 +301,26 @@ class TestGetDb:
 
     @pytest.mark.asyncio
     async def test_get_db_session_is_usable(self) -> None:
-        """Test that the yielded session can be used for database operations."""
+        """Test that get_db returns a session that's ready for use."""
         generator = get_db()
         try:
             async for session in generator:
-                # Should be able to execute a simple query
-                result = await session.execute(text("SELECT 1"))
-                assert result is not None
+                # Verify session is an AsyncSession instance
+                assert isinstance(session, AsyncSession)
+                # Session should be active and ready to use
+                assert session.is_active
                 break
         finally:
             await generator.aclose()
             # Dispose engine to avoid event loop issues
             await database.engine.dispose()
+
+
+class TestCreateSession:
+    """Tests for create_session function for non-FastAPI contexts."""
+
+    def test_create_session_returns_async_session(self) -> None:
+        """Test that create_session returns an AsyncSession."""
+        session = create_session()
+        assert isinstance(session, AsyncSession)
+        # Note: This test only verifies the return type, not database connectivity

@@ -1,6 +1,8 @@
 """Tests for nonce background tasks."""
 
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -57,8 +59,14 @@ class TestCleanupExpiredNonces:
         db_session.add(valid_nonce)
         await db_session.commit()
 
-        # Run cleanup task
-        await cleanup_expired_nonces()
+        # Mock create_session to return async context manager yielding our test session
+        @asynccontextmanager
+        async def mock_create_session():
+            yield db_session
+
+        with patch("leadr.auth.services.nonce_tasks.create_session", mock_create_session):
+            # Run cleanup task
+            await cleanup_expired_nonces()
 
         # Verify nonce still exists
         await db_session.refresh(valid_nonce)
@@ -78,8 +86,14 @@ class TestCleanupExpiredNonces:
         db_session.add(used_nonce)
         await db_session.commit()
 
-        # Run cleanup task
-        await cleanup_expired_nonces()
+        # Mock create_session to return async context manager yielding our test session
+        @asynccontextmanager
+        async def mock_create_session():
+            yield db_session
+
+        with patch("leadr.auth.services.nonce_tasks.create_session", mock_create_session):
+            # Run cleanup task
+            await cleanup_expired_nonces()
 
         # Verify used nonce still exists
         await db_session.refresh(used_nonce)
@@ -89,7 +103,13 @@ class TestCleanupExpiredNonces:
         """Test that cleanup task handles case with no expired nonces gracefully."""
         # No setup needed - empty database
 
-        # Run cleanup task - should not raise any errors
-        await cleanup_expired_nonces()
+        # Mock create_session to return async context manager yielding our test session
+        @asynccontextmanager
+        async def mock_create_session():
+            yield db_session
+
+        with patch("leadr.auth.services.nonce_tasks.create_session", mock_create_session):
+            # Run cleanup task - should not raise any errors
+            await cleanup_expired_nonces()
 
         # Task should complete without errors

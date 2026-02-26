@@ -9,7 +9,7 @@ import logging
 from sqlalchemy.exc import DBAPIError, OperationalError
 
 from leadr.auth.services.nonce_service import NonceService
-from leadr.common.database import get_db
+from leadr.common.database import create_session
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ async def cleanup_expired_nonces() -> None:
     logger.debug("Checking for expired nonces to clean up...")
 
     # Get database session
-    async for session in get_db():
+    async with create_session() as session:
         # Create nonce service
         nonce_service = NonceService(session)
 

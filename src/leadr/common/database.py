@@ -104,6 +104,24 @@ async_session_factory = async_sessionmaker(
 )
 
 
+def create_session() -> AsyncSession:
+    """Create a database session for non-FastAPI contexts.
+
+    Use this for background tasks, scripts, and other non-request contexts
+    where the FastAPI dependency injection pattern (get_db) is not appropriate.
+
+    Returns:
+        AsyncSession: A new database session that should be used with
+        async context manager: `async with create_session() as session:`
+
+    Example:
+        async with create_session() as session:
+            result = await session.execute(select(User))
+            await session.commit()
+    """
+    return async_session_factory()
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency for async database session.
 

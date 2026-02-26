@@ -1,5 +1,6 @@
 """Tests for board background tasks."""
 
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -54,11 +55,11 @@ class TestProcessDueTemplates:
 
         await db_session.commit()
 
-        # Mock get_db to return our session
-        async def mock_get_db():
-            yield db_session
+        # Mock create_session to return our session
+        def mock_create_session():
+            return db_session
 
-        with patch("leadr.boards.services.board_tasks.get_db", mock_get_db):
+        with patch("leadr.boards.services.board_tasks.create_session", mock_create_session):
             # Process templates
             await process_due_templates()
 
@@ -112,11 +113,11 @@ class TestProcessDueTemplates:
 
         await db_session.commit()
 
-        # Mock get_db
-        async def mock_get_db():
-            yield db_session
+        # Mock create_session
+        def mock_create_session():
+            return db_session
 
-        with patch("leadr.boards.services.board_tasks.get_db", mock_get_db):
+        with patch("leadr.boards.services.board_tasks.create_session", mock_create_session):
             # Process templates - should return early
             await process_due_templates()
 
@@ -133,14 +134,17 @@ class TestProcessDueTemplates:
     async def test_process_due_templates_database_error_on_query(self, db_session):
         """Test handling database error during template query."""
 
-        async def mock_get_db_with_error():
+        @asynccontextmanager
+        async def mock_create_session_with_error():
             mock_session = MagicMock()
             mock_session.execute = AsyncMock(
                 side_effect=OperationalError("DB error", {}, Exception())
             )
             yield mock_session
 
-        with patch("leadr.boards.services.board_tasks.get_db", mock_get_db_with_error):
+        with patch(
+            "leadr.boards.services.board_tasks.create_session", mock_create_session_with_error
+        ):
             # Should handle error gracefully and return
             await process_due_templates()
             # No exception should be raised
@@ -175,9 +179,9 @@ class TestProcessDueTemplates:
 
         await db_session.commit()
 
-        # Mock get_db
-        async def mock_get_db():
-            yield db_session
+        # Mock create_session
+        def mock_create_session():
+            return db_session
 
         # Mock to_domain to fail on first template, succeed on second
         original_to_domain = BoardTemplateORM.to_domain
@@ -190,7 +194,7 @@ class TestProcessDueTemplates:
             return original_to_domain(self)
 
         with (
-            patch("leadr.boards.services.board_tasks.get_db", mock_get_db),
+            patch("leadr.boards.services.board_tasks.create_session", mock_create_session),
             patch.object(BoardTemplateORM, "to_domain", mock_to_domain),
         ):
             # Process templates - should skip invalid and process valid
@@ -227,7 +231,8 @@ class TestProcessDueTemplates:
         await db_session.commit()
 
         # Mock session with commit error
-        async def mock_get_db_with_commit_error():
+        @asynccontextmanager
+        async def mock_create_session_with_commit_error():
             mock_session = MagicMock()
             mock_session.execute = db_session.execute
             mock_session.commit = AsyncMock(
@@ -236,7 +241,10 @@ class TestProcessDueTemplates:
             mock_session.rollback = AsyncMock()
             yield mock_session
 
-        with patch("leadr.boards.services.board_tasks.get_db", mock_get_db_with_commit_error):
+        with patch(
+            "leadr.boards.services.board_tasks.create_session",
+            mock_create_session_with_commit_error,
+        ):
             # Should handle commit error gracefully
             await process_due_templates()
             # No exception should be raised
@@ -280,11 +288,12 @@ class TestExpireBoards:
         db_session.add(board_orm)
         await db_session.commit()
 
-        # Mock get_db
-        async def mock_get_db():
+        # Mock create_session to return async context manager yielding our test session
+        @asynccontextmanager
+        async def mock_create_session():
             yield db_session
 
-        with patch("leadr.boards.services.board_tasks.get_db", mock_get_db):
+        with patch("leadr.boards.services.board_tasks.create_session", mock_create_session):
             # Expire boards
             await expire_boards()
 
@@ -326,11 +335,12 @@ class TestExpireBoards:
         db_session.add(board_orm)
         await db_session.commit()
 
-        # Mock get_db
-        async def mock_get_db():
+        # Mock create_session to return async context manager yielding our test session
+        @asynccontextmanager
+        async def mock_create_session():
             yield db_session
 
-        with patch("leadr.boards.services.board_tasks.get_db", mock_get_db):
+        with patch("leadr.boards.services.board_tasks.create_session", mock_create_session):
             # Expire boards - should return early
             await expire_boards()
 
@@ -341,12 +351,15 @@ class TestExpireBoards:
     async def test_expire_boards_database_error_on_query(self, db_session):
         """Test handling database error during board query."""
 
-        async def mock_get_db_with_error():
+        @asynccontextmanager
+        async def mock_create_session_with_error():
             mock_session = MagicMock()
             mock_session.execute = AsyncMock(side_effect=DBAPIError("DB error", {}, Exception()))
             yield mock_session
 
-        with patch("leadr.boards.services.board_tasks.get_db", mock_get_db_with_error):
+        with patch(
+            "leadr.boards.services.board_tasks.create_session", mock_create_session_with_error
+        ):
             # Should handle error gracefully and return
             await expire_boards()
             # No exception should be raised
@@ -386,7 +399,8 @@ class TestExpireBoards:
         await db_session.commit()
 
         # Mock session with commit error
-        async def mock_get_db_with_commit_error():
+        @asynccontextmanager
+        async def mock_create_session_with_commit_error():
             mock_session = MagicMock()
             mock_session.execute = db_session.execute
             mock_session.commit = AsyncMock(
@@ -395,7 +409,10 @@ class TestExpireBoards:
             mock_session.rollback = AsyncMock()
             yield mock_session
 
-        with patch("leadr.boards.services.board_tasks.get_db", mock_get_db_with_commit_error):
+        with patch(
+            "leadr.boards.services.board_tasks.create_session",
+            mock_create_session_with_commit_error,
+        ):
             # Should handle commit error gracefully
             await expire_boards()
             # No exception should be raised

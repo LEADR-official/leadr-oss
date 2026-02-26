@@ -14,7 +14,7 @@ from sqlalchemy.exc import DBAPIError, OperationalError
 from leadr.boards.adapters.orm import BoardORM, BoardTemplateORM
 from leadr.boards.services.board_service import BoardService
 from leadr.boards.services.board_template_service import BoardTemplateService
-from leadr.common.database import get_db
+from leadr.common.database import create_session
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ async def process_due_templates() -> None:
     logger.debug("Checking for due board templates...")
 
     # Get database session
-    async for session in get_db():
+    async with create_session() as session:
         # Query for due templates - fail fast on database errors
         try:
             result = await session.execute(
@@ -112,7 +112,7 @@ async def expire_boards() -> None:
     logger.debug("Checking for expired boards...")
 
     # Get database session
-    async for session in get_db():
+    async with create_session() as session:
         # Query for expired boards - fail fast on database errors
         try:
             result = await session.execute(

@@ -22,7 +22,7 @@ import logging
 import sys
 
 from leadr.auth.bootstrap import ensure_superadmin_exists
-from leadr.common.database import async_session_factory
+from leadr.common.database import create_session
 from leadr.config import settings
 
 # Configure logging
@@ -43,7 +43,7 @@ async def main() -> None:
     logger.info("Display name: %s", settings.SUPERADMIN_DISPLAY_NAME)
 
     try:
-        async with async_session_factory() as session:
+        async with create_session() as session:
             await ensure_superadmin_exists(session)
 
         logger.info("Superadmin creation completed successfully")
