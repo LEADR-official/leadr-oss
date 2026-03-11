@@ -785,3 +785,170 @@ class TestAuxDataInBoardState:
         assert state2.aux is not None
         assert state2.aux["event_count"] == 2
         assert state2.aux["last_event_id"] == str(event2.id)
+
+
+@pytest.mark.asyncio
+class TestValueDisplayAndMetadataPersistence:
+    """Tests for value_display and metadata persistence in score submissions."""
+
+    async def test_run_identity_persists_value_display_and_metadata(
+        self,
+        db_session: AsyncSession,
+    ):
+        """RUN_IDENTITY board persists value_display and metadata."""
+        # Create account
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account-vd-ri",
+        )
+
+        # Create game
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Value Display Test",
+            slug="value-display-ri",
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        # Create identity
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="test-device-vd-ri",
+        )
+
+        service = ScoreService(db_session)
+
+        # Submit score with value_display and metadata
+        _, state, _ = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
+            value=1234.0,
+            value_display="1,234",
+            metadata={"level": 5, "weapon": "sword"},
+        )
+
+        assert isinstance(state, BoardState)
+        assert state.value_display == "1,234"
+        assert state.metadata == {"level": 5, "weapon": "sword"}
+
+    async def test_run_runs_persists_value_display_and_metadata(
+        self,
+        db_session: AsyncSession,
+    ):
+        """RUN_RUNS board persists value_display and metadata on run entry."""
+        # Create account
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account-vd-rr",
+        )
+
+        # Create game
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Value Display Runs",
+            slug="value-display-rr",
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        # Create identity
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="test-device-vd-rr",
+        )
+
+        service = ScoreService(db_session)
+
+        # Submit score with value_display and metadata
+        _, entry, _ = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
+            value=5678.0,
+            value_display="5,678",
+            metadata={"difficulty": "hard"},
+        )
+
+        assert isinstance(entry, RunEntry)
+        assert entry.value_display == "5,678"
+        assert entry.metadata == {"difficulty": "hard"}
+
+    async def test_counter_persists_value_display_and_metadata(
+        self,
+        db_session: AsyncSession,
+    ):
+        """COUNTER board persists value_display and metadata."""
+        # Create account
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-account-vd-ctr",
+        )
+
+        # Create game
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        # Create board
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Value Display Counter",
+            slug="value-display-ctr",
+            board_type=BoardType.COUNTER,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        # Create identity
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="test-device-vd-ctr",
+        )
+
+        service = ScoreService(db_session)
+
+        # Submit score with value_display and metadata
+        _, state, _ = await service.submit_score(
+            board_id=board.id,
+            identity_id=identity.id,
+            delta=100.0,
+            value_display="100",
+            metadata={"source": "daily_bonus"},
+        )
+
+        assert isinstance(state, BoardState)
+        assert state.value_display == "100"
+        assert state.metadata == {"source": "daily_bonus"}

@@ -95,6 +95,8 @@ class ScoreService:
         is_test: bool = False,
         trust_tier: TrustTier = TrustTier.B,
         background_tasks: BackgroundTasks | None = None,
+        value_display: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> tuple[ScoreEvent, BoardState | RunEntry | None, AntiCheatResult | None]:
         """Submit a score using the event-sourcing architecture.
 
@@ -114,6 +116,8 @@ class ScoreService:
             is_test: Whether this is a test submission.
             trust_tier: Trust tier for anti-cheat thresholds (defaults to B).
             background_tasks: Optional BackgroundTasks for async ratio updates.
+            value_display: Optional formatted display string for the score value.
+            metadata: Optional custom metadata dictionary.
 
         Returns:
             Tuple of (ScoreEvent, ranking_entry, anti_cheat_result).
@@ -189,6 +193,8 @@ class ScoreService:
                 timezone=timezone,
                 country=country,
                 city=city,
+                value_display=value_display,
+                metadata=metadata,
             )
         elif board.board_type == BoardType.RUN_RUNS:
             ranking_entry = await self._handle_run_runs(
@@ -201,6 +207,8 @@ class ScoreService:
                 timezone=timezone,
                 country=country,
                 city=city,
+                value_display=value_display,
+                metadata=metadata,
             )
         elif board.board_type == BoardType.COUNTER:
             ranking_entry = await self._handle_counter(
@@ -213,6 +221,8 @@ class ScoreService:
                 timezone=timezone,
                 country=country,
                 city=city,
+                value_display=value_display,
+                metadata=metadata,
             )
         # RATIO boards have no direct handler - they are derived
 
@@ -287,6 +297,8 @@ class ScoreService:
         timezone: str | None,
         country: str | None,
         city: str | None,
+        value_display: str | None,
+        metadata: dict[str, Any] | None,
     ) -> BoardState:
         """Handle RUN_IDENTITY board submission.
 
@@ -302,6 +314,8 @@ class ScoreService:
             timezone: Timezone from GeoIP.
             country: Country code from GeoIP.
             city: City name from GeoIP.
+            value_display: Optional formatted display string.
+            metadata: Optional custom metadata.
 
         Returns:
             Updated or existing BoardState.
@@ -330,6 +344,8 @@ class ScoreService:
                 timezone=timezone,
                 country=country,
                 city=city,
+                value_display=value_display,
+                metadata=metadata,
             )
 
         # Apply keep_strategy
@@ -351,6 +367,8 @@ class ScoreService:
                 timezone=existing_state.timezone,
                 country=existing_state.country,
                 city=existing_state.city,
+                value_display=existing_state.value_display,
+                metadata=existing_state.metadata,
             )
 
         if board.keep_strategy == KeepStrategy.LATEST:
@@ -369,6 +387,8 @@ class ScoreService:
                 timezone=timezone,
                 country=country,
                 city=city,
+                value_display=value_display,
+                metadata=metadata,
             )
 
         if board.keep_strategy == KeepStrategy.BEST:
@@ -391,6 +411,8 @@ class ScoreService:
                     timezone=timezone,
                     country=country,
                     city=city,
+                    value_display=value_display,
+                    metadata=metadata,
                 )
             else:
                 # Keep existing better score, just update event count (keep original data)
@@ -408,6 +430,8 @@ class ScoreService:
                     timezone=existing_state.timezone,
                     country=existing_state.country,
                     city=existing_state.city,
+                    value_display=existing_state.value_display,
+                    metadata=existing_state.metadata,
                 )
 
         # Fallback (shouldn't reach here with valid keep_strategy)
@@ -424,6 +448,8 @@ class ScoreService:
         timezone: str | None,
         country: str | None,
         city: str | None,
+        value_display: str | None,
+        metadata: dict[str, Any] | None,
     ) -> RunEntry:
         """Handle RUN_RUNS board submission.
 
@@ -439,6 +465,8 @@ class ScoreService:
             timezone: Timezone from GeoIP.
             country: Country code from GeoIP.
             city: City name from GeoIP.
+            value_display: Optional formatted display string.
+            metadata: Optional custom metadata.
 
         Returns:
             Created RunEntry.
@@ -454,6 +482,8 @@ class ScoreService:
             timezone=timezone,
             country=country,
             city=city,
+            value_display=value_display,
+            metadata=metadata,
         )
 
     async def _handle_counter(
@@ -467,6 +497,8 @@ class ScoreService:
         timezone: str | None,
         country: str | None,
         city: str | None,
+        value_display: str | None,
+        metadata: dict[str, Any] | None,
     ) -> BoardState:
         """Handle COUNTER board submission.
 
@@ -482,6 +514,8 @@ class ScoreService:
             timezone: Timezone from GeoIP.
             country: Country code from GeoIP.
             city: City name from GeoIP.
+            value_display: Optional formatted display string.
+            metadata: Optional custom metadata.
 
         Returns:
             Updated BoardState.
@@ -510,6 +544,8 @@ class ScoreService:
                 timezone=timezone,
                 country=country,
                 city=city,
+                value_display=value_display,
+                metadata=metadata,
             )
 
         # Accumulate delta
@@ -532,6 +568,8 @@ class ScoreService:
             timezone=timezone,
             country=country,
             city=city,
+            value_display=value_display,
+            metadata=metadata,
         )
 
     async def _update_submission_metadata(
