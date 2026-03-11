@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
+from starlette.middleware.cors import CORSMiddleware
 from starlette.types import Lifespan
 
 from api.middleware import AccessLogMiddleware
@@ -182,7 +183,15 @@ def create_app(
     app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, catchall_exception_handler)  # type: ignore[arg-type]
 
-    # Add middleware
+    # Add middleware (order matters: CORS first to handle preflight, then logging)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ALLOW_ORIGINS,
+        allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+        allow_methods=settings.CORS_ALLOW_METHODS,
+        allow_headers=settings.CORS_ALLOW_HEADERS,
+        max_age=settings.CORS_MAX_AGE,
+    )
     app.add_middleware(AccessLogMiddleware)
 
     # Create public and admin routers with separate authentication requirements

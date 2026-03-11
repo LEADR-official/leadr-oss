@@ -360,6 +360,34 @@ class CommonSettings(BaseSettings):
         description="Use JSON format for logs (disable for colored console in dev)",
     )
 
+    # CORS Configuration
+    CORS_ALLOW_ORIGINS: list[str] = Field(
+        default=["*"],
+        description="Allowed CORS origins. Use ['*'] for all origins (required for game clients).",
+    )
+    CORS_ALLOW_CREDENTIALS: bool = Field(
+        default=False,
+        description="Allow credentials in CORS. Must be False when origins is ['*'].",
+    )
+    CORS_ALLOW_METHODS: list[str] = Field(
+        default=["GET", "POST", "PATCH", "OPTIONS"],
+        description="HTTP methods allowed for CORS requests.",
+    )
+    CORS_ALLOW_HEADERS: list[str] = Field(
+        default=[
+            "authorization",
+            "content-type",
+            "leadr-client-nonce",
+            "leadr-client",
+            "leadr-api-key",
+        ],
+        description="HTTP headers allowed in CORS requests.",
+    )
+    CORS_MAX_AGE: int = Field(
+        default=600,
+        description="Seconds to cache preflight responses (default: 10 minutes).",
+    )
+
     @model_validator(mode="after")
     def validate_api_enabled(self):
         """Ensure at least one API (Admin or Client) is enabled."""
