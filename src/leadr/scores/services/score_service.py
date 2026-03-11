@@ -137,7 +137,9 @@ class ScoreService:
         self._validate_submission_payload(board, value, delta)
 
         # Build event payload
-        event_payload = self._build_event_payload(board, value, delta)
+        event_payload = self._build_event_payload(
+            board, value, delta, value_display=value_display, metadata=metadata
+        )
 
         # Create score event (always, regardless of anti-cheat result - immutable audit log)
         event_service = ScoreEventService(self.session)
@@ -221,7 +223,6 @@ class ScoreService:
                 timezone=timezone,
                 country=country,
                 city=city,
-                value_display=value_display,
                 metadata=metadata,
             )
         # RATIO boards have no direct handler - they are derived
@@ -268,6 +269,8 @@ class ScoreService:
         board: Board,
         value: float | None,
         delta: float | None,
+        value_display: str | None = None,
+        metadata: Any | None = None,
     ) -> dict[str, Any]:
         """Build the event payload based on board type.
 
@@ -275,14 +278,20 @@ class ScoreService:
             board: The board being submitted to.
             value: Score value (for RUN boards).
             delta: Delta value (for COUNTER boards).
+            value_display: String representation of value for display (ignored for COUNTER).
+            metadata: Metadata to be associated with score event
 
         Returns:
             Event payload dictionary.
         """
         if board.board_type in (BoardType.RUN_IDENTITY, BoardType.RUN_RUNS):
-            return {"value": value}
+            return {
+                "value": value,
+                "value_display": value_display,
+                "metadata": metadata,
+            }
         elif board.board_type == BoardType.COUNTER:
-            return {"delta": delta}
+            return {"delta": delta, "metadata": metadata}
         else:
             return {}
 
@@ -497,8 +506,7 @@ class ScoreService:
         timezone: str | None,
         country: str | None,
         city: str | None,
-        value_display: str | None,
-        metadata: dict[str, Any] | None,
+        metadata: dict[str, Any] | None = None,
     ) -> BoardState:
         """Handle COUNTER board submission.
 
@@ -544,7 +552,6 @@ class ScoreService:
                 timezone=timezone,
                 country=country,
                 city=city,
-                value_display=value_display,
                 metadata=metadata,
             )
 
@@ -568,7 +575,6 @@ class ScoreService:
             timezone=timezone,
             country=country,
             city=city,
-            value_display=value_display,
             metadata=metadata,
         )
 

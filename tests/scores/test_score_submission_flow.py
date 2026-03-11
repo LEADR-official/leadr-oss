@@ -262,7 +262,7 @@ class TestRunIdentitySubmission:
         assert isinstance(event, ScoreEvent)
         assert event.board_id == board.id
         assert event.identity_id == identity.id
-        assert event.event_payload == {"value": 1000.0}
+        assert event.event_payload == {"value": 1000.0, "value_display": None, "metadata": None}
 
         # Verify board state was created
         assert isinstance(ranking_entry, BoardState)
@@ -585,7 +585,7 @@ class TestCounterSubmission:
         )
         assert isinstance(state1, BoardState)
         assert state1.primary_value == 10.0
-        assert event1.event_payload == {"delta": 10.0}
+        assert event1.event_payload == {"delta": 10.0, "metadata": None}
 
         # Submit second delta
         event2, state2, _ = await service.submit_score(
@@ -833,7 +833,7 @@ class TestValueDisplayAndMetadataPersistence:
         service = ScoreService(db_session)
 
         # Submit score with value_display and metadata
-        _, state, _ = await service.submit_score(
+        event, state, _ = await service.submit_score(
             board_id=board.id,
             identity_id=identity.id,
             value=1234.0,
@@ -844,6 +844,11 @@ class TestValueDisplayAndMetadataPersistence:
         assert isinstance(state, BoardState)
         assert state.value_display == "1,234"
         assert state.metadata == {"level": 5, "weapon": "sword"}
+
+        # Verify event_payload contains value_display and metadata for traceability
+        assert event.event_payload["value"] == 1234.0
+        assert event.event_payload["value_display"] == "1,234"
+        assert event.event_payload["metadata"] == {"level": 5, "weapon": "sword"}
 
     async def test_run_runs_persists_value_display_and_metadata(
         self,
@@ -887,7 +892,7 @@ class TestValueDisplayAndMetadataPersistence:
         service = ScoreService(db_session)
 
         # Submit score with value_display and metadata
-        _, entry, _ = await service.submit_score(
+        event, entry, _ = await service.submit_score(
             board_id=board.id,
             identity_id=identity.id,
             value=5678.0,
@@ -899,7 +904,12 @@ class TestValueDisplayAndMetadataPersistence:
         assert entry.value_display == "5,678"
         assert entry.metadata == {"difficulty": "hard"}
 
-    async def test_counter_persists_value_display_and_metadata(
+        # Verify event_payload contains value_display and metadata for traceability
+        assert event.event_payload["value"] == 5678.0
+        assert event.event_payload["value_display"] == "5,678"
+        assert event.event_payload["metadata"] == {"difficulty": "hard"}
+
+    async def test_counter_persists_metadata(
         self,
         db_session: AsyncSession,
     ):
@@ -941,14 +951,17 @@ class TestValueDisplayAndMetadataPersistence:
         service = ScoreService(db_session)
 
         # Submit score with value_display and metadata
-        _, state, _ = await service.submit_score(
+        event, state, _ = await service.submit_score(
             board_id=board.id,
             identity_id=identity.id,
             delta=100.0,
-            value_display="100",
             metadata={"source": "daily_bonus"},
         )
 
         assert isinstance(state, BoardState)
-        assert state.value_display == "100"
+        assert state.value_display is None
         assert state.metadata == {"source": "daily_bonus"}
+
+        # Verify event_payload contains metadata for traceability (COUNTER uses delta)
+        assert event.event_payload["delta"] == 100.0
+        assert event.event_payload["metadata"] == {"source": "daily_bonus"}
