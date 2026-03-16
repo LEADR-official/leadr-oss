@@ -4,7 +4,7 @@ import asyncio
 from unittest.mock import Mock
 
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from httpx import ASGITransport, AsyncClient
 
@@ -311,6 +311,75 @@ class TestAccessLogMiddleware:
 
         kwargs = mock_logger.info.call_args[1]
         assert len(kwargs["user_agent"]) == 256
+
+    @pytest.mark.asyncio
+    async def test_logs_account_id_from_request_state(self):
+        """Test that middleware logs account_id when set on request.state by a dependency."""
+        app = FastAPI()
+        mock_logger = Mock()
+
+        app.add_middleware(AccessLogMiddleware, logger=mock_logger)
+
+        @app.get("/test")
+        async def test_route(request: Request):
+            request.state.account_id = "acc_123"
+            return JSONResponse({"ok": True})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            await client.get("/test")
+
+        kwargs = mock_logger.info.call_args[1]
+        assert kwargs["account_id"] == "acc_123"
+        assert kwargs["game_id"] is None
+
+    @pytest.mark.asyncio
+    async def test_logs_account_id_and_game_id_from_request_state(self):
+        """Test that middleware logs both account_id and game_id when set on request.state."""
+        app = FastAPI()
+        mock_logger = Mock()
+
+        app.add_middleware(AccessLogMiddleware, logger=mock_logger)
+
+        @app.get("/test")
+        async def test_route(request: Request):
+            request.state.account_id = "acc_123"
+            request.state.game_id = "game_456"
+            return JSONResponse({"ok": True})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            await client.get("/test")
+
+        kwargs = mock_logger.info.call_args[1]
+        assert kwargs["account_id"] == "acc_123"
+        assert kwargs["game_id"] == "game_456"
+
+    @pytest.mark.asyncio
+    async def test_logs_none_for_account_and_game_when_state_not_set(self):
+        """Test that middleware logs None for account_id and game_id on unauthenticated routes."""
+        app = FastAPI()
+        mock_logger = Mock()
+
+        app.add_middleware(AccessLogMiddleware, logger=mock_logger)
+
+        @app.get("/test")
+        async def test_route():
+            return JSONResponse({"ok": True})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            await client.get("/test")
+
+        kwargs = mock_logger.info.call_args[1]
+        assert kwargs["account_id"] is None
+        assert kwargs["game_id"] is None
 
     @pytest.mark.asyncio
     async def test_leadr_client_malformed_does_not_crash(self):

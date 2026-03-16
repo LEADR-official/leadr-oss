@@ -352,6 +352,7 @@ class AuthContextDependency:
                     status_code=403,
                     detail="Access denied to the specified account",
                 )
+            request.state.account_id = str(auth_context.account_id)
             return auth_context
 
         # Client-only authentication
@@ -371,12 +372,15 @@ class AuthContextDependency:
                     status_code=401,
                     detail="Authorization token required",
                 )
-            return await self._validate_client_auth(
+            client_ctx = await self._validate_client_auth(
                 authorization=authorization,
                 identity_service=identity_service,
                 nonce_service=nonce_service,
                 leadr_client_nonce=leadr_client_nonce,
             )
+            request.state.account_id = str(client_ctx.account_id)
+            request.state.game_id = str(client_ctx.game_id)
+            return client_ctx
 
         # Should never reach here due to __init__ validation
         raise ValueError("At least one of require_admin or require_client must be True")

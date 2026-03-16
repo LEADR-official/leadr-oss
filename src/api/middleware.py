@@ -76,6 +76,8 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             "status_code": response.status_code,
             "duration_ms": round(duration_ms, 2),
             "client_ip": extract_client_ip(request),
+            "account_id": getattr(request.state, "account_id", None),
+            "game_id": getattr(request.state, "game_id", None),
             "leadr_client": _sanitise_header(request.headers.get("leadr-client")),
             "user_agent": _sanitise_header(request.headers.get("user-agent")),
         }
