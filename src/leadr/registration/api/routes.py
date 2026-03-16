@@ -3,10 +3,11 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import AdminAuthContextDep
+from leadr.common.api.hooks import PostCompleteRegistrationHookDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
 from leadr.config import settings
 from leadr.registration.api.schemas import (
@@ -92,6 +93,8 @@ async def verify_code(
 async def complete_registration(
     request: CompleteRegistrationRequest,
     registration_service: RegistrationServiceDep,
+    background_tasks: BackgroundTasks,
+    post_hook: PostCompleteRegistrationHookDep,
 ) -> CompleteRegistrationResponse:
     """Complete registration or invite acceptance.
 
@@ -128,6 +131,14 @@ async def complete_registration(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered",
         ) from None
+
+    await post_hook(
+        email=user.email,
+        display_name=user.display_name,
+        account_name=account.name,
+        account_slug=account.slug,
+        background_tasks=background_tasks,
+    )
 
     return CompleteRegistrationResponse.from_domain(account, user, api_key)
 

@@ -1,5 +1,6 @@
 """Tests for registration API routes."""
 
+from unittest.mock import ANY, AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -8,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User, UserStatus
 from leadr.auth.dependencies import require_admin_auth
+from leadr.common.api.hooks import get_post_complete_registration_hook
 from leadr.common.api.pagination import PaginatedResult
 from leadr.common.domain.ids import AccountID, UserID
 from leadr.registration.domain.jam_code import JamCode
@@ -356,6 +358,62 @@ class TestCompleteRegistration:
         assert response.status_code == 409
         data = response.json()
         assert data["error"] == "Email already registered"
+
+    async def test_post_hook_called_with_registration_data(
+        self, test_app, mock_client_no_db, mock_registration_service
+    ):
+        """Post hook should be called with the created account and user data."""
+        mock_account = Account(
+            id=AccountID(),
+            name="Hook Test Account",
+            slug="hook-test",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_user = User(
+            id=UserID(),
+            account_id=mock_account.id,
+            email="hook@example.com",
+            display_name="hookuser",
+        )
+        mock_registration_service.complete_registration.return_value = (
+            mock_account,
+            mock_user,
+            "ldr_key",
+        )
+
+        mock_hook = AsyncMock()
+        test_app.dependency_overrides[get_post_complete_registration_hook] = lambda: mock_hook
+
+        response = await mock_client_no_db.post(
+            "/register/complete",
+            json={"verification_token": "valid_token", "account_name": "Hook Test Account"},
+        )
+
+        assert response.status_code == 201
+        mock_hook.assert_called_once_with(
+            email="hook@example.com",
+            display_name="hookuser",
+            account_name="Hook Test Account",
+            account_slug="hook-test",
+            background_tasks=ANY,
+        )
+
+    async def test_post_hook_not_called_on_error(
+        self, test_app, mock_client_no_db, mock_registration_service
+    ):
+        """Post hook should NOT be called when registration fails."""
+        mock_registration_service.complete_registration.side_effect = ValueError("Invalid token")
+
+        mock_hook = AsyncMock()
+        test_app.dependency_overrides[get_post_complete_registration_hook] = lambda: mock_hook
+
+        response = await mock_client_no_db.post(
+            "/register/complete",
+            json={"verification_token": "bad_token", "account_name": "Test"},
+        )
+
+        assert response.status_code == 400
+        mock_hook.assert_not_called()
 
 
 @pytest.mark.asyncio

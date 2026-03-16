@@ -75,6 +75,29 @@ PreUpdateBoardTemplateHook: TypeAlias = UpdateHook[BoardTemplateUpdateRequest, A
 RateLimitHook = Callable[[Request], Awaitable[None]]
 
 
+# --- Registration hook protocol ---
+# (Public endpoint, no auth context — data comes from created entities)
+
+
+class PostCompleteRegistrationHook(Protocol):
+    """Hook called after POST /register/complete succeeds.
+
+    Fires for both new-account registration and invite-acceptance flows.
+    Does not follow the standard Hook[RequestT, AuthT] pattern because
+    /register/complete is a public endpoint with no auth context; the useful
+    data comes from the created entities rather than the request body.
+    """
+
+    async def __call__(
+        self,
+        email: str,
+        display_name: str,
+        account_name: str,
+        account_slug: str,
+        background_tasks: BackgroundTasks,
+    ) -> None: ...
+
+
 # --- No-op implementations ---
 
 
@@ -133,6 +156,16 @@ async def noop_pre_update_board_template(
     """No-op pre-update board template hook."""
 
 
+async def noop_post_complete_registration(
+    email: str,
+    display_name: str,
+    account_name: str,
+    account_slug: str,
+    background_tasks: BackgroundTasks,
+) -> None:
+    """No-op post-complete registration hook."""
+
+
 # --- Dependency factories (for override targets) ---
 
 
@@ -181,6 +214,11 @@ def get_pre_update_board_template_hook() -> PreUpdateBoardTemplateHook:
     return noop_pre_update_board_template
 
 
+def get_post_complete_registration_hook() -> PostCompleteRegistrationHook:
+    """Get the post-complete registration hook. Override in cloud."""
+    return noop_post_complete_registration
+
+
 # --- Injectable dependencies ---
 
 PreCreateGameHookDep = Annotated[PreCreateGameHook, Depends(get_pre_create_game_hook)]
@@ -194,6 +232,9 @@ PreCreateBoardTemplateHookDep = Annotated[
 ]
 PreUpdateBoardTemplateHookDep = Annotated[
     PreUpdateBoardTemplateHook, Depends(get_pre_update_board_template_hook)
+]
+PostCompleteRegistrationHookDep = Annotated[
+    PostCompleteRegistrationHook, Depends(get_post_complete_registration_hook)
 ]
 
 
