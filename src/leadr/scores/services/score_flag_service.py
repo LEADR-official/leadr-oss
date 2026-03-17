@@ -25,7 +25,7 @@ from leadr.common.domain.ids import (
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.services import BaseService
 from leadr.scores.adapters.orm import ScoreEventORM, ScoreFlagORM
-from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
+from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag
 from leadr.scores.services.anti_cheat_repositories import ScoreFlagRepository
 from leadr.scores.services.score_event_service import ScoreEventService
@@ -108,6 +108,41 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             >>> flag = await service.get_flag(flag_id)
         """
         return await self.get_by_id(flag_id)
+
+    async def create_flag(
+        self,
+        score_event_id: ScoreEventID,
+        flag_type: FlagType,
+        confidence: FlagConfidence,
+        metadata: dict[str, Any] | None = None,
+    ) -> ScoreFlag:
+        """Create a new score flag (for manual admin flagging).
+
+        Args:
+            score_event_id: ID of the score event to flag
+            flag_type: Type of flag (MANUAL, DUPLICATE, etc.)
+            confidence: Confidence level (LOW, MEDIUM, HIGH)
+            metadata: Optional metadata/notes about the flag
+
+        Returns:
+            The created ScoreFlag
+
+        Example:
+            >>> flag = await service.create_flag(
+            ...     score_event_id=event.id,
+            ...     flag_type=FlagType.MANUAL,
+            ...     confidence=FlagConfidence.MEDIUM,
+            ...     metadata={"reason": "Suspicious score"},
+            ... )
+        """
+        flag = ScoreFlag(
+            score_event_id=score_event_id,
+            flag_type=flag_type,
+            confidence=confidence,
+            metadata=metadata or {},
+            status=ScoreFlagStatus.PENDING,
+        )
+        return await self.repository.create(flag)
 
     async def _sync_ranking_status(self, flag: ScoreFlag, new_flag_status: ScoreFlagStatus) -> None:
         """Sync ranking status based on flag status change.

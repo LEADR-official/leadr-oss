@@ -6,13 +6,32 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from leadr.common.domain.ids import ScoreEventID, ScoreFlagID, UserID
+from leadr.scores.domain.anti_cheat.enums import FlagConfidence, FlagType, ScoreFlagStatus
 from leadr.scores.domain.anti_cheat.models import ScoreFlag
+
+
+class ScoreFlagCreateRequest(BaseModel):
+    """Request model for creating a score flag (manual flagging by admin)."""
+
+    score_event_id: ScoreEventID = Field(description="ID of the score event to flag")
+    flag_type: FlagType = Field(
+        default=FlagType.MANUAL,
+        description="Type of flag (manual, duplicate, velocity, rate_limit, outlier, etc.)",
+    )
+    confidence: FlagConfidence = Field(
+        default=FlagConfidence.MEDIUM,
+        description="Confidence level (low, medium, high)",
+    )
+    metadata: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional metadata/notes about the flag",
+    )
 
 
 class ScoreFlagUpdateRequest(BaseModel):
     """Request model for updating a score flag (reviewing)."""
 
-    status: str | None = Field(
+    status: ScoreFlagStatus | None = Field(
         default=None,
         description="Updated status: pending, confirmed_cheat, false_positive, or dismissed",
     )

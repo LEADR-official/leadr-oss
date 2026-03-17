@@ -1019,7 +1019,7 @@ class TestScoreFlagRoutes:
         assert response.status_code == 400
 
     async def test_update_flag_invalid_status(self, client: AsyncClient, db_session, test_api_key):
-        """Test updating a flag with invalid status returns 400."""
+        """Test updating a flag with invalid status returns 422 (Pydantic validation)."""
         # Create supporting entities
         account_service = AccountService(db_session)
         account = await account_service.create_account(
@@ -1080,8 +1080,7 @@ class TestScoreFlagRoutes:
             headers={"leadr-api-key": test_api_key},
         )
 
-        assert response.status_code == 400
-        assert "Invalid status" in response.json()["error"]
+        assert response.status_code == 422  # Pydantic validation error
 
     async def test_update_flag_no_data(self, client: AsyncClient, db_session, test_api_key):
         """Test updating a flag without providing any data returns 400."""
@@ -1219,3 +1218,262 @@ class TestScoreFlagRoutes:
         data = response.json()
         assert data["reviewer_decision"] == "Needs more investigation"
         assert data["status"] == "pending"  # Status unchanged
+
+    async def test_create_flag_success(self, client: AsyncClient, db_session, test_api_key):
+        """Test creating a score flag via API with default values."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_create_flag",
+            display_name="TestPlayer",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TB2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        # Create score event
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
+        )
+
+        # Create flag via API with defaults
+        response = await client.post(
+            "/score-flags",
+            json={"score_event_id": str(event.id)},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["score_event_id"] == str(event.id)
+        assert data["flag_type"] == "manual"
+        assert data["confidence"] == "medium"
+        assert data["status"] == "pending"
+        assert data["metadata"] == {}
+
+    async def test_create_flag_with_custom_type(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating a score flag with a custom flag type (e.g., duplicate)."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_create_custom",
+            display_name="TestPlayer",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TC2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
+        )
+
+        # Create flag with custom type and metadata
+        response = await client.post(
+            "/score-flags",
+            json={
+                "score_event_id": str(event.id),
+                "flag_type": "duplicate",
+                "confidence": "high",
+                "metadata": {"reason": "Manually flagged as duplicate"},
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["flag_type"] == "duplicate"
+        assert data["confidence"] == "high"
+        assert data["metadata"]["reason"] == "Manually flagged as duplicate"
+
+    async def test_create_flag_score_not_found(self, client: AsyncClient, db_session, test_api_key):
+        """Test creating a flag for non-existent score event returns 404."""
+        fake_event_id = "sev_00000000-0000-0000-0000-000000000000"
+
+        response = await client.post(
+            "/score-flags",
+            json={"score_event_id": fake_event_id},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 404
+        assert "Score event not found" in response.json()["error"]
+
+    async def test_create_flag_invalid_flag_type(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating a flag with invalid flag_type returns 422 (Pydantic validation)."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_invalid_type",
+            display_name="TestPlayer",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TI2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
+        )
+
+        response = await client.post(
+            "/score-flags",
+            json={
+                "score_event_id": str(event.id),
+                "flag_type": "invalid_type",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 422  # Pydantic validation error
+
+    async def test_create_flag_invalid_confidence(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating a flag with invalid confidence returns 422 (Pydantic validation)."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_invalid_conf",
+            display_name="TestPlayer",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TIC2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
+        )
+
+        response = await client.post(
+            "/score-flags",
+            json={
+                "score_event_id": str(event.id),
+                "confidence": "invalid_confidence",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 422  # Pydantic validation error

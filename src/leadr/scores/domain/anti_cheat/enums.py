@@ -53,6 +53,9 @@ class FlagType(str, Enum):
     CLUSTER = "cluster"
     """Multiple users submitting identical scores in short time window."""
 
+    MANUAL = "manual"
+    """Admin manually flagged this score for review."""
+
 
 class FlagConfidence(str, Enum):
     """Confidence level for anti-cheat detection.
