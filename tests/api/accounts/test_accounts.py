@@ -32,6 +32,10 @@ class TestAccountAPI:
         assert "id" in data
         assert "created_at" in data
         assert "updated_at" in data
+        # Geo fields should be present (nullable)
+        assert "timezone" in data
+        assert "country" in data
+        assert "city" in data
 
         # Verify we can retrieve it
         account_id = data["id"]
@@ -399,6 +403,77 @@ class TestAccountAPI:
         assert data["name"] == "Acme Corporation"  # unchanged
         assert data["slug"] == "acme-corp"  # unchanged
         assert data["status"] == "suspended"
+
+    async def test_update_account_geo_fields(self, authenticated_client: AsyncClient, db_session):
+        """Test updating geo fields (timezone, country, city) of an account."""
+        # Create account without geo fields
+        repo = AccountRepository(db_session)
+        account_id = AccountID()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-geo-test",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await repo.create(account)
+
+        # Update geo fields
+        response = await authenticated_client.patch(
+            f"/accounts/{account_id}",
+            json={
+                "timezone": "Europe/London",
+                "country": "GB",
+                "city": "London",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Acme Corporation"  # unchanged
+        assert data["slug"] == "acme-geo-test"  # unchanged
+        assert data["timezone"] == "Europe/London"
+        assert data["country"] == "GB"
+        assert data["city"] == "London"
+
+    async def test_update_account_single_geo_field(
+        self, authenticated_client: AsyncClient, db_session
+    ):
+        """Test updating only one geo field of an account."""
+        # Create account
+        repo = AccountRepository(db_session)
+        account_id = AccountID()
+        now = datetime.now(UTC)
+
+        account = Account(
+            id=account_id,
+            name="Acme Corporation",
+            slug="acme-single-geo",
+            status=AccountStatus.ACTIVE,
+            timezone="America/New_York",
+            country="US",
+            city="New York",
+            created_at=now,
+            updated_at=now,
+        )
+        await repo.create(account)
+
+        # Update only timezone
+        response = await authenticated_client.patch(
+            f"/accounts/{account_id}",
+            json={
+                "timezone": "America/Los_Angeles",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["timezone"] == "America/Los_Angeles"
+        assert data["country"] == "US"  # unchanged
+        assert data["city"] == "New York"  # unchanged
 
     async def test_update_account_empty_request(
         self, authenticated_client: AsyncClient, db_session

@@ -65,7 +65,7 @@ class TestAuthContextDependencyInit:
 
         mock_api_key_service = AsyncMock()
         mock_api_key_service.validate_api_key_with_user.return_value = (mock_key, mock_user)
-        mock_api_key_service.should_update_usage.return_value = False
+        mock_api_key_service.should_update_usage = Mock(return_value=False)
 
         await dep(
             request=mock_request,

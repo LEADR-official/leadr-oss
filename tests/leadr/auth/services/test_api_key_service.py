@@ -449,60 +449,6 @@ class TestAPIKeyService:
         assert "APIKey not found" in str(exc_info.value)
         service.repository.get_by_id.assert_called_once_with(non_existent_id)
 
-    def test_should_update_usage_returns_true_when_last_used_is_none(self, service):
-        """Test that should_update_usage returns True when last_used_at is None."""
-        account_id = AccountID(uuid4())
-        user_id = UserID(uuid4())
-
-        api_key = APIKey(
-            account_id=account_id,
-            user_id=user_id,
-            name="Test Key",
-            key_hash="hash",
-            key_prefix="ldr_test12345",
-            last_used_at=None,
-        )
-
-        assert service.should_update_usage(api_key) is True
-
-    def test_should_update_usage_returns_true_when_last_used_is_stale(self, service):
-        """Test that should_update_usage returns True when last_used_at is older than threshold."""
-        account_id = AccountID(uuid4())
-        user_id = UserID(uuid4())
-
-        # Set last_used_at to 10 minutes ago (threshold is 5 minutes by default)
-        stale_time = datetime.now(UTC) - timedelta(minutes=10)
-
-        api_key = APIKey(
-            account_id=account_id,
-            user_id=user_id,
-            name="Test Key",
-            key_hash="hash",
-            key_prefix="ldr_test12345",
-            last_used_at=stale_time,
-        )
-
-        assert service.should_update_usage(api_key) is True
-
-    def test_should_update_usage_returns_false_when_last_used_is_recent(self, service):
-        """Test that should_update_usage returns False when last_used_at is recent."""
-        account_id = AccountID(uuid4())
-        user_id = UserID(uuid4())
-
-        # Set last_used_at to 1 minute ago (threshold is 5 minutes by default)
-        recent_time = datetime.now(UTC) - timedelta(minutes=1)
-
-        api_key = APIKey(
-            account_id=account_id,
-            user_id=user_id,
-            name="Test Key",
-            key_hash="hash",
-            key_prefix="ldr_test12345",
-            last_used_at=recent_time,
-        )
-
-        assert service.should_update_usage(api_key) is False
-
     async def test_record_usage_async_updates_last_used_at(self, service):
         """Test that record_usage_async updates last_used_at for existing key."""
         account_id = AccountID(uuid4())
@@ -686,3 +632,61 @@ class TestAPIKeyService:
         result = await service.validate_api_key_with_user(plain_key)
 
         assert result is None
+
+
+class TestAPIKeyServiceShouldUpdateUsage:
+    """Test suite for synchronous should_update_usage method."""
+
+    def test_should_update_usage_returns_true_when_last_used_is_none(self, service):
+        """Test that should_update_usage returns True when last_used_at is None."""
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
+
+        api_key = APIKey(
+            account_id=account_id,
+            user_id=user_id,
+            name="Test Key",
+            key_hash="hash",
+            key_prefix="ldr_test12345",
+            last_used_at=None,
+        )
+
+        assert service.should_update_usage(api_key) is True
+
+    def test_should_update_usage_returns_true_when_last_used_is_stale(self, service):
+        """Test that should_update_usage returns True when last_used_at is older than threshold."""
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
+
+        # Set last_used_at to 10 minutes ago (threshold is 5 minutes by default)
+        stale_time = datetime.now(UTC) - timedelta(minutes=10)
+
+        api_key = APIKey(
+            account_id=account_id,
+            user_id=user_id,
+            name="Test Key",
+            key_hash="hash",
+            key_prefix="ldr_test12345",
+            last_used_at=stale_time,
+        )
+
+        assert service.should_update_usage(api_key) is True
+
+    def test_should_update_usage_returns_false_when_last_used_is_recent(self, service):
+        """Test that should_update_usage returns False when last_used_at is recent."""
+        account_id = AccountID(uuid4())
+        user_id = UserID(uuid4())
+
+        # Set last_used_at to 1 minute ago (threshold is 5 minutes by default)
+        recent_time = datetime.now(UTC) - timedelta(minutes=1)
+
+        api_key = APIKey(
+            account_id=account_id,
+            user_id=user_id,
+            name="Test Key",
+            key_hash="hash",
+            key_prefix="ldr_test12345",
+            last_used_at=recent_time,
+        )
+
+        assert service.should_update_usage(api_key) is False

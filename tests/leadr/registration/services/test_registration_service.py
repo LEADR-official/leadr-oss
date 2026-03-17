@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.domain.user import User, UserStatus
 from leadr.common.domain.ids import AccountID, UserID
+from leadr.common.geoip import GeoInfo
 from leadr.registration.domain.jam_code import JamCode
 from leadr.registration.services.registration_service import RegistrationService
 
@@ -17,7 +18,7 @@ class TestRegistrationServiceCompleteRegistration:
     """Test RegistrationService.complete_registration method."""
 
     async def test_complete_registration_success(self, db_session: AsyncSession):
-        """Test successful registration flow."""
+        """Test successful registration flow with geo info."""
         # Mock all dependencies
         mock_account_service = AsyncMock()
         mock_user_service = AsyncMock()
@@ -35,6 +36,9 @@ class TestRegistrationServiceCompleteRegistration:
             name="Test Account",
             slug="test-account",
             status=AccountStatus.ACTIVE,
+            timezone="America/New_York",
+            country="US",
+            city="New York",
         )
         mock_account_service.create_account.return_value = mock_account
 
@@ -57,10 +61,12 @@ class TestRegistrationServiceCompleteRegistration:
             email_service=mock_email_service,
         )
 
+        geo_info = GeoInfo(timezone="America/New_York", country="US", city="New York")
         account, user, api_key = await service.complete_registration(
             verification_token="valid_token",
             account_name="Test Account",
             account_slug="test-account",
+            geo_info=geo_info,
         )
 
         assert account == mock_account
@@ -70,7 +76,11 @@ class TestRegistrationServiceCompleteRegistration:
         # Verify all services were called correctly
         mock_verification_service.validate_verification_token.assert_called_once_with("valid_token")
         mock_account_service.create_account.assert_called_once_with(
-            name="Test Account", slug="test-account"
+            name="Test Account",
+            slug="test-account",
+            timezone="America/New_York",
+            country="US",
+            city="New York",
         )
         mock_user_service.create_user.assert_called_once_with(
             account_id=mock_account.id,
@@ -79,6 +89,118 @@ class TestRegistrationServiceCompleteRegistration:
             is_owner=True,
         )
         mock_api_key_service.create_api_key.assert_called_once()
+
+    async def test_complete_registration_without_geo_info(self, db_session: AsyncSession):
+        """Test registration without geo info passes None for geo fields."""
+        mock_account_service = AsyncMock()
+        mock_user_service = AsyncMock()
+        mock_api_key_service = AsyncMock()
+        mock_verification_service = Mock()
+        mock_jam_code_service = AsyncMock()
+        mock_email_service = AsyncMock()
+
+        mock_verification_service.validate_verification_token.return_value = "test@example.com"
+        mock_verification_service.get_invite_user_id.return_value = None
+
+        mock_account = Account(
+            id=AccountID(),
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_account_service.create_account.return_value = mock_account
+
+        mock_user = User(
+            id=UserID(),
+            account_id=mock_account.id,
+            email="test@example.com",
+            display_name="test",
+        )
+        mock_user_service.create_user.return_value = mock_user
+        mock_api_key_service.create_api_key.return_value = (Mock(), "ldr_key")
+
+        service = RegistrationService(
+            db=db_session,
+            account_service=mock_account_service,
+            user_service=mock_user_service,
+            api_key_service=mock_api_key_service,
+            verification_service=mock_verification_service,
+            jam_code_service=mock_jam_code_service,
+            email_service=mock_email_service,
+        )
+
+        await service.complete_registration(
+            verification_token="valid_token",
+            account_name="Test Account",
+            account_slug="test-account",
+            geo_info=None,  # No geo info
+        )
+
+        # Verify geo fields are None when geo_info is not provided
+        mock_account_service.create_account.assert_called_once_with(
+            name="Test Account",
+            slug="test-account",
+            timezone=None,
+            country=None,
+            city=None,
+        )
+
+    async def test_complete_registration_with_empty_geo_info(self, db_session: AsyncSession):
+        """Test registration with empty geo info passes None for geo fields."""
+        mock_account_service = AsyncMock()
+        mock_user_service = AsyncMock()
+        mock_api_key_service = AsyncMock()
+        mock_verification_service = Mock()
+        mock_jam_code_service = AsyncMock()
+        mock_email_service = AsyncMock()
+
+        mock_verification_service.validate_verification_token.return_value = "test@example.com"
+        mock_verification_service.get_invite_user_id.return_value = None
+
+        mock_account = Account(
+            id=AccountID(),
+            name="Test Account",
+            slug="test-account",
+            status=AccountStatus.ACTIVE,
+        )
+        mock_account_service.create_account.return_value = mock_account
+
+        mock_user = User(
+            id=UserID(),
+            account_id=mock_account.id,
+            email="test@example.com",
+            display_name="test",
+        )
+        mock_user_service.create_user.return_value = mock_user
+        mock_api_key_service.create_api_key.return_value = (Mock(), "ldr_key")
+
+        service = RegistrationService(
+            db=db_session,
+            account_service=mock_account_service,
+            user_service=mock_user_service,
+            api_key_service=mock_api_key_service,
+            verification_service=mock_verification_service,
+            jam_code_service=mock_jam_code_service,
+            email_service=mock_email_service,
+        )
+
+        # GeoInfo with all None fields (e.g., when GeoIP lookup fails)
+        geo_info = GeoInfo(timezone=None, country=None, city=None)
+        await service.complete_registration(
+            verification_token="valid_token",
+            account_name="Test Account",
+            account_slug="test-account",
+            geo_info=geo_info,
+        )
+
+        # Verify geo fields are None when geo_info has all None fields
+        mock_account_service.create_account.assert_called_once_with(
+            name="Test Account",
+            slug="test-account",
+            timezone=None,
+            country=None,
+            city=None,
+        )
 
     async def test_complete_registration_auto_generates_slug(self, db_session: AsyncSession):
         """Test that slug is auto-generated when not provided."""
@@ -669,7 +791,7 @@ class TestRegistrationServiceInviteFlow:
     """Test RegistrationService invite completion flow."""
 
     async def test_complete_registration_invite_flow_activates_user(self, db_session: AsyncSession):
-        """Test that invite flow activates the invited user."""
+        """Test that invite flow activates the invited user and ignores geo_info."""
         mock_account_service = AsyncMock()
         mock_user_service = AsyncMock()
         mock_api_key_service = AsyncMock()
@@ -714,13 +836,16 @@ class TestRegistrationServiceInviteFlow:
             email_service=mock_email_service,
         )
 
+        # Pass geo_info even for invite flow - it should be ignored
+        geo_info = GeoInfo(timezone="America/New_York", country="US", city="New York")
         account, user, api_key = await service.complete_registration(
             verification_token="valid_invite_token",
             account_name=None,  # Not needed for invite flow
+            geo_info=geo_info,  # Should be ignored
         )
 
         assert api_key == "ldr_invite_key"
-        # Should not create new account
+        # Should not create new account (geo_info is ignored)
         mock_account_service.create_account.assert_not_called()
         # Should not create new user
         mock_user_service.create_user.assert_not_called()

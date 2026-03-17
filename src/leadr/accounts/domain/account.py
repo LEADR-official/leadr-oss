@@ -32,6 +32,18 @@ class Account(Entity):
     name: str
     slug: str
     status: AccountStatus = AccountStatus.ACTIVE
+    timezone: str | None = Field(
+        default=None,
+        description="Timezone from GeoIP lookup during registration",
+    )
+    country: str | None = Field(
+        default=None,
+        description="Country code from GeoIP lookup during registration",
+    )
+    city: str | None = Field(
+        default=None,
+        description="City name from GeoIP lookup during registration",
+    )
 
     @field_validator("name")
     @classmethod

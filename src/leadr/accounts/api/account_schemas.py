@@ -30,6 +30,9 @@ class AccountUpdateRequest(BaseModel):
         default=None, description="Account status (active, suspended, deleted)"
     )
     deleted: bool | None = Field(default=None, description="Set to true to soft delete the account")
+    timezone: str | None = Field(default=None, description="Timezone (IANA format)")
+    country: str | None = Field(default=None, description="Country code (ISO 2-letter)")
+    city: str | None = Field(default=None, description="City name")
 
 
 class AccountResponse(BaseModel):
@@ -39,6 +42,9 @@ class AccountResponse(BaseModel):
     name: str = Field(description="Account name")
     slug: str = Field(description="URL-friendly identifier")
     status: AccountStatus = Field(description="Current account status")
+    timezone: str | None = Field(description="Timezone from registration GeoIP")
+    country: str | None = Field(description="Country code from registration GeoIP")
+    city: str | None = Field(description="City name from registration GeoIP")
     created_at: datetime = Field(description="Timestamp when the account was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -57,6 +63,9 @@ class AccountResponse(BaseModel):
             name=account.name,
             slug=account.slug,
             status=account.status,
+            timezone=account.timezone,
+            country=account.country,
+            city=account.city,
             created_at=account.created_at,
             updated_at=account.updated_at,
         )

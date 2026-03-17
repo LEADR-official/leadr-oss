@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from leadr.auth.dependencies import AdminAuthContextDep
 from leadr.common.api.hooks import PostCompleteRegistrationHookDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationParams
+from leadr.common.dependencies import GeoInfoDep
 from leadr.config import settings
 from leadr.registration.api.schemas import (
     CompleteRegistrationRequest,
@@ -95,6 +96,7 @@ async def complete_registration(
     registration_service: RegistrationServiceDep,
     background_tasks: BackgroundTasks,
     post_hook: PostCompleteRegistrationHookDep,
+    geo_info: GeoInfoDep,
 ) -> CompleteRegistrationResponse:
     """Complete registration or invite acceptance.
 
@@ -105,11 +107,13 @@ async def complete_registration(
     - Creates user as account owner
     - Creates API key for CLI authentication
     - Optionally redeems jam code
+    - Geo fields (timezone, country, city) auto-populated from GeoIP
 
     Invite flow (joining existing account):
     - Activates the invited user (changes status from INVITED to ACTIVE)
     - Creates API key for CLI authentication
     - account_name and jam_code are ignored
+    - geo_info is ignored (account already exists)
 
     The API key is returned in plaintext and should be stored securely by the client.
     """
@@ -120,6 +124,7 @@ async def complete_registration(
             account_slug=request.account_slug,
             jam_code=request.jam_code,
             display_name=request.display_name,
+            geo_info=geo_info,
         )
     except ValueError as e:
         raise HTTPException(

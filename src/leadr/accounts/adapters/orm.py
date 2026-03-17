@@ -52,6 +52,9 @@ class AccountORM(Base):
         server_default="active",
         index=True,
     )
+    timezone: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    country: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    city: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
 
     # Relationships
     users: Mapped[list["UserORM"]] = relationship(

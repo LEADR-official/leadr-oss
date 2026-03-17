@@ -33,8 +33,11 @@ class AccountService(BaseService[Account, AccountRepository]):
         self,
         name: str,
         slug: str | None = None,
+        timezone: str | None = None,
+        country: str | None = None,
+        city: str | None = None,
     ) -> Account:
-        """Create a new account with optional slug override.
+        """Create a new account with optional slug override and geo data.
 
         If slug is not provided, it will be auto-generated from the name
         with automatic collision handling to ensure global uniqueness.
@@ -42,6 +45,9 @@ class AccountService(BaseService[Account, AccountRepository]):
         Args:
             name: The account name.
             slug: Optional URL-friendly slug. If not provided, auto-generated from name.
+            timezone: Optional timezone from GeoIP lookup (e.g., "America/New_York").
+            country: Optional country code from GeoIP lookup (e.g., "US").
+            city: Optional city name from GeoIP lookup (e.g., "New York").
 
         Returns:
             The created Account domain entity.
@@ -52,10 +58,13 @@ class AccountService(BaseService[Account, AccountRepository]):
         Example:
             >>> # Auto-generate slug from name
             >>> account = await service.create_account(name="Acme Corporation")
-            >>> # Override with custom slug
+            >>> # Override with custom slug and geo data
             >>> account = await service.create_account(
             ...     name="Acme Corporation",
             ...     slug="acme-corp",
+            ...     timezone="America/New_York",
+            ...     country="US",
+            ...     city="New York",
             ... )
         """
         # Generate or validate slug
@@ -82,6 +91,9 @@ class AccountService(BaseService[Account, AccountRepository]):
             name=name,
             slug=slug,
             status=AccountStatus.ACTIVE,
+            timezone=timezone,
+            country=country,
+            city=city,
         )
 
         return await self.repository.create(account)

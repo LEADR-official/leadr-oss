@@ -11,6 +11,7 @@ from leadr.accounts.services.account_service import AccountService
 from leadr.accounts.services.user_service import UserService
 from leadr.auth.services.api_key_service import APIKeyService
 from leadr.common.domain.ids import AccountID, UserID
+from leadr.common.geoip import GeoInfo
 from leadr.common.utils.slug import generate_slug
 from leadr.infra.email import EmailService
 from leadr.logging import get_logger
@@ -64,14 +65,16 @@ class RegistrationService:
         account_slug: str | None = None,
         jam_code: str | None = None,
         display_name: str | None = None,
+        geo_info: GeoInfo | None = None,
     ) -> tuple[Account, User, str]:
         """Complete the registration process and create account, user, and API key.
 
         For invite flow: If the verification token contains a user_id, this is an
         invite completion. The existing invited user is activated and an API key
-        is created. Account creation is skipped.
+        is created. Account creation is skipped. geo_info is ignored.
 
         For registration flow: A new account, user, and API key are created.
+        geo_info is used to populate the account's timezone, country, and city.
 
         Args:
             verification_token: JWT token from email verification.
@@ -79,6 +82,7 @@ class RegistrationService:
             account_slug: Optional slug (will be auto-generated if not provided).
             jam_code: Optional jam code for promotional features (registration only).
             display_name: Optional display name (will use email prefix if not provided).
+            geo_info: Optional GeoIP info to populate account geo fields (registration only).
 
         Returns:
             Tuple of (Account, User, plain_api_key).
@@ -94,7 +98,7 @@ class RegistrationService:
         invite_user_id = self.verification_service.get_invite_user_id(verification_token)
 
         if invite_user_id:
-            # INVITE FLOW: Activate existing invited user
+            # INVITE FLOW: Activate existing invited user (geo_info ignored)
             return await self._complete_invite_registration(
                 user_id=invite_user_id,
                 display_name=display_name,
@@ -110,6 +114,7 @@ class RegistrationService:
                 account_slug=account_slug,
                 jam_code=jam_code,
                 display_name=display_name,
+                geo_info=geo_info,
             )
 
     async def _complete_invite_registration(
@@ -178,6 +183,7 @@ class RegistrationService:
         account_slug: str | None = None,
         jam_code: str | None = None,
         display_name: str | None = None,
+        geo_info: GeoInfo | None = None,
     ) -> tuple[Account, User, str]:
         """Complete registration for a new account.
 
@@ -187,6 +193,7 @@ class RegistrationService:
             account_slug: Optional slug (will be auto-generated if not provided).
             jam_code: Optional jam code for promotional features.
             display_name: Optional display name (will use email prefix if not provided).
+            geo_info: Optional GeoIP info to populate account geo fields.
 
         Returns:
             Tuple of (Account, User, plain_api_key).
@@ -207,10 +214,13 @@ class RegistrationService:
                 raise ValueError("Invalid or expired jam code")
             jam_code_meta = jam_code_entity.features
 
-        # Create account
+        # Create account with geo fields from GeoIP
         account = await self.account_service.create_account(
             name=account_name,
             slug=account_slug,
+            timezone=geo_info.timezone if geo_info else None,
+            country=geo_info.country if geo_info else None,
+            city=geo_info.city if geo_info else None,
         )
         logger.info("Account created", account_id=str(account.id), slug=account_slug)
 
