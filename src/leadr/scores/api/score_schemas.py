@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from leadr.boards.domain.board_state import BoardState
 from leadr.boards.domain.run_entry import RunEntry
-from leadr.common.domain.ids import AccountID, BoardID, GameID, IdentityID, ScoreID
+from leadr.common.domain.ids import AccountID, BoardID, GameID, IdentityID, ScoreEventID, ScoreID
 from leadr.config import settings
 from leadr.scores.domain.anti_cheat.enums import ScoreStatus
 
@@ -80,6 +80,11 @@ class ScoreResponse(BaseModel):
     game_id: GameID = Field(description="ID of the game this score belongs to")
     board_id: BoardID = Field(description="ID of the board this score belongs to")
     identity_id: IdentityID = Field(description="ID of the identity that submitted this score")
+    score_event_id: ScoreEventID | None = Field(
+        default=None,
+        description="ID of the score event that created/updated this score. "
+        "Null for RATIO boards which derive values from other boards.",
+    )
     player_name: str = Field(description="Display name of the player")
     value: float = Field(description="Numeric value of the score")
     value_display: str | None = Field(default=None, description="Formatted display string, or null")
@@ -129,12 +134,23 @@ class ScoreResponse(BaseModel):
         # Mask BoardStateID to ScoreID (same UUID, different prefix)
         masked_id = ScoreID(state.id.uuid)
 
+        # Extract score_event_id from aux field based on board type
+        # RUN_IDENTITY stores selected_event_id, COUNTER stores last_event_id
+        # RATIO boards don't have an event ID (they derive from other boards)
+        score_event_id: ScoreEventID | None = None
+        if state.aux:
+            if "selected_event_id" in state.aux:
+                score_event_id = ScoreEventID(state.aux["selected_event_id"])
+            elif "last_event_id" in state.aux:
+                score_event_id = ScoreEventID(state.aux["last_event_id"])
+
         return cls(
             id=masked_id,
             account_id=account_id,
             game_id=game_id,
             board_id=state.board_id,
             identity_id=state.identity_id,
+            score_event_id=score_event_id,
             player_name=state.player_name,
             value=state.primary_value or 0.0,
             value_display=state.value_display,
@@ -180,6 +196,7 @@ class ScoreResponse(BaseModel):
             game_id=game_id,
             board_id=entry.board_id,
             identity_id=entry.identity_id,
+            score_event_id=entry.score_event_id,
             player_name=entry.player_name,
             value=entry.primary_value,
             value_display=entry.value_display,

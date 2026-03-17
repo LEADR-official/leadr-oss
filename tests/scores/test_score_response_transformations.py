@@ -245,3 +245,138 @@ class TestScoreIDMasking:
         # ID should have scr_ prefix but same UUID
         assert str(response.id).startswith("scr_")
         assert response.id.uuid == run_entry.id.uuid
+
+
+@pytest.mark.asyncio
+class TestScoreEventIdExposure:
+    """Tests for score_event_id field exposure in ScoreResponse."""
+
+    async def test_run_entry_exposes_score_event_id(self):
+        """RunEntry should expose its score_event_id in the response."""
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
+        score_event_id = ScoreEventID()
+
+        run_entry = RunEntry(
+            board_id=board_id,
+            identity_id=identity_id,
+            score_event_id=score_event_id,
+            primary_value=123.45,
+            player_name="SpeedRunner",
+            is_test=False,
+        )
+
+        response = ScoreResponse.from_run_entry(
+            entry=run_entry,
+            account_id=account_id,
+            game_id=game_id,
+            rank=1,
+        )
+
+        assert response.score_event_id == score_event_id
+
+    async def test_board_state_with_selected_event_id_exposes_it(self):
+        """BoardState with selected_event_id in aux should expose it (RUN_IDENTITY boards)."""
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
+        score_event_id = ScoreEventID()
+
+        board_state = BoardState(
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=1500.0,
+            aux={"selected_event_id": str(score_event_id), "event_count": 3},
+            player_name="Test Player",
+            is_test=False,
+        )
+
+        response = ScoreResponse.from_board_state(
+            state=board_state,
+            account_id=account_id,
+            game_id=game_id,
+            rank=1,
+        )
+
+        assert response.score_event_id is not None
+        assert response.score_event_id.uuid == score_event_id.uuid
+
+    async def test_board_state_with_last_event_id_exposes_it(self):
+        """BoardState with last_event_id in aux should expose it (COUNTER boards)."""
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
+        score_event_id = ScoreEventID()
+
+        board_state = BoardState(
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,
+            aux={"last_event_id": str(score_event_id), "event_count": 5},
+            player_name="Test Player",
+            is_test=False,
+        )
+
+        response = ScoreResponse.from_board_state(
+            state=board_state,
+            account_id=account_id,
+            game_id=game_id,
+            rank=1,
+        )
+
+        assert response.score_event_id is not None
+        assert response.score_event_id.uuid == score_event_id.uuid
+
+    async def test_board_state_ratio_has_null_score_event_id(self):
+        """BoardState for RATIO boards (no event_id in aux) should have null score_event_id."""
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
+
+        board_state = BoardState(
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=0.75,
+            aux={"numerator_value": 15.0, "denominator_value": 20.0},
+            player_name="Test Player",
+            is_test=False,
+        )
+
+        response = ScoreResponse.from_board_state(
+            state=board_state,
+            account_id=account_id,
+            game_id=game_id,
+            rank=1,
+        )
+
+        assert response.score_event_id is None
+
+    async def test_board_state_no_aux_has_null_score_event_id(self):
+        """BoardState with no aux field should have null score_event_id."""
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
+
+        board_state = BoardState(
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,
+            aux=None,
+            player_name="Test Player",
+            is_test=False,
+        )
+
+        response = ScoreResponse.from_board_state(
+            state=board_state,
+            account_id=account_id,
+            game_id=game_id,
+            rank=1,
+        )
+
+        assert response.score_event_id is None
