@@ -139,6 +139,69 @@ def _make_run_entry(
 
 
 @pytest.mark.asyncio
+class TestCreateFlag:
+    """Tests for create_flag method."""
+
+    async def test_create_flag_with_default_status(self, service):
+        """Test create_flag uses PENDING status by default."""
+        score_event_id = ScoreEventID()
+        expected_flag = _make_flag(score_event_id=score_event_id, status=ScoreFlagStatus.PENDING)
+        service.repository.create = AsyncMock(return_value=expected_flag)
+
+        result = await service.create_flag(
+            score_event_id=score_event_id,
+            flag_type=FlagType.MANUAL,
+            confidence=FlagConfidence.MEDIUM,
+        )
+
+        assert result.status == ScoreFlagStatus.PENDING
+        service.repository.create.assert_awaited_once()
+        created_flag = service.repository.create.call_args[0][0]
+        assert created_flag.status == ScoreFlagStatus.PENDING
+
+    async def test_create_flag_with_explicit_status(self, service):
+        """Test create_flag accepts explicit status parameter."""
+        score_event_id = ScoreEventID()
+        expected_flag = _make_flag(score_event_id=score_event_id, status=ScoreFlagStatus.REMOVED)
+        service.repository.create = AsyncMock(return_value=expected_flag)
+
+        result = await service.create_flag(
+            score_event_id=score_event_id,
+            flag_type=FlagType.MANUAL,
+            confidence=FlagConfidence.HIGH,
+            status=ScoreFlagStatus.REMOVED,
+        )
+
+        assert result.status == ScoreFlagStatus.REMOVED
+        service.repository.create.assert_awaited_once()
+        created_flag = service.repository.create.call_args[0][0]
+        assert created_flag.status == ScoreFlagStatus.REMOVED
+
+    async def test_create_flag_with_metadata(self, service):
+        """Test create_flag passes metadata correctly."""
+        score_event_id = ScoreEventID()
+        metadata = {"reason": "Manual removal by admin"}
+        expected_flag = _make_flag(
+            score_event_id=score_event_id,
+            status=ScoreFlagStatus.REMOVED,
+            metadata=metadata,
+        )
+        service.repository.create = AsyncMock(return_value=expected_flag)
+
+        result = await service.create_flag(
+            score_event_id=score_event_id,
+            flag_type=FlagType.MANUAL,
+            confidence=FlagConfidence.HIGH,
+            status=ScoreFlagStatus.REMOVED,
+            metadata=metadata,
+        )
+
+        assert result.metadata == metadata
+        created_flag = service.repository.create.call_args[0][0]
+        assert created_flag.metadata == metadata
+
+
+@pytest.mark.asyncio
 class TestScoreFlagService:
     """Test suite for ScoreFlagService."""
 
@@ -392,6 +455,28 @@ class TestSyncRankingStatus:
             service._sync_run_runs_entry = AsyncMock()
 
             await service._sync_ranking_status(flag, ScoreFlagStatus.CONFIRMED_CHEAT)
+
+            service._sync_run_runs_entry.assert_awaited_once_with(
+                board_id=board.id,
+                score_event_id=flag.score_event_id,
+                exclude=True,
+            )
+
+    async def test_removed_status_excludes_from_ranking(self, service):
+        """REMOVED status excludes score from ranking (same as CONFIRMED_CHEAT)."""
+        board = _make_board(board_type=BoardType.RUN_RUNS)
+        event = _make_event(board_id=board.id)
+        flag = _make_flag(score_event_id=event.id)
+
+        with (
+            patch(f"{MODULE}.ScoreEventService") as mock_event_svc,
+            patch(f"{MODULE}.BoardService") as mock_board_svc,
+        ):
+            mock_event_svc.return_value.get_score_event = AsyncMock(return_value=event)
+            mock_board_svc.return_value.get_board = AsyncMock(return_value=board)
+            service._sync_run_runs_entry = AsyncMock()
+
+            await service._sync_ranking_status(flag, ScoreFlagStatus.REMOVED)
 
             service._sync_run_runs_entry.assert_awaited_once_with(
                 board_id=board.id,

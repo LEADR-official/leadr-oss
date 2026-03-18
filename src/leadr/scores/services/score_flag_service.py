@@ -114,6 +114,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         score_event_id: ScoreEventID,
         flag_type: FlagType,
         confidence: FlagConfidence,
+        status: ScoreFlagStatus = ScoreFlagStatus.PENDING,
         metadata: dict[str, Any] | None = None,
     ) -> ScoreFlag:
         """Create a new score flag (for manual admin flagging).
@@ -122,6 +123,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             score_event_id: ID of the score event to flag
             flag_type: Type of flag (MANUAL, DUPLICATE, etc.)
             confidence: Confidence level (LOW, MEDIUM, HIGH)
+            status: Initial status (defaults to PENDING)
             metadata: Optional metadata/notes about the flag
 
         Returns:
@@ -140,7 +142,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             flag_type=flag_type,
             confidence=confidence,
             metadata=metadata or {},
-            status=ScoreFlagStatus.PENDING,
+            status=status,
         )
         return await self.repository.create(flag)
 
@@ -167,7 +169,10 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         if board is None:
             return
 
-        is_exclusion = new_flag_status == ScoreFlagStatus.CONFIRMED_CHEAT
+        is_exclusion = new_flag_status in (
+            ScoreFlagStatus.CONFIRMED_CHEAT,
+            ScoreFlagStatus.REMOVED,
+        )
         is_restoration = new_flag_status in (
             ScoreFlagStatus.FALSE_POSITIVE,
             ScoreFlagStatus.DISMISSED,

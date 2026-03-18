@@ -104,6 +104,9 @@ class ScoreFlagStatus(str, Enum):
     CONFIRMED_CHEAT = "confirmed_cheat"
     """Admin confirmed this is cheating behavior."""
 
+    REMOVED = "removed"
+    """Admin has chosen to remove this score."""
+
     FALSE_POSITIVE = "false_positive"
     """Admin determined this was legitimate gameplay."""
 

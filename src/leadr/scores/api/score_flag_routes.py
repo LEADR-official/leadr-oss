@@ -13,6 +13,7 @@ from leadr.scores.api.score_flag_schemas import (
     ScoreFlagResponse,
     ScoreFlagUpdateRequest,
 )
+from leadr.scores.domain.anti_cheat.enums import ScoreFlagStatus
 from leadr.scores.services.dependencies import ScoreFlagServiceDep
 from leadr.scores.services.score_event_service import ScoreEventService
 
@@ -67,6 +68,7 @@ async def create_score_flag(
         score_event_id=request.score_event_id,
         flag_type=request.flag_type,
         confidence=request.confidence,
+        status=request.status or ScoreFlagStatus.REMOVED,
         metadata=request.metadata,
     )
 

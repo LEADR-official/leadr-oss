@@ -22,6 +22,10 @@ class ScoreFlagCreateRequest(BaseModel):
         default=FlagConfidence.MEDIUM,
         description="Confidence level (low, medium, high)",
     )
+    status: ScoreFlagStatus | None = Field(
+        default=ScoreFlagStatus.REMOVED,
+        description="Flag status (defaults to removed for manual admin flagging)",
+    )
     metadata: dict[str, Any] | None = Field(
         default=None,
         description="Optional metadata/notes about the flag",

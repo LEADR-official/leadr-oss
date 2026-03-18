@@ -1278,7 +1278,7 @@ class TestScoreFlagRoutes:
         assert data["score_event_id"] == str(event.id)
         assert data["flag_type"] == "manual"
         assert data["confidence"] == "medium"
-        assert data["status"] == "pending"
+        assert data["status"] == "removed"  # Default for manual admin flagging
         assert data["metadata"] == {}
 
     async def test_create_flag_with_custom_type(
@@ -1346,6 +1346,68 @@ class TestScoreFlagRoutes:
         assert data["flag_type"] == "duplicate"
         assert data["confidence"] == "high"
         assert data["metadata"]["reason"] == "Manually flagged as duplicate"
+
+    async def test_create_flag_with_custom_status(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating a score flag with a custom status (e.g., pending)."""
+        # Create supporting entities
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Acme Corporation",
+            slug="acme-corp",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(
+            account_id=account.id,
+            name="Test Game",
+        )
+
+        identity_service = IdentityService(db_session, device_service=DeviceService(db_session))
+        identity, _ = await identity_service.get_or_create_identity(
+            account_id=account.id,
+            game_id=game.id,
+            kind=IdentityKind.DEVICE,
+            external_key="dev_test_custom_status",
+            display_name="TestPlayer",
+        )
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Test Board",
+            icon="trophy",
+            short_code="TS2025",
+            unit="points",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        event_service = ScoreEventService(db_session)
+        event = await event_service.create_score_event(
+            account_id=account.id,
+            game_id=game.id,
+            board_id=board.id,
+            identity_id=identity.id,
+            event_payload={"value": 100.0},
+        )
+
+        # Create flag with explicit pending status (overriding default of removed)
+        response = await client.post(
+            "/score-flags",
+            json={
+                "score_event_id": str(event.id),
+                "status": "pending",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["status"] == "pending"
 
     async def test_create_flag_score_not_found(self, client: AsyncClient, db_session, test_api_key):
         """Test creating a flag for non-existent score event returns 404."""
