@@ -160,10 +160,11 @@ class TestCreateFlag:
         assert created_flag.status == ScoreFlagStatus.PENDING
 
     async def test_create_flag_with_explicit_status(self, service):
-        """Test create_flag accepts explicit status parameter."""
+        """Test create_flag accepts explicit status parameter and triggers sync for exclusion."""
         score_event_id = ScoreEventID()
         expected_flag = _make_flag(score_event_id=score_event_id, status=ScoreFlagStatus.REMOVED)
         service.repository.create = AsyncMock(return_value=expected_flag)
+        service._sync_ranking_status = AsyncMock()
 
         result = await service.create_flag(
             score_event_id=score_event_id,
@@ -176,6 +177,47 @@ class TestCreateFlag:
         service.repository.create.assert_awaited_once()
         created_flag = service.repository.create.call_args[0][0]
         assert created_flag.status == ScoreFlagStatus.REMOVED
+        # Verify sync was called for exclusion status
+        service._sync_ranking_status.assert_awaited_once_with(
+            expected_flag, ScoreFlagStatus.REMOVED
+        )
+
+    async def test_create_flag_with_pending_status_no_sync(self, service):
+        """Test create_flag with PENDING status does NOT trigger sync."""
+        score_event_id = ScoreEventID()
+        expected_flag = _make_flag(score_event_id=score_event_id, status=ScoreFlagStatus.PENDING)
+        service.repository.create = AsyncMock(return_value=expected_flag)
+        service._sync_ranking_status = AsyncMock()
+
+        await service.create_flag(
+            score_event_id=score_event_id,
+            flag_type=FlagType.MANUAL,
+            confidence=FlagConfidence.MEDIUM,
+            status=ScoreFlagStatus.PENDING,
+        )
+
+        # Sync should NOT be called for PENDING status
+        service._sync_ranking_status.assert_not_awaited()
+
+    async def test_create_flag_with_confirmed_cheat_triggers_sync(self, service):
+        """Test create_flag with CONFIRMED_CHEAT status triggers sync."""
+        score_event_id = ScoreEventID()
+        expected_flag = _make_flag(
+            score_event_id=score_event_id, status=ScoreFlagStatus.CONFIRMED_CHEAT
+        )
+        service.repository.create = AsyncMock(return_value=expected_flag)
+        service._sync_ranking_status = AsyncMock()
+
+        await service.create_flag(
+            score_event_id=score_event_id,
+            flag_type=FlagType.MANUAL,
+            confidence=FlagConfidence.HIGH,
+            status=ScoreFlagStatus.CONFIRMED_CHEAT,
+        )
+
+        service._sync_ranking_status.assert_awaited_once_with(
+            expected_flag, ScoreFlagStatus.CONFIRMED_CHEAT
+        )
 
     async def test_create_flag_with_metadata(self, service):
         """Test create_flag passes metadata correctly."""
@@ -187,6 +229,7 @@ class TestCreateFlag:
             metadata=metadata,
         )
         service.repository.create = AsyncMock(return_value=expected_flag)
+        service._sync_ranking_status = AsyncMock()
 
         result = await service.create_flag(
             score_event_id=score_event_id,
@@ -460,6 +503,7 @@ class TestSyncRankingStatus:
                 board_id=board.id,
                 score_event_id=flag.score_event_id,
                 exclude=True,
+                flag_status=ScoreFlagStatus.CONFIRMED_CHEAT,
             )
 
     async def test_removed_status_excludes_from_ranking(self, service):
@@ -482,6 +526,7 @@ class TestSyncRankingStatus:
                 board_id=board.id,
                 score_event_id=flag.score_event_id,
                 exclude=True,
+                flag_status=ScoreFlagStatus.REMOVED,
             )
 
     async def test_false_positive_on_run_identity_board(self, service):
@@ -531,8 +576,8 @@ class TestSyncRankingStatus:
 class TestSyncRunRunsEntry:
     """Test _sync_run_runs_entry."""
 
-    async def test_exclude_entry(self, service):
-        """Excluding sets excluded_at and excluded_reason."""
+    async def test_exclude_entry_confirmed_cheat(self, service):
+        """Excluding with CONFIRMED_CHEAT sets excluded_reason to 'confirmed_cheat'."""
         board_id = BoardID()
         event_id = ScoreEventID()
         entry = _make_run_entry(board_id, IdentityID(), event_id)
@@ -542,10 +587,31 @@ class TestSyncRunRunsEntry:
             mock_svc.get_by_board_and_score_event = AsyncMock(return_value=entry)
             mock_svc.repository.update = AsyncMock()
 
-            await service._sync_run_runs_entry(board_id, event_id, exclude=True)
+            await service._sync_run_runs_entry(
+                board_id, event_id, exclude=True, flag_status=ScoreFlagStatus.CONFIRMED_CHEAT
+            )
 
             assert entry.excluded_at is not None
             assert entry.excluded_reason == "confirmed_cheat"
+            mock_svc.repository.update.assert_awaited_once_with(entry)
+
+    async def test_exclude_entry_removed(self, service):
+        """Excluding with REMOVED sets excluded_reason to 'removed'."""
+        board_id = BoardID()
+        event_id = ScoreEventID()
+        entry = _make_run_entry(board_id, IdentityID(), event_id)
+
+        with patch(f"{MODULE}.RunEntryService") as mock_run_svc:
+            mock_svc = mock_run_svc.return_value
+            mock_svc.get_by_board_and_score_event = AsyncMock(return_value=entry)
+            mock_svc.repository.update = AsyncMock()
+
+            await service._sync_run_runs_entry(
+                board_id, event_id, exclude=True, flag_status=ScoreFlagStatus.REMOVED
+            )
+
+            assert entry.excluded_at is not None
+            assert entry.excluded_reason == "removed"
             mock_svc.repository.update.assert_awaited_once_with(entry)
 
     async def test_restore_entry(self, service):
@@ -561,7 +627,9 @@ class TestSyncRunRunsEntry:
             mock_svc.get_by_board_and_score_event = AsyncMock(return_value=entry)
             mock_svc.repository.update = AsyncMock()
 
-            await service._sync_run_runs_entry(board_id, event_id, exclude=False)
+            await service._sync_run_runs_entry(
+                board_id, event_id, exclude=False, flag_status=ScoreFlagStatus.FALSE_POSITIVE
+            )
 
             assert entry.excluded_at is None
             assert entry.excluded_reason is None
@@ -574,7 +642,9 @@ class TestSyncRunRunsEntry:
             mock_svc.get_by_board_and_score_event = AsyncMock(return_value=None)
             mock_svc.repository.update = AsyncMock()
 
-            await service._sync_run_runs_entry(BoardID(), ScoreEventID(), exclude=True)
+            await service._sync_run_runs_entry(
+                BoardID(), ScoreEventID(), exclude=True, flag_status=ScoreFlagStatus.CONFIRMED_CHEAT
+            )
 
             mock_svc.repository.update.assert_not_awaited()
 

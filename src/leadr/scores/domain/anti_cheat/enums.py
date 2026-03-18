@@ -115,10 +115,14 @@ class ScoreFlagStatus(str, Enum):
 
 
 class ScoreStatus(str, Enum):
-    """Lifecycle status of a score in the anti-cheat workflow.
+    """DEPRECATED: Legacy lifecycle status field.
 
-    Tracks the score from submission through review, determining visibility
-    on leaderboards.
+    This enum is retained for API backwards compatibility only. Score visibility
+    is now controlled via ScoreFlag status and materialized views:
+    - RunEntry.excluded_at for RUN_RUNS boards
+    - BoardState recomputation for RUN_IDENTITY/COUNTER boards
+
+    All API responses return ACTIVE regardless of actual flag status.
     """
 
     PROVISIONAL = "provisional"

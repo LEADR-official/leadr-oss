@@ -144,7 +144,13 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             metadata=metadata or {},
             status=status,
         )
-        return await self.repository.create(flag)
+        created_flag = await self.repository.create(flag)
+
+        # Sync ranking if status requires exclusion (for manual admin flagging flow)
+        if status in (ScoreFlagStatus.CONFIRMED_CHEAT, ScoreFlagStatus.REMOVED):
+            await self._sync_ranking_status(created_flag, status)
+
+        return created_flag
 
     async def _sync_ranking_status(self, flag: ScoreFlag, new_flag_status: ScoreFlagStatus) -> None:
         """Sync ranking status based on flag status change.
@@ -187,6 +193,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
                 board_id=board.id,
                 score_event_id=flag.score_event_id,
                 exclude=is_exclusion,
+                flag_status=new_flag_status,
             )
         elif board.board_type == BoardType.RUN_IDENTITY:
             await self._sync_run_identity_state(
@@ -209,6 +216,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         board_id: BoardID,
         score_event_id: ScoreEventID,
         exclude: bool,
+        flag_status: ScoreFlagStatus,
     ) -> None:
         """Exclude or restore a run entry from rankings.
 
@@ -216,6 +224,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             board_id: Board ID
             score_event_id: Score event ID
             exclude: True to exclude, False to restore
+            flag_status: The flag status that triggered this sync
         """
         run_entry_service = RunEntryService(self.session)
         entry = await run_entry_service.get_by_board_and_score_event(board_id, score_event_id)
@@ -224,7 +233,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
 
         if exclude:
             entry.excluded_at = datetime.now(UTC)
-            entry.excluded_reason = "confirmed_cheat"
+            entry.excluded_reason = flag_status.value
         else:
             entry.excluded_at = None
             entry.excluded_reason = None
@@ -279,10 +288,15 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
 
         # Correlated subquery - only checks flags for events being queried
         # Uses NOT EXISTS for efficient early-exit evaluation
-        confirmed_cheat_exists = exists(
+        exclusion_flag_exists = exists(
             select(ScoreFlagORM.id).where(
                 ScoreFlagORM.score_event_id == ScoreEventORM.id,
-                ScoreFlagORM.status == ScoreFlagStatus.CONFIRMED_CHEAT.value,
+                ScoreFlagORM.status.in_(
+                    [
+                        ScoreFlagStatus.CONFIRMED_CHEAT.value,
+                        ScoreFlagStatus.REMOVED.value,
+                    ]
+                ),
             )
         )
 
@@ -307,7 +321,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             .where(
                 ScoreEventORM.board_id == board.id.uuid,
                 ScoreEventORM.identity_id == identity_id.uuid,
-                ~confirmed_cheat_exists,
+                ~exclusion_flag_exists,
             )
             .order_by(order_by)
             .limit(1)
@@ -358,10 +372,15 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
 
         # Correlated subquery - only checks flags for events being queried
         # Uses NOT EXISTS for efficient early-exit evaluation
-        confirmed_cheat_exists = exists(
+        exclusion_flag_exists = exists(
             select(ScoreFlagORM.id).where(
                 ScoreFlagORM.score_event_id == ScoreEventORM.id,
-                ScoreFlagORM.status == ScoreFlagStatus.CONFIRMED_CHEAT.value,
+                ScoreFlagORM.status.in_(
+                    [
+                        ScoreFlagStatus.CONFIRMED_CHEAT.value,
+                        ScoreFlagStatus.REMOVED.value,
+                    ]
+                ),
             )
         )
 
@@ -372,7 +391,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         ).where(
             ScoreEventORM.board_id == board.id.uuid,
             ScoreEventORM.identity_id == identity_id.uuid,
-            ~confirmed_cheat_exists,
+            ~exclusion_flag_exists,
         )
 
         result = await self.session.execute(sum_query)
