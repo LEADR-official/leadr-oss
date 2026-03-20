@@ -19,7 +19,7 @@ Example:
 import os
 from pathlib import Path
 
-from pydantic import Field, HttpUrl, model_validator
+from pydantic import Field, HttpUrl, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Use current working directory so .env is loaded from where the app is run
@@ -167,8 +167,22 @@ class CommonSettings(BaseSettings):
     )
     SUPERADMIN_API_KEY: str = Field(
         default=...,
-        description="API key for the superadmin user. REQUIRED for bootstrap.",
+        description=(
+            "API key for the superadmin user. Must start with 'ldr_'. "
+            "Generate with: echo \"ldr_$(openssl rand -base64 60 | tr -d '/+=\\n')\""
+        ),
     )
+
+    @field_validator("SUPERADMIN_API_KEY")
+    @classmethod
+    def validate_superadmin_api_key(cls, v: str) -> str:
+        if not v or not v.startswith("ldr_"):
+            raise ValueError(
+                "SUPERADMIN_API_KEY must be set and start with 'ldr_'. "
+                "Generate one with: echo \"ldr_$(openssl rand -base64 60 | tr -d '/+=\\n')\""
+            )
+        return v
+
     SUPERADMIN_API_KEY_NAME: str = Field(
         default="Superadmin Key",
         description="Display name for the superadmin API key",

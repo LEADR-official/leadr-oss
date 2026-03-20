@@ -41,17 +41,25 @@ docker compose -f docker/docker-compose.base.yml -f docker/docker-compose.selfho
 
 ### Required
 
-| Variable             | Description                                                      |
-| -------------------- | ---------------------------------------------------------------- |
-| `ENV`                | Environment name (e.g., `PROD`)                                  |
-| `DB_HOST`            | PostgreSQL host (e.g., `db.example.com`)                         |
-| `DB_PASSWORD`        | Database password                                                |
-| `DB_NAME`            | Database name (default: `leadr`)                                 |
-| `DB_USER`            | Database user (default: `leadr`)                                 |
-| `DOMAIN`             | Your domain for routing (e.g., `example.com`)                    |
-| `SUPERADMIN_API_KEY` | Admin API key - **must start with `ldr_`**                       |
-| `JWT_SECRET`         | Secret for JWT signing - **generate a strong random string**     |
-| `API_KEY_SECRET`     | Secret for API key hashing - **generate a strong random string** |
+| Variable             | Description                                                               |
+| -------------------- | ------------------------------------------------------------------------- |
+| `ENV`                | Environment name (e.g., `PROD`)                                           |
+| `DB_HOST`            | PostgreSQL host (e.g., `db.example.com`)                                  |
+| `DB_PASSWORD`        | Database password                                                         |
+| `DB_NAME`            | Database name (default: `leadr`)                                          |
+| `DB_USER`            | Database user (default: `leadr`)                                          |
+| `DOMAIN`             | Your domain for routing (e.g., `example.com`)                             |
+| `SUPERADMIN_API_KEY` | Admin API key - **must start with `ldr_`** - see generation command below |
+| `JWT_SECRET`         | Secret for JWT signing - **generate a strong random string**              |
+| `API_KEY_SECRET`     | Secret for API key hashing - **generate a strong random string**          |
+
+Generate your `SUPERADMIN_API_KEY`:
+
+```bash
+echo "ldr_$(openssl rand -base64 60 | tr -d '/+=\n')"
+```
+
+Set the output as the value of `SUPERADMIN_API_KEY` in your `.env` file.
 
 ### Optional Variables
 

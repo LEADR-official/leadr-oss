@@ -73,6 +73,16 @@ ______________________________________________________________________
 
 ## Developer Documentation
 
+### Generating a Superadmin API Key
+
+LEADR requires a `SUPERADMIN_API_KEY` to bootstrap the first admin user. Generate one with:
+
+```bash
+echo "ldr_$(openssl rand -base64 60 | tr -d '/+=\n')"
+```
+
+Set the output as `SUPERADMIN_API_KEY` in your `.env` file before starting the server.
+
 ### Local Development
 
 ...
