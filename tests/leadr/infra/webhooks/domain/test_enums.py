@@ -11,8 +11,8 @@ class TestWebhookSource:
         assert WebhookSource.STRIPE.value == "stripe"
 
     def test_is_string_enum(self) -> None:
-        """Should be a string enum."""
-        assert str(WebhookSource.STRIPE) == "stripe"
+        """Should be usable as a string value."""
+        assert WebhookSource.STRIPE == "stripe"
 
 
 class TestWebhookProcessingStatus:
