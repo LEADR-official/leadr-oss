@@ -27,6 +27,7 @@ from leadr.boards.adapters.orm import (
 )  # noqa: F401
 from leadr.games.adapters.orm import GameORM  # noqa: F401
 from leadr.infra.email.adapters.orm import EmailORM  # noqa: F401
+from leadr.infra.webhooks.adapters.orm import WebhookEventORM  # noqa: F401
 from leadr.registration.adapters.orm import (  # noqa: F401
     JamCodeORM,
     JamCodeRedemptionORM,
