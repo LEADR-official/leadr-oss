@@ -1,13 +1,12 @@
 """Webhook event repository."""
 
 from datetime import UTC, datetime
-from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.infra.webhooks.adapters.orm import WebhookEventORM, WebhookProcessingStatusEnum
-from leadr.infra.webhooks.domain.enums import WebhookProcessingStatus, WebhookSource
+from leadr.infra.webhooks.domain.enums import WebhookSource
 from leadr.infra.webhooks.domain.ids import WebhookEventID
 from leadr.infra.webhooks.domain.webhook_event import WebhookEvent
 

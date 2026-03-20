@@ -2,6 +2,8 @@
 
 from uuid import UUID
 
+import pytest
+
 from leadr.infra.webhooks.domain.ids import WebhookEventID
 
 
@@ -33,6 +35,5 @@ class TestWebhookEventID:
 
     def test_invalid_prefix_raises(self) -> None:
         """Should raise ValueError for wrong prefix."""
-        import pytest
         with pytest.raises(ValueError, match="Invalid prefix"):
             WebhookEventID("acc_12345678-1234-5678-1234-567812345678")

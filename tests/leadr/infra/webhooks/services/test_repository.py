@@ -1,6 +1,9 @@
 """Tests for WebhookEventRepository."""
 
+from datetime import UTC, datetime
+
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from leadr.infra.webhooks.domain.enums import WebhookProcessingStatus, WebhookSource
 from leadr.infra.webhooks.domain.webhook_event import WebhookEvent
@@ -23,9 +26,7 @@ class TestWebhookEventRepository:
 
         created = await repo.create(event)
 
-        retrieved = await repo.get_by_source_and_external_id(
-            WebhookSource.STRIPE, "evt_test_001"
-        )
+        retrieved = await repo.get_by_source_and_external_id(WebhookSource.STRIPE, "evt_test_001")
         assert retrieved is not None
         assert retrieved.external_event_id == "evt_test_001"
         assert retrieved.source == WebhookSource.STRIPE
@@ -43,8 +44,6 @@ class TestWebhookEventRepository:
 
     async def test_unique_constraint_on_source_and_external_id(self, db_session) -> None:
         """Should enforce uniqueness on (source, external_event_id)."""
-        from sqlalchemy.exc import IntegrityError
-
         repo = WebhookEventRepository(db_session)
         event = WebhookEvent(
             external_event_id="evt_duplicate_001",
@@ -65,8 +64,6 @@ class TestWebhookEventRepository:
 
     async def test_mark_processed(self, db_session) -> None:
         """Should update status to PROCESSED and set processed_at."""
-        from datetime import UTC, datetime
-
         repo = WebhookEventRepository(db_session)
         event = WebhookEvent(
             external_event_id="evt_mark_processed",

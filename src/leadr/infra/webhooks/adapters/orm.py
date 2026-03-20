@@ -2,7 +2,6 @@
 
 import enum
 from datetime import datetime
-from uuid import UUID
 
 from sqlalchemy import DateTime, Enum, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
