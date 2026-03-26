@@ -22,12 +22,18 @@ class WebhookEventService:
         """Initialize service."""
         self._repository = WebhookEventRepository(session)
 
+    async def get_existing_event(
+        self, source: WebhookSource, external_event_id: str
+    ) -> WebhookEvent | None:
+        """Return an existing webhook event record if one exists (any status)."""
+        return await self._repository.get_by_source_and_external_id(source, external_event_id)
+
     async def is_already_processed(self, source: WebhookSource, external_event_id: str) -> bool:
         """Return True if this event has already been successfully processed.
 
         A PENDING or FAILED event is not considered processed — it can be retried.
         """
-        event = await self._repository.get_by_source_and_external_id(source, external_event_id)
+        event = await self.get_existing_event(source, external_event_id)
         if event is None:
             return False
         return event.processing_status == WebhookProcessingStatus.PROCESSED
