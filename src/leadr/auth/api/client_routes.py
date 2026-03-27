@@ -1,6 +1,6 @@
 """API routes for client authentication using Identity."""
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 
 from leadr.auth.api.client_schemas import (
     NonceResponse,
@@ -24,6 +24,7 @@ protected_router = APIRouter()
     status_code=status.HTTP_201_CREATED,
 )
 async def start_session(
+    request: Request,
     session_request: StartSessionRequest,
     identity_service: IdentityServiceDep,
     _geo: GeoInfoDep,
@@ -40,6 +41,7 @@ async def start_session(
     available for future use via _geo.timezone, _geo.country, _geo.city.
 
     Args:
+        request: FastAPI request object (used for access logging)
         session_request: Session start request with game_id and fingerprint
         identity_service: IdentityService dependency (handles device and identity creation)
         _geo: GeoIP information extracted from client IP address (available for future use)
@@ -51,6 +53,9 @@ async def start_session(
         404: Game not found
         422: Invalid request (missing required fields, invalid UUID format)
     """
+    # Set game_id for access logging
+    request.state.game_id = str(session_request.game_id)
+
     try:
         identity, access_token, refresh_token, expires_in = await identity_service.start_session(
             game_id=session_request.game_id,
@@ -64,6 +69,9 @@ async def start_session(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
         ) from None
+
+    # Set account_id for access logging (available after successful lookup)
+    request.state.account_id = str(identity.account_id)
 
     return StartSessionResponse.from_domain(
         identity, access_token, refresh_token, expires_in, test_mode=session_request.test_mode
