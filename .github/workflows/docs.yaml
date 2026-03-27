@@ -19,7 +19,7 @@ env:
   ENV: CI
   ENABLE_ADMIN_API: true
   ENABLE_CLIENT_API: true
-  SUPERADMIN_API_KEY: "superfakesuperadminfakekey111"
+  SUPERADMIN_API_KEY: "ldr_superfakesuperadminfakekey111"
 
 jobs:
   build-and-pr:
