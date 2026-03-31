@@ -361,7 +361,7 @@ class TestEmailServiceConvenienceMethods:
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
         result = await repository.filter(pagination=pagination)
         assert len(result.items) == 1
-        assert result.items[0].subject == "Verify your LEADR account"
+        assert result.items[0].subject == "[TEST] Verify your LEADR account"
         assert "ABC123" in result.items[0].body
         assert result.items[0].priority == EmailPriority.HIGH
 
@@ -426,7 +426,7 @@ class TestEmailServiceConvenienceMethods:
         pagination = PaginationParams(cursor=None, limit=100, sort=None)
         result = await repository.filter(pagination=pagination)
         assert len(result.items) == 1
-        assert result.items[0].subject == "Important Update"
+        assert result.items[0].subject == "[TEST] Important Update"
         assert "Your account has been upgraded!" in result.items[0].body
         assert result.items[0].priority == EmailPriority.HIGH
 

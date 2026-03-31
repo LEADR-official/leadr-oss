@@ -80,6 +80,9 @@ class EmailService:
         ):
             to = settings.TESTING_EMAIL
 
+        if settings.ENV != "PROD":
+            subject = f"[{settings.ENV}] {subject}"
+
         # Use default if not provided, validate domain if provided
         if from_email is None:
             from_email = settings.default_from_email
