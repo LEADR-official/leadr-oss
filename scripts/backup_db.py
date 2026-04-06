@@ -9,6 +9,11 @@ Requires pg_dump to be available on PATH.
 
 Usage:
     uv run python scripts/backup_db.py
+    uv run python scripts/backup_db.py --local /path/to/backup/dir
+
+Options:
+    --local <dir>   Store backup files locally instead of uploading to object storage.
+                    Skips upload configuration validation. Creates the directory if needed.
 
 Environment Variables (configured in .env):
     BACKUP_ENABLED: Enable/disable backups (default: false)
@@ -20,6 +25,8 @@ Environment Variables (configured in .env):
     BACKUP_STORAGE_SECRET_ACCESS_KEY: Secret key for object storage
 """
 
+import argparse
+import hashlib
 import json
 import logging
 import subprocess
@@ -52,6 +59,15 @@ def build_object_key(prefix: str, db_name: str, timestamp: datetime, ext: str) -
     return f"{prefix}/{year}/{month}/{db_name}_{ts_str}.{ext}"
 
 
+def compute_md5(file_path: Path) -> str:
+    """Compute the MD5 hex digest of a file."""
+    md5 = hashlib.md5()  # noqa: S324
+    with file_path.open("rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            md5.update(chunk)
+    return md5.hexdigest()
+
+
 def build_manifest(
     *,
     timestamp: datetime,
@@ -60,6 +76,7 @@ def build_manifest(
     db_port: int,
     backup_filename: str,
     backup_size_bytes: int,
+    backup_md5: str,
     pg_dump_version: str,
     duration_seconds: float,
 ) -> dict[str, Any]:
@@ -75,6 +92,7 @@ def build_manifest(
         "backup_file": backup_filename,
         "backup_format": "custom",
         "backup_size_bytes": backup_size_bytes,
+        "backup_md5": backup_md5,
         "pg_dump_version": pg_dump_version,
         "duration_seconds": duration_seconds,
         "artifacts": [],
@@ -107,17 +125,54 @@ def get_pg_dump_version() -> str:
     return result.stdout.strip()
 
 
-def run_backup() -> None:
+def upload_to_storage(
+    *,
+    dump_path: Path,
+    manifest_path: Path,
+    dump_key: str,
+    manifest_key: str,
+) -> None:
+    """Upload backup files to S3-compatible object storage."""
+    logger.info("Uploading to %s/%s", settings.BACKUP_STORAGE_BUCKET, dump_key)
+
+    s3_client_kwargs: dict[str, Any] = {
+        "aws_access_key_id": settings.BACKUP_STORAGE_ACCESS_KEY_ID,
+        "aws_secret_access_key": settings.BACKUP_STORAGE_SECRET_ACCESS_KEY,
+    }
+    if settings.BACKUP_STORAGE_ENDPOINT_URL:
+        s3_client_kwargs["endpoint_url"] = settings.BACKUP_STORAGE_ENDPOINT_URL
+    if settings.BACKUP_STORAGE_REGION:
+        s3_client_kwargs["region_name"] = settings.BACKUP_STORAGE_REGION
+
+    s3 = boto3.client("s3", **s3_client_kwargs)
+
+    s3.upload_file(
+        Filename=str(dump_path),
+        Bucket=settings.BACKUP_STORAGE_BUCKET,
+        Key=dump_key,
+    )
+    logger.info("Uploaded dump: %s", dump_key)
+
+    s3.upload_file(
+        Filename=str(manifest_path),
+        Bucket=settings.BACKUP_STORAGE_BUCKET,
+        Key=manifest_key,
+    )
+    logger.info("Uploaded manifest: %s", manifest_key)
+
+
+def run_backup(*, local_dir: Path | None = None) -> None:
     """Run the database backup process."""
     if not settings.BACKUP_ENABLED:
         logger.info("Backups disabled (BACKUP_ENABLED=false), skipping")
         return
 
-    validate_backup_config(
-        bucket=settings.BACKUP_STORAGE_BUCKET,
-        access_key_id=settings.BACKUP_STORAGE_ACCESS_KEY_ID,
-        secret_access_key=settings.BACKUP_STORAGE_SECRET_ACCESS_KEY,
-    )
+    if not local_dir:
+        validate_backup_config(
+            bucket=settings.BACKUP_STORAGE_BUCKET,
+            access_key_id=settings.BACKUP_STORAGE_ACCESS_KEY_ID,
+            secret_access_key=settings.BACKUP_STORAGE_SECRET_ACCESS_KEY,
+        )
 
     timestamp = datetime.now(UTC)
     db_host = settings.DB_HOST_DIRECT or settings.DB_HOST
@@ -144,10 +199,11 @@ def run_backup() -> None:
         ext="manifest.json",
     )
     dump_filename = Path(dump_key).name
+    manifest_filename = Path(manifest_key).name
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        dump_path = Path(tmpdir) / dump_filename
-        manifest_path = Path(tmpdir) / f"{dump_filename}.manifest.json"
+    def _create_backup(work_dir: Path) -> None:
+        dump_path = work_dir / dump_filename
+        manifest_path = work_dir / manifest_filename
 
         # Run pg_dump
         start_time = time.monotonic()
@@ -174,6 +230,10 @@ def run_backup() -> None:
         backup_size = dump_path.stat().st_size
         logger.info("pg_dump completed in %.1fs, size: %d bytes", duration, backup_size)
 
+        # Compute checksum
+        backup_md5 = compute_md5(dump_path)
+        logger.info("MD5: %s", backup_md5)
+
         # Build and write manifest
         manifest = build_manifest(
             timestamp=timestamp,
@@ -182,6 +242,7 @@ def run_backup() -> None:
             db_port=settings.DB_PORT,
             backup_filename=dump_filename,
             backup_size_bytes=backup_size,
+            backup_md5=backup_md5,
             pg_dump_version=pg_dump_version,
             duration_seconds=round(duration, 2),
         )
@@ -194,40 +255,38 @@ def run_backup() -> None:
         # - Other connected artefacts
         # Each artifact backup should append to manifest["artifacts"]
 
-        # Upload to object storage
-        logger.info("Uploading to %s/%s", settings.BACKUP_STORAGE_BUCKET, dump_key)
+        if local_dir:
+            logger.info("Local mode: files saved to %s", work_dir)
+        else:
+            upload_to_storage(
+                dump_path=dump_path,
+                manifest_path=manifest_path,
+                dump_key=dump_key,
+                manifest_key=manifest_key,
+            )
 
-        s3_client_kwargs: dict[str, Any] = {
-            "aws_access_key_id": settings.BACKUP_STORAGE_ACCESS_KEY_ID,
-            "aws_secret_access_key": settings.BACKUP_STORAGE_SECRET_ACCESS_KEY,
-        }
-        if settings.BACKUP_STORAGE_ENDPOINT_URL:
-            s3_client_kwargs["endpoint_url"] = settings.BACKUP_STORAGE_ENDPOINT_URL
-        if settings.BACKUP_STORAGE_REGION:
-            s3_client_kwargs["region_name"] = settings.BACKUP_STORAGE_REGION
-
-        s3 = boto3.client("s3", **s3_client_kwargs)
-
-        s3.upload_file(
-            Filename=str(dump_path),
-            Bucket=settings.BACKUP_STORAGE_BUCKET,
-            Key=dump_key,
-        )
-        logger.info("Uploaded dump: %s", dump_key)
-
-        s3.upload_file(
-            Filename=str(manifest_path),
-            Bucket=settings.BACKUP_STORAGE_BUCKET,
-            Key=manifest_key,
-        )
-        logger.info("Uploaded manifest: %s", manifest_key)
+    if local_dir:
+        local_dir.mkdir(parents=True, exist_ok=True)
+        _create_backup(local_dir)
+    else:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _create_backup(Path(tmpdir))
 
     logger.info("Backup completed successfully")
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="LEADR database backup")
+    parser.add_argument(
+        "--local",
+        type=Path,
+        default=None,
+        help="Store backup files locally at the given directory instead of uploading",
+    )
+    args = parser.parse_args()
+
     try:
-        run_backup()
+        run_backup(local_dir=args.local)
     except Exception as e:
         logger.exception("Backup failed: %s", str(e))
         sys.exit(1)
