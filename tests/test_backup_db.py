@@ -7,7 +7,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from scripts.backup_db import (
+
+from leadr.common.utils.backup import (
     build_manifest,
     build_object_key,
     run_backup,
@@ -176,8 +177,8 @@ def _configure_mock_settings(mock_settings):
 class TestUploadToStorage:
     """Tests for the upload_to_storage function."""
 
-    @patch("scripts.backup_db.boto3")
-    @patch("scripts.backup_db.settings")
+    @patch("leadr.common.utils.backup.boto3")
+    @patch("leadr.common.utils.backup.settings")
     def test_uploads_both_files(self, mock_settings, mock_boto3, tmp_path):
         """Uploads dump and manifest to the configured bucket."""
         _configure_mock_settings(mock_settings)
@@ -210,7 +211,7 @@ class TestUploadToStorage:
 class TestRunBackup:
     """Tests for the main backup flow."""
 
-    @patch("scripts.backup_db.settings")
+    @patch("leadr.common.utils.backup.settings")
     def test_backup_disabled_exits_cleanly(self, mock_settings):
         """When BACKUP_ENABLED=False, run_backup returns without error."""
         mock_settings.BACKUP_ENABLED = False
@@ -219,9 +220,9 @@ class TestRunBackup:
 
         assert result is None
 
-    @patch("scripts.backup_db.boto3")
-    @patch("scripts.backup_db.subprocess")
-    @patch("scripts.backup_db.settings")
+    @patch("leadr.common.utils.backup.boto3")
+    @patch("leadr.common.utils.backup.subprocess")
+    @patch("leadr.common.utils.backup.settings")
     def test_backup_flow_uploads_dump_and_manifest(
         self, mock_settings, mock_subprocess, mock_boto3
     ):
@@ -245,7 +246,7 @@ class TestRunBackup:
         assert manifest_call[1]["Bucket"] == "test-bucket"
         assert manifest_call[1]["Key"].endswith(".manifest.json")
 
-    @patch("scripts.backup_db.settings")
+    @patch("leadr.common.utils.backup.settings")
     def test_missing_config_raises_when_enabled(self, mock_settings):
         """When enabled but bucket is empty, raises ValueError."""
         mock_settings.BACKUP_ENABLED = True
@@ -256,9 +257,9 @@ class TestRunBackup:
         with pytest.raises(ValueError, match="BACKUP_STORAGE_BUCKET"):
             run_backup()
 
-    @patch("scripts.backup_db.boto3")
-    @patch("scripts.backup_db.subprocess")
-    @patch("scripts.backup_db.settings")
+    @patch("leadr.common.utils.backup.boto3")
+    @patch("leadr.common.utils.backup.subprocess")
+    @patch("leadr.common.utils.backup.settings")
     def test_uses_db_host_direct_when_available(self, mock_settings, mock_subprocess, mock_boto3):
         """When DB_HOST_DIRECT is set, pg_dump uses it instead of DB_HOST."""
         _configure_mock_settings(mock_settings)
@@ -274,8 +275,8 @@ class TestRunBackup:
         h_index = pg_dump_cmd.index("-h") + 1
         assert pg_dump_cmd[h_index] == "direct.example.com"
 
-    @patch("scripts.backup_db.subprocess")
-    @patch("scripts.backup_db.settings")
+    @patch("leadr.common.utils.backup.subprocess")
+    @patch("leadr.common.utils.backup.settings")
     def test_pg_dump_failure_raises(self, mock_settings, mock_subprocess):
         """When pg_dump fails, the script raises an error."""
         _configure_mock_settings(mock_settings)
@@ -299,8 +300,8 @@ class TestRunBackup:
         with pytest.raises(subprocess.CalledProcessError):
             run_backup()
 
-    @patch("scripts.backup_db.subprocess")
-    @patch("scripts.backup_db.settings")
+    @patch("leadr.common.utils.backup.subprocess")
+    @patch("leadr.common.utils.backup.settings")
     def test_manifest_includes_md5(self, mock_settings, mock_subprocess, tmp_path):
         """Manifest contains a valid MD5 hex digest of the dump file."""
         _configure_mock_settings(mock_settings)
@@ -317,8 +318,8 @@ class TestRunBackup:
         assert len(manifest["backup_md5"]) == 32
         assert all(c in "0123456789abcdef" for c in manifest["backup_md5"])
 
-    @patch("scripts.backup_db.subprocess")
-    @patch("scripts.backup_db.settings")
+    @patch("leadr.common.utils.backup.subprocess")
+    @patch("leadr.common.utils.backup.settings")
     def test_local_mode_stores_files_locally(self, mock_settings, mock_subprocess, tmp_path):
         """With --local, files are stored in the given directory, no upload occurs."""
         _configure_mock_settings(mock_settings)
@@ -336,8 +337,8 @@ class TestRunBackup:
         assert len(dump_files) == 1
         assert len(manifest_files) == 1
 
-    @patch("scripts.backup_db.subprocess")
-    @patch("scripts.backup_db.settings")
+    @patch("leadr.common.utils.backup.subprocess")
+    @patch("leadr.common.utils.backup.settings")
     def test_local_mode_skips_upload_validation(self, mock_settings, mock_subprocess, tmp_path):
         """With --local, missing storage credentials don't raise errors."""
         mock_settings.BACKUP_ENABLED = True

@@ -1,15 +1,13 @@
-#!/usr/bin/env python3
-"""Database backup script for LEADR.
+"""Database backup utilities for LEADR.
 
 Creates a pg_dump backup in custom format and uploads it to S3-compatible
 object storage along with a JSON manifest file.
 
-Designed to be triggered by a scheduled job (e.g. k8s CronJob) or run manually.
-Requires pg_dump to be available on PATH.
+Can be run as a module or imported by other packages (e.g. leadr-cloud).
 
 Usage:
-    uv run python scripts/backup_db.py
-    uv run python scripts/backup_db.py --local /path/to/backup/dir
+    uv run python -m leadr.common.utils.backup
+    uv run python -m leadr.common.utils.backup --local /path/to/backup/dir
 
 Options:
     --local <dir>   Store backup files locally instead of uploading to object storage.
@@ -29,6 +27,7 @@ import argparse
 import hashlib
 import json
 import logging
+import os
 import subprocess
 import sys
 import tempfile
@@ -41,10 +40,6 @@ import boto3
 
 from leadr.config import settings
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
@@ -210,17 +205,20 @@ def run_backup(*, local_dir: Path | None = None) -> None:
         pg_dump_cmd = [
             "pg_dump",
             "-Fc",
-            "-h", db_host,
-            "-p", str(settings.DB_PORT),
-            "-U", settings.DB_USER,
-            "-d", db_name,
-            "-f", str(dump_path),
+            "-h",
+            db_host,
+            "-p",
+            str(settings.DB_PORT),
+            "-U",
+            settings.DB_USER,
+            "-d",
+            db_name,
+            "-f",
+            str(dump_path),
         ]
 
         env = None
         if settings.DB_PASSWORD:
-            import os
-
             env = {**os.environ, "PGPASSWORD": settings.DB_PASSWORD}
 
         logger.info("Running pg_dump...")
@@ -276,6 +274,11 @@ def run_backup(*, local_dir: Path | None = None) -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
     parser = argparse.ArgumentParser(description="LEADR database backup")
     parser.add_argument(
         "--local",

@@ -59,7 +59,7 @@ unfixable = ["B"]
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402"]
 "src/leadr/config.py" = ["S105"]
-"scripts/backup_db.py" = ["S603", "S607"]
+"src/leadr/common/utils/backup.py" = ["S603", "S607"]
 "alembic/env.py" = ["E402", "F401"]
 "**/{tests,docs,tools}/*" = ["S101"]
 "tests/**/*" = ["S105", "S106"]
@@ -73,7 +73,7 @@ include = ["src", "tests"]
 exclude = ["**/__pycache__"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src", "."]
+pythonpath = ["src"]
 testpaths = ["tests"]
 filterwarnings = [
     "ignore:coroutine 'Connection._cancel' was never awaited:RuntimeWarning",
