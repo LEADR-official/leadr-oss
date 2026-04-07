@@ -43,6 +43,31 @@ class TestBuildObjectKey:
 
         assert key == "p/2026/03/db_20260301T000000Z.dump"
 
+    def test_env_label_inserted_before_extension(self):
+        """When env is provided, it appears between timestamp and extension."""
+        ts = datetime(2026, 4, 6, 14, 30, 45, tzinfo=UTC)
+        key = build_object_key(
+            prefix="leadr-backups", db_name="leadr", timestamp=ts, ext="dump", env="staging"
+        )
+
+        assert key == "leadr-backups/2026/04/leadr_20260406T143045Z.staging.dump"
+
+    def test_env_label_with_manifest_extension(self):
+        """Env label works with multi-part extensions like manifest.json."""
+        ts = datetime(2026, 4, 6, 14, 30, 45, tzinfo=UTC)
+        key = build_object_key(
+            prefix="backups", db_name="db", timestamp=ts, ext="manifest.json", env="prod"
+        )
+
+        assert key == "backups/2026/04/db_20260406T143045Z.prod.manifest.json"
+
+    def test_no_env_label_when_none(self):
+        """When env is None, no env part is added (backward compatible)."""
+        ts = datetime(2026, 4, 6, 14, 30, 45, tzinfo=UTC)
+        key = build_object_key(prefix="p", db_name="db", timestamp=ts, ext="dump", env=None)
+
+        assert key == "p/2026/04/db_20260406T143045Z.dump"
+
 
 class TestBuildManifest:
     """Tests for JSON manifest generation."""
@@ -74,6 +99,41 @@ class TestBuildManifest:
         assert manifest["pg_dump_version"] == "15.4"
         assert manifest["duration_seconds"] == 42.5
         assert manifest["artifacts"] == []
+
+    def test_manifest_includes_env_when_provided(self):
+        """Manifest includes env field when provided."""
+        ts = datetime(2026, 4, 6, 14, 30, 45, tzinfo=UTC)
+        manifest = build_manifest(
+            timestamp=ts,
+            db_name="leadr",
+            db_host="localhost",
+            db_port=5432,
+            backup_filename="leadr_20260406T143045Z.staging.dump",
+            backup_size_bytes=100,
+            backup_md5="abc123",
+            pg_dump_version="16.0",
+            duration_seconds=1.0,
+            env="staging",
+        )
+
+        assert manifest["env"] == "staging"
+
+    def test_manifest_omits_env_when_none(self):
+        """Manifest has no env field when not provided."""
+        ts = datetime(2026, 4, 6, 14, 30, 45, tzinfo=UTC)
+        manifest = build_manifest(
+            timestamp=ts,
+            db_name="leadr",
+            db_host="localhost",
+            db_port=5432,
+            backup_filename="leadr_20260406T143045Z.dump",
+            backup_size_bytes=100,
+            backup_md5="abc123",
+            pg_dump_version="16.0",
+            duration_seconds=1.0,
+        )
+
+        assert "env" not in manifest
 
     def test_manifest_is_json_serializable(self):
         """Manifest can be serialized to JSON."""
@@ -172,6 +232,7 @@ def _configure_mock_settings(mock_settings):
     mock_settings.DB_NAME = "leadr"
     mock_settings.DB_USER = "leadr"
     mock_settings.DB_PASSWORD = "pass"
+    mock_settings.ENV = "DEV"
 
 
 class TestUploadToStorage:
@@ -240,11 +301,11 @@ class TestRunBackup:
         dump_call = mock_s3_client.upload_file.call_args_list[0]
         assert dump_call[1]["Bucket"] == "test-bucket"
         assert dump_call[1]["Key"].startswith("backups/")
-        assert dump_call[1]["Key"].endswith(".dump")
+        assert dump_call[1]["Key"].endswith(".dev.dump")
 
         manifest_call = mock_s3_client.upload_file.call_args_list[1]
         assert manifest_call[1]["Bucket"] == "test-bucket"
-        assert manifest_call[1]["Key"].endswith(".manifest.json")
+        assert manifest_call[1]["Key"].endswith(".dev.manifest.json")
 
     @patch("leadr.common.utils.backup.settings")
     def test_missing_config_raises_when_enabled(self, mock_settings):
@@ -354,6 +415,7 @@ class TestRunBackup:
         mock_settings.DB_NAME = "leadr"
         mock_settings.DB_USER = "leadr"
         mock_settings.DB_PASSWORD = ""
+        mock_settings.ENV = "TEST"
 
         mock_subprocess.run.side_effect = _make_subprocess_side_effect()
 

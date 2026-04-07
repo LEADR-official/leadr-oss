@@ -43,15 +43,18 @@ from leadr.config import settings
 logger = logging.getLogger(__name__)
 
 
-def build_object_key(prefix: str, db_name: str, timestamp: datetime, ext: str) -> str:
+def build_object_key(
+    prefix: str, db_name: str, timestamp: datetime, ext: str, *, env: str | None = None
+) -> str:
     """Build the object storage key for a backup file.
 
-    Structure: {prefix}/{YYYY}/{MM}/{db_name}_{YYYYMMDD}T{HHMMSS}Z.{ext}
+    Structure: {prefix}/{YYYY}/{MM}/{db_name}_{YYYYMMDD}T{HHMMSS}Z[.{env}].{ext}
     """
     ts_str = timestamp.strftime("%Y%m%dT%H%M%SZ")
     year = timestamp.strftime("%Y")
     month = timestamp.strftime("%m")
-    return f"{prefix}/{year}/{month}/{db_name}_{ts_str}.{ext}"
+    env_part = f".{env}" if env else ""
+    return f"{prefix}/{year}/{month}/{db_name}_{ts_str}{env_part}.{ext}"
 
 
 def compute_md5(file_path: Path) -> str:
@@ -74,9 +77,10 @@ def build_manifest(
     backup_md5: str,
     pg_dump_version: str,
     duration_seconds: float,
+    env: str | None = None,
 ) -> dict[str, Any]:
     """Build the JSON manifest for a backup."""
-    return {
+    manifest: dict[str, Any] = {
         "version": 1,
         "timestamp": timestamp.isoformat(),
         "database": {
@@ -92,6 +96,9 @@ def build_manifest(
         "duration_seconds": duration_seconds,
         "artifacts": [],
     }
+    if env:
+        manifest["env"] = env
+    return manifest
 
 
 def validate_backup_config(
@@ -172,9 +179,11 @@ def run_backup(*, local_dir: Path | None = None) -> None:
     timestamp = datetime.now(UTC)
     db_host = settings.DB_HOST_DIRECT or settings.DB_HOST
     db_name = settings.DB_NAME
+    env = settings.ENV.lower()
 
     logger.info("Starting database backup")
     logger.info("Database: %s@%s:%d/%s", settings.DB_USER, db_host, settings.DB_PORT, db_name)
+    logger.info("Environment: %s", env)
 
     # Get pg_dump version
     pg_dump_version = get_pg_dump_version()
@@ -186,12 +195,14 @@ def run_backup(*, local_dir: Path | None = None) -> None:
         db_name=db_name,
         timestamp=timestamp,
         ext="dump",
+        env=env,
     )
     manifest_key = build_object_key(
         prefix=settings.BACKUP_STORAGE_PREFIX,
         db_name=db_name,
         timestamp=timestamp,
         ext="manifest.json",
+        env=env,
     )
     dump_filename = Path(dump_key).name
     manifest_filename = Path(manifest_key).name
@@ -217,12 +228,12 @@ def run_backup(*, local_dir: Path | None = None) -> None:
             str(dump_path),
         ]
 
-        env = None
+        pg_env = None
         if settings.DB_PASSWORD:
-            env = {**os.environ, "PGPASSWORD": settings.DB_PASSWORD}
+            pg_env = {**os.environ, "PGPASSWORD": settings.DB_PASSWORD}
 
         logger.info("Running pg_dump...")
-        subprocess.run(pg_dump_cmd, check=True, env=env)
+        subprocess.run(pg_dump_cmd, check=True, env=pg_env)
         duration = time.monotonic() - start_time
 
         backup_size = dump_path.stat().st_size
@@ -243,6 +254,7 @@ def run_backup(*, local_dir: Path | None = None) -> None:
             backup_md5=backup_md5,
             pg_dump_version=pg_dump_version,
             duration_seconds=round(duration, 2),
+            env=env,
         )
         manifest_path.write_text(json.dumps(manifest, indent=2))
 
