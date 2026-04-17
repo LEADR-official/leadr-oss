@@ -511,13 +511,13 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
 
         # Special handling: when status is updated, also set reviewed_at
         if "status" in updates:
-            flag.reviewed_at = datetime.now(UTC)
+            updates["reviewed_at"] = datetime.now(UTC)
             new_status = updates["status"]
             if isinstance(new_status, str):
                 new_status = ScoreFlagStatus(new_status)
 
-        for field, value in updates.items():
-            setattr(flag, field, value)
+        # Apply all updates atomically - validation runs once at the end
+        flag = flag.model_copy(update=updates)
 
         # Persist the flag first so ranking sync queries see the updated status
         updated_flag = await self.repository.update(flag)

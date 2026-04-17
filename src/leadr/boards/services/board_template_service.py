@@ -241,8 +241,8 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         if "name_template" in updates:
             self._validate_name_template(updates["name_template"])
 
-        for field, value in updates.items():
-            setattr(template, field, value)
+        # Apply all updates atomically - validation runs once at the end
+        template = template.model_copy(update=updates)
 
         return await self.repository.update(template)
 

@@ -333,7 +333,9 @@ class BoardService(BaseService[Board, BoardRepository]):
         """
         board = await self.get_by_id_or_raise(board_id)
 
-        for field, value in updates.items():
-            setattr(board, field, value)
+        # Apply all updates atomically - validation runs once at the end
+        # This prevents validation errors when updating cross-dependent fields
+        # like board_type and keep_strategy together
+        board = board.model_copy(update=updates)
 
         return await self.repository.update(board)

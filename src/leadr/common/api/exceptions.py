@@ -27,7 +27,10 @@ async def catchall_exception_handler(
     Returns:
         JSONResponse with 500 status and error detail
     """
-    logger.exception(exc)
+    logger.exception(
+        exc,
+        extra={"method": request.method, "url": str(request.url.path)},
+    )
     if settings.DEBUG:
         return JSONResponse(status_code=500, content={"error": str(exc)})
     else:
@@ -51,7 +54,10 @@ async def http_exception_handler(
         JSONResponse with HTTP status code and error detail
     """
     if exc.status_code >= 500:
-        logger.exception(exc)
+        logger.exception(
+            exc,
+            extra={"method": request.method, "url": str(request.url.path)},
+        )
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": exc.detail},

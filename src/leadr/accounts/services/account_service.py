@@ -186,8 +186,8 @@ class AccountService(BaseService[Account, AccountRepository]):
         """
         account = await self.get_by_id_or_raise(account_id)
 
-        for field, value in updates.items():
-            setattr(account, field, value)
+        # Apply all updates atomically - validation runs once at the end
+        account = account.model_copy(update=updates)
 
         return await self.repository.update(account)
 

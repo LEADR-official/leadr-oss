@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from leadr.boards.domain.board import Board, KeepStrategy, SortDirection
+from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.boards.services.board_service import BoardService
 from leadr.common.api.pagination import PaginatedResult
@@ -619,6 +619,49 @@ class TestBoardService:
         )
 
         assert updated_board.keep_strategy == KeepStrategy.BEST
+        assert updated_board.name == "Speed Run Board"
+        service.repository.update.assert_called_once()
+
+    async def test_update_board_type_and_keep_strategy_atomically(self, service):
+        """Test updating board_type and keep_strategy together works atomically.
+
+        This tests the fix for cross-field validation when changing board_type
+        from RUN_IDENTITY to RUN_RUNS. Both fields must be updated together
+        because RUN_RUNS requires keep_strategy=NA while RUN_IDENTITY requires
+        keep_strategy to be FIRST/BEST/LATEST.
+
+        Regression test for: ValidationError when updating board_type and keep_strategy
+        """
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        # Start with a RUN_IDENTITY board with BEST keep_strategy
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Speed Run Board",
+            slug="speed-run-board",
+            short_code="SR2025",
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        # Mock repository methods
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+        service.repository.update = AsyncMock(side_effect=lambda entity: entity)
+
+        # Update both board_type and keep_strategy together
+        # This previously failed due to sequential setattr triggering validation
+        updated_board = await service.update_board(
+            board_id=board_id,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        assert updated_board.board_type == BoardType.RUN_RUNS
+        assert updated_board.keep_strategy == KeepStrategy.NA
         assert updated_board.name == "Speed Run Board"
         service.repository.update.assert_called_once()
 

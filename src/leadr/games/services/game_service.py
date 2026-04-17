@@ -166,7 +166,7 @@ class GameService(BaseService[Game, GameRepository]):
         """
         game = await self.get_by_id_or_raise(game_id)
 
-        for field, value in updates.items():
-            setattr(game, field, value)
+        # Apply all updates atomically - validation runs once at the end
+        game = game.model_copy(update=updates)
 
         return await self.repository.update(game)

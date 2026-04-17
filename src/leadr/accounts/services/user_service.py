@@ -123,8 +123,8 @@ class UserService(BaseService[User, UserRepository]):
         """
         user = await self.get_by_id_or_raise(user_id)
 
-        for field, value in updates.items():
-            setattr(user, field, value)
+        # Apply all updates atomically - validation runs once at the end
+        user = user.model_copy(update=updates)
 
         return await self.repository.update(user)
 
