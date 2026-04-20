@@ -402,6 +402,37 @@ class CommonSettings(BaseSettings):
         description="Seconds to cache preflight responses (default: 10 minutes).",
     )
 
+    # Backup Configuration
+    BACKUP_ENABLED: bool = Field(
+        default=False,
+        description="Enable scheduled database backups to object storage",
+    )
+    BACKUP_STORAGE_BUCKET: str = Field(
+        default="",
+        description="Object storage bucket name for backups",
+    )
+    BACKUP_STORAGE_PREFIX: str = Field(
+        default="leadr-backups",
+        description="Key prefix (folder) within the backup bucket",
+    )
+    BACKUP_STORAGE_ENDPOINT_URL: str | None = Field(
+        default=None,
+        description="Endpoint URL for S3-compatible object storage providers "
+        "(e.g. Hetzner, Cloudflare R2, MinIO). Required for non-AWS providers.",
+    )
+    BACKUP_STORAGE_REGION: str = Field(
+        default="",
+        description="Storage region (e.g. 'fsn1', 'us-east-1')",
+    )
+    BACKUP_STORAGE_ACCESS_KEY_ID: str = Field(
+        default="",
+        description="Access key ID for object storage authentication",
+    )
+    BACKUP_STORAGE_SECRET_ACCESS_KEY: str = Field(
+        default="",
+        description="Secret access key for object storage authentication",
+    )
+
     @model_validator(mode="after")
     def validate_api_enabled(self):
         """Ensure at least one API (Admin or Client) is enabled."""
