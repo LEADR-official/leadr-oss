@@ -356,6 +356,62 @@ class TestScoreEventIdExposure:
 
         assert response.score_event_id is None
 
+    async def test_board_state_with_raw_uuid_selected_event_id(self):
+        """BoardState with raw UUID (no prefix) in selected_event_id should parse successfully."""
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
+        score_event_id = ScoreEventID()
+
+        # Store raw UUID string (no sev_ prefix) to simulate existing bad data
+        board_state = BoardState(
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=1500.0,
+            aux={"selected_event_id": str(score_event_id.uuid), "event_count": 3},
+            player_name="Test Player",
+            is_test=False,
+        )
+
+        response = ScoreResponse.from_board_state(
+            state=board_state,
+            account_id=account_id,
+            game_id=game_id,
+            rank=1,
+        )
+
+        assert response.score_event_id is not None
+        assert response.score_event_id.uuid == score_event_id.uuid
+
+    async def test_board_state_with_raw_uuid_last_event_id(self):
+        """BoardState with raw UUID (no prefix) in last_event_id should parse successfully."""
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
+        score_event_id = ScoreEventID()
+
+        # Store raw UUID string (no sev_ prefix) to simulate existing bad data
+        board_state = BoardState(
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,
+            aux={"last_event_id": str(score_event_id.uuid), "event_count": 5},
+            player_name="Test Player",
+            is_test=False,
+        )
+
+        response = ScoreResponse.from_board_state(
+            state=board_state,
+            account_id=account_id,
+            game_id=game_id,
+            rank=1,
+        )
+
+        assert response.score_event_id is not None
+        assert response.score_event_id.uuid == score_event_id.uuid
+
     async def test_board_state_no_aux_has_null_score_event_id(self):
         """BoardState with no aux field should have null score_event_id."""
         account_id = AccountID()

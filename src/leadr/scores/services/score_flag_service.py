@@ -261,8 +261,9 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             return
 
         # Check if the flagged event is the currently selected event
+        # Compare against both prefixed and raw UUID formats to handle existing data
         selected_event_id = (state.aux or {}).get("selected_event_id")
-        if selected_event_id != str(flagged_event_id):
+        if selected_event_id not in (str(flagged_event_id), str(flagged_event_id.uuid)):
             return  # Flagged event is not the selected one, no recomputation needed
 
         # Recompute by finding the next eligible event
@@ -344,7 +345,7 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
             value = eligible_event.event_payload.get("value")
             existing_state.primary_value = float(value) if value is not None else None
             existing_state.aux = {
-                "selected_event_id": str(eligible_event.id),
+                "selected_event_id": str(ScoreEventID(eligible_event.id)),
                 "event_count": event_count,
             }
             # Update denormalized fields from the new event

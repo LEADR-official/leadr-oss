@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 from enum import Enum
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -12,6 +13,14 @@ from leadr.boards.domain.run_entry import RunEntry
 from leadr.common.domain.ids import AccountID, BoardID, GameID, IdentityID, ScoreEventID, ScoreID
 from leadr.config import settings
 from leadr.scores.domain.anti_cheat.enums import ScoreStatus
+
+
+def _parse_score_event_id(raw: str) -> ScoreEventID:
+    """Parse ScoreEventID from aux data, handling both prefixed and raw UUID formats."""
+    try:
+        return ScoreEventID(raw)
+    except ValueError:
+        return ScoreEventID(UUID(raw))
 
 
 class IsTestFilter(str, Enum):
@@ -140,9 +149,9 @@ class ScoreResponse(BaseModel):
         score_event_id: ScoreEventID | None = None
         if state.aux:
             if "selected_event_id" in state.aux:
-                score_event_id = ScoreEventID(state.aux["selected_event_id"])
+                score_event_id = _parse_score_event_id(state.aux["selected_event_id"])
             elif "last_event_id" in state.aux:
-                score_event_id = ScoreEventID(state.aux["last_event_id"])
+                score_event_id = _parse_score_event_id(state.aux["last_event_id"])
 
         return cls(
             id=masked_id,
