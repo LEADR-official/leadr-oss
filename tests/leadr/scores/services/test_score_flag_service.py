@@ -728,7 +728,7 @@ class TestRecomputeRunIdentity:
 
             assert state.primary_value == 500.0
             assert state.aux is not None
-            assert state.aux["selected_event_id"] == str(mock_event.id)
+            assert state.aux["selected_event_id"] == str(ScoreEventID(mock_event.id))
             assert state.aux["event_count"] == 3
             assert state.timezone == "US/Eastern"
             assert state.country == "US"
