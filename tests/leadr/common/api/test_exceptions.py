@@ -53,6 +53,53 @@ class TestCatchallExceptionHandler:
 
         assert response.body == b'{"error":"Internal server error"}'
 
+    @pytest.mark.asyncio
+    async def test_logs_account_id_when_available(self) -> None:
+        """Handler should include account_id in log extra when set on request.state."""
+        mock_request = MagicMock(spec=Request)
+        mock_request.state.account_id = "test-account-123"
+        mock_request.state.game_id = None
+        exc = Exception("Test error")
+
+        with patch("leadr.common.api.exceptions.logger") as mock_logger:
+            await catchall_exception_handler(mock_request, exc)
+
+            mock_logger.exception.assert_called_once()
+            call_kwargs = mock_logger.exception.call_args[1]
+            assert call_kwargs["extra"]["account_id"] == "test-account-123"
+
+    @pytest.mark.asyncio
+    async def test_logs_game_id_when_available(self) -> None:
+        """Handler should include game_id in log extra when set on request.state."""
+        mock_request = MagicMock(spec=Request)
+        mock_request.state.account_id = "test-account-123"
+        mock_request.state.game_id = "test-game-456"
+        exc = Exception("Test error")
+
+        with patch("leadr.common.api.exceptions.logger") as mock_logger:
+            await catchall_exception_handler(mock_request, exc)
+
+            mock_logger.exception.assert_called_once()
+            call_kwargs = mock_logger.exception.call_args[1]
+            assert call_kwargs["extra"]["game_id"] == "test-game-456"
+
+    @pytest.mark.asyncio
+    async def test_handles_missing_state_attributes(self) -> None:
+        """Handler should gracefully handle missing account_id/game_id on request.state."""
+        mock_request = MagicMock(spec=Request)
+        # Simulate state without account_id or game_id attributes
+        del mock_request.state.account_id
+        del mock_request.state.game_id
+        exc = Exception("Test error")
+
+        with patch("leadr.common.api.exceptions.logger") as mock_logger:
+            response = await catchall_exception_handler(mock_request, exc)
+
+            assert response.status_code == 500
+            call_kwargs = mock_logger.exception.call_args[1]
+            assert call_kwargs["extra"]["account_id"] is None
+            assert call_kwargs["extra"]["game_id"] is None
+
 
 class TestHttpExceptionHandler:
     """Tests for http_exception_handler."""
@@ -87,6 +134,38 @@ class TestHttpExceptionHandler:
 
         assert response.status_code == 401
         assert response.body == b'{"error":"Authentication required"}'
+
+    @pytest.mark.asyncio
+    async def test_logs_context_for_500_errors(self) -> None:
+        """Handler should include account_id and game_id in log for 500+ errors."""
+        mock_request = MagicMock(spec=Request)
+        mock_request.state.account_id = "test-account-123"
+        mock_request.state.game_id = "test-game-456"
+        exc = HTTPException(status_code=500, detail="Internal error")
+
+        with patch("leadr.common.api.exceptions.logger") as mock_logger:
+            await http_exception_handler(mock_request, exc)
+
+            mock_logger.exception.assert_called_once()
+            call_kwargs = mock_logger.exception.call_args[1]
+            assert call_kwargs["extra"]["account_id"] == "test-account-123"
+            assert call_kwargs["extra"]["game_id"] == "test-game-456"
+
+    @pytest.mark.asyncio
+    async def test_handles_missing_state_for_500_errors(self) -> None:
+        """Handler should gracefully handle missing state attributes for 500+ errors."""
+        mock_request = MagicMock(spec=Request)
+        del mock_request.state.account_id
+        del mock_request.state.game_id
+        exc = HTTPException(status_code=502, detail="Bad gateway")
+
+        with patch("leadr.common.api.exceptions.logger") as mock_logger:
+            response = await http_exception_handler(mock_request, exc)
+
+            assert response.status_code == 502
+            call_kwargs = mock_logger.exception.call_args[1]
+            assert call_kwargs["extra"]["account_id"] is None
+            assert call_kwargs["extra"]["game_id"] is None
 
 
 class TestEntityNotFoundHandler:

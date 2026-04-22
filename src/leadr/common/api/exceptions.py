@@ -27,9 +27,17 @@ async def catchall_exception_handler(
     Returns:
         JSONResponse with 500 status and error detail
     """
+    account_id = getattr(request.state, "account_id", None)
+    game_id = getattr(request.state, "game_id", None)
+
     logger.exception(
         exc,
-        extra={"method": request.method, "url": str(request.url.path)},
+        extra={
+            "method": request.method,
+            "url": str(request.url.path),
+            "account_id": account_id,
+            "game_id": game_id,
+        },
     )
     if settings.DEBUG:
         return JSONResponse(status_code=500, content={"error": str(exc)})
@@ -54,9 +62,17 @@ async def http_exception_handler(
         JSONResponse with HTTP status code and error detail
     """
     if exc.status_code >= 500:
+        account_id = getattr(request.state, "account_id", None)
+        game_id = getattr(request.state, "game_id", None)
+
         logger.exception(
             exc,
-            extra={"method": request.method, "url": str(request.url.path)},
+            extra={
+                "method": request.method,
+                "url": str(request.url.path),
+                "account_id": account_id,
+                "game_id": game_id,
+            },
         )
     return JSONResponse(
         status_code=exc.status_code,
