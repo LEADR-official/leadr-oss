@@ -3,9 +3,10 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import Float, exists, func, select
+from sqlalchemy import Float, delete, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.boards.adapters.orm import BoardStateORM
 from leadr.boards.domain.board import Board, BoardType, KeepStrategy
 from leadr.boards.domain.board import SortDirection as BoardSortDirection
 from leadr.boards.domain.board_state import BoardState
@@ -429,6 +430,69 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         dependent_configs = await state_service.find_dependent_ratio_boards(board_id)
         for config in dependent_configs:
             await state_service.recompute_ratio_for_identity(config, identity_id)
+
+    async def recompute_state_for_identities(
+        self,
+        board: Board,
+        identity_ids: set[IdentityID],
+    ) -> int:
+        """Recompute board state for multiple identities after score deletion.
+
+        This is a bulk version of the single-identity recomputation used during
+        flag review. For each identity:
+        - If no events remain: deletes the BoardState
+        - If events remain: recomputes using existing _recompute_* methods
+
+        Args:
+            board: The board to recompute state for
+            identity_ids: Set of identity IDs that were affected by deletion
+
+        Returns:
+            Number of identities recomputed
+        """
+        board_state_service = BoardStateService(self.session)
+        recomputed = 0
+
+        for identity_id in identity_ids:
+            # Check if any events remain for this identity
+            remaining_query = select(func.count()).where(
+                ScoreEventORM.board_id == board.id.uuid,
+                ScoreEventORM.identity_id == identity_id.uuid,
+            )
+            result = await self.session.execute(remaining_query)
+            count = result.scalar() or 0
+
+            if count == 0:
+                # No events remain - delete BoardState
+                await self.session.execute(
+                    delete(BoardStateORM).where(
+                        BoardStateORM.board_id == board.id.uuid,
+                        BoardStateORM.identity_id == identity_id.uuid,
+                    )
+                )
+                recomputed += 1
+                continue
+
+            # Get existing state for recomputation
+            state = await board_state_service.get_by_board_and_identity(board.id, identity_id)
+            if state is None:
+                continue
+
+            # Reuse existing private methods based on board type
+            if board.board_type == BoardType.RUN_IDENTITY:
+                await self._recompute_run_identity(board, identity_id, state)
+            elif board.board_type == BoardType.COUNTER:
+                await self._sync_counter_state(board, identity_id)
+            # RUN_RUNS: handled by RunEntry deletion, no BoardState recomputation needed
+            # RATIO: handled separately via ratio dependency system
+
+            # Handle ratio dependencies for boards that affect ratios
+            if board.board_type in (BoardType.RUN_IDENTITY, BoardType.COUNTER):
+                await self._sync_ratio_dependents(board.id, identity_id)
+
+            recomputed += 1
+
+        return recomputed
 
     async def review_flag(
         self,
