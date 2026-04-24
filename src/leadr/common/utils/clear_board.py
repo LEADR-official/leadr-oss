@@ -28,12 +28,15 @@ from uuid import UUID
 from sqlalchemy import CursorResult, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from leadr.accounts.adapters.orm import AccountORM  # noqa: F401 - required for ORM relationships
+from leadr.auth.adapters.orm import IdentityORM  # noqa: F401 - required for ORM relationships
 from leadr.boards.adapters.orm import BoardStateORM, RunEntryORM
 from leadr.boards.domain.board import Board
 from leadr.boards.services.board_service import BoardService
 from leadr.common.database import async_session_factory
 from leadr.common.domain.ids import BoardID, IdentityID
 from leadr.config import settings
+from leadr.games.adapters.orm import GameORM  # noqa: F401 - required for ORM relationships
 from leadr.logging import setup_logging
 from leadr.scores.adapters.orm import (
     ScoreEventORM,
