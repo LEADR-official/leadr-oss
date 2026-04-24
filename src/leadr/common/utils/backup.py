@@ -39,6 +39,7 @@ from typing import Any
 import boto3
 
 from leadr.config import settings
+from leadr.logging import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -286,9 +287,13 @@ def run_backup(*, local_dir: Path | None = None) -> None:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    setup_logging(
+        log_level="DEBUG" if settings.DEBUG else "INFO",
+        json_format=settings.LOG_JSON,
+        log_to_file=settings.LOG_TO_FILE,
+        log_dir=settings.LOG_DIR,
+        app_name=settings.APP,
+        env=settings.ENV,
     )
 
     parser = argparse.ArgumentParser(description="LEADR database backup")
