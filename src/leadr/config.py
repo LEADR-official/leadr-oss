@@ -207,6 +207,11 @@ class CommonSettings(BaseSettings):
         default=False,
         description="Enable client API endpoints",
     )
+    JOB_MODE: bool = Field(
+        default=False,
+        description="Set to True for standalone job scripts (backup, restore, clear_board) "
+        "that don't need the API enabled.",
+    )
 
     TESTING_EMAIL: str = Field(
         default="hello@example.com",
@@ -435,7 +440,9 @@ class CommonSettings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_api_enabled(self):
-        """Ensure at least one API (Admin or Client) is enabled."""
+        """Ensure at least one API (Admin or Client) is enabled, unless in job mode."""
+        if self.JOB_MODE:
+            return self  # Skip validation for standalone jobs
         if not self.ENABLE_ADMIN_API and not self.ENABLE_CLIENT_API:
             raise ValueError("At least one of ENABLE_ADMIN_API or ENABLE_CLIENT_API must be True")
         return self
