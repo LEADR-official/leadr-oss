@@ -138,16 +138,18 @@ def upload_to_storage(
     """Upload backup files to S3-compatible object storage."""
     logger.info("Uploading to %s/%s", settings.BACKUP_STORAGE_BUCKET, dump_key)
 
-    s3_client_kwargs: dict[str, Any] = {
-        "aws_access_key_id": settings.BACKUP_STORAGE_ACCESS_KEY_ID,
-        "aws_secret_access_key": settings.BACKUP_STORAGE_SECRET_ACCESS_KEY,
-    }
-    if settings.BACKUP_STORAGE_ENDPOINT_URL:
-        s3_client_kwargs["endpoint_url"] = settings.BACKUP_STORAGE_ENDPOINT_URL
-    if settings.BACKUP_STORAGE_REGION:
-        s3_client_kwargs["region_name"] = settings.BACKUP_STORAGE_REGION
+    # Create explicit session to avoid reading ~/.aws/config profiles
+    session = boto3.Session(
+        aws_access_key_id=settings.BACKUP_STORAGE_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.BACKUP_STORAGE_SECRET_ACCESS_KEY,
+        region_name=settings.BACKUP_STORAGE_REGION or None,
+    )
 
-    s3 = boto3.client("s3", **s3_client_kwargs)
+    client_kwargs: dict[str, Any] = {}
+    if settings.BACKUP_STORAGE_ENDPOINT_URL:
+        client_kwargs["endpoint_url"] = settings.BACKUP_STORAGE_ENDPOINT_URL
+
+    s3 = session.client("s3", **client_kwargs)
 
     s3.upload_file(
         Filename=str(dump_path),
