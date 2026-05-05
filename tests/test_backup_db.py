@@ -250,7 +250,9 @@ class TestUploadToStorage:
         manifest_path.write_text("{}")
 
         mock_s3 = MagicMock()
-        mock_boto3.client.return_value = mock_s3
+        mock_session = MagicMock()
+        mock_session.client.return_value = mock_s3
+        mock_boto3.Session.return_value = mock_session
 
         upload_to_storage(
             dump_path=dump_path,
@@ -259,12 +261,14 @@ class TestUploadToStorage:
             manifest_key="backups/2026/04/leadr.manifest.json",
         )
 
-        mock_boto3.client.assert_called_once_with(
-            "s3",
-            endpoint_url="https://fsn1.your-objectstorage.com",
-            region_name="fsn1",
+        mock_boto3.Session.assert_called_once_with(
             aws_access_key_id="test-key",
             aws_secret_access_key="test-secret",
+            region_name="fsn1",
+        )
+        mock_session.client.assert_called_once_with(
+            "s3",
+            endpoint_url="https://fsn1.your-objectstorage.com",
         )
         assert mock_s3.upload_file.call_count == 2
 
@@ -291,7 +295,9 @@ class TestRunBackup:
         _configure_mock_settings(mock_settings)
         mock_subprocess.run.side_effect = _make_subprocess_side_effect()
         mock_s3_client = MagicMock()
-        mock_boto3.client.return_value = mock_s3_client
+        mock_session = MagicMock()
+        mock_session.client.return_value = mock_s3_client
+        mock_boto3.Session.return_value = mock_session
 
         run_backup()
 
@@ -327,7 +333,9 @@ class TestRunBackup:
         mock_settings.DB_HOST = "pooler.example.com"
         mock_settings.DB_HOST_DIRECT = "direct.example.com"
         mock_subprocess.run.side_effect = _make_subprocess_side_effect()
-        mock_boto3.client.return_value = MagicMock()
+        mock_session = MagicMock()
+        mock_session.client.return_value = MagicMock()
+        mock_boto3.Session.return_value = mock_session
 
         run_backup()
 
