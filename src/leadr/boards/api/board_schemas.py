@@ -158,7 +158,11 @@ class BoardUpdateRequest(BaseModel):
     is_active: bool | None = Field(default=None, description="Updated active status")
     is_published: bool | None = Field(default=None, description="Updated published status")
     sort_direction: SortDirection | None = Field(default=None, description="Updated sort direction")
-    board_type: BoardType | None = Field(default=None, description="Updated board type")
+    board_type: BoardType | None = Field(
+        default=None,
+        description="DEPRECATED: board_type cannot be changed after creation",
+        deprecated=True,
+    )
     keep_strategy: KeepStrategy | None = Field(default=None, description="Updated keep strategy")
     created_from_template_id: BoardTemplateID | None = Field(
         default=None, description="Updated template ID"
@@ -173,6 +177,10 @@ class BoardUpdateRequest(BaseModel):
         default=None,
         description="Updated ratio config (for RATIO boards only)",
     )
+
+    # NOTE: board_type validation happens at route level to allow old clients
+    # that always send the current board_type to continue working. Only actual
+    # changes to board_type are rejected.
 
 
 class BoardResponse(BaseModel):

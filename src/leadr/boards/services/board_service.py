@@ -333,9 +333,11 @@ class BoardService(BaseService[Board, BoardRepository]):
         """
         board = await self.get_by_id_or_raise(board_id)
 
-        # Apply all updates atomically - validation runs once at the end
-        # This prevents validation errors when updating cross-dependent fields
-        # like board_type and keep_strategy together
-        board = board.model_copy(update=updates)
+        # Reconstruct Board with updates to ensure @model_validator runs.
+        # This catches invalid field combinations (e.g., board_type/keep_strategy)
+        # before persisting to the database.
+        data = board.model_dump()
+        data.update(updates)
+        board = Board(**data)
 
         return await self.repository.update(board)

@@ -1066,3 +1066,70 @@ class TestBoardClientRoutes:
 
         # The param is silently ignored, so it returns all boards for the game
         assert response.status_code == 200
+
+    async def test_update_board_rejects_board_type_change(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that changing board_type returns 400 error."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-board-type-change",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Original Board",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        # Try to change board_type from RUN_IDENTITY to RUN_RUNS
+        response = await client.patch(
+            f"/boards/{board.id}",
+            json={"board_type": "RUN_RUNS"},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 400
+        assert "board_type cannot be changed" in response.json()["error"]
+
+    async def test_update_board_accepts_same_board_type(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test that sending the same board_type is accepted (backward compat)."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(
+            name="Test Account",
+            slug="test-board-type-same",
+        )
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        board_service = BoardService(db_session)
+        board = await board_service.create_board(
+            account_id=account.id,
+            game_id=game.id,
+            name="Original Board",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        # Send the same board_type (backward compat for old TUI clients)
+        response = await client.patch(
+            f"/boards/{board.id}",
+            json={"board_type": "RUN_IDENTITY", "name": "Updated Board"},
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["name"] == "Updated Board"
+        assert response.json()["board_type"] == "RUN_IDENTITY"

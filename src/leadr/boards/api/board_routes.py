@@ -539,6 +539,17 @@ async def update_board(
     update_data.pop("deleted", None)  # Handled separately above
     update_data.pop("ratio_config", None)  # Handled separately below
 
+    # Validate board_type is not being changed (backward compat: allow same value)
+    if "board_type" in update_data:
+        if update_data["board_type"] != board.board_type:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="board_type cannot be changed after creation. "
+                "Delete and recreate the board if you need a different type.",
+            )
+        # Remove board_type since it can't change (but was allowed for backward compat)
+        update_data.pop("board_type")
+
     if update_data:
         board = await service.update_board(board_id, **update_data)
 

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
@@ -1058,3 +1059,33 @@ class TestBoardService:
         assert updated_board.description == "Updated description for the board"
         assert updated_board.name == "Speed Run Board"
         service.repository.update.assert_called_once()
+
+    async def test_update_keep_strategy_invalid_for_board_type_raises_validation_error(
+        self, service
+    ):
+        """Test that updating keep_strategy to an invalid value for board_type fails.
+
+        RUN_RUNS boards must have keep_strategy=NA. Attempting to change it to
+        BEST/FIRST/LATEST should raise a ValidationError at the service level.
+        """
+        board_id = BoardID(uuid4())
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        # Create a RUN_RUNS board (requires keep_strategy=NA)
+        existing_board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="All Runs Board",
+            slug="all-runs-board",
+            short_code="AR2025",
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        service.repository.get_by_id = AsyncMock(return_value=existing_board)
+
+        # Trying to change keep_strategy to BEST should fail validation
+        with pytest.raises(ValidationError, match="keep_strategy=NA"):
+            await service.update_board(board_id=board_id, keep_strategy=KeepStrategy.BEST)
