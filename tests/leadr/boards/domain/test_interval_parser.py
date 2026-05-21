@@ -59,6 +59,26 @@ class TestParseInterval:
         result = parse_interval("1 hour")
         assert result == relativedelta(hours=1)
 
+    def test_parse_minutes(self):
+        """Test parsing minutes interval."""
+        result = parse_interval("30 minutes")
+        assert result == relativedelta(minutes=30)
+
+    def test_parse_single_minute(self):
+        """Test parsing single minute interval."""
+        result = parse_interval("1 minute")
+        assert result == relativedelta(minutes=1)
+
+    def test_parse_seconds(self):
+        """Test parsing seconds interval."""
+        result = parse_interval("10 seconds")
+        assert result == relativedelta(seconds=10)
+
+    def test_parse_single_second(self):
+        """Test parsing single second interval."""
+        result = parse_interval("1 second")
+        assert result == relativedelta(seconds=1)
+
     def test_parse_with_extra_whitespace(self):
         """Test parsing with extra whitespace."""
         result = parse_interval("  7   days  ")

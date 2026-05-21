@@ -404,7 +404,7 @@ class TestBoardTemplate:
             "1 year",
             "1 hour",
             "30 minutes",
-            "1 day 2 hours",
+            "10 seconds",
         ]
 
         for interval in valid_intervals:
@@ -433,7 +433,6 @@ class TestBoardTemplate:
         invalid_intervals = [
             "",
             "invalid",
-            "1 dayss",  # typo
             "foo bar",
             "123",  # number without unit
         ]

@@ -12,6 +12,8 @@ def parse_interval(interval_string: str) -> relativedelta:
     - "1 month"
     - "1 year"
     - "2 hours"
+    - "30 minutes"
+    - "10 seconds"
 
     Args:
         interval_string: PostgreSQL interval syntax string.
@@ -53,8 +55,12 @@ def parse_interval(interval_string: str) -> relativedelta:
         return relativedelta(years=amount)
     elif unit == "hour":
         return relativedelta(hours=amount)
+    elif unit == "minute":
+        return relativedelta(minutes=amount)
+    elif unit == "second":
+        return relativedelta(seconds=amount)
     else:
         raise ValueError(
             f"Unsupported time unit in interval '{interval_string}': {unit}. "
-            "Supported units: day, week, month, year, hour"
+            "Supported units: day, week, month, year, hour, minute, second"
         )
