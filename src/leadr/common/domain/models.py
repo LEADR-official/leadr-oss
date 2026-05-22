@@ -7,19 +7,13 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ImmutableEntity(BaseModel):
-    """Base class for immutable domain entities (append-only, no updates/deletes).
+class _EntityBase(BaseModel):
+    """Private shared base for Entity and ImmutableEntity.
 
-    Provides common functionality for event-sourced entities including:
+    Provides common fields and behaviour:
     - Auto-generated UUID primary key (or typed prefixed ID in subclasses)
     - Created timestamp (UTC)
     - Equality and hashing based on ID
-
-    Used for entities that are never updated or deleted after creation,
-    such as ScoreEvent in event-sourcing patterns.
-
-    Subclasses can override the `id` field with a typed PrefixedID for better
-    type safety and API clarity.
     """
 
     model_config = ConfigDict(validate_assignment=True)
@@ -61,7 +55,23 @@ class ImmutableEntity(BaseModel):
         return hash(self.id)
 
 
-class Entity(BaseModel):
+class ImmutableEntity(_EntityBase):
+    """Base class for immutable domain entities (append-only, no updates/deletes).
+
+    Provides common functionality for event-sourced entities including:
+    - Auto-generated UUID primary key (or typed prefixed ID in subclasses)
+    - Created timestamp (UTC)
+    - Equality and hashing based on ID
+
+    Used for entities that are never updated or deleted after creation,
+    such as ScoreEvent in event-sourcing patterns.
+
+    Subclasses can override the `id` field with a typed PrefixedID for better
+    type safety and API clarity.
+    """
+
+
+class Entity(_EntityBase):
     """Base class for all domain entities with ID and timestamps.
 
     Provides common functionality for domain entities including:
@@ -78,17 +88,6 @@ class Entity(BaseModel):
     type safety and API clarity.
     """
 
-    model_config = ConfigDict(validate_assignment=True)
-
-    id: Any = Field(
-        frozen=True,
-        default_factory=uuid4,
-        description="Unique identifier (auto-generated UUID or typed ID)",
-    )
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
-        description="Timestamp when entity was created (UTC)",
-    )
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         description="Timestamp of last update (UTC)",
@@ -131,29 +130,3 @@ class Entity(BaseModel):
             >>> assert account.is_deleted is False
         """
         self.deleted_at = None
-
-    def __eq__(self, other: object) -> bool:
-        """Check equality based on ID.
-
-        Two entities are considered equal if they have the same ID and are
-        of the same class.
-
-        Args:
-            other: Object to compare with.
-
-        Returns:
-            True if both entities have the same ID and class.
-        """
-        if not isinstance(other, self.__class__):
-            return False
-        return self.id == other.id
-
-    def __hash__(self) -> int:
-        """Return hash based on ID.
-
-        Allows entities to be used in sets and as dictionary keys.
-
-        Returns:
-            Hash of the entity's ID.
-        """
-        return hash(self.id)
