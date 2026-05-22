@@ -7,7 +7,7 @@ from typing import Any
 from pydantic import Field, field_validator
 
 from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
-from leadr.boards.domain.interval_parser import parse_interval
+from leadr.boards.domain.interval_parser import normalize_interval
 from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 from leadr.common.domain.models import Entity
 
@@ -159,8 +159,7 @@ class BoardTemplate(Entity):
         if not value or not value.strip():
             raise ValueError("repeat_interval cannot be empty")
 
-        parse_interval(value)
-        return value.strip()
+        return normalize_interval(value)
 
     def generate_name(self, timestamp: datetime, series_value: int | None) -> str:
         """Generate a board name using the name template.

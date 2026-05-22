@@ -3,7 +3,7 @@
 import pytest
 from dateutil.relativedelta import relativedelta
 
-from leadr.boards.domain.interval_parser import parse_interval
+from leadr.boards.domain.interval_parser import normalize_interval, parse_interval
 
 
 class TestParseInterval:
@@ -113,3 +113,69 @@ class TestParseInterval:
         """Test parsing negative amounts (allowed by parser)."""
         result = parse_interval("-7 days")
         assert result == relativedelta(days=-7)
+
+    def test_parse_shorthand_hourly(self):
+        """Test parsing 'hourly' shorthand."""
+        result = parse_interval("hourly")
+        assert result == relativedelta(hours=1)
+
+    def test_parse_shorthand_daily(self):
+        """Test parsing 'daily' shorthand."""
+        result = parse_interval("daily")
+        assert result == relativedelta(days=1)
+
+    def test_parse_shorthand_weekly(self):
+        """Test parsing 'weekly' shorthand."""
+        result = parse_interval("weekly")
+        assert result == relativedelta(days=7)
+
+    def test_parse_shorthand_monthly(self):
+        """Test parsing 'monthly' shorthand."""
+        result = parse_interval("monthly")
+        assert result == relativedelta(months=1)
+
+    def test_parse_shorthand_case_insensitive(self):
+        """Test shorthand aliases are case-insensitive."""
+        assert parse_interval("Daily") == relativedelta(days=1)
+        assert parse_interval("WEEKLY") == relativedelta(days=7)
+
+    def test_parse_shorthand_with_whitespace(self):
+        """Test shorthand aliases with surrounding whitespace."""
+        result = parse_interval("  daily  ")
+        assert result == relativedelta(days=1)
+
+
+class TestNormalizeInterval:
+    """Tests for normalize_interval function."""
+
+    def test_normalize_shorthand_hourly(self):
+        assert normalize_interval("hourly") == "1 hour"
+
+    def test_normalize_shorthand_daily(self):
+        assert normalize_interval("daily") == "1 day"
+
+    def test_normalize_shorthand_weekly(self):
+        assert normalize_interval("weekly") == "7 days"
+
+    def test_normalize_shorthand_monthly(self):
+        assert normalize_interval("monthly") == "1 month"
+
+    def test_normalize_passthrough(self):
+        """Standard interval syntax passes through unchanged."""
+        assert normalize_interval("7 days") == "7 days"
+        assert normalize_interval("1 hour") == "1 hour"
+
+    def test_normalize_shorthand_case_insensitive(self):
+        assert normalize_interval("Daily") == "1 day"
+        assert normalize_interval("MONTHLY") == "1 month"
+
+    def test_normalize_strips_whitespace(self):
+        assert normalize_interval("  weekly  ") == "7 days"
+        assert normalize_interval("  7 days  ") == "7 days"
+
+    def test_normalize_invalid_raises(self):
+        """Invalid intervals still raise ValueError."""
+        with pytest.raises(ValueError):
+            normalize_interval("")
+        with pytest.raises(ValueError):
+            normalize_interval("bogus")
