@@ -11,6 +11,7 @@ from leadr.boards.api.board_template_schemas import (
     BoardTemplateResponse,
     BoardTemplateUpdateRequest,
 )
+from leadr.boards.domain.board import BoardType, KeepStrategy
 from leadr.boards.services.dependencies import BoardTemplateServiceDep
 from leadr.common.api.hooks import (
     PreCreateBoardTemplateHookDep,
@@ -60,6 +61,13 @@ async def create_board_template(
     # Run pre-create hook (entitlement checks, validation, etc.)
     await pre_hook(request, auth, background_tasks)
 
+    # Resolve keep_strategy based on board_type
+    if request.board_type == BoardType.RUN_IDENTITY:
+        effective_keep_strategy = request.keep_strategy or KeepStrategy.BEST
+    else:
+        # Non-RUN_IDENTITY boards always use NA
+        effective_keep_strategy = KeepStrategy.NA
+
     try:
         template = await service.create_board_template(
             account_id=request.account_id,
@@ -75,7 +83,8 @@ async def create_board_template(
             icon=request.icon,
             unit=request.unit,
             sort_direction=request.sort_direction,
-            keep_strategy=request.keep_strategy,
+            board_type=request.board_type,
+            keep_strategy=effective_keep_strategy,
             starts_at=request.starts_at,
             ends_at=request.ends_at,
             tags=request.tags,

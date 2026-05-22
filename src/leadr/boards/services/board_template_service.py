@@ -6,7 +6,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from leadr.boards.domain.board import KeepStrategy, SortDirection
+from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.boards.domain.interval_parser import parse_interval
 from leadr.boards.services.repositories import BoardTemplateRepository
@@ -89,6 +89,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         icon: str | None = "fa-crown",
         unit: str | None = None,
         sort_direction: SortDirection = SortDirection.DESCENDING,
+        board_type: BoardType = BoardType.RUN_IDENTITY,
         keep_strategy: KeepStrategy = KeepStrategy.BEST,
         starts_at: datetime | None = None,
         ends_at: datetime | None = None,
@@ -149,6 +150,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             icon=icon,
             unit=unit,
             sort_direction=sort_direction,
+            board_type=board_type,
             keep_strategy=keep_strategy,
             starts_at=starts_at,
             ends_at=ends_at,

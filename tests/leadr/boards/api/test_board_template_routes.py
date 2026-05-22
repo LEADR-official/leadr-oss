@@ -54,6 +54,7 @@ class TestBoardTemplateRoutes:
         assert data["repeat_interval"] == "7 days"
         assert data["account_id"] == str(account.id)
         assert data["game_id"] == str(game.id)
+        assert data["board_type"] == "RUN_IDENTITY"
         assert data["is_active"] is True
         assert "id" in data
         assert "created_at" in data
@@ -164,6 +165,7 @@ class TestBoardTemplateRoutes:
         data = response.json()
         assert data["id"] == template_id
         assert data["name"] == "Test Template"
+        assert data["board_type"] == "RUN_IDENTITY"
 
     async def test_get_nonexistent_board_template_returns_404(
         self, client: AsyncClient, test_api_key
@@ -459,3 +461,96 @@ class TestBoardTemplateRoutes:
         template_names = {t["name"] for t in data["data"]}
         assert "Template from Account 1" in template_names
         assert "Template from Account 2" in template_names
+
+    async def test_create_board_template_with_run_runs_board_type(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating a board template with RUN_RUNS board type."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Corp", slug="test-corp")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        next_run_at = (datetime.now(UTC) + timedelta(days=7)).isoformat()
+        response = await client.post(
+            "/board-templates",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "Run Runs Template",
+                "slug": "run-runs-template",
+                "repeat_interval": "7 days",
+                "next_run_at": next_run_at,
+                "is_active": True,
+                "board_type": "RUN_RUNS",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["board_type"] == "RUN_RUNS"
+        assert data["keep_strategy"] == "NA"
+
+    async def test_create_board_template_default_board_type(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating a board template without board_type defaults to RUN_IDENTITY with BEST."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Corp", slug="test-corp-2")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        next_run_at = (datetime.now(UTC) + timedelta(days=7)).isoformat()
+        response = await client.post(
+            "/board-templates",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "Default Type Template",
+                "slug": "default-type-template",
+                "repeat_interval": "7 days",
+                "next_run_at": next_run_at,
+                "is_active": True,
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["board_type"] == "RUN_IDENTITY"
+        assert data["keep_strategy"] == "BEST"
+
+    async def test_create_board_template_run_identity_explicit_keep_strategy(
+        self, client: AsyncClient, db_session, test_api_key
+    ):
+        """Test creating a RUN_IDENTITY template with explicit keep_strategy=FIRST."""
+        account_service = AccountService(db_session)
+        account = await account_service.create_account(name="Test Corp", slug="test-corp-3")
+
+        game_service = GameService(db_session)
+        game = await game_service.create_game(account_id=account.id, name="Test Game")
+
+        next_run_at = (datetime.now(UTC) + timedelta(days=7)).isoformat()
+        response = await client.post(
+            "/board-templates",
+            json={
+                "account_id": str(account.id),
+                "game_id": str(game.id),
+                "name": "First Strategy Template",
+                "slug": "first-strategy-template",
+                "repeat_interval": "7 days",
+                "next_run_at": next_run_at,
+                "is_active": True,
+                "board_type": "RUN_IDENTITY",
+                "keep_strategy": "FIRST",
+            },
+            headers={"leadr-api-key": test_api_key},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["board_type"] == "RUN_IDENTITY"
+        assert data["keep_strategy"] == "FIRST"

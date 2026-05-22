@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from leadr.boards.domain.board import KeepStrategy, SortDirection
+from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 
@@ -47,9 +47,13 @@ class BoardTemplateCreateRequest(BaseModel):
         default=SortDirection.DESCENDING,
         description="Direction to sort scores (ascending/descending)",
     )
-    keep_strategy: KeepStrategy = Field(
-        default=KeepStrategy.BEST,
-        description="Strategy for keeping multiple scores from the same user",
+    board_type: BoardType = Field(
+        default=BoardType.RUN_IDENTITY,
+        description="Type of board to create from this template",
+    )
+    keep_strategy: KeepStrategy | None = Field(
+        default=None,
+        description="Strategy for keeping multiple scores from the same user (RUN_IDENTITY only)",
     )
     starts_at: datetime | None = Field(
         default=None, description="Optional start time for time-bounded boards"
@@ -119,8 +123,9 @@ class BoardTemplateResponse(BaseModel):
     sort_direction: SortDirection = Field(
         description="Direction to sort scores (ascending/descending)"
     )
+    board_type: BoardType = Field(description="Type of board to create from this template")
     keep_strategy: KeepStrategy = Field(
-        description="Strategy for keeping multiple scores from the same user"
+        description="Strategy for keeping multiple scores from the same user (RUN_IDENTITY only)"
     )
     starts_at: datetime | None = Field(description="Optional start time for time-bounded boards")
     ends_at: datetime | None = Field(description="Optional end time for time-bounded boards")
@@ -163,6 +168,7 @@ class BoardTemplateResponse(BaseModel):
             icon=template.icon,
             unit=template.unit,
             sort_direction=template.sort_direction,
+            board_type=template.board_type,
             keep_strategy=template.keep_strategy,
             starts_at=template.starts_at,
             ends_at=template.ends_at,

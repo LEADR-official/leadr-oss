@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.boards.domain.interval_parser import normalize_interval
@@ -160,6 +160,29 @@ class BoardTemplate(Entity):
             raise ValueError("repeat_interval cannot be empty")
 
         return normalize_interval(value)
+
+    @model_validator(mode="after")
+    def validate_board_type_keep_strategy(self) -> "BoardTemplate":
+        """Validate board_type and keep_strategy combination.
+
+        - RUN_IDENTITY boards must have a non-NA keep_strategy (FIRST, BEST, LATEST)
+        - Non-RUN_IDENTITY boards (RUN_RUNS, COUNTER, RATIO) must have NA keep_strategy
+
+        Returns:
+            The validated BoardTemplate instance.
+
+        Raises:
+            ValueError: If the board_type/keep_strategy combination is invalid.
+        """
+        if self.board_type == BoardType.RUN_IDENTITY:
+            if self.keep_strategy == KeepStrategy.NA:
+                raise ValueError(
+                    "RUN_IDENTITY boards must have a keep_strategy of FIRST, BEST, or LATEST"
+                )
+        else:
+            if self.keep_strategy != KeepStrategy.NA:
+                raise ValueError(f"{self.board_type.value} boards must have keep_strategy=NA")
+        return self
 
     def generate_name(self, timestamp: datetime, series_value: int | None) -> str:
         """Generate a board name using the name template.

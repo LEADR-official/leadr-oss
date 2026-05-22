@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from leadr.boards.domain.board import BoardType, KeepStrategy
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.common.domain.ids import AccountID, BoardTemplateID, GameID
 
@@ -44,6 +45,7 @@ class TestBoardTemplate:
         assert template.repeat_interval == "7 days"
         assert template.config == {"unit": "seconds", "sort_direction": "ASCENDING"}
         assert template.next_run_at == next_run_at
+        assert template.board_type == BoardType.RUN_IDENTITY
         assert template.is_active is True
         assert template.created_at == now
         assert template.updated_at == now
@@ -75,6 +77,7 @@ class TestBoardTemplate:
         assert template.name == "Simple Template"
         assert template.name_template is None
         assert template.repeat_interval == "1 day"
+        assert template.board_type == BoardType.RUN_IDENTITY
         assert template.config == {}
         assert template.next_run_at == next_run_at
         assert template.is_active is True
@@ -1020,3 +1023,89 @@ class TestBoardTemplateGenerateName:
         timestamp = datetime(2025, 7, 15, tzinfo=UTC)
         result = template.generate_name(timestamp=timestamp, series_value=42)
         assert result == "2025/July/Jul/29/Q3/2025-07-15/#42"
+
+
+class TestBoardTemplateTypeKeepStrategyValidation:
+    """Test suite for BoardTemplate board_type/keep_strategy validation."""
+
+    def test_run_identity_with_na_keep_strategy_raises(self):
+        """RUN_IDENTITY + NA keep_strategy is invalid."""
+        now = datetime.now(UTC)
+        with pytest.raises(ValidationError, match="keep_strategy"):
+            BoardTemplate(
+                account_id=AccountID(uuid4()),
+                game_id=GameID(uuid4()),
+                name="Test",
+                slug="test",
+                repeat_interval="7 days",
+                next_run_at=now + timedelta(days=7),
+                is_active=True,
+                board_type=BoardType.RUN_IDENTITY,
+                keep_strategy=KeepStrategy.NA,
+            )
+
+    def test_non_run_identity_with_non_na_keep_strategy_raises(self):
+        """Non-RUN_IDENTITY board types with non-NA keep_strategy are invalid."""
+        now = datetime.now(UTC)
+        for board_type in [BoardType.RUN_RUNS, BoardType.COUNTER, BoardType.RATIO]:
+            with pytest.raises(ValidationError, match="keep_strategy"):
+                BoardTemplate(
+                    account_id=AccountID(uuid4()),
+                    game_id=GameID(uuid4()),
+                    name="Test",
+                    slug="test",
+                    repeat_interval="7 days",
+                    next_run_at=now + timedelta(days=7),
+                    is_active=True,
+                    board_type=board_type,
+                    keep_strategy=KeepStrategy.BEST,
+                )
+
+    def test_run_identity_with_valid_keep_strategies(self):
+        """RUN_IDENTITY allows FIRST, BEST, and LATEST keep strategies."""
+        now = datetime.now(UTC)
+        for strategy in [KeepStrategy.FIRST, KeepStrategy.BEST, KeepStrategy.LATEST]:
+            template = BoardTemplate(
+                account_id=AccountID(uuid4()),
+                game_id=GameID(uuid4()),
+                name="Test",
+                slug="test",
+                repeat_interval="7 days",
+                next_run_at=now + timedelta(days=7),
+                is_active=True,
+                board_type=BoardType.RUN_IDENTITY,
+                keep_strategy=strategy,
+            )
+            assert template.keep_strategy == strategy
+
+    def test_non_run_identity_with_na_keep_strategy(self):
+        """Non-RUN_IDENTITY board types with NA keep_strategy are valid."""
+        now = datetime.now(UTC)
+        template = BoardTemplate(
+            account_id=AccountID(uuid4()),
+            game_id=GameID(uuid4()),
+            name="Test",
+            slug="test",
+            repeat_interval="7 days",
+            next_run_at=now + timedelta(days=7),
+            is_active=True,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+        assert template.board_type == BoardType.RUN_RUNS
+        assert template.keep_strategy == KeepStrategy.NA
+
+    def test_defaults_are_valid_combination(self):
+        """Default board_type (RUN_IDENTITY) + default keep_strategy (BEST) is valid."""
+        now = datetime.now(UTC)
+        template = BoardTemplate(
+            account_id=AccountID(uuid4()),
+            game_id=GameID(uuid4()),
+            name="Test",
+            slug="test",
+            repeat_interval="7 days",
+            next_run_at=now + timedelta(days=7),
+            is_active=True,
+        )
+        assert template.board_type == BoardType.RUN_IDENTITY
+        assert template.keep_strategy == KeepStrategy.BEST

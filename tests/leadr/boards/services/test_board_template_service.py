@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from leadr.boards.domain.board import BoardType, KeepStrategy
 from leadr.boards.domain.board_template import BoardTemplate
 from leadr.boards.services.board_template_service import BoardTemplateService
 from leadr.common.api.pagination import PaginationParams
@@ -71,6 +72,7 @@ class TestBoardTemplateService:
         assert template.account_id == account_id
         assert template.game_id == game_id
         assert template.name == "Weekly Speed Run Template"
+        assert template.board_type == BoardType.RUN_IDENTITY
         assert template.repeat_interval == "7 days"
         assert template.next_run_at == next_run_at
         assert template.is_active is True
@@ -706,3 +708,33 @@ class TestBoardTemplateService:
 
         assert template1.series is None
         assert template2.series is None
+
+    @patch("leadr.boards.services.board_template_service.GameService")
+    async def test_create_board_template_with_board_type(self, mock_game_service_class, service):
+        """Test creating a board template with explicit board_type=RUN_RUNS."""
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+
+        mock_game_service = mock_game_service_class.return_value
+        mock_game = Game(account_id=account_id, name="Test Game", slug="test-game")
+        mock_game_service.get_by_id_or_raise = AsyncMock(return_value=mock_game)
+
+        service.repository.create = AsyncMock(side_effect=lambda e: e)
+
+        now = datetime.now(UTC)
+        next_run_at = now + timedelta(days=7)
+
+        template = await service.create_board_template(
+            account_id=account_id,
+            game_id=game_id,
+            name="Run Runs Template",
+            slug="run-runs-template",
+            repeat_interval="7 days",
+            next_run_at=next_run_at,
+            is_active=True,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        assert template.board_type == BoardType.RUN_RUNS
+        assert template.keep_strategy == KeepStrategy.NA
