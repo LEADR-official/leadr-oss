@@ -304,13 +304,25 @@ class _RepositoryBase(ABC, Generic[_EntityBaseT, _ORMBaseT]):
         Returns:
             PaginatedResult with items and pagination metadata
         """
+        # Determine if we're paginating backward
+        is_backward = cursor is not None and cursor.direction == PaginationDirection.BACKWARD
+
         # Apply cursor WHERE clause if present
         if cursor is not None:
             cursor_where = self._build_cursor_where_clause(cursor, sort_fields)
             query = query.where(cursor_where)
 
+        # For backward pagination, flip the sort order so the DB returns items
+        # from the correct end, then reverse them back to display order below.
+        if is_backward:
+            effective_sort = [
+                SortField(name=sf.name, direction=sf.direction.opposite()) for sf in sort_fields
+            ]
+        else:
+            effective_sort = sort_fields
+
         # Apply sorting
-        query = self._apply_sort(query, sort_fields)
+        query = self._apply_sort(query, effective_sort)
 
         # Fetch limit+1 to detect has_next
         query = query.limit(limit + 1)
@@ -325,6 +337,10 @@ class _RepositoryBase(ABC, Generic[_EntityBaseT, _ORMBaseT]):
         # Trim to limit
         if has_more:
             orms = orms[:limit]
+
+        # Restore display order after backward fetch
+        if is_backward:
+            orms.reverse()
 
         # Convert to domain entities
         items = [self._to_domain(orm) for orm in orms]

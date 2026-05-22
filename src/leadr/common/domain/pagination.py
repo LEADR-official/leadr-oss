@@ -18,6 +18,10 @@ class SortDirection(str, Enum):
     ASC = "asc"
     DESC = "desc"
 
+    def opposite(self) -> "SortDirection":
+        """Return the opposite sort direction."""
+        return SortDirection.DESC if self == SortDirection.ASC else SortDirection.ASC
+
 
 @dataclass(frozen=True)
 class SortField:

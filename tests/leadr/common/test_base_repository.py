@@ -1,6 +1,6 @@
 """Tests for BaseRepository abstraction."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 from uuid import uuid4
@@ -12,9 +12,16 @@ from sqlalchemy import String, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
+from leadr.common.domain.cursor import Cursor
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import PrefixedID
 from leadr.common.domain.models import Entity
+from leadr.common.domain.pagination import (
+    PaginationDirection,
+    SortDirection,
+    SortField,
+)
+from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.orm import Base
 from leadr.common.repositories import BaseRepository
 
@@ -100,6 +107,16 @@ class MockRepository(BaseRepository[MockEntity, MockEntityORM]):
         result = await self.session.execute(query)
         orms = result.scalars().all()
         return [self._to_domain(orm) for orm in orms]
+
+    async def filter_paginated(
+        self,
+        sort_fields: list[SortField],
+        cursor: Cursor | None,
+        limit: int,
+    ) -> PaginatedResult[MockEntity]:
+        """Filter with cursor-based pagination, delegating to _execute_paginated_query."""
+        query = select(MockEntityORM).where(MockEntityORM.deleted_at.is_(None))
+        return await self._execute_paginated_query(query, sort_fields, cursor, limit)
 
 
 @pytest.mark.asyncio
@@ -366,3 +383,241 @@ class TestBaseRepository:
         assert len(active_entities) == 1
         assert active_entities[0].name == "Entity 1"
         assert active_entities[0].status == MockStatus.ACTIVE
+
+    # --- Backward cursor pagination tests ---
+
+    @pytest_asyncio.fixture
+    async def nine_entities(self, db_session: AsyncSession) -> list[MockEntity]:
+        """Create 9 entities with distinct created_at timestamps for stable ordering."""
+        repo = MockRepository(db_session)
+        base_time = datetime(2025, 1, 1, tzinfo=UTC)
+        entities = []
+        for i in range(9):
+            entity = MockEntity(
+                name=f"Entity {i + 1}",
+                status=MockStatus.ACTIVE,
+                created_at=base_time + timedelta(seconds=i),
+                updated_at=base_time + timedelta(seconds=i),
+            )
+            created = await repo.create(entity)
+            entities.append(created)
+        return entities
+
+    async def test_backward_pagination_returns_previous_page(
+        self, db_session: AsyncSession, nine_entities: list[MockEntity]
+    ):
+        """Paginate forward to page 3, then backward — should get page 2."""
+        repo = MockRepository(db_session)
+        sort_fields = [
+            SortField(name="created_at", direction=SortDirection.DESC),
+            SortField(name="id", direction=SortDirection.ASC),
+        ]
+
+        # Page 1 (newest first): entities 9,8,7
+        page1 = await repo.filter_paginated(sort_fields, cursor=None, limit=3)
+        assert [e.name for e in page1.items] == ["Entity 9", "Entity 8", "Entity 7"]
+        assert page1.has_next is True
+        assert page1.has_prev is False
+
+        # Page 2: entities 6,5,4
+        assert page1.next_position is not None
+        fwd_cursor1 = Cursor(
+            position=page1.next_position,
+            sort_fields=sort_fields,
+            filters={},
+            direction=PaginationDirection.FORWARD,
+        )
+        page2 = await repo.filter_paginated(sort_fields, cursor=fwd_cursor1, limit=3)
+        assert [e.name for e in page2.items] == ["Entity 6", "Entity 5", "Entity 4"]
+        assert page2.has_next is True
+        assert page2.has_prev is True
+
+        # Page 3: entities 3,2,1
+        assert page2.next_position is not None
+        fwd_cursor2 = Cursor(
+            position=page2.next_position,
+            sort_fields=sort_fields,
+            filters={},
+            direction=PaginationDirection.FORWARD,
+        )
+        page3 = await repo.filter_paginated(sort_fields, cursor=fwd_cursor2, limit=3)
+        assert [e.name for e in page3.items] == ["Entity 3", "Entity 2", "Entity 1"]
+        assert page3.has_next is False
+        assert page3.has_prev is True
+
+        # Go backward from page 3 — should get page 2
+        assert page3.prev_position is not None
+        back_cursor = Cursor(
+            position=page3.prev_position,
+            sort_fields=sort_fields,
+            filters={},
+            direction=PaginationDirection.BACKWARD,
+        )
+        prev_page = await repo.filter_paginated(sort_fields, cursor=back_cursor, limit=3)
+        assert [e.name for e in prev_page.items] == ["Entity 6", "Entity 5", "Entity 4"]
+        assert prev_page.has_next is True
+        assert prev_page.has_prev is True
+
+    async def test_backward_pagination_from_page2_returns_page1(
+        self, db_session: AsyncSession, nine_entities: list[MockEntity]
+    ):
+        """Paginate forward to page 2, then backward — should get page 1."""
+        repo = MockRepository(db_session)
+        sort_fields = [
+            SortField(name="created_at", direction=SortDirection.DESC),
+            SortField(name="id", direction=SortDirection.ASC),
+        ]
+
+        # Page 1
+        page1 = await repo.filter_paginated(sort_fields, cursor=None, limit=3)
+        page1_names = [e.name for e in page1.items]
+
+        # Page 2
+        assert page1.next_position is not None
+        fwd_cursor = Cursor(
+            position=page1.next_position,
+            sort_fields=sort_fields,
+            filters={},
+            direction=PaginationDirection.FORWARD,
+        )
+        page2 = await repo.filter_paginated(sort_fields, cursor=fwd_cursor, limit=3)
+
+        # Backward from page 2 — should get page 1
+        assert page2.prev_position is not None
+        back_cursor = Cursor(
+            position=page2.prev_position,
+            sort_fields=sort_fields,
+            filters={},
+            direction=PaginationDirection.BACKWARD,
+        )
+        prev_page = await repo.filter_paginated(sort_fields, cursor=back_cursor, limit=3)
+        assert [e.name for e in prev_page.items] == page1_names
+        assert prev_page.has_next is True
+        assert prev_page.has_prev is False
+
+    async def test_backward_then_forward_roundtrip(
+        self, db_session: AsyncSession, nine_entities: list[MockEntity]
+    ):
+        """Forward to page 2, backward to page 1, forward again — consistent results."""
+        repo = MockRepository(db_session)
+        sort_fields = [
+            SortField(name="created_at", direction=SortDirection.DESC),
+            SortField(name="id", direction=SortDirection.ASC),
+        ]
+
+        # Page 1
+        page1 = await repo.filter_paginated(sort_fields, cursor=None, limit=3)
+        page1_names = [e.name for e in page1.items]
+
+        # Forward to page 2
+        assert page1.next_position is not None
+        fwd_cursor = Cursor(
+            position=page1.next_position,
+            sort_fields=sort_fields,
+            filters={},
+            direction=PaginationDirection.FORWARD,
+        )
+        page2 = await repo.filter_paginated(sort_fields, cursor=fwd_cursor, limit=3)
+        page2_names = [e.name for e in page2.items]
+
+        # Backward to page 1
+        assert page2.prev_position is not None
+        back_cursor = Cursor(
+            position=page2.prev_position,
+            sort_fields=sort_fields,
+            filters={},
+            direction=PaginationDirection.BACKWARD,
+        )
+        back_to_page1 = await repo.filter_paginated(sort_fields, cursor=back_cursor, limit=3)
+        assert [e.name for e in back_to_page1.items] == page1_names
+        assert back_to_page1.has_next is True
+        assert back_to_page1.has_prev is False
+
+        # Forward again to page 2
+        assert back_to_page1.next_position is not None
+        fwd_cursor2 = Cursor(
+            position=back_to_page1.next_position,
+            sort_fields=sort_fields,
+            filters={},
+            direction=PaginationDirection.FORWARD,
+        )
+        back_to_page2 = await repo.filter_paginated(sort_fields, cursor=fwd_cursor2, limit=3)
+        assert [e.name for e in back_to_page2.items] == page2_names
+        assert back_to_page2.has_next is True
+        assert back_to_page2.has_prev is True
+
+    async def test_backward_pagination_with_asc_sort(
+        self, db_session: AsyncSession, nine_entities: list[MockEntity]
+    ):
+        """Backward pagination works when primary sort is ASC."""
+        repo = MockRepository(db_session)
+        sort_fields = [
+            SortField(name="created_at", direction=SortDirection.ASC),
+            SortField(name="id", direction=SortDirection.ASC),
+        ]
+
+        # Page 1 (oldest first): entities 1,2,3
+        page1 = await repo.filter_paginated(sort_fields, cursor=None, limit=3)
+        assert [e.name for e in page1.items] == ["Entity 1", "Entity 2", "Entity 3"]
+        assert page1.has_next is True
+        assert page1.has_prev is False
+
+        # Page 2: entities 4,5,6
+        assert page1.next_position is not None
+        fwd_cursor = Cursor(
+            position=page1.next_position,
+            sort_fields=sort_fields,
+            filters={},
+            direction=PaginationDirection.FORWARD,
+        )
+        page2 = await repo.filter_paginated(sort_fields, cursor=fwd_cursor, limit=3)
+        assert [e.name for e in page2.items] == ["Entity 4", "Entity 5", "Entity 6"]
+        assert page2.has_next is True
+        assert page2.has_prev is True
+
+        # Backward from page 2 — should get page 1
+        assert page2.prev_position is not None
+        back_cursor = Cursor(
+            position=page2.prev_position,
+            sort_fields=sort_fields,
+            filters={},
+            direction=PaginationDirection.BACKWARD,
+        )
+        prev_page = await repo.filter_paginated(sort_fields, cursor=back_cursor, limit=3)
+        assert [e.name for e in prev_page.items] == ["Entity 1", "Entity 2", "Entity 3"]
+        assert prev_page.has_next is True
+        assert prev_page.has_prev is False
+
+    async def test_backward_to_first_page_has_no_prev(
+        self, db_session: AsyncSession, nine_entities: list[MockEntity]
+    ):
+        """Going backward to the first page sets has_prev=False."""
+        repo = MockRepository(db_session)
+        sort_fields = [
+            SortField(name="created_at", direction=SortDirection.DESC),
+            SortField(name="id", direction=SortDirection.ASC),
+        ]
+
+        # Page 1, then forward to page 2
+        page1 = await repo.filter_paginated(sort_fields, cursor=None, limit=3)
+        assert page1.next_position is not None
+        fwd_cursor = Cursor(
+            position=page1.next_position,
+            sort_fields=sort_fields,
+            filters={},
+            direction=PaginationDirection.FORWARD,
+        )
+        page2 = await repo.filter_paginated(sort_fields, cursor=fwd_cursor, limit=3)
+
+        # Backward to page 1
+        assert page2.prev_position is not None
+        back_cursor = Cursor(
+            position=page2.prev_position,
+            sort_fields=sort_fields,
+            filters={},
+            direction=PaginationDirection.BACKWARD,
+        )
+        back_to_page1 = await repo.filter_paginated(sort_fields, cursor=back_cursor, limit=3)
+
+        assert back_to_page1.has_prev is False
+        assert back_to_page1.has_next is True
