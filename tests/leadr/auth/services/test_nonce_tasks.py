@@ -2,11 +2,12 @@
 
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.auth.adapters.orm import NonceORM
@@ -113,3 +114,92 @@ class TestCleanupExpiredNonces:
             await cleanup_expired_nonces()
 
         # Task should complete without errors
+
+    async def test_cleanup_handles_operational_error(self):
+        """Test that cleanup handles OperationalError gracefully without raising."""
+        mock_session = MagicMock()
+
+        @asynccontextmanager
+        async def mock_create_session():
+            yield mock_session
+
+        mock_nonce_service = MagicMock()
+        mock_nonce_service.cleanup_expired_nonces = AsyncMock(
+            side_effect=OperationalError("statement", {}, Exception("connection failed"))
+        )
+
+        with (
+            patch("leadr.auth.services.nonce_tasks.create_session", mock_create_session),
+            patch("leadr.auth.services.nonce_tasks.NonceService", return_value=mock_nonce_service),
+        ):
+            # Should not raise - error is handled internally
+            await cleanup_expired_nonces()
+
+        mock_nonce_service.cleanup_expired_nonces.assert_awaited_once()
+
+    async def test_cleanup_handles_dbapi_error(self):
+        """Test that cleanup handles DBAPIError gracefully without raising."""
+        mock_session = MagicMock()
+
+        @asynccontextmanager
+        async def mock_create_session():
+            yield mock_session
+
+        mock_nonce_service = MagicMock()
+        mock_nonce_service.cleanup_expired_nonces = AsyncMock(
+            side_effect=DBAPIError("statement", {}, Exception("db error"))
+        )
+
+        with (
+            patch("leadr.auth.services.nonce_tasks.create_session", mock_create_session),
+            patch("leadr.auth.services.nonce_tasks.NonceService", return_value=mock_nonce_service),
+        ):
+            # Should not raise - error is handled internally
+            await cleanup_expired_nonces()
+
+        mock_nonce_service.cleanup_expired_nonces.assert_awaited_once()
+
+    async def test_cleanup_handles_unexpected_error(self):
+        """Test that cleanup handles unexpected exceptions gracefully without raising."""
+        mock_session = MagicMock()
+
+        @asynccontextmanager
+        async def mock_create_session():
+            yield mock_session
+
+        mock_nonce_service = MagicMock()
+        mock_nonce_service.cleanup_expired_nonces = AsyncMock(
+            side_effect=RuntimeError("unexpected error")
+        )
+
+        with (
+            patch("leadr.auth.services.nonce_tasks.create_session", mock_create_session),
+            patch("leadr.auth.services.nonce_tasks.NonceService", return_value=mock_nonce_service),
+        ):
+            # Should not raise - error is handled internally
+            await cleanup_expired_nonces()
+
+        mock_nonce_service.cleanup_expired_nonces.assert_awaited_once()
+
+    async def test_cleanup_logs_when_nonces_deleted(self):
+        """Test that cleanup logs success message when nonces are deleted."""
+        mock_session = MagicMock()
+
+        @asynccontextmanager
+        async def mock_create_session():
+            yield mock_session
+
+        mock_nonce_service = MagicMock()
+        mock_nonce_service.cleanup_expired_nonces = AsyncMock(return_value=5)
+
+        with (
+            patch("leadr.auth.services.nonce_tasks.create_session", mock_create_session),
+            patch("leadr.auth.services.nonce_tasks.NonceService", return_value=mock_nonce_service),
+            patch("leadr.auth.services.nonce_tasks.logger") as mock_logger,
+        ):
+            await cleanup_expired_nonces()
+
+        # Verify info log was called with the count
+        mock_logger.info.assert_called_once()
+        call_args = mock_logger.info.call_args
+        assert "5" in str(call_args) or 5 in call_args[0]

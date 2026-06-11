@@ -8,9 +8,12 @@ from httpx import AsyncClient
 from leadr.accounts.domain.account import Account, AccountStatus
 from leadr.accounts.services.account_service import AccountService
 from leadr.accounts.services.repositories import AccountRepository
+from leadr.auth.dependencies import require_admin_auth
+from leadr.auth.domain.device import Device, DeviceStatus
 from leadr.auth.services.device_service import DeviceService
-from leadr.common.domain.ids import AccountID
+from leadr.common.domain.ids import AccountID, DeviceID, GameID
 from leadr.games.services.game_service import GameService
+from tests.conftest import make_admin_auth
 
 
 @pytest.mark.asyncio
@@ -364,3 +367,111 @@ class TestDeviceRoutes:
         fingerprints = {d["client_fingerprint"] for d in data["data"]}
         assert hash1 in fingerprints
         assert hash2 in fingerprints
+
+
+@pytest.mark.asyncio
+class TestDeviceRoutesUnit:
+    """Unit tests for Device API routes with mocked services."""
+
+    async def test_get_device_returns_403_for_unauthorized_account(
+        self, mock_client_no_db, test_app, mock_device_service
+    ):
+        """Test get_device returns 403 when user lacks account access."""
+        # Create a device belonging to a different account
+        different_account_id = AccountID()
+        device = Device(
+            id=DeviceID(),
+            game_id=GameID(),
+            account_id=different_account_id,
+            client_fingerprint="a" * 64,
+            status=DeviceStatus.ACTIVE,
+            first_seen_at=datetime.now(UTC),
+            last_seen_at=datetime.now(UTC),
+        )
+        mock_device_service.get_by_id_or_raise.return_value = device
+
+        # Use non-superadmin auth with a different account
+        user_account_id = AccountID()
+        auth = make_admin_auth(account_id=user_account_id, is_superadmin=False)
+        test_app.dependency_overrides[require_admin_auth] = lambda: auth
+
+        response = await mock_client_no_db.get(f"/devices/{device.id}")
+
+        assert response.status_code == 403
+        assert "do not have access" in response.json()["error"]
+
+    async def test_update_device_returns_403_for_unauthorized_account(
+        self, mock_client_no_db, test_app, mock_device_service
+    ):
+        """Test update_device returns 403 when user lacks account access."""
+        # Create a device belonging to a different account
+        different_account_id = AccountID()
+        device = Device(
+            id=DeviceID(),
+            game_id=GameID(),
+            account_id=different_account_id,
+            client_fingerprint="a" * 64,
+            status=DeviceStatus.ACTIVE,
+            first_seen_at=datetime.now(UTC),
+            last_seen_at=datetime.now(UTC),
+        )
+        mock_device_service.get_by_id_or_raise.return_value = device
+
+        # Use non-superadmin auth with a different account
+        user_account_id = AccountID()
+        auth = make_admin_auth(account_id=user_account_id, is_superadmin=False)
+        test_app.dependency_overrides[require_admin_auth] = lambda: auth
+
+        response = await mock_client_no_db.patch(
+            f"/devices/{device.id}",
+            json={"status": "banned"},
+        )
+
+        assert response.status_code == 403
+        assert "do not have access" in response.json()["error"]
+
+    async def test_update_device_returns_400_for_invalid_status(
+        self, mock_client_no_db, admin_auth, mock_device_service
+    ):
+        """Test update_device returns 400 for invalid status value."""
+        device = Device(
+            id=DeviceID(),
+            game_id=GameID(),
+            account_id=admin_auth.account_id,
+            client_fingerprint="a" * 64,
+            status=DeviceStatus.ACTIVE,
+            first_seen_at=datetime.now(UTC),
+            last_seen_at=datetime.now(UTC),
+        )
+        mock_device_service.get_by_id_or_raise.return_value = device
+
+        response = await mock_client_no_db.patch(
+            f"/devices/{device.id}",
+            json={"status": "invalid_status"},
+        )
+
+        assert response.status_code == 400
+        assert "Invalid status" in response.json()["error"]
+
+    async def test_update_device_returns_400_when_no_status_provided(
+        self, mock_client_no_db, admin_auth, mock_device_service
+    ):
+        """Test update_device returns 400 when status field is missing."""
+        device = Device(
+            id=DeviceID(),
+            game_id=GameID(),
+            account_id=admin_auth.account_id,
+            client_fingerprint="a" * 64,
+            status=DeviceStatus.ACTIVE,
+            first_seen_at=datetime.now(UTC),
+            last_seen_at=datetime.now(UTC),
+        )
+        mock_device_service.get_by_id_or_raise.return_value = device
+
+        response = await mock_client_no_db.patch(
+            f"/devices/{device.id}",
+            json={},
+        )
+
+        assert response.status_code == 400
+        assert "Must provide status field" in response.json()["error"]

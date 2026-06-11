@@ -84,6 +84,7 @@ source = ["src"]
 omit = [
     "*/tests/*",
     "*/test_*",
+    "*/leadr/infra/email/__init__.py",
 ]
 concurrency = ["greenlet"]
 

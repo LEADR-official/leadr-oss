@@ -267,6 +267,88 @@ class TestAccountRepository:
         retrieved = await repo.get_by_slug("acme-corp")
         assert retrieved is None
 
+    async def test_filter_by_status(self, db_session: AsyncSession):
+        """Test filtering accounts by status."""
+        repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        # Create accounts with different statuses
+        active_account = Account(
+            id=AccountID(uuid4()),
+            name="Active Corp",
+            slug="active-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        suspended_account = Account(
+            id=AccountID(uuid4()),
+            name="Suspended Corp",
+            slug="suspended-corp",
+            status=AccountStatus.SUSPENDED,
+            created_at=now,
+            updated_at=now,
+        )
+
+        await repo.create(active_account)
+        await repo.create(suspended_account)
+
+        # Filter by ACTIVE status using enum
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repo.filter(pagination=pagination, status=AccountStatus.ACTIVE)
+
+        assert len(result.items) == 1
+        assert result.items[0].status == AccountStatus.ACTIVE
+
+        # Filter by SUSPENDED status using string
+        result = await repo.filter(pagination=pagination, status="suspended")
+
+        assert len(result.items) == 1
+        assert result.items[0].status == AccountStatus.SUSPENDED
+
+    async def test_filter_by_slug(self, db_session: AsyncSession):
+        """Test filtering accounts by slug."""
+        repo = AccountRepository(db_session)
+        now = datetime.now(UTC)
+
+        # Create accounts
+        account1 = Account(
+            id=AccountID(uuid4()),
+            name="Acme Corp",
+            slug="acme-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        account2 = Account(
+            id=AccountID(uuid4()),
+            name="Beta Corp",
+            slug="beta-corp",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+
+        await repo.create(account1)
+        await repo.create(account2)
+
+        # Filter by slug
+        pagination = PaginationParams(cursor=None, limit=100, sort=None)
+        result = await repo.filter(pagination=pagination, slug="acme-corp")
+
+        assert len(result.items) == 1
+        assert result.items[0].slug == "acme-corp"
+
+    async def test_filter_invalid_sort_field_raises_error(self, db_session: AsyncSession):
+        """Test that filtering with invalid sort field raises ValueError."""
+        repo = AccountRepository(db_session)
+
+        # Try to sort by an invalid field (format is field:direction)
+        pagination = PaginationParams(cursor=None, limit=100, sort="invalid_field:asc")
+
+        with pytest.raises(ValueError, match="Unknown sort field: invalid_field"):
+            await repo.filter(pagination=pagination)
+
 
 @pytest.mark.asyncio
 class TestUserRepository:
@@ -639,3 +721,150 @@ class TestUserRepository:
         # Should not be found by email
         retrieved = await user_repo.get_by_email("user@example.com")
         assert retrieved is None
+
+    async def test_filter_invalid_sort_field_raises_error(
+        self, db_session: AsyncSession, test_account: Account
+    ):
+        """Test that filtering with invalid sort field raises ValueError."""
+        user_repo = UserRepository(db_session)
+
+        # Try to sort by an invalid field (format is field:direction)
+        pagination = PaginationParams(cursor=None, limit=100, sort="invalid_field:asc")
+
+        with pytest.raises(ValueError, match="Unknown sort field: invalid_field"):
+            await user_repo.filter(test_account.id, pagination=pagination)
+
+    async def test_find_superadmins(self, db_session: AsyncSession, test_account: Account):
+        """Test finding all superadmin users."""
+        user_repo = UserRepository(db_session)
+        now = datetime.now(UTC)
+
+        # Create users - one superadmin, one regular
+        superadmin = User(
+            id=UserID(uuid4()),
+            account_id=test_account.id,
+            email="superadmin@example.com",
+            display_name="Super Admin",
+            super_admin=True,
+            created_at=now,
+            updated_at=now,
+        )
+        regular_user = User(
+            id=UserID(uuid4()),
+            account_id=test_account.id,
+            email="regular@example.com",
+            display_name="Regular User",
+            super_admin=False,
+            created_at=now,
+            updated_at=now,
+        )
+
+        await user_repo.create(superadmin)
+        await user_repo.create(regular_user)
+
+        # Find superadmins
+        superadmins = await user_repo.find_superadmins()
+
+        assert len(superadmins) == 1
+        assert superadmins[0].email == "superadmin@example.com"
+        assert superadmins[0].super_admin is True
+
+    async def test_find_superadmins_excludes_deleted(
+        self, db_session: AsyncSession, test_account: Account
+    ):
+        """Test that find_superadmins excludes soft-deleted users."""
+        user_repo = UserRepository(db_session)
+        now = datetime.now(UTC)
+
+        # Create superadmin user
+        superadmin = User(
+            id=UserID(uuid4()),
+            account_id=test_account.id,
+            email="superadmin@example.com",
+            display_name="Super Admin",
+            super_admin=True,
+            created_at=now,
+            updated_at=now,
+        )
+        await user_repo.create(superadmin)
+
+        # Soft-delete the superadmin
+        await user_repo.delete(superadmin.id)
+
+        # Find superadmins - should be empty
+        superadmins = await user_repo.find_superadmins()
+
+        assert len(superadmins) == 0
+
+    async def test_get_owner_email_for_account(
+        self, db_session: AsyncSession, test_account: Account
+    ):
+        """Test getting owner email for an account."""
+        user_repo = UserRepository(db_session)
+        now = datetime.now(UTC)
+
+        # Create users - one owner, one regular
+        owner = User(
+            id=UserID(uuid4()),
+            account_id=test_account.id,
+            email="owner@example.com",
+            display_name="Owner",
+            is_owner=True,
+            created_at=now,
+            updated_at=now,
+        )
+        regular_user = User(
+            id=UserID(uuid4()),
+            account_id=test_account.id,
+            email="regular@example.com",
+            display_name="Regular User",
+            is_owner=False,
+            created_at=now,
+            updated_at=now,
+        )
+
+        await user_repo.create(owner)
+        await user_repo.create(regular_user)
+
+        # Get owner email
+        email = await user_repo.get_owner_email_for_account(test_account.id)
+
+        assert email == "owner@example.com"
+
+    async def test_get_owner_email_for_account_not_found(
+        self, db_session: AsyncSession, test_account: Account
+    ):
+        """Test getting owner email when no owner exists."""
+        user_repo = UserRepository(db_session)
+
+        # No users created - no owner exists
+        email = await user_repo.get_owner_email_for_account(test_account.id)
+
+        assert email is None
+
+    async def test_get_owner_email_excludes_deleted(
+        self, db_session: AsyncSession, test_account: Account
+    ):
+        """Test that get_owner_email_for_account excludes soft-deleted owners."""
+        user_repo = UserRepository(db_session)
+        now = datetime.now(UTC)
+
+        # Create owner user
+        owner = User(
+            id=UserID(uuid4()),
+            account_id=test_account.id,
+            email="owner@example.com",
+            display_name="Owner",
+            is_owner=True,
+            created_at=now,
+            updated_at=now,
+        )
+        await user_repo.create(owner)
+
+        # Soft-delete the owner
+        await user_repo.delete(owner.id)
+
+        # Get owner email - should be None
+        email = await user_repo.get_owner_email_for_account(test_account.id)
+
+        assert email is None

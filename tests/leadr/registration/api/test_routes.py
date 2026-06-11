@@ -677,6 +677,18 @@ class TestGetJamCode:
 
         assert response.status_code == 404
 
+    async def test_get_jam_code_non_superadmin(
+        self, mock_client_no_db, test_app, mock_jam_code_service
+    ):
+        """Test getting jam code as non-superadmin fails."""
+        non_superadmin_auth = make_admin_auth(is_superadmin=False)
+        test_app.dependency_overrides[require_admin_auth] = lambda: non_superadmin_auth
+
+        response = await mock_client_no_db.get(f"/jam-codes/{uuid4()}")
+
+        assert response.status_code == 403
+        assert "Superadmin access required" in response.json()["error"]
+
 
 @pytest.mark.asyncio
 class TestUpdateJamCode:
@@ -742,3 +754,18 @@ class TestUpdateJamCode:
         assert data["features"] == {"new": True}
         assert data["max_uses"] == 50
         assert data["active"] is False
+
+    async def test_update_jam_code_non_superadmin(
+        self, mock_client_no_db, test_app, mock_jam_code_service
+    ):
+        """Test updating jam code as non-superadmin fails."""
+        non_superadmin_auth = make_admin_auth(is_superadmin=False)
+        test_app.dependency_overrides[require_admin_auth] = lambda: non_superadmin_auth
+
+        response = await mock_client_no_db.patch(
+            f"/jam-codes/{uuid4()}",
+            json={"description": "Updated"},
+        )
+
+        assert response.status_code == 403
+        assert "Superadmin access required" in response.json()["error"]
