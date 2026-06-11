@@ -17,7 +17,8 @@ class StartSessionRequest(BaseModel):
 
     game_id: GameID = Field(description="ID of the game this device belongs to")
     client_fingerprint: str = Field(
-        description="Client-generated SHA256 device fingerprint (64 hex characters)"
+        pattern=r"^[a-fA-F0-9]{64}$",
+        description="Client-generated SHA256 device fingerprint (64 hex characters)",
     )
     platform: str | None = Field(
         default=None, description="Device platform (e.g., 'ios', 'android', 'pc', 'console')"

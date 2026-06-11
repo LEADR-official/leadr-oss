@@ -53,8 +53,9 @@ async def start_session(
         404: Game not found
         422: Invalid request (missing required fields, invalid UUID format)
     """
-    # Set game_id for access logging
+    # Set context for access logging
     request.state.game_id = str(session_request.game_id)
+    request.state.client_fingerprint = session_request.client_fingerprint
 
     try:
         identity, access_token, refresh_token, expires_in = await identity_service.start_session(

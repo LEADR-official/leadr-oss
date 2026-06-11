@@ -175,11 +175,13 @@ class TestClientSessionRoutes:
 
     async def test_start_session_with_nonexistent_game_returns_404(self, client: AsyncClient):
         """Test starting a session with nonexistent game returns 404."""
+        # Use a valid SHA256 fingerprint (64 hex chars)
+        valid_fingerprint = hashlib.sha256(str(uuid4()).encode()).hexdigest()
         response = await client.post(
             "/client/sessions",
             json={
                 "game_id": "gam_00000000-0000-0000-0000-000000000000",
-                "client_fingerprint": str(uuid4()),
+                "client_fingerprint": valid_fingerprint,
             },
         )
 
@@ -219,6 +221,59 @@ class TestClientSessionRoutes:
         )
 
         assert response.status_code == 422
+
+    async def test_start_session_with_63_char_fingerprint_returns_422(self, client: AsyncClient):
+        """Test that a 63-character fingerprint (off-by-one truncation) returns 422."""
+        truncated_fingerprint = "a" * 63  # Off-by-one error
+
+        response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": "gam_00000000-0000-0000-0000-000000000000",
+                "client_fingerprint": truncated_fingerprint,
+            },
+        )
+
+        assert response.status_code == 422
+        error_body = response.json()
+        assert "error" in error_body
+        # Should include helpful info about the pattern mismatch
+        error_str = str(error_body)
+        assert "client_fingerprint" in error_str.lower() or "fingerprint" in error_str.lower()
+
+    async def test_start_session_with_65_char_fingerprint_returns_422(self, client: AsyncClient):
+        """Test that a 65-character fingerprint (too long) returns 422."""
+        long_fingerprint = "a" * 65  # One character too long
+
+        response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": "gam_00000000-0000-0000-0000-000000000000",
+                "client_fingerprint": long_fingerprint,
+            },
+        )
+
+        assert response.status_code == 422
+        error_body = response.json()
+        assert "error" in error_body
+
+    async def test_start_session_with_invalid_hex_fingerprint_returns_422(
+        self, client: AsyncClient
+    ):
+        """Test that a fingerprint with non-hex characters returns 422."""
+        invalid_fingerprint = "g" * 64  # 'g' is not hex
+
+        response = await client.post(
+            "/client/sessions",
+            json={
+                "game_id": "gam_00000000-0000-0000-0000-000000000000",
+                "client_fingerprint": invalid_fingerprint,
+            },
+        )
+
+        assert response.status_code == 422
+        error_body = response.json()
+        assert "error" in error_body
 
     async def test_refresh_session_with_valid_token(self, client: AsyncClient, db_session):
         """Test refreshing a session with a valid refresh token."""

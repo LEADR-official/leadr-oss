@@ -78,6 +78,7 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             "client_ip": extract_client_ip(request),
             "account_id": getattr(request.state, "account_id", None),
             "game_id": getattr(request.state, "game_id", None),
+            "client_fingerprint": getattr(request.state, "client_fingerprint", None),
             "leadr_client": _sanitise_header(request.headers.get("leadr-client")),
             "user_agent": _sanitise_header(request.headers.get("user-agent")),
         }

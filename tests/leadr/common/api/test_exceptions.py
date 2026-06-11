@@ -55,33 +55,39 @@ class TestCatchallExceptionHandler:
 
     @pytest.mark.asyncio
     async def test_logs_account_id_when_available(self) -> None:
-        """Handler should include account_id in log extra when set on request.state."""
+        """Handler should include account_id in structlog bind when set on request.state."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.account_id = "test-account-123"
         mock_request.state.game_id = None
         exc = Exception("Test error")
 
         with patch("leadr.common.api.exceptions.logger") as mock_logger:
+            mock_bound_logger = MagicMock()
+            mock_logger.bind.return_value = mock_bound_logger
             await catchall_exception_handler(mock_request, exc)
 
-            mock_logger.exception.assert_called_once()
-            call_kwargs = mock_logger.exception.call_args[1]
-            assert call_kwargs["extra"]["account_id"] == "test-account-123"
+            mock_logger.bind.assert_called_once()
+            bind_kwargs = mock_logger.bind.call_args[1]
+            assert bind_kwargs["account_id"] == "test-account-123"
+            mock_bound_logger.exception.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_logs_game_id_when_available(self) -> None:
-        """Handler should include game_id in log extra when set on request.state."""
+        """Handler should include game_id in structlog bind when set on request.state."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.account_id = "test-account-123"
         mock_request.state.game_id = "test-game-456"
         exc = Exception("Test error")
 
         with patch("leadr.common.api.exceptions.logger") as mock_logger:
+            mock_bound_logger = MagicMock()
+            mock_logger.bind.return_value = mock_bound_logger
             await catchall_exception_handler(mock_request, exc)
 
-            mock_logger.exception.assert_called_once()
-            call_kwargs = mock_logger.exception.call_args[1]
-            assert call_kwargs["extra"]["game_id"] == "test-game-456"
+            mock_logger.bind.assert_called_once()
+            bind_kwargs = mock_logger.bind.call_args[1]
+            assert bind_kwargs["game_id"] == "test-game-456"
+            mock_bound_logger.exception.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_handles_missing_state_attributes(self) -> None:
@@ -93,12 +99,14 @@ class TestCatchallExceptionHandler:
         exc = Exception("Test error")
 
         with patch("leadr.common.api.exceptions.logger") as mock_logger:
+            mock_bound_logger = MagicMock()
+            mock_logger.bind.return_value = mock_bound_logger
             response = await catchall_exception_handler(mock_request, exc)
 
             assert response.status_code == 500
-            call_kwargs = mock_logger.exception.call_args[1]
-            assert call_kwargs["extra"]["account_id"] is None
-            assert call_kwargs["extra"]["game_id"] is None
+            bind_kwargs = mock_logger.bind.call_args[1]
+            assert bind_kwargs["account_id"] is None
+            assert bind_kwargs["game_id"] is None
 
 
 class TestHttpExceptionHandler:
@@ -137,19 +145,22 @@ class TestHttpExceptionHandler:
 
     @pytest.mark.asyncio
     async def test_logs_context_for_500_errors(self) -> None:
-        """Handler should include account_id and game_id in log for 500+ errors."""
+        """Handler should include account_id and game_id in structlog bind for 500+ errors."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.account_id = "test-account-123"
         mock_request.state.game_id = "test-game-456"
         exc = HTTPException(status_code=500, detail="Internal error")
 
         with patch("leadr.common.api.exceptions.logger") as mock_logger:
+            mock_bound_logger = MagicMock()
+            mock_logger.bind.return_value = mock_bound_logger
             await http_exception_handler(mock_request, exc)
 
-            mock_logger.exception.assert_called_once()
-            call_kwargs = mock_logger.exception.call_args[1]
-            assert call_kwargs["extra"]["account_id"] == "test-account-123"
-            assert call_kwargs["extra"]["game_id"] == "test-game-456"
+            mock_logger.bind.assert_called_once()
+            bind_kwargs = mock_logger.bind.call_args[1]
+            assert bind_kwargs["account_id"] == "test-account-123"
+            assert bind_kwargs["game_id"] == "test-game-456"
+            mock_bound_logger.exception.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_handles_missing_state_for_500_errors(self) -> None:
@@ -160,12 +171,14 @@ class TestHttpExceptionHandler:
         exc = HTTPException(status_code=502, detail="Bad gateway")
 
         with patch("leadr.common.api.exceptions.logger") as mock_logger:
+            mock_bound_logger = MagicMock()
+            mock_logger.bind.return_value = mock_bound_logger
             response = await http_exception_handler(mock_request, exc)
 
             assert response.status_code == 502
-            call_kwargs = mock_logger.exception.call_args[1]
-            assert call_kwargs["extra"]["account_id"] is None
-            assert call_kwargs["extra"]["game_id"] is None
+            bind_kwargs = mock_logger.bind.call_args[1]
+            assert bind_kwargs["account_id"] is None
+            assert bind_kwargs["game_id"] is None
 
 
 class TestEntityNotFoundHandler:

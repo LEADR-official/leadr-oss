@@ -415,6 +415,28 @@ class TestDevice:
 
         assert "client_fingerprint" in str(exc_info.value).lower()
 
+    def test_client_fingerprint_error_message_includes_length(self):
+        """Test that fingerprint validation error includes actual length received."""
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        now = datetime.now(UTC)
+        invalid_hash = "a" * 63  # 63 characters
+
+        with pytest.raises(ValidationError) as exc_info:
+            Device(
+                id=DeviceID(uuid4()),
+                game_id=game_id,
+                client_fingerprint=invalid_hash,
+                account_id=account_id,
+                first_seen_at=now,
+                last_seen_at=now,
+                created_at=now,
+                updated_at=now,
+            )
+
+        error_message = str(exc_info.value)
+        assert "63" in error_message, f"Error should include length '63', got: {error_message}"
+
     def test_client_fingerprint_rejects_invalid_length_too_long(self):
         """Test that client_fingerprint rejects SHA256 hash that's too long."""
         game_id = GameID(uuid4())

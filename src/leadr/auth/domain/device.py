@@ -58,7 +58,10 @@ class Device(Entity):
             ValueError: If the fingerprint is not a valid 64-character hex string.
         """
         if not re.match(r"^[a-f0-9]{64}$", v.lower()):
-            raise ValueError("client_fingerprint must be a 64-character SHA256 hash (hex)")
+            raise ValueError(
+                f"client_fingerprint must be a 64-character SHA256 hash (hex), "
+                f"got {len(v)} characters: {v}"
+            )
         return v.lower()  # Normalize to lowercase
 
     def is_active(self) -> bool:

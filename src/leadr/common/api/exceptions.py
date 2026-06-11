@@ -1,7 +1,5 @@
 """Global exception handlers for API layer."""
 
-import logging
-
 from fastapi import HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -9,8 +7,9 @@ from fastapi.responses import JSONResponse
 
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.config import settings
+from leadr.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 async def catchall_exception_handler(
@@ -30,15 +29,15 @@ async def catchall_exception_handler(
     account_id = getattr(request.state, "account_id", None)
     game_id = getattr(request.state, "game_id", None)
 
-    logger.exception(
-        exc,
-        extra={
-            "method": request.method,
-            "url": str(request.url.path),
-            "account_id": account_id,
-            "game_id": game_id,
-        },
+    # Use structlog binding for consistent field output in logs
+    bound_logger = logger.bind(
+        method=request.method,
+        url=str(request.url.path),
+        account_id=account_id,
+        game_id=game_id,
     )
+    bound_logger.exception("Unhandled exception", exc_info=exc)
+
     if settings.DEBUG:
         return JSONResponse(status_code=500, content={"error": str(exc)})
     else:
@@ -65,15 +64,15 @@ async def http_exception_handler(
         account_id = getattr(request.state, "account_id", None)
         game_id = getattr(request.state, "game_id", None)
 
-        logger.exception(
-            exc,
-            extra={
-                "method": request.method,
-                "url": str(request.url.path),
-                "account_id": account_id,
-                "game_id": game_id,
-            },
+        # Use structlog binding for consistent field output in logs
+        bound_logger = logger.bind(
+            method=request.method,
+            url=str(request.url.path),
+            account_id=account_id,
+            game_id=game_id,
         )
+        bound_logger.exception("HTTP exception", exc_info=exc)
+
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": exc.detail},
@@ -113,6 +112,12 @@ async def validation_error_handler(
     Returns:
         JSONResponse with 422 status and list of validation errors
     """
+    # Extract client_fingerprint for logging (route handler doesn't run on validation failure)
+    if exc.body and isinstance(exc.body, dict):
+        fingerprint = exc.body.get("client_fingerprint")
+        if fingerprint is not None:
+            request.state.client_fingerprint = fingerprint
+
     return JSONResponse(
         status_code=422,
         content={"error": jsonable_encoder(exc.errors()), "body": exc.body},
