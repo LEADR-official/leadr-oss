@@ -260,6 +260,11 @@ class CommonSettings(BaseSettings):
     )
 
     # Background Task Configuration
+    BACKGROUND_TASKS_ENABLED: bool = Field(
+        default=True,
+        description="Enable background task scheduler (board templates, expiry, nonce cleanup). "
+        "Set to false to disable all background tasks (useful for read-only replicas).",
+    )
     BACKGROUND_TASK_TEMPLATE_INTERVAL: int = Field(
         default=60,
         description="Interval in seconds for processing due board templates (default: 60s)",

@@ -103,8 +103,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Register and start background tasks
     scheduler = get_scheduler()
 
-    # Ensure we only run background tasks one API instance
-    if settings.ENABLE_ADMIN_API:
+    # Ensure we only run background tasks on one API instance
+    # BACKGROUND_TASKS_ENABLED can be set to false to disable tasks (e.g., on read-only replicas)
+    if settings.ENABLE_ADMIN_API and settings.BACKGROUND_TASKS_ENABLED:
         scheduler.add_task(
             "process-due-templates",
             process_due_templates,
