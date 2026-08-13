@@ -7,14 +7,23 @@ from typing import Any
 import structlog
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
+from leadr.common.ratelimit.service import RateLimitService
 from leadr.common.utils.ip import extract_client_ip
+from leadr.config import settings
+from leadr.infra.cache.adapters.memory import InMemoryCache
 from leadr.logging import get_logger
 
 logger = logging.getLogger(__name__)
 
 MAX_HEADER_LOG_LENGTH = 256
+
+# Paths allowed for localhost requests (health checks)
+ALLOWED_LOCALHOST_PATHS = frozenset({"/", "/v1/health", "/v1/health/live"})
+
+# Localhost IP addresses to block
+LOCALHOST_ADDRESSES = frozenset({"127.0.0.1", "::1"})
 
 
 def _sanitise_header(value: str | None) -> str | None:
@@ -91,5 +100,106 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             else self._logger.info
         )
         log_method("%s %s", request.method, request.url.path, **log_kwargs)
+
+        return response
+
+
+class LocalhostBlockerMiddleware(BaseHTTPMiddleware):
+    """Middleware to block localhost traffic except for health endpoints.
+
+    Defense-in-depth measure: even with Caddy header fixes, block localhost
+    at the application layer. Skipped in DEV and TEST environments.
+
+    Blocked IPs: 127.0.0.1, ::1
+    Allowed paths: /, /v1/health, /v1/health/live
+    """
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        """Block localhost requests to non-health endpoints.
+
+        Args:
+            request: The incoming request
+            call_next: The next middleware/route handler
+
+        Returns:
+            403 Forbidden for blocked requests, otherwise response from handler
+        """
+        # Skip in dev/test environments
+        if settings.ENV in ("DEV", "TEST"):
+            return await call_next(request)
+
+        client_ip = extract_client_ip(request)
+
+        if client_ip in LOCALHOST_ADDRESSES:
+            # Normalize path: strip trailing slash, default to "/"
+            path = request.url.path.rstrip("/") or "/"
+
+            if path not in ALLOWED_LOCALHOST_PATHS:
+                logger.warning(
+                    "Blocked localhost request",
+                    extra={"client_ip": client_ip, "path": request.url.path},
+                )
+                return JSONResponse(
+                    status_code=403,
+                    content={"error": "Forbidden"},
+                )
+
+        return await call_next(request)
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Middleware for 4xx-based adaptive rate limiting.
+
+    Tracks consecutive 4xx responses per IP address. When an IP exceeds
+    the configured threshold, subsequent requests are blocked with 429.
+
+    Uses in-memory cache by default. Cloud deployments can provide
+    alternative implementations via dependency overrides.
+
+    Skipped in TEST environment.
+    """
+
+    def __init__(self, app: Any) -> None:
+        """Initialize with cache-backed rate limit service."""
+        super().__init__(app)
+        self._service = RateLimitService(InMemoryCache.get_instance())
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        """Check rate limits before processing, update after response.
+
+        Args:
+            request: The incoming request
+            call_next: The next middleware/route handler
+
+        Returns:
+            429 Too Many Requests if blocked, otherwise response from handler
+        """
+        # Skip if disabled or in test environment
+        if not settings.RATELIMIT_ENABLED or settings.ENV == "TEST":
+            return await call_next(request)
+
+        client_ip = extract_client_ip(request)
+
+        # Skip if no IP detected
+        if not client_ip:
+            return await call_next(request)
+
+        # Pre-request check: is IP currently blocked?
+        if self._service.is_blocked(client_ip):
+            logger.warning(
+                "Blocked rate-limited IP",
+                extra={"client_ip": client_ip, "path": request.url.path},
+            )
+            return JSONResponse(
+                status_code=429,
+                content={"error": "Too many requests"},
+                headers={"Retry-After": "60"},
+            )
+
+        # Process request
+        response = await call_next(request)
+
+        # Post-response: update rate limit state
+        self._service.check_and_update(client_ip, response.status_code)
 
         return response

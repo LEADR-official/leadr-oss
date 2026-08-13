@@ -8,7 +8,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from httpx import ASGITransport, AsyncClient
 
-from api.middleware import AccessLogMiddleware
+from api.middleware import (
+    AccessLogMiddleware,
+    LocalhostBlockerMiddleware,
+    RateLimitMiddleware,
+)
+from leadr.infra.cache.adapters.memory import InMemoryCache
 
 
 class TestAccessLogMiddleware:
@@ -447,3 +452,355 @@ class TestAccessLogMiddleware:
 
         kwargs = mock_logger.info.call_args[1]
         assert kwargs["qs"] is None
+
+
+class TestLocalhostBlockerMiddleware:
+    """Tests for localhost blocking middleware."""
+
+    @pytest.mark.asyncio
+    async def test_blocks_localhost_on_non_health_path(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Localhost requests to non-health paths should be blocked."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "PROD")
+
+        app = FastAPI()
+        app.add_middleware(LocalhostBlockerMiddleware)
+
+        @app.get("/api/data")
+        async def data_route():
+            return JSONResponse({"data": "secret"})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.get("/api/data", headers={"X-Real-IP": "127.0.0.1"})
+
+        assert response.status_code == 403
+        assert response.json() == {"error": "Forbidden"}
+
+    @pytest.mark.asyncio
+    async def test_allows_localhost_on_health_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Localhost requests to health endpoints should be allowed."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "PROD")
+
+        app = FastAPI()
+        app.add_middleware(LocalhostBlockerMiddleware)
+
+        @app.get("/v1/health")
+        async def health_route():
+            return JSONResponse({"status": "ok"})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.get("/v1/health", headers={"X-Real-IP": "127.0.0.1"})
+
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_allows_localhost_on_health_live_path(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Localhost requests to /v1/health/live should be allowed."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "PROD")
+
+        app = FastAPI()
+        app.add_middleware(LocalhostBlockerMiddleware)
+
+        @app.get("/v1/health/live")
+        async def health_live_route():
+            return JSONResponse({"status": "ok"})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.get("/v1/health/live", headers={"X-Real-IP": "127.0.0.1"})
+
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_allows_localhost_on_root_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Localhost requests to root path should be allowed."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "PROD")
+
+        app = FastAPI()
+        app.add_middleware(LocalhostBlockerMiddleware)
+
+        @app.get("/")
+        async def root_route():
+            return JSONResponse({"message": "LEADR API"})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.get("/", headers={"X-Real-IP": "127.0.0.1"})
+
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_allows_non_localhost_traffic(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Non-localhost traffic should pass through."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "PROD")
+
+        app = FastAPI()
+        app.add_middleware(LocalhostBlockerMiddleware)
+
+        @app.get("/api/data")
+        async def data_route():
+            return JSONResponse({"data": "public"})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.get("/api/data", headers={"X-Real-IP": "8.8.8.8"})
+
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_skips_blocking_in_test_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Localhost blocking should be skipped in TEST environment."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "TEST")
+
+        app = FastAPI()
+        app.add_middleware(LocalhostBlockerMiddleware)
+
+        @app.get("/api/data")
+        async def data_route():
+            return JSONResponse({"data": "test"})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.get("/api/data", headers={"X-Real-IP": "127.0.0.1"})
+
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_skips_blocking_in_dev_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Localhost blocking should be skipped in DEV environment."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "DEV")
+
+        app = FastAPI()
+        app.add_middleware(LocalhostBlockerMiddleware)
+
+        @app.get("/api/data")
+        async def data_route():
+            return JSONResponse({"data": "dev"})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.get("/api/data", headers={"X-Real-IP": "127.0.0.1"})
+
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_blocks_ipv6_localhost(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """IPv6 localhost (::1) should also be blocked."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "PROD")
+
+        app = FastAPI()
+        app.add_middleware(LocalhostBlockerMiddleware)
+
+        @app.get("/api/data")
+        async def data_route():
+            return JSONResponse({"data": "secret"})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.get("/api/data", headers={"X-Real-IP": "::1"})
+
+        assert response.status_code == 403
+
+
+class TestRateLimitMiddleware:
+    """Tests for 4xx-based rate limiting middleware."""
+
+    @pytest.fixture(autouse=True)
+    def reset_cache(self) -> None:
+        """Reset the singleton cache before each test."""
+        InMemoryCache.reset_instance()
+
+    @pytest.mark.asyncio
+    async def test_allows_normal_requests(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Normal successful requests should pass through."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "PROD")
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_ENABLED", True)
+
+        app = FastAPI()
+        app.add_middleware(RateLimitMiddleware)
+
+        @app.get("/api/data")
+        async def data_route():
+            return JSONResponse({"data": "ok"})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.get("/api/data", headers={"X-Real-IP": "1.2.3.4"})
+
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_blocks_after_threshold_4xx(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """IP should be blocked after threshold consecutive 4xx responses."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "PROD")
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_ENABLED", True)
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_4XX_THRESHOLD", 3)
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_INITIAL_BLOCK_SECONDS", 60)
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_MAX_BLOCK_SECONDS", 3600)
+
+        app = FastAPI()
+        app.add_middleware(RateLimitMiddleware)
+
+        @app.get("/not-found")
+        async def not_found_route():
+            return JSONResponse({"error": "not found"}, status_code=404)
+
+        @app.get("/ok")
+        async def ok_route():
+            return JSONResponse({"status": "ok"})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            # Generate threshold 4xx responses
+            for _ in range(3):
+                await client.get("/not-found", headers={"X-Real-IP": "1.2.3.4"})
+
+            # Next request should be blocked
+            response = await client.get("/ok", headers={"X-Real-IP": "1.2.3.4"})
+
+        assert response.status_code == 429
+        assert response.json() == {"error": "Too many requests"}
+        assert response.headers.get("Retry-After") == "60"
+
+    @pytest.mark.asyncio
+    async def test_success_resets_counter(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Successful responses should reset the 4xx counter."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "PROD")
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_ENABLED", True)
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_4XX_THRESHOLD", 3)
+
+        app = FastAPI()
+        app.add_middleware(RateLimitMiddleware)
+
+        @app.get("/not-found")
+        async def not_found_route():
+            return JSONResponse({"error": "not found"}, status_code=404)
+
+        @app.get("/ok")
+        async def ok_route():
+            return JSONResponse({"status": "ok"})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            # Generate some 4xx responses (below threshold)
+            await client.get("/not-found", headers={"X-Real-IP": "1.2.3.4"})
+            await client.get("/not-found", headers={"X-Real-IP": "1.2.3.4"})
+
+            # Success resets counter
+            await client.get("/ok", headers={"X-Real-IP": "1.2.3.4"})
+
+            # Should be able to do more 4xx without being blocked
+            await client.get("/not-found", headers={"X-Real-IP": "1.2.3.4"})
+            await client.get("/not-found", headers={"X-Real-IP": "1.2.3.4"})
+
+            # Still not blocked (reset after success)
+            response = await client.get("/ok", headers={"X-Real-IP": "1.2.3.4"})
+
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_skips_in_test_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Rate limiting should be skipped in TEST environment."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "TEST")
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_ENABLED", True)
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_4XX_THRESHOLD", 1)
+
+        app = FastAPI()
+        app.add_middleware(RateLimitMiddleware)
+
+        @app.get("/not-found")
+        async def not_found_route():
+            return JSONResponse({"error": "not found"}, status_code=404)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            # Even with threshold=1, should not be blocked in TEST
+            await client.get("/not-found", headers={"X-Real-IP": "1.2.3.4"})
+            response = await client.get("/not-found", headers={"X-Real-IP": "1.2.3.4"})
+
+        assert response.status_code == 404  # Not 429
+
+    @pytest.mark.asyncio
+    async def test_skips_when_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Rate limiting should be skipped when RATELIMIT_ENABLED=False."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "PROD")
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_ENABLED", False)
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_4XX_THRESHOLD", 1)
+
+        app = FastAPI()
+        app.add_middleware(RateLimitMiddleware)
+
+        @app.get("/not-found")
+        async def not_found_route():
+            return JSONResponse({"error": "not found"}, status_code=404)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            await client.get("/not-found", headers={"X-Real-IP": "1.2.3.4"})
+            response = await client.get("/not-found", headers={"X-Real-IP": "1.2.3.4"})
+
+        assert response.status_code == 404  # Not 429
+
+    @pytest.mark.asyncio
+    async def test_different_ips_tracked_separately(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Different IPs should have separate counters."""
+        monkeypatch.setattr("api.middleware.settings.ENV", "PROD")
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_ENABLED", True)
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_4XX_THRESHOLD", 2)
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_INITIAL_BLOCK_SECONDS", 60)
+        monkeypatch.setattr("api.middleware.settings.RATELIMIT_MAX_BLOCK_SECONDS", 3600)
+
+        app = FastAPI()
+        app.add_middleware(RateLimitMiddleware)
+
+        @app.get("/not-found")
+        async def not_found_route():
+            return JSONResponse({"error": "not found"}, status_code=404)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            # IP 1 hits threshold
+            await client.get("/not-found", headers={"X-Real-IP": "1.1.1.1"})
+            await client.get("/not-found", headers={"X-Real-IP": "1.1.1.1"})
+
+            # IP 1 is blocked
+            response1 = await client.get("/not-found", headers={"X-Real-IP": "1.1.1.1"})
+
+            # IP 2 is not blocked
+            response2 = await client.get("/not-found", headers={"X-Real-IP": "2.2.2.2"})
+
+        assert response1.status_code == 429
+        assert response2.status_code == 404

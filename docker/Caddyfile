@@ -1,9 +1,57 @@
+# LEADR Caddyfile - Reference configuration for OSS users
+#
+# IMPORTANT: This configuration requires a custom Caddy build with the
+# rate limiting module. Build using:
+#
+#   xcaddy build --with github.com/mholt/caddy-ratelimit
+#
+# Or use the pre-built image: ghcr.io/leadr-official/caddy:2-ratelimit
+
+{
+    # Enable rate_limit directive before reverse_proxy
+    order rate_limit before reverse_proxy
+}
+
 # Admin API on subdomain
 api.admin.{$DOMAIN:localhost} {
-    reverse_proxy admin-api:{$PORT:8000}
+    encode zstd gzip
+
+    # Rate limit: 50 requests per 10 seconds per IP
+    rate_limit {
+        zone admin_api {
+            key {remote_host}
+            events 50
+            window 10s
+        }
+    }
+
+    reverse_proxy admin-api:{$PORT:8000} {
+        # Overwrite IP headers to prevent spoofing
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        # Remove Cloudflare header if not using Cloudflare
+        header_up -CF-Connecting-IP
+    }
 }
 
 # Client API on main domain
 api.{$DOMAIN:localhost} {
-    reverse_proxy client-api:{$PORT:8000}
+    encode zstd gzip
+
+    # Rate limit: 100 requests per 10 seconds per IP
+    rate_limit {
+        zone client_api {
+            key {remote_host}
+            events 100
+            window 10s
+        }
+    }
+
+    reverse_proxy client-api:{$PORT:8000} {
+        # Overwrite IP headers to prevent spoofing
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        # Remove Cloudflare header if not using Cloudflare
+        header_up -CF-Connecting-IP
+    }
 }

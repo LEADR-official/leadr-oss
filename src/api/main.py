@@ -10,7 +10,11 @@ from fastapi.exceptions import RequestValidationError
 from starlette.middleware.cors import CORSMiddleware
 from starlette.types import Lifespan
 
-from api.middleware import AccessLogMiddleware
+from api.middleware import (
+    AccessLogMiddleware,
+    LocalhostBlockerMiddleware,
+    RateLimitMiddleware,
+)
 from api.routes import router as api_router
 from leadr.accounts.api.account_routes import router as account_router
 from leadr.accounts.api.user_routes import router as user_router
@@ -184,7 +188,11 @@ def create_app(
     app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, catchall_exception_handler)  # type: ignore[arg-type]
 
-    # Add middleware (order matters: CORS first to handle preflight, then logging)
+    # Add middleware (order matters: outer to inner)
+    # 1. CORS - handle preflight requests first
+    # 2. LocalhostBlocker - block spoofed localhost early
+    # 3. RateLimit - block abusive IPs before processing
+    # 4. AccessLog - log all requests with timing
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ALLOW_ORIGINS,
@@ -193,6 +201,8 @@ def create_app(
         allow_headers=settings.CORS_ALLOW_HEADERS,
         max_age=settings.CORS_MAX_AGE,
     )
+    app.add_middleware(LocalhostBlockerMiddleware)
+    app.add_middleware(RateLimitMiddleware)
     app.add_middleware(AccessLogMiddleware)
 
     # Create public and admin routers with separate authentication requirements

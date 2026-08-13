@@ -412,6 +412,24 @@ class CommonSettings(BaseSettings):
         description="Seconds to cache preflight responses (default: 10 minutes).",
     )
 
+    # Rate Limiting Configuration (4xx-based adaptive blocking)
+    RATELIMIT_ENABLED: bool = Field(
+        default=True,
+        description="Enable 4xx-based adaptive rate limiting middleware",
+    )
+    RATELIMIT_4XX_THRESHOLD: int = Field(
+        default=10,
+        description="Number of consecutive 4xx responses before blocking an IP",
+    )
+    RATELIMIT_INITIAL_BLOCK_SECONDS: int = Field(
+        default=60,
+        description="Initial block duration in seconds after threshold exceeded",
+    )
+    RATELIMIT_MAX_BLOCK_SECONDS: int = Field(
+        default=3600,
+        description="Maximum block duration in seconds (with exponential backoff)",
+    )
+
     # Backup Configuration
     BACKUP_ENABLED: bool = Field(
         default=False,
