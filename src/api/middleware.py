@@ -75,6 +75,7 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         log_kwargs = {
             "status_code": response.status_code,
             "duration_ms": round(duration_ms, 2),
+            "qs": request.url.query or None,
             "client_ip": extract_client_ip(request),
             "account_id": getattr(request.state, "account_id", None),
             "game_id": getattr(request.state, "game_id", None),

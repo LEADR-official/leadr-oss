@@ -405,3 +405,45 @@ class TestAccessLogMiddleware:
         assert response.status_code == 200
         kwargs = mock_logger.info.call_args[1]
         assert "leadr_client" in kwargs
+
+    @pytest.mark.asyncio
+    async def test_logs_query_string(self):
+        """Test that middleware logs query string as qs field."""
+        app = FastAPI()
+        mock_logger = Mock()
+
+        app.add_middleware(AccessLogMiddleware, logger=mock_logger)
+
+        @app.get("/test")
+        async def test_route():
+            return JSONResponse({"ok": True})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            await client.get("/test?foo=bar&baz=qux")
+
+        kwargs = mock_logger.info.call_args[1]
+        assert kwargs["qs"] == "foo=bar&baz=qux"
+
+    @pytest.mark.asyncio
+    async def test_logs_none_when_no_query_string(self):
+        """Test that middleware logs None when no query string present."""
+        app = FastAPI()
+        mock_logger = Mock()
+
+        app.add_middleware(AccessLogMiddleware, logger=mock_logger)
+
+        @app.get("/test")
+        async def test_route():
+            return JSONResponse({"ok": True})
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            await client.get("/test")
+
+        kwargs = mock_logger.info.call_args[1]
+        assert kwargs["qs"] is None
