@@ -72,6 +72,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             unit=orm.unit,
             is_active=orm.is_active,
             is_published=orm.is_published,
+            unique_player_names=orm.unique_player_names,
             sort_direction=SortDirection(orm.sort_direction),
             board_type=BoardType(orm.board_type.value),
             keep_strategy=KeepStrategy(orm.keep_strategy.value),
@@ -101,6 +102,7 @@ class BoardRepository(BaseRepository[Board, BoardORM]):
             unit=entity.unit,
             is_active=entity.is_active,
             is_published=entity.is_published,
+            unique_player_names=entity.unique_player_names,
             sort_direction=entity.sort_direction.value,
             board_type=BoardTypeEnum(entity.board_type.value),
             keep_strategy=KeepStrategyEnum(entity.keep_strategy.value),
@@ -426,6 +428,38 @@ class BoardStateRepository(BaseRepository[BoardState, BoardStateORM]):
         if orm is None:
             return None
         return self._to_domain(orm)
+
+    async def is_player_name_available(
+        self,
+        board_id: BoardID,
+        player_name: str,
+        exclude_identity_id: IdentityID | None = None,
+    ) -> bool:
+        """Check if a player name is available on a board (case-insensitive).
+
+        For RUN_IDENTITY/COUNTER boards that use BoardState table.
+
+        Args:
+            board_id: The board to check.
+            player_name: The player name to check.
+            exclude_identity_id: Optional identity to exclude (allows name reuse by owner).
+
+        Returns:
+            True if name is available, False if taken by another identity.
+        """
+        query = (
+            select(BoardStateORM.id)
+            .where(BoardStateORM.board_id == board_id.uuid)
+            .where(func.lower(BoardStateORM.player_name) == func.lower(player_name))
+            .where(BoardStateORM.deleted_at.is_(None))
+        )
+
+        if exclude_identity_id is not None:
+            query = query.where(BoardStateORM.identity_id != exclude_identity_id.uuid)
+
+        query = query.limit(1)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none() is None
 
     async def filter(  # type: ignore[override] - board states filter by board_id, not account_id
         self,
@@ -1087,6 +1121,38 @@ class RunEntryRepository(BaseRepository[RunEntry, RunEntryORM]):
         if orm is None:
             return None
         return self._to_domain(orm)
+
+    async def is_player_name_available(
+        self,
+        board_id: BoardID,
+        player_name: str,
+        exclude_identity_id: IdentityID | None = None,
+    ) -> bool:
+        """Check if a player name is available on a board (case-insensitive).
+
+        For RUN_RUNS boards that use RunEntry table.
+
+        Args:
+            board_id: The board to check.
+            player_name: The player name to check.
+            exclude_identity_id: Optional identity to exclude (allows name reuse by owner).
+
+        Returns:
+            True if name is available, False if taken by another identity.
+        """
+        query = (
+            select(RunEntryORM.id)
+            .where(RunEntryORM.board_id == board_id.uuid)
+            .where(func.lower(RunEntryORM.player_name) == func.lower(player_name))
+            .where(RunEntryORM.deleted_at.is_(None))
+        )
+
+        if exclude_identity_id is not None:
+            query = query.where(RunEntryORM.identity_id != exclude_identity_id.uuid)
+
+        query = query.limit(1)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none() is None
 
     async def filter(  # type: ignore[override] - run entries filter by board_id, not account_id
         self,

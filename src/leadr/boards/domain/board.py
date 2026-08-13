@@ -69,6 +69,10 @@ class Board(Entity):
     is_published: bool = Field(
         description="Whether the board is published and visible on public web views", default=True
     )
+    unique_player_names: bool = Field(
+        default=False,
+        description="Whether player names must be unique on this board (case-insensitive)",
+    )
     sort_direction: SortDirection = Field(
         description="Direction to sort scores (ascending/descending)",
         default=SortDirection.DESCENDING,

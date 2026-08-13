@@ -48,6 +48,7 @@ class BoardService(BaseService[Board, BoardRepository]):
         unit: str | None = None,
         is_active: bool = True,
         is_published: bool = True,
+        unique_player_names: bool = False,
         sort_direction: SortDirection = SortDirection.DESCENDING,
         board_type: BoardType = BoardType.RUN_IDENTITY,
         keep_strategy: KeepStrategy = KeepStrategy.BEST,
@@ -71,6 +72,8 @@ class BoardService(BaseService[Board, BoardRepository]):
             is_active: Whether the board is currently active. Defaults to True.
             is_published: Whether the board is published and visible on public web views.
                 Defaults to True.
+            unique_player_names: Whether player names must be unique on this board
+                (case-insensitive). Defaults to False.
             sort_direction: Direction to sort scores. Defaults to DESCENDING.
             keep_strategy: Strategy for keeping multiple scores from same user. Defaults to ALL.
             slug: Optional URL-friendly slug. If not provided, auto-generated from name.
@@ -156,6 +159,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             unit=unit,
             is_active=is_active,
             is_published=is_published,
+            unique_player_names=unique_player_names,
             sort_direction=sort_direction,
             board_type=board_type,
             keep_strategy=keep_strategy,

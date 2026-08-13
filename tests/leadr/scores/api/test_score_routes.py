@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from leadr.auth.dependencies import require_admin_auth
 from leadr.boards.domain.board import BoardType, KeepStrategy, SortDirection
 from leadr.common.domain.cursor import CursorValidationError
-from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.exceptions import EntityNotFoundError, PlayerNameConflictError
 from leadr.common.domain.ids import AccountID, GameID, IdentityID
 from leadr.common.domain.pagination import CursorPosition
 from leadr.scores.domain.anti_cheat.enums import FlagAction
@@ -875,3 +875,296 @@ class TestScoreRoutesClient:
         assert len(data["data"]) == 3
         assert data["pagination"]["has_next"] is True
         assert data["pagination"]["next_cursor"] is not None
+
+
+@pytest.mark.asyncio
+class TestUniquePlayerNames:
+    """Test suite for unique player names feature."""
+
+    async def test_create_score_with_unique_name_succeeds(
+        self,
+        mock_client_no_db: AsyncClient,
+        client_auth,
+        mock_score_service,
+        mock_board_service,
+        mock_identity_service,
+        mock_hooks,
+    ):
+        """Test creating a score with a unique player name succeeds with 201."""
+        # Arrange
+        board = make_board(
+            account_id=client_auth.account_id,
+            game_id=client_auth.game_id,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+            unique_player_names=True,
+        )
+        mock_board_service.get_by_id.return_value = board
+
+        identity = client_auth.identity
+        mock_identity_service.update_identity.return_value = identity
+
+        event = make_score_event(
+            account_id=client_auth.account_id,
+            game_id=client_auth.game_id,
+            board_id=board.id,
+            identity_id=identity.id,
+            value=1000.0,
+        )
+        state = make_board_state(
+            board_id=board.id,
+            identity_id=identity.id,
+            primary_value=1000.0,
+            player_name="UniquePlayer",
+        )
+        anti_cheat_result = make_anti_cheat_result(action=FlagAction.ACCEPT)
+
+        mock_score_service.submit_score.return_value = (event, state, anti_cheat_result)
+
+        # Act
+        response = await mock_client_no_db.post(
+            "/client/scores",
+            json={
+                "board_id": str(board.id),
+                "value": 1000.0,
+                "player_name": "UniquePlayer",
+            },
+        )
+
+        # Assert
+        assert response.status_code == 201
+        data = response.json()
+        assert data["value"] == 1000.0
+        assert data["player_name"] == "UniquePlayer"
+
+    async def test_create_score_duplicate_name_returns_409(
+        self,
+        mock_client_no_db: AsyncClient,
+        client_auth,
+        mock_score_service,
+        mock_board_service,
+        mock_identity_service,
+        mock_hooks,
+    ):
+        """Test creating a score with a duplicate player name returns 409 Conflict."""
+        # Arrange
+        board = make_board(
+            account_id=client_auth.account_id,
+            game_id=client_auth.game_id,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+            unique_player_names=True,
+        )
+        mock_board_service.get_by_id.return_value = board
+
+        identity = client_auth.identity
+        mock_identity_service.update_identity.return_value = identity
+
+        # Mock service to raise PlayerNameConflictError
+        mock_score_service.submit_score.side_effect = PlayerNameConflictError("Alice")
+
+        # Act
+        response = await mock_client_no_db.post(
+            "/client/scores",
+            json={
+                "board_id": str(board.id),
+                "value": 1000.0,
+                "player_name": "Alice",
+            },
+        )
+
+        # Assert
+        assert response.status_code == 409
+        assert "Alice" in response.json()["error"]
+        assert "already in use" in response.json()["error"]
+
+    async def test_create_score_duplicate_name_case_insensitive_returns_409(
+        self,
+        mock_client_no_db: AsyncClient,
+        client_auth,
+        mock_score_service,
+        mock_board_service,
+        mock_identity_service,
+        mock_hooks,
+    ):
+        """Test that case variations of existing names are blocked (409)."""
+        # Arrange
+        board = make_board(
+            account_id=client_auth.account_id,
+            game_id=client_auth.game_id,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+            unique_player_names=True,
+        )
+        mock_board_service.get_by_id.return_value = board
+
+        identity = client_auth.identity
+        mock_identity_service.update_identity.return_value = identity
+
+        # Mock service to raise PlayerNameConflictError for case-insensitive match
+        # Note: "ALICE" already exists, user tries to submit "alice"
+        mock_score_service.submit_score.side_effect = PlayerNameConflictError("alice")
+
+        # Act
+        response = await mock_client_no_db.post(
+            "/client/scores",
+            json={
+                "board_id": str(board.id),
+                "value": 500.0,
+                "player_name": "alice",  # lowercase variant
+            },
+        )
+
+        # Assert
+        assert response.status_code == 409
+        assert "alice" in response.json()["error"]
+
+    async def test_create_score_same_identity_can_reuse_own_name(
+        self,
+        mock_client_no_db: AsyncClient,
+        client_auth,
+        mock_score_service,
+        mock_board_service,
+        mock_identity_service,
+        mock_hooks,
+    ):
+        """Test that the same identity can resubmit with their own name (201)."""
+        # Arrange
+        board = make_board(
+            account_id=client_auth.account_id,
+            game_id=client_auth.game_id,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+            unique_player_names=True,
+        )
+        mock_board_service.get_by_id.return_value = board
+
+        identity = client_auth.identity
+        mock_identity_service.update_identity.return_value = identity
+
+        # Service allows submission (same identity owns the name)
+        event = make_score_event(
+            account_id=client_auth.account_id,
+            game_id=client_auth.game_id,
+            board_id=board.id,
+            identity_id=identity.id,
+            value=2000.0,
+        )
+        state = make_board_state(
+            board_id=board.id,
+            identity_id=identity.id,
+            primary_value=2000.0,
+            player_name="MyName",
+        )
+        anti_cheat_result = make_anti_cheat_result(action=FlagAction.ACCEPT)
+
+        mock_score_service.submit_score.return_value = (event, state, anti_cheat_result)
+
+        # Act - same identity resubmits with their same name
+        response = await mock_client_no_db.post(
+            "/client/scores",
+            json={
+                "board_id": str(board.id),
+                "value": 2000.0,
+                "player_name": "MyName",
+            },
+        )
+
+        # Assert - should succeed
+        assert response.status_code == 201
+        data = response.json()
+        assert data["value"] == 2000.0
+
+    async def test_create_score_unique_names_disabled_allows_duplicates(
+        self,
+        mock_client_no_db: AsyncClient,
+        client_auth,
+        mock_score_service,
+        mock_board_service,
+        mock_identity_service,
+        mock_hooks,
+    ):
+        """Test that boards with unique_player_names=False allow duplicate names."""
+        # Arrange
+        board = make_board(
+            account_id=client_auth.account_id,
+            game_id=client_auth.game_id,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+            unique_player_names=False,  # Not enforcing unique names
+        )
+        mock_board_service.get_by_id.return_value = board
+
+        identity = client_auth.identity
+        mock_identity_service.update_identity.return_value = identity
+
+        # Service allows the submission (no uniqueness check)
+        event = make_score_event(
+            account_id=client_auth.account_id,
+            game_id=client_auth.game_id,
+            board_id=board.id,
+            identity_id=identity.id,
+            value=1000.0,
+        )
+        state = make_board_state(
+            board_id=board.id,
+            identity_id=identity.id,
+            primary_value=1000.0,
+            player_name="CommonName",
+        )
+        anti_cheat_result = make_anti_cheat_result(action=FlagAction.ACCEPT)
+
+        mock_score_service.submit_score.return_value = (event, state, anti_cheat_result)
+
+        # Act
+        response = await mock_client_no_db.post(
+            "/client/scores",
+            json={
+                "board_id": str(board.id),
+                "value": 1000.0,
+                "player_name": "CommonName",
+            },
+        )
+
+        # Assert - should succeed even if name exists elsewhere
+        assert response.status_code == 201
+
+    async def test_create_score_run_runs_board_duplicate_name_returns_409(
+        self,
+        mock_client_no_db: AsyncClient,
+        client_auth,
+        mock_score_service,
+        mock_board_service,
+        mock_identity_service,
+        mock_hooks,
+    ):
+        """Test duplicate name check works for RUN_RUNS boards (checks RunEntry table)."""
+        # Arrange
+        board = make_board(
+            account_id=client_auth.account_id,
+            game_id=client_auth.game_id,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+            unique_player_names=True,
+        )
+        mock_board_service.get_by_id.return_value = board
+
+        identity = client_auth.identity
+        mock_identity_service.update_identity.return_value = identity
+
+        # Mock service to raise PlayerNameConflictError
+        mock_score_service.submit_score.side_effect = PlayerNameConflictError("Speedrunner")
+
+        # Act
+        response = await mock_client_no_db.post(
+            "/client/scores",
+            json={
+                "board_id": str(board.id),
+                "value": 120.5,
+                "player_name": "Speedrunner",
+            },
+        )
+
+        # Assert
+        assert response.status_code == 409
+        assert "Speedrunner" in response.json()["error"]

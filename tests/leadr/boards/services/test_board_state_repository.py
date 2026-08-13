@@ -815,3 +815,235 @@ class TestBoardStateRepositoryGetRank:
         # state2 should be rank 1 since state1 is deleted
         rank2 = await state_repo.get_rank(state2, sort_fields)
         assert rank2 == 1
+
+
+@pytest.mark.asyncio
+class TestBoardStateRepositoryPlayerNameAvailability:
+    """Tests for BoardStateRepository.is_player_name_available method."""
+
+    async def _create_test_fixtures(self, db_session: AsyncSession):
+        """Create common test fixtures for player name availability tests."""
+        now = datetime.now(UTC)
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug=f"test-{uuid4().hex[:8]}",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create game
+        game_repo = GameRepository(db_session)
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug=f"test-game-{uuid4().hex[:8]}",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create board
+        board_repo = BoardRepository(db_session)
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Test Board",
+            slug=f"test-board-{uuid4().hex[:8]}",
+            short_code=f"TB{uuid4().hex[:4].upper()}",
+            is_active=True,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(board)
+
+        # Create two identities
+        identity_repo = IdentityRepository(db_session)
+        identity_id_1 = IdentityID(uuid4())
+        identity1 = Identity(
+            id=identity_id_1,
+            account_id=account_id,
+            game_id=game_id,
+            kind=IdentityKind.DEVICE,
+            external_key=f"dev_{uuid4().hex[:8]}",
+            created_at=now,
+            updated_at=now,
+        )
+        await identity_repo.create(identity1)
+
+        identity_id_2 = IdentityID(uuid4())
+        identity2 = Identity(
+            id=identity_id_2,
+            account_id=account_id,
+            game_id=game_id,
+            kind=IdentityKind.DEVICE,
+            external_key=f"dev_{uuid4().hex[:8]}",
+            created_at=now,
+            updated_at=now,
+        )
+        await identity_repo.create(identity2)
+
+        return {
+            "board_id": board_id,
+            "identity_id_1": identity_id_1,
+            "identity_id_2": identity_id_2,
+            "now": now,
+        }
+
+    async def test_name_available_when_no_entries(self, db_session: AsyncSession):
+        """Test that a name is available when no entries exist."""
+        fixtures = await self._create_test_fixtures(db_session)
+        state_repo = BoardStateRepository(db_session)
+
+        is_available = await state_repo.is_player_name_available(
+            board_id=fixtures["board_id"],
+            player_name="Alice",
+        )
+
+        assert is_available is True
+
+    async def test_name_taken_by_other_identity(self, db_session: AsyncSession):
+        """Test that a name is not available when taken by another identity."""
+        fixtures = await self._create_test_fixtures(db_session)
+        state_repo = BoardStateRepository(db_session)
+
+        # Create state with player_name "Alice" for identity_1
+        state = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_id_1"],
+            primary_value=100.0,
+            player_name="Alice",
+        )
+        await state_repo.create(state)
+
+        # Check availability for identity_2
+        is_available = await state_repo.is_player_name_available(
+            board_id=fixtures["board_id"],
+            player_name="Alice",
+            exclude_identity_id=fixtures["identity_id_2"],
+        )
+
+        assert is_available is False
+
+    async def test_name_available_for_same_identity(self, db_session: AsyncSession):
+        """Test that a name is available when checking for the same identity that owns it."""
+        fixtures = await self._create_test_fixtures(db_session)
+        state_repo = BoardStateRepository(db_session)
+
+        # Create state with player_name "Alice" for identity_1
+        state = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_id_1"],
+            primary_value=100.0,
+            player_name="Alice",
+        )
+        await state_repo.create(state)
+
+        # Check availability for identity_1 (same identity)
+        is_available = await state_repo.is_player_name_available(
+            board_id=fixtures["board_id"],
+            player_name="Alice",
+            exclude_identity_id=fixtures["identity_id_1"],
+        )
+
+        assert is_available is True
+
+    async def test_case_insensitive_matching(self, db_session: AsyncSession):
+        """Test that name matching is case-insensitive."""
+        fixtures = await self._create_test_fixtures(db_session)
+        state_repo = BoardStateRepository(db_session)
+
+        # Create state with player_name "Alice"
+        state = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_id_1"],
+            primary_value=100.0,
+            player_name="Alice",
+        )
+        await state_repo.create(state)
+
+        # Check "alice" (lowercase) - should not be available
+        is_available_lower = await state_repo.is_player_name_available(
+            board_id=fixtures["board_id"],
+            player_name="alice",
+            exclude_identity_id=fixtures["identity_id_2"],
+        )
+        assert is_available_lower is False
+
+        # Check "ALICE" (uppercase) - should not be available
+        is_available_upper = await state_repo.is_player_name_available(
+            board_id=fixtures["board_id"],
+            player_name="ALICE",
+            exclude_identity_id=fixtures["identity_id_2"],
+        )
+        assert is_available_upper is False
+
+        # Check "aLiCe" (mixed case) - should not be available
+        is_available_mixed = await state_repo.is_player_name_available(
+            board_id=fixtures["board_id"],
+            player_name="aLiCe",
+            exclude_identity_id=fixtures["identity_id_2"],
+        )
+        assert is_available_mixed is False
+
+    async def test_soft_deleted_entries_excluded(self, db_session: AsyncSession):
+        """Test that soft-deleted entries are excluded from availability check."""
+        fixtures = await self._create_test_fixtures(db_session)
+        state_repo = BoardStateRepository(db_session)
+
+        # Create state with player_name "Alice"
+        state = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_id_1"],
+            primary_value=100.0,
+            player_name="Alice",
+        )
+        await state_repo.create(state)
+
+        # Soft delete the state
+        state.soft_delete()
+        await state_repo.update(state)
+
+        # Check availability - should be available since entry is deleted
+        is_available = await state_repo.is_player_name_available(
+            board_id=fixtures["board_id"],
+            player_name="Alice",
+            exclude_identity_id=fixtures["identity_id_2"],
+        )
+
+        assert is_available is True
+
+    async def test_different_board_allows_same_name(self, db_session: AsyncSession):
+        """Test that same name can be used on different boards."""
+        fixtures = await self._create_test_fixtures(db_session)
+        state_repo = BoardStateRepository(db_session)
+
+        # Create state with player_name "Alice" on original board
+        state = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_id_1"],
+            primary_value=100.0,
+            player_name="Alice",
+        )
+        await state_repo.create(state)
+
+        # Check availability on a different board
+        other_board_id = BoardID(uuid4())
+        is_available = await state_repo.is_player_name_available(
+            board_id=other_board_id,
+            player_name="Alice",
+        )
+
+        assert is_available is True

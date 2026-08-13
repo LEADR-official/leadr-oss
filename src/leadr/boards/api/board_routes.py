@@ -113,6 +113,7 @@ async def create_board(
             unit=request.unit,
             is_active=request.is_active,
             is_published=request.is_published,
+            unique_player_names=request.unique_player_names,
             sort_direction=request.sort_direction,
             board_type=request.board_type,
             keep_strategy=effective_keep_strategy,

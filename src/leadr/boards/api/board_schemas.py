@@ -112,6 +112,10 @@ class BoardCreateRequest(BaseModel):
     is_published: bool = Field(
         default=True, description="Whether the board is published and visible on public web views"
     )
+    unique_player_names: bool = Field(
+        default=False,
+        description="Whether player names must be unique on this board (case-insensitive)",
+    )
     sort_direction: SortDirection = Field(
         default=SortDirection.DESCENDING, description="Direction to sort scores"
     )
@@ -157,6 +161,10 @@ class BoardUpdateRequest(BaseModel):
     unit: str | None = Field(default=None, description="Updated unit of measurement")
     is_active: bool | None = Field(default=None, description="Updated active status")
     is_published: bool | None = Field(default=None, description="Updated published status")
+    unique_player_names: bool | None = Field(
+        default=None,
+        description="Whether player names must be unique on this board (case-insensitive)",
+    )
     sort_direction: SortDirection | None = Field(default=None, description="Updated sort direction")
     board_type: BoardType | None = Field(
         default=None,
@@ -197,6 +205,10 @@ class BoardResponse(BaseModel):
     is_active: bool = Field(description="Whether the board is currently active")
     is_published: bool = Field(
         description="Whether the board is published and visible on public web views"
+    )
+    unique_player_names: bool = Field(
+        default=False,
+        description="Whether player names must be unique on this board (case-insensitive)",
     )
     sort_direction: SortDirection = Field(description="Direction to sort scores")
     board_type: BoardType = Field(description="Type of board determining score behavior")
@@ -262,6 +274,7 @@ class BoardResponse(BaseModel):
             unit=board.unit,
             is_active=board.is_active,
             is_published=board.is_published,
+            unique_player_names=board.unique_player_names,
             sort_direction=board.sort_direction,
             board_type=board.board_type,
             keep_strategy=board.keep_strategy,

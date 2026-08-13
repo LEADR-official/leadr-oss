@@ -339,3 +339,22 @@ class ScoreClientResponse(BaseModel):
             created_at=entry.created_at,
             updated_at=entry.updated_at,
         )
+
+
+class PlayerNameConflict(BaseModel):
+    """A board where the player name conflicts."""
+
+    board_id: BoardID = Field(description="ID of the board with the conflict")
+    board_name: str = Field(description="Name of the board with the conflict")
+
+
+class PlayerNameCheckResponse(BaseModel):
+    """Response for player name availability check."""
+
+    name: str = Field(description="Original name submitted")
+    normalised_name: str = Field(description="Normalised name (lowercase, trimmed)")
+    available: bool = Field(description="Whether name is available on all checked boards")
+    conflicts: list[PlayerNameConflict] = Field(
+        default_factory=list,
+        description="Boards where this name is already taken",
+    )
