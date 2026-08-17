@@ -16,7 +16,7 @@ from leadr.boards.services.board_state_service import BoardStateService
 from leadr.boards.services.repositories import BoardStateRepository, RunEntryRepository
 from leadr.boards.services.run_entry_service import RunEntryService
 from leadr.common.api.pagination import PaginationParams
-from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.exceptions import EntityNotFoundError, PlayerNameConflictError
 from leadr.common.domain.ids import (
     AccountID,
     BoardID,
@@ -38,6 +38,16 @@ from leadr.scores.services.anti_cheat_repositories import (
 )
 from leadr.scores.services.anti_cheat_service import AntiCheatService
 from leadr.scores.services.score_event_service import ScoreEventService
+
+
+def _normalise_player_name(name: str) -> str:
+    """Normalise player name for comparison.
+
+    - Collapses multiple whitespace to single space
+    - Trims leading/trailing whitespace
+    - Converts to lowercase
+    """
+    return " ".join(name.split()).strip().lower()
 
 
 class ScoreService:
@@ -135,6 +145,10 @@ class ScoreService:
 
         # Validate payload based on board type
         self._validate_submission_payload(board, value, delta)
+
+        # Check unique player name constraint
+        if board.unique_player_names and player_name:
+            await self._check_player_name_availability(board, identity_id, player_name)
 
         # Build event payload
         event_payload = self._build_event_payload(
@@ -263,6 +277,44 @@ class ScoreService:
         if board.board_type == BoardType.COUNTER:
             if delta is None:
                 raise ValueError("delta is required for COUNTER boards")
+
+    async def _check_player_name_availability(
+        self,
+        board: Board,
+        identity_id: IdentityID,
+        player_name: str,
+    ) -> None:
+        """Check if player name is available on the board.
+
+        Checks the appropriate table based on board type:
+        - RUN_RUNS boards → RunEntry table
+        - RUN_IDENTITY/COUNTER boards → BoardState table
+
+        Args:
+            board: The board to check.
+            identity_id: The identity submitting (excluded from conflict check).
+            player_name: The player name to check.
+
+        Raises:
+            PlayerNameConflictError: If name is taken by another identity.
+        """
+        normalised_name = _normalise_player_name(player_name)
+        if not normalised_name:
+            return  # Empty name, no conflict possible
+
+        # Check appropriate table based on board type
+        if board.board_type == BoardType.RUN_RUNS:
+            repo = RunEntryRepository(self.session)
+        else:  # RUN_IDENTITY, COUNTER
+            repo = BoardStateRepository(self.session)
+
+        is_available = await repo.is_player_name_available(
+            board_id=board.id,
+            player_name=normalised_name,
+            exclude_identity_id=identity_id,
+        )
+        if not is_available:
+            raise PlayerNameConflictError(normalised_name)
 
     def _build_event_payload(
         self,
@@ -847,3 +899,47 @@ class ScoreService:
                 around_state=around_state,
                 around_value=around_score_value,
             )
+
+    async def check_player_name_availability(
+        self,
+        boards: list[tuple[BoardID, str, BoardType]],
+        player_name: str,
+        exclude_identity_id: IdentityID | None = None,
+    ) -> tuple[str, bool, list[tuple[BoardID, str]]]:
+        """Check if player name is available across multiple boards.
+
+        Checks the appropriate table per board type:
+        - RUN_RUNS → RunEntry table
+        - RUN_IDENTITY/COUNTER → BoardState table
+
+        Args:
+            boards: List of (board_id, board_name, board_type) tuples to check.
+            player_name: The player name to check.
+            exclude_identity_id: Optional identity ID to exclude (same identity can reuse own name).
+
+        Returns:
+            Tuple of (normalised_name, is_available, conflicts_list)
+            where conflicts_list contains (board_id, board_name) tuples.
+        """
+        normalised_name = _normalise_player_name(player_name)
+        if not normalised_name:
+            return normalised_name, True, []
+
+        conflicts: list[tuple[BoardID, str]] = []
+
+        for board_id, board_name, board_type in boards:
+            # Select appropriate repository based on board type
+            if board_type == BoardType.RUN_RUNS:
+                repo = RunEntryRepository(self.session)
+            else:  # RUN_IDENTITY, COUNTER
+                repo = BoardStateRepository(self.session)
+
+            is_available = await repo.is_player_name_available(
+                board_id=board_id,
+                player_name=normalised_name,
+                exclude_identity_id=exclude_identity_id,
+            )
+            if not is_available:
+                conflicts.append((board_id, board_name))
+
+        return normalised_name, len(conflicts) == 0, conflicts

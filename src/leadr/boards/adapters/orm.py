@@ -17,6 +17,8 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -122,6 +124,9 @@ class BoardORM(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, index=True)
     is_published: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=sa.text("true"), index=True
+    )
+    unique_player_names: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa.text("false")
     )
     sort_direction: Mapped[str] = mapped_column(String, nullable=False)
     board_type: Mapped[BoardTypeEnum] = mapped_column(
@@ -378,6 +383,13 @@ class BoardStateORM(Base):
             "id",
             postgresql_where="deleted_at IS NULL AND primary_value IS NOT NULL",
         ),
+        # Index for efficient player name uniqueness checks (case-insensitive)
+        Index(
+            "ix_board_states_board_id_player_name_lower",
+            "board_id",
+            func.lower(sa.column("player_name")),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
     )
 
     board_id: Mapped[UUID] = mapped_column(
@@ -433,6 +445,13 @@ class RunEntryORM(Base):
             "created_at",
             "id",
             postgresql_where="deleted_at IS NULL",
+        ),
+        # Index for efficient player name uniqueness checks (case-insensitive)
+        Index(
+            "ix_run_entries_board_id_player_name_lower",
+            "board_id",
+            func.lower(sa.column("player_name")),
+            postgresql_where=text("deleted_at IS NULL"),
         ),
     )
 

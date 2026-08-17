@@ -20,9 +20,12 @@ from leadr.common.api.hooks import PostCreateScoreHookDep, PreCreateScoreHookDep
 from leadr.common.api.pagination import PaginatedResponse, PaginationMeta, PaginationParams
 from leadr.common.dependencies import GeoInfoDep
 from leadr.common.domain.cursor import Cursor, CursorValidationError, PaginationDirection
+from leadr.common.domain.exceptions import PlayerNameConflictError
 from leadr.common.domain.ids import AccountID, BoardID, GameID, IdentityID, ScoreID
 from leadr.scores.api.score_schemas import (
     IsTestFilter,
+    PlayerNameCheckResponse,
+    PlayerNameConflict,
     ScoreClientCreateRequest,
     ScoreClientResponse,
     ScoreResponse,
@@ -128,6 +131,11 @@ async def create_score_client(
             status_code=404,
             detail="Board not found",
         ) from None
+    except PlayerNameConflictError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        ) from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
@@ -146,6 +154,95 @@ async def create_score_client(
         ranking_entry=ranking_entry,
         identity=identity,
         board_type=board.board_type,
+    )
+
+
+@client_router.get("/player-names/check", response_model=PlayerNameCheckResponse)
+async def check_player_name(
+    name: Annotated[str, Query(description="Player name to check")],
+    auth: ClientAuthContextDep,
+    service: ScoreServiceDep,
+    board_service: BoardServiceDep,
+    board_ids: Annotated[
+        str | None,
+        Query(
+            description="Comma-separated board IDs to check. If omitted, checks all game boards."
+        ),
+    ] = None,
+) -> PlayerNameCheckResponse:
+    """Check if a player name is available before gameplay.
+
+    Checks whether the given player name is available on boards that have
+    unique_player_names enabled. This allows games to validate names early,
+    before gameplay begins.
+
+    Args:
+        name: The player name to check.
+        auth: Client authentication context.
+        service: Injected score service.
+        board_service: Injected board service.
+        board_ids: Optional comma-separated board IDs to check. If omitted,
+            checks all boards for the game that have unique_player_names enabled.
+
+    Returns:
+        PlayerNameCheckResponse with availability status and any conflicts.
+    """
+    # Gather boards to check
+    boards_to_check: list[tuple[BoardID, str, BoardType]] = []
+
+    if board_ids is not None:
+        # Parse comma-separated board IDs
+        for raw_id in board_ids.split(","):
+            raw_id = raw_id.strip()
+            if not raw_id:
+                continue
+            try:
+                board_id = BoardID(raw_id)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid board ID format: {raw_id}",
+                ) from None
+
+            board = await board_service.get_by_id(board_id)
+            if board is None:
+                continue  # Skip non-existent boards
+            if board.game_id != auth.game_id:
+                continue  # Skip boards from other games
+            if not board.unique_player_names:
+                continue  # Skip boards without unique name enforcement
+            boards_to_check.append((board.id, board.name, board.board_type))
+    else:
+        # Get all boards for this game with unique_player_names enabled
+        # Using high limit - games rarely have >1000 boards with unique names
+        pagination = PaginationParams(cursor=None, limit=1000, sort=None)
+        result = await board_service.list_boards(
+            account_id=auth.account_id,
+            game_id=auth.game_id,
+            is_active=True,
+            pagination=pagination,
+        )
+        boards_to_check.extend(
+            (board.id, board.name, board.board_type)
+            for board in result.items
+            if board.unique_player_names
+        )
+
+    # Check availability across all boards (service handles empty boards case)
+    normalised_name, is_available, conflicts = await service.check_player_name_availability(
+        boards=boards_to_check,
+        player_name=name,
+        exclude_identity_id=auth.identity.id,
+    )
+
+    return PlayerNameCheckResponse(
+        name=name,
+        normalised_name=normalised_name,
+        available=is_available,
+        conflicts=[
+            PlayerNameConflict(board_id=board_id, board_name=board_name)
+            for board_id, board_name in conflicts
+        ],
     )
 
 

@@ -86,3 +86,23 @@ class ValidationError(DomainError):
         self.field = field
         self.reason = reason
         super().__init__(f"{entity_type}.{field}: {reason}")
+
+
+class PlayerNameConflictError(DomainError):
+    """Raised when player name conflicts with existing entry on board.
+
+    This exception is raised when attempting to submit a score with a player
+    name that is already in use by another identity on a board that has
+    unique_player_names enabled.
+
+    Args:
+        player_name: The player name that caused the conflict.
+
+    Example:
+        >>> raise PlayerNameConflictError("Alice")
+        PlayerNameConflictError: Player name 'Alice' is already in use on this board
+    """
+
+    def __init__(self, player_name: str) -> None:
+        self.player_name = player_name
+        super().__init__(f"Player name '{player_name}' is already in use on this board")
