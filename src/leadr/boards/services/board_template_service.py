@@ -84,6 +84,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
         next_run_at: datetime,
         is_active: bool,
         is_published: bool = True,
+        unique_player_names: bool = False,
         name_template: str | None = None,
         series: str | None = None,
         icon: str | None = "fa-crown",
@@ -160,6 +161,7 @@ class BoardTemplateService(BaseService[BoardTemplate, BoardTemplateRepository]):
             next_run_at=next_run_at,
             is_active=is_active,
             is_published=is_published,
+            unique_player_names=unique_player_names,
         )
 
         created_template = await self.repository.create(template)

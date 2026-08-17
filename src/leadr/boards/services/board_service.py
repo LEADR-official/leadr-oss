@@ -226,6 +226,7 @@ class BoardService(BaseService[Board, BoardRepository]):
             unit=template.unit,
             is_active=True,  # New boards from templates are always active
             is_published=template.is_published,
+            unique_player_names=template.unique_player_names,
             sort_direction=template.sort_direction,
             board_type=template.board_type,
             keep_strategy=template.keep_strategy,

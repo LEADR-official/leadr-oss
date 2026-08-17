@@ -78,6 +78,7 @@ async def create_board_template(
             next_run_at=request.next_run_at,
             is_active=request.is_active,
             is_published=request.is_published,
+            unique_player_names=request.unique_player_names,
             name_template=request.name_template,
             series=request.series,
             icon=request.icon,

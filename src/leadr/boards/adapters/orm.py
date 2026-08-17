@@ -244,6 +244,9 @@ class BoardTemplateORM(Base):
     is_published: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=sa.text("true")
     )
+    unique_player_names: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa.text("false")
+    )
 
     __table_args__ = (
         # Unique series identifier per game (partial index - only when series is set)
@@ -317,6 +320,7 @@ class BoardTemplateORM(Base):
             next_run_at=self.next_run_at,
             is_active=self.is_active,
             is_published=self.is_published,
+            unique_player_names=self.unique_player_names,
             created_at=self.created_at,
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
@@ -354,6 +358,7 @@ class BoardTemplateORM(Base):
             next_run_at=entity.next_run_at,
             is_active=entity.is_active,
             is_published=entity.is_published,
+            unique_player_names=entity.unique_player_names,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
             deleted_at=entity.deleted_at,

@@ -92,6 +92,10 @@ class BoardTemplate(Entity):
     is_published: bool = Field(
         description="Whether boards created from this template should be published", default=True
     )
+    unique_player_names: bool = Field(
+        default=False,
+        description="Whether player names must be unique on boards created from this template",
+    )
 
     @field_validator("name")
     @classmethod

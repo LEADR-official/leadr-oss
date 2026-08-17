@@ -29,6 +29,10 @@ class BoardTemplateCreateRequest(BaseModel):
     is_published: bool = Field(
         default=True, description="Whether boards created from this template should be published"
     )
+    unique_player_names: bool = Field(
+        default=False,
+        description="Whether player names must be unique on boards created from this template",
+    )
     name_template: str | None = Field(
         default=None, description="Optional template string for generating board names"
     )
@@ -95,6 +99,10 @@ class BoardTemplateUpdateRequest(BaseModel):
     next_run_at: datetime | None = Field(default=None, description="Updated next run time")
     is_active: bool | None = Field(default=None, description="Updated active status")
     is_published: bool | None = Field(default=None, description="Updated published status")
+    unique_player_names: bool | None = Field(
+        default=None,
+        description="Whether player names must be unique on boards created from this template",
+    )
     deleted: bool | None = Field(
         default=None, description="Set to true to soft delete the template"
     )
@@ -144,6 +152,10 @@ class BoardTemplateResponse(BaseModel):
     is_published: bool = Field(
         description="Whether boards created from this template should be published"
     )
+    unique_player_names: bool = Field(
+        default=False,
+        description="Whether player names must be unique on boards created from this template",
+    )
     created_at: datetime = Field(description="Timestamp when the template was created (UTC)")
     updated_at: datetime = Field(description="Timestamp of last update (UTC)")
 
@@ -178,6 +190,7 @@ class BoardTemplateResponse(BaseModel):
             next_run_at=template.next_run_at,
             is_active=template.is_active,
             is_published=template.is_published,
+            unique_player_names=template.unique_player_names,
             created_at=template.created_at,
             updated_at=template.updated_at,
         )
