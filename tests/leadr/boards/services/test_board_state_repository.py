@@ -1047,3 +1047,236 @@ class TestBoardStateRepositoryPlayerNameAvailability:
         )
 
         assert is_available is True
+
+
+@pytest.mark.asyncio
+class TestBoardStateRepositoryNullPrimaryValue:
+    """Tests for BoardStateRepository handling of NULL primary_value.
+
+    NULL primary_value is intentional for RATIO boards when player doesn't meet
+    minimum thresholds. These entries should be excluded from ranking queries.
+    """
+
+    async def _create_test_fixtures(self, db_session: AsyncSession):
+        """Create common test fixtures."""
+        now = datetime.now(UTC)
+        account_id = AccountID(uuid4())
+        game_id = GameID(uuid4())
+        board_id = BoardID(uuid4())
+
+        # Create account
+        account_repo = AccountRepository(db_session)
+        account = Account(
+            id=account_id,
+            name="Test Account",
+            slug=f"test-{uuid4().hex[:8]}",
+            status=AccountStatus.ACTIVE,
+            created_at=now,
+            updated_at=now,
+        )
+        await account_repo.create(account)
+
+        # Create game
+        game_repo = GameRepository(db_session)
+        game = Game(
+            id=game_id,
+            account_id=account_id,
+            name="Test Game",
+            slug=f"test-game-{uuid4().hex[:8]}",
+            created_at=now,
+            updated_at=now,
+        )
+        await game_repo.create(game)
+
+        # Create board (RUN_IDENTITY - NULL primary_value filtering applies to all types)
+        board_repo = BoardRepository(db_session)
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Test Board",
+            slug=f"test-board-{uuid4().hex[:8]}",
+            short_code=f"TB{uuid4().hex[:4].upper()}",
+            is_active=True,
+            board_type=BoardType.RUN_IDENTITY,
+            sort_direction=SortDirection.DESCENDING,
+            keep_strategy=KeepStrategy.BEST,
+            created_at=now,
+            updated_at=now,
+        )
+        await board_repo.create(board)
+
+        # Create identities
+        identity_repo = IdentityRepository(db_session)
+        identity_ids = []
+        for _ in range(4):
+            identity_id = IdentityID(uuid4())
+            identity = Identity(
+                id=identity_id,
+                account_id=account_id,
+                game_id=game_id,
+                kind=IdentityKind.DEVICE,
+                external_key=f"dev_{uuid4().hex[:8]}",
+                created_at=now,
+                updated_at=now,
+            )
+            await identity_repo.create(identity)
+            identity_ids.append(identity_id)
+
+        return {
+            "board_id": board_id,
+            "identity_ids": identity_ids,
+            "now": now,
+        }
+
+    async def test_filter_excludes_null_primary_value(self, db_session: AsyncSession):
+        """Test that filter() excludes entries with NULL primary_value."""
+        fixtures = await self._create_test_fixtures(db_session)
+        state_repo = BoardStateRepository(db_session)
+
+        # Create state with value (rankable)
+        rankable_state = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_ids"][0],
+            primary_value=100.0,
+            player_name="Rankable Player",
+            is_test=False,
+        )
+        await state_repo.create(rankable_state)
+
+        # Create state with NULL value (not rankable - e.g., ratio board below threshold)
+        unrankable_state = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_ids"][1],
+            primary_value=None,  # NULL = not rankable
+            player_name="Unrankable Player",
+            is_test=False,
+        )
+        await state_repo.create(unrankable_state)
+
+        # Filter should exclude NULL primary_value entries
+        pagination = PaginationParams(cursor=None, limit=50, sort=None)
+        result = await state_repo.filter(
+            board_id=fixtures["board_id"],
+            pagination=pagination,
+        )
+
+        assert len(result.items) == 1
+        assert result.items[0].id == rankable_state.id
+        assert result.items[0].primary_value == 100.0
+
+    async def test_filter_returns_only_rankable_entries(self, db_session: AsyncSession):
+        """Test that filter() returns only entries with non-NULL primary_value."""
+        fixtures = await self._create_test_fixtures(db_session)
+        state_repo = BoardStateRepository(db_session)
+
+        # Create mix of rankable and unrankable states
+        state_300 = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_ids"][0],
+            primary_value=300.0,
+            player_name="Player 300",
+            is_test=False,
+        )
+        await state_repo.create(state_300)
+
+        state_null_1 = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_ids"][1],
+            primary_value=None,
+            player_name="Unrankable 1",
+            is_test=False,
+        )
+        await state_repo.create(state_null_1)
+
+        state_100 = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_ids"][2],
+            primary_value=100.0,
+            player_name="Player 100",
+            is_test=False,
+        )
+        await state_repo.create(state_100)
+
+        state_null_2 = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_ids"][3],
+            primary_value=None,
+            player_name="Unrankable 2",
+            is_test=False,
+        )
+        await state_repo.create(state_null_2)
+
+        # Filter should only return rankable entries
+        pagination = PaginationParams(cursor=None, limit=50, sort=None)
+        result = await state_repo.filter(
+            board_id=fixtures["board_id"],
+            pagination=pagination,
+        )
+
+        assert len(result.items) == 2
+        primary_values = {item.primary_value for item in result.items}
+        assert primary_values == {100.0, 300.0}
+
+    async def test_filter_ranks_correctly_with_null_excluded(self, db_session: AsyncSession):
+        """Test that ranks are consecutive when NULL entries are excluded."""
+        fixtures = await self._create_test_fixtures(db_session)
+        state_repo = BoardStateRepository(db_session)
+
+        # Create rankable states
+        state_300 = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_ids"][0],
+            primary_value=300.0,
+            player_name="Player 300",
+            is_test=False,
+        )
+        await state_repo.create(state_300)
+
+        state_200 = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_ids"][1],
+            primary_value=200.0,
+            player_name="Player 200",
+            is_test=False,
+        )
+        await state_repo.create(state_200)
+
+        # Create unrankable state (should not affect ranks)
+        state_null = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_ids"][2],
+            primary_value=None,
+            player_name="Unrankable",
+            is_test=False,
+        )
+        await state_repo.create(state_null)
+
+        state_100 = BoardState(
+            board_id=fixtures["board_id"],
+            identity_id=fixtures["identity_ids"][3],
+            primary_value=100.0,
+            player_name="Player 100",
+            is_test=False,
+        )
+        await state_repo.create(state_100)
+
+        # Filter with DESC sort (higher value = better rank)
+        pagination = PaginationParams(
+            cursor=None,
+            limit=50,
+            sort="primary_value:desc,created_at:desc,id:asc",
+        )
+        result = await state_repo.filter(
+            board_id=fixtures["board_id"],
+            pagination=pagination,
+        )
+
+        # Should have 3 rankable entries with consecutive ranks 1, 2, 3
+        assert len(result.items) == 3
+        assert result.items[0].primary_value == 300.0
+        assert result.items[0].rank == 1
+        assert result.items[1].primary_value == 200.0
+        assert result.items[1].rank == 2
+        assert result.items[2].primary_value == 100.0
+        assert result.items[2].rank == 3

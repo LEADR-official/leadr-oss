@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, false, func, or_, select
 
 from leadr.boards.adapters.orm import (
     BoardORM,
@@ -44,6 +44,50 @@ from leadr.common.domain.pagination import SortDirection as PaginationSortDirect
 from leadr.common.domain.pagination import SortField
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
+
+
+def _build_null_safe_comparison(column: Any, value: Any, comp_op: str) -> Any:
+    """Build a NULL-safe comparison clause for SQLAlchemy.
+
+    SQLAlchemy's comparison operators (__gt__, __lt__) cannot be used with None.
+    This is a defensive fallback - NULL entries should be filtered upstream.
+
+    Treats NULL as "lowest" value:
+    - Works correctly for DESC boards (NULL ranks last = worst)
+    - Would misbehave for ASC boards (NULL would rank first = best)
+
+    This is acceptable because NULL primary_value entries are filtered at query
+    level before this code executes.
+
+    Args:
+        column: SQLAlchemy column object.
+        value: Value to compare against (may be None).
+        comp_op: Comparison operator ("__gt__" or "__lt__").
+
+    Returns:
+        SQLAlchemy WHERE clause.
+    """
+    if value is None:
+        if comp_op == "__gt__":
+            return column.is_not(None)
+        else:  # __lt__
+            return false()
+    return getattr(column, comp_op)(value)
+
+
+def _build_null_safe_equality(column: Any, value: Any) -> Any:
+    """Build a NULL-safe equality clause for SQLAlchemy.
+
+    Args:
+        column: SQLAlchemy column object.
+        value: Value to compare against (may be None).
+
+    Returns:
+        SQLAlchemy WHERE clause for equality.
+    """
+    if value is None:
+        return column.is_(None)
+    return column == value
 
 
 class BoardRepository(BaseRepository[Board, BoardORM]):
@@ -485,7 +529,12 @@ class BoardStateRepository(BaseRepository[BoardState, BoardStateORM]):
             ValueError: If sort field is not in SORTABLE_FIELDS.
             CursorValidationError: If cursor is invalid or state doesn't match.
         """
-        query = select(BoardStateORM).where(BoardStateORM.deleted_at.is_(None))
+        # Exclude deleted and non-rankable (NULL primary_value) entries.
+        # Matches ranking index: postgresql_where="deleted_at IS NULL AND primary_value IS NOT NULL"
+        query = select(BoardStateORM).where(
+            BoardStateORM.deleted_at.is_(None),
+            BoardStateORM.primary_value.is_not(None),
+        )
 
         # Build filters dict for cursor validation
         filters_dict: dict[str, str] = {}
@@ -561,11 +610,12 @@ class BoardStateRepository(BaseRepository[BoardState, BoardStateORM]):
             before_target=True,  # Entries that come BEFORE target = better ranked
         )
 
-        # Count entries that rank better (within same board, not deleted)
+        # Count entries that rank better (within same board, not deleted, rankable)
         count_query = (
             select(func.count())
             .select_from(BoardStateORM)
             .where(BoardStateORM.deleted_at.is_(None))
+            .where(BoardStateORM.primary_value.is_not(None))
             .where(BoardStateORM.board_id == state.board_id.uuid)
             .where(BoardStateORM.is_test == state.is_test)
             .where(better_condition)
@@ -638,18 +688,18 @@ class BoardStateRepository(BaseRepository[BoardState, BoardStateORM]):
                 else:
                     comp_op = "__gt__"
 
-            # Build equality conditions for all previous fields
+            # Build equality conditions for all previous fields (NULL-safe)
             equality_conditions = []
             for j in range(i):
                 prev_field = sort_fields[j]
                 prev_column = self._get_orm_column(prev_field.name)
                 prev_value = target_values[prev_field.name]
-                equality_conditions.append(prev_column == prev_value)
+                equality_conditions.append(_build_null_safe_equality(prev_column, prev_value))
 
-            # Add comparison condition for current field
+            # Add comparison condition for current field (NULL-safe)
             current_column = self._get_orm_column(sort_field.name)
             current_value = target_values[sort_field.name]
-            comparison = getattr(current_column, comp_op)(current_value)
+            comparison = _build_null_safe_comparison(current_column, current_value, comp_op)
 
             # Combine: all previous equals AND current comparison
             if equality_conditions:
@@ -733,9 +783,10 @@ class BoardStateRepository(BaseRepository[BoardState, BoardStateORM]):
         # Extract target position values
         target_values = self._extract_target_values(target_state, sort_fields)
 
-        # Build base query
+        # Build base query - exclude deleted and non-rankable entries
         base_query = select(BoardStateORM).where(
             BoardStateORM.deleted_at.is_(None),
+            BoardStateORM.primary_value.is_not(None),
             BoardStateORM.board_id == board_id.uuid,
         )
         if is_test is not None:
@@ -870,9 +921,10 @@ class BoardStateRepository(BaseRepository[BoardState, BoardStateORM]):
         ideal_below_count = limit - ideal_above_count - 1
         max_side_items = limit - 1
 
-        # Build base query
+        # Build base query - exclude deleted and non-rankable entries
         base_query = select(BoardStateORM).where(
             BoardStateORM.deleted_at.is_(None),
+            BoardStateORM.primary_value.is_not(None),
             BoardStateORM.board_id == board_id.uuid,
         )
         if is_test is not None:
@@ -1331,18 +1383,18 @@ class RunEntryRepository(BaseRepository[RunEntry, RunEntryORM]):
                 else:
                     comp_op = "__gt__"
 
-            # Build equality conditions for all previous fields
+            # Build equality conditions for all previous fields (NULL-safe)
             equality_conditions = []
             for j in range(i):
                 prev_field = sort_fields[j]
                 prev_column = self._get_orm_column(prev_field.name)
                 prev_value = target_values[prev_field.name]
-                equality_conditions.append(prev_column == prev_value)
+                equality_conditions.append(_build_null_safe_equality(prev_column, prev_value))
 
-            # Add comparison condition for current field
+            # Add comparison condition for current field (NULL-safe)
             current_column = self._get_orm_column(sort_field.name)
             current_value = target_values[sort_field.name]
-            comparison = getattr(current_column, comp_op)(current_value)
+            comparison = _build_null_safe_comparison(current_column, current_value, comp_op)
 
             # Combine: all previous equals AND current comparison
             if equality_conditions:
