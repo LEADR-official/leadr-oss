@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from leadr.auth.domain.device import Device
@@ -80,22 +81,32 @@ class DeviceService(BaseService[Device, DeviceRepository]):
             device.update_last_seen()
             if platform and not device.platform:
                 device.platform = platform
-            device = await self.repository.update(device)
-        else:
-            # Create new device
-            now = datetime.now(UTC)
-            device = Device(
-                game_id=game_id,
-                client_fingerprint=client_fingerprint,
-                account_id=account_id,
-                platform=platform,
-                first_seen_at=now,
-                last_seen_at=now,
-                metadata=metadata or {},
-            )
-            device = await self.repository.create(device)
+            return await self.repository.update(device)
 
-        return device
+        # Create new device
+        now = datetime.now(UTC)
+        new_device = Device(
+            game_id=game_id,
+            client_fingerprint=client_fingerprint,
+            account_id=account_id,
+            platform=platform,
+            first_seen_at=now,
+            last_seen_at=now,
+            metadata=metadata or {},
+        )
+
+        try:
+            return await self.repository.create(new_device)
+        except IntegrityError:
+            # Race condition: another request created device between SELECT and INSERT
+            # Rollback failed transaction and fetch existing device
+            await self.session.rollback()
+            device = await self.repository.get_by_game_and_fingerprint(game_id, client_fingerprint)
+            if device is None:
+                # Constraint violated but device not found - could be soft-deleted blocking
+                raise
+            device.update_last_seen()
+            return await self.repository.update(device)
 
     async def list_devices(
         self,

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from leadr.auth.domain.device import Device, DeviceStatus
@@ -143,8 +143,14 @@ class DeviceORM(Base):
 
     # Indexes
     __table_args__ = (
-        # Composite unique index on (game_id, client_fingerprint)
-        Index("ix_devices_game_device", "game_id", "client_fingerprint", unique=True),
+        # Composite unique index on (game_id, client_fingerprint), excludes soft-deleted
+        Index(
+            "ix_devices_game_device",
+            "game_id",
+            "client_fingerprint",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
     )
 
     @classmethod

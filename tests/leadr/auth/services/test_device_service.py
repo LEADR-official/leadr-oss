@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.domain.device import Device, DeviceStatus
 from leadr.auth.services.device_service import DeviceService
@@ -325,3 +326,94 @@ class TestDeviceService:
         # Execute & Verify
         with pytest.raises(EntityNotFoundError):
             await service.ban_device(device_id)
+
+    async def test_get_or_create_device_handles_race_condition(self, service, mock_session):
+        """IntegrityError from race condition triggers retry and returns existing device."""
+        # Setup
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        fingerprint = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+        first_seen = datetime.now(UTC)
+
+        # Mock game lookup
+        game_mock = MagicMock()
+        game_mock.account_id = account_id.uuid
+        mock_session.get = AsyncMock(return_value=game_mock)
+
+        # Existing device that was created by concurrent request
+        existing_device = Device(
+            game_id=game_id,
+            client_fingerprint=fingerprint,
+            account_id=account_id,
+            platform="ios",
+            first_seen_at=first_seen,
+            last_seen_at=first_seen,
+            metadata={},
+        )
+
+        # First call: no device found (race window)
+        # After IntegrityError: return existing device
+        service.repository.get_by_game_and_fingerprint = AsyncMock(
+            side_effect=[None, existing_device]
+        )
+
+        # Mock create to raise IntegrityError (concurrent insert won)
+        service.repository.create = AsyncMock(
+            side_effect=IntegrityError("duplicate", {}, Exception())
+        )
+
+        # Mock session rollback
+        mock_session.rollback = AsyncMock()
+
+        # Mock update for the retry path
+        async def mock_update(device: Device) -> Device:
+            return device
+
+        service.repository.update = AsyncMock(side_effect=mock_update)
+
+        # Execute
+        device = await service.get_or_create_device(
+            game_id=game_id,
+            client_fingerprint=fingerprint,
+            platform="ios",
+        )
+
+        # Verify
+        assert device.id == existing_device.id
+        assert device.client_fingerprint == fingerprint
+        mock_session.rollback.assert_called_once()
+        service.repository.update.assert_called_once()
+        assert service.repository.get_by_game_and_fingerprint.call_count == 2
+
+    async def test_get_or_create_device_reraises_integrity_error_if_device_still_not_found(
+        self, service, mock_session
+    ):
+        """Test that IntegrityError is re-raised if device not found after retry."""
+        # Setup
+        game_id = GameID(uuid4())
+        account_id = AccountID(uuid4())
+        fingerprint = hashlib.sha256(str(uuid4()).encode()).hexdigest()
+
+        # Mock game lookup
+        game_mock = MagicMock()
+        game_mock.account_id = account_id.uuid
+        mock_session.get = AsyncMock(return_value=game_mock)
+
+        # Both calls return None (device not found - could be soft-deleted blocking)
+        service.repository.get_by_game_and_fingerprint = AsyncMock(return_value=None)
+
+        # Mock create to raise IntegrityError
+        service.repository.create = AsyncMock(
+            side_effect=IntegrityError("duplicate", {}, Exception())
+        )
+
+        # Mock session rollback
+        mock_session.rollback = AsyncMock()
+
+        # Execute & Verify - should re-raise IntegrityError
+        with pytest.raises(IntegrityError):
+            await service.get_or_create_device(
+                game_id=game_id,
+                client_fingerprint=fingerprint,
+                platform="ios",
+            )
