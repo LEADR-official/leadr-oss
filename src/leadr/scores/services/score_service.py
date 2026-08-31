@@ -857,6 +857,16 @@ class ScoreService:
                 SortField(name="created_at", direction=SortDirection.DESC),
                 SortField(name="id", direction=SortDirection.ASC),
             ]
+        else:
+            # Translate public API field names to internal field names
+            sort_field_aliases = {"value": "primary_value"}
+            pagination.sort_spec = [
+                SortField(
+                    name=sort_field_aliases.get(field.name, field.name),
+                    direction=field.direction,
+                )
+                for field in pagination.sort_spec
+            ]
 
         # If around_score_id is provided, fetch the target entry first
         around_state: BoardState | None = None

@@ -19,6 +19,7 @@ from leadr.common.domain.ids import (
     ScoreEventID,
     ScoreID,
 )
+from leadr.common.domain.pagination import SortDirection as PaginationSortDirection
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.scores.domain.anti_cheat.enums import FlagAction
 from leadr.scores.domain.anti_cheat.models import AntiCheatResult
@@ -1377,6 +1378,101 @@ class TestScoreServiceQuery:
         )
 
         assert len(result.items) == 5
+
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    async def test_list_scores_translates_value_sort_field_to_primary_value(
+        self, mock_state_service_cls, mock_board_service_cls
+    ):
+        """Test that sort field 'value' is translated to 'primary_value' for the repository."""
+
+        board_id = BoardID()
+        board = Board(
+            id=board_id,
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        paginated = PaginatedResult(
+            items=[],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_state_service = AsyncMock()
+        mock_state_service.list_board_states = AsyncMock(return_value=paginated)
+        mock_state_service_cls.return_value = mock_state_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        pagination = PaginationParams(limit=10, cursor=None, sort="value:desc")
+        await service.list_scores(board_id=board_id, pagination=pagination)
+
+        # Verify the sort spec was translated before reaching the service
+        call_kwargs = mock_state_service.list_board_states.call_args.kwargs
+        passed_pagination = call_kwargs["pagination"]
+        assert passed_pagination.sort_spec[0].name == "primary_value"
+        assert passed_pagination.sort_spec[0].direction == PaginationSortDirection.DESC
+
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.RunEntryService")
+    async def test_list_scores_translates_value_sort_field_run_entry(
+        self, mock_run_service_cls, mock_board_service_cls
+    ):
+        """Test that sort field 'value' is translated for RUN_RUNS boards too."""
+
+        board_id = BoardID()
+        board = Board(
+            id=board_id,
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="Speedruns",
+            slug="speedruns",
+            short_code="SPD001",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        paginated = PaginatedResult(
+            items=[],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_run_service = AsyncMock()
+        mock_run_service.list_run_entries = AsyncMock(return_value=paginated)
+        mock_run_service_cls.return_value = mock_run_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        pagination = PaginationParams(limit=10, cursor=None, sort="value:asc")
+        await service.list_scores(board_id=board_id, pagination=pagination)
+
+        call_kwargs = mock_run_service.list_run_entries.call_args.kwargs
+        passed_pagination = call_kwargs["pagination"]
+        assert passed_pagination.sort_spec[0].name == "primary_value"
+        assert passed_pagination.sort_spec[0].direction == PaginationSortDirection.ASC
 
     @patch("leadr.scores.services.score_service.BoardService")
     @patch("leadr.scores.services.score_service.BoardStateService")
