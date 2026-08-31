@@ -1,5 +1,6 @@
 """Tests for Board API schemas."""
 
+import warnings
 from datetime import UTC, datetime
 from unittest.mock import patch
 
@@ -13,28 +14,35 @@ class TestBoardUpdateRequest:
 
     def test_accepts_board_type(self):
         """Test that BoardUpdateRequest accepts board_type (validated at route level)."""
-        # Schema should accept board_type - validation happens at route level
         request = BoardUpdateRequest(board_type=BoardType.RUN_RUNS)
-        assert request.board_type == BoardType.RUN_RUNS
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            assert request.board_type == BoardType.RUN_RUNS
 
     def test_accepts_board_type_with_other_fields(self):
         """Test that BoardUpdateRequest accepts board_type with other fields."""
         request = BoardUpdateRequest(name="New Name", board_type=BoardType.RUN_IDENTITY)
-        assert request.name == "New Name"
-        assert request.board_type == BoardType.RUN_IDENTITY
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            assert request.name == "New Name"
+            assert request.board_type == BoardType.RUN_IDENTITY
 
     def test_allows_other_fields_without_board_type(self):
         """Test that BoardUpdateRequest accepts valid fields without board_type."""
         request = BoardUpdateRequest(name="New Name", keep_strategy=KeepStrategy.BEST)
-        assert request.name == "New Name"
-        assert request.keep_strategy == KeepStrategy.BEST
-        assert request.board_type is None
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            assert request.name == "New Name"
+            assert request.keep_strategy == KeepStrategy.BEST
+            assert request.board_type is None
 
     def test_allows_empty_update(self):
         """Test that BoardUpdateRequest accepts empty update (no fields set)."""
         request = BoardUpdateRequest()
-        assert request.name is None
-        assert request.board_type is None
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            assert request.name is None
+            assert request.board_type is None
 
 
 class TestBoardResponseUrlShort:

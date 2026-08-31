@@ -5,10 +5,11 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from leadr.boards.domain.board import Board, BoardType, KeepStrategy, SortDirection
+from leadr.boards.domain.board_ratio_config import BoardRatioConfig
 from leadr.boards.domain.board_state import BoardState
 from leadr.boards.domain.run_entry import RunEntry
 from leadr.common.api.pagination import PaginationParams
-from leadr.common.domain.exceptions import EntityNotFoundError
+from leadr.common.domain.exceptions import EntityNotFoundError, PlayerNameConflictError
 from leadr.common.domain.ids import (
     AccountID,
     BoardID,
@@ -21,8 +22,8 @@ from leadr.common.domain.ids import (
 )
 from leadr.common.domain.pagination import SortDirection as PaginationSortDirection
 from leadr.common.domain.pagination_result import PaginatedResult
-from leadr.scores.domain.anti_cheat.enums import FlagAction
-from leadr.scores.domain.anti_cheat.models import AntiCheatResult
+from leadr.scores.domain.anti_cheat.enums import FlagAction, FlagConfidence, FlagType
+from leadr.scores.domain.anti_cheat.models import AntiCheatResult, ScoreSubmissionMeta
 from leadr.scores.domain.score_event import ScoreEvent
 from leadr.scores.services.score_service import ScoreService
 
@@ -1114,6 +1115,442 @@ class TestScoreServiceSubmission:
                 player_name="Player1",
             )
 
+    @patch("leadr.scores.services.score_service.BoardStateRepository")
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_checks_unique_player_name(
+        self,
+        mock_settings,
+        mock_board_state_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
+        mock_board_state_repo_cls,
+    ):
+        """Test submission checks player name uniqueness when enabled."""
+        mock_settings.ANTICHEAT_ENABLED = False
+        board_id = BoardID()
+        identity_id = IdentityID()
+
+        board = Board(
+            id=board_id,
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+            unique_player_names=True,
+        )
+
+        event = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=board.account_id,
+            game_id=board.game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 100.0},
+        )
+
+        state = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,
+            player_name="Player One",
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_repo = AsyncMock()
+        mock_repo.is_player_name_available = AsyncMock(return_value=True)
+        mock_board_state_repo_cls.return_value = mock_repo
+
+        mock_event_service = AsyncMock()
+        mock_event_service.create_score_event = AsyncMock(return_value=event)
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_state_service = AsyncMock()
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=None)
+        mock_state_service.create_board_state = AsyncMock(return_value=state)
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        service = ScoreService(AsyncMock())
+        result_event, result_entry, _ = await service.submit_score(
+            board_id=board_id,
+            identity_id=identity_id,
+            value=100.0,
+            player_name="Player One",
+        )
+
+        assert result_event is not None
+        assert result_entry is not None
+        mock_repo.is_player_name_available.assert_called_once_with(
+            board_id=board_id,
+            player_name="player one",
+            exclude_identity_id=identity_id,
+        )
+
+    @patch("leadr.scores.services.score_service.BoardStateRepository")
+    @patch("leadr.scores.services.score_service.BoardService")
+    async def test_submit_score_unique_name_conflict_raises(
+        self,
+        mock_board_service_cls,
+        mock_board_state_repo_cls,
+    ):
+        """Test that a taken player name raises PlayerNameConflictError."""
+        board_id = BoardID()
+        identity_id = IdentityID()
+
+        board = Board(
+            id=board_id,
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+            unique_player_names=True,
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_repo = AsyncMock()
+        mock_repo.is_player_name_available = AsyncMock(return_value=False)
+        mock_board_state_repo_cls.return_value = mock_repo
+
+        service = ScoreService(AsyncMock())
+
+        with pytest.raises(PlayerNameConflictError):
+            await service.submit_score(
+                board_id=board_id,
+                identity_id=identity_id,
+                value=100.0,
+                player_name="Taken Name",
+            )
+
+    @patch("leadr.scores.services.score_service.RunEntryRepository")
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.RunEntryService")
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_unique_name_run_runs_board(
+        self,
+        mock_settings,
+        mock_run_entry_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
+        mock_run_entry_repo_cls,
+    ):
+        """Test unique name check uses RunEntryRepository for RUN_RUNS boards."""
+        mock_settings.ANTICHEAT_ENABLED = False
+        board_id = BoardID()
+        identity_id = IdentityID()
+
+        board = Board(
+            id=board_id,
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="Speedruns",
+            slug="speedruns",
+            short_code="SPD001",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+            unique_player_names=True,
+        )
+
+        event = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=board.account_id,
+            game_id=board.game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 50.0},
+        )
+
+        entry = RunEntry(
+            id=RunEntryID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            score_event_id=event.id,
+            primary_value=50.0,
+            player_name="Runner",
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_repo = AsyncMock()
+        mock_repo.is_player_name_available = AsyncMock(return_value=True)
+        mock_run_entry_repo_cls.return_value = mock_repo
+
+        mock_event_service = AsyncMock()
+        mock_event_service.create_score_event = AsyncMock(return_value=event)
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_run_service = AsyncMock()
+        mock_run_service.create_run_entry = AsyncMock(return_value=entry)
+        mock_run_entry_service_cls.return_value = mock_run_service
+
+        service = ScoreService(AsyncMock())
+        await service.submit_score(
+            board_id=board_id,
+            identity_id=identity_id,
+            value=50.0,
+            player_name="Runner",
+        )
+
+        mock_repo.is_player_name_available.assert_called_once()
+
+    @patch("leadr.scores.services.score_service.BoardService")
+    async def test_submit_score_unique_name_empty_skips_check(
+        self,
+        mock_board_service_cls,
+    ):
+        """Test that whitespace-only player name skips uniqueness check."""
+        board_id = BoardID()
+
+        board = Board(
+            id=board_id,
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+            unique_player_names=True,
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        service = ScoreService(AsyncMock())
+
+        # Whitespace-only name normalises to empty → but submit_score checks
+        # `if board.unique_player_names and player_name` — empty string is falsy,
+        # so the uniqueness check is skipped entirely at line 150.
+        # Use a non-empty name but with only whitespace to test the normalisation path.
+        # Actually, "   " is truthy, so it enters _check_player_name_availability,
+        # which normalises to "" and returns early (line 302-303).
+        # We need to also patch ScoreEventService to avoid the event creation.
+        # But the check happens BEFORE event creation, so we can just verify no error.
+        # Actually line 150: `if board.unique_player_names and player_name:` —
+        # "   " is truthy, so it WILL enter the check. Good — this covers lines 301-303.
+        # But after the check, it continues to event creation which needs mocking.
+        # Simplest: test _check_player_name_availability directly.
+        await service._check_player_name_availability(board, IdentityID(), "   ")
+        # If it reaches here without error, the empty-after-normalisation path worked.
+
+    @patch("leadr.scores.services.score_service.ScoreFlagRepository")
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.AntiCheatService")
+    @patch("leadr.scores.services.score_service.ScoreSubmissionMetaRepository")
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_anticheat_flag_creates_flag_and_updates_ranking(
+        self,
+        mock_settings,
+        mock_meta_repo_cls,
+        mock_ac_service_cls,
+        mock_board_state_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
+        mock_flag_repo_cls,
+    ):
+        """Test anti-cheat FLAG creates a flag but still updates rankings."""
+        mock_settings.ANTICHEAT_ENABLED = True
+        board_id = BoardID()
+        identity_id = IdentityID()
+
+        board = Board(
+            id=board_id,
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        event = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=board.account_id,
+            game_id=board.game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 100.0},
+        )
+
+        state = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,
+            player_name="Player1",
+        )
+
+        ac_result = AntiCheatResult(
+            action=FlagAction.FLAG,
+            flag_type=FlagType.VELOCITY,
+            confidence=FlagConfidence.MEDIUM,
+            reason="Submissions too fast",
+            metadata={"interval_ms": 500},
+        )
+
+        # Existing submission metadata to test update path (lines 669-673)
+        existing_meta = ScoreSubmissionMeta(
+            score_event_id=ScoreEventID(),
+            identity_id=identity_id,
+            board_id=board_id,
+            submission_count=3,
+            last_submission_at=event.created_at,
+            last_score_value=90.0,
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_event_service = AsyncMock()
+        mock_event_service.create_score_event = AsyncMock(return_value=event)
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_state_service = AsyncMock()
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=None)
+        mock_state_service.create_board_state = AsyncMock(return_value=state)
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        mock_ac_service = AsyncMock()
+        mock_ac_service.check_submission_for_event = AsyncMock(return_value=ac_result)
+        mock_ac_service_cls.return_value = mock_ac_service
+
+        mock_meta_repo = AsyncMock()
+        mock_meta_repo.get_by_identity_and_board = AsyncMock(return_value=existing_meta)
+        mock_meta_repo.update = AsyncMock()
+        mock_meta_repo_cls.return_value = mock_meta_repo
+
+        mock_flag_repo = AsyncMock()
+        mock_flag_repo.create = AsyncMock()
+        mock_flag_repo_cls.return_value = mock_flag_repo
+
+        service = ScoreService(AsyncMock())
+        result_event, result_entry, result_ac = await service.submit_score(
+            board_id=board_id,
+            identity_id=identity_id,
+            value=100.0,
+            player_name="Player1",
+        )
+
+        # FLAG still produces a ranking entry
+        assert result_entry is not None
+        assert result_ac is not None
+        assert result_ac.action == FlagAction.FLAG
+
+        # Flag was created
+        mock_flag_repo.create.assert_called_once()
+
+        # Existing metadata was updated (not created)
+        mock_meta_repo.update.assert_called_once()
+        assert existing_meta.submission_count == 4
+
+    @patch("leadr.scores.services.score_service.ScoreFlagRepository")
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.AntiCheatService")
+    @patch("leadr.scores.services.score_service.ScoreSubmissionMetaRepository")
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_anticheat_reject_skips_ranking(
+        self,
+        mock_settings,
+        mock_meta_repo_cls,
+        mock_ac_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
+        mock_flag_repo_cls,
+    ):
+        """Test anti-cheat REJECT returns early without updating rankings."""
+        mock_settings.ANTICHEAT_ENABLED = True
+        board_id = BoardID()
+        identity_id = IdentityID()
+
+        board = Board(
+            id=board_id,
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        event = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=board.account_id,
+            game_id=board.game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 100.0},
+        )
+
+        ac_result = AntiCheatResult(
+            action=FlagAction.REJECT,
+            flag_type=FlagType.VELOCITY,
+            confidence=FlagConfidence.HIGH,
+            reason="Too fast",
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_event_service = AsyncMock()
+        mock_event_service.create_score_event = AsyncMock(return_value=event)
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_ac_service = AsyncMock()
+        mock_ac_service.check_submission_for_event = AsyncMock(return_value=ac_result)
+        mock_ac_service_cls.return_value = mock_ac_service
+
+        mock_meta_repo = AsyncMock()
+        mock_meta_repo.get_by_identity_and_board = AsyncMock(return_value=None)
+        mock_meta_repo.create = AsyncMock()
+        mock_meta_repo_cls.return_value = mock_meta_repo
+
+        mock_flag_repo = AsyncMock()
+        mock_flag_repo_cls.return_value = mock_flag_repo
+
+        service = ScoreService(AsyncMock())
+        result_event, result_entry, result_ac = await service.submit_score(
+            board_id=board_id,
+            identity_id=identity_id,
+            value=100.0,
+            player_name="Player1",
+        )
+
+        # REJECT returns no ranking entry
+        assert result_entry is None
+        assert result_ac is not None
+        assert result_ac.action == FlagAction.REJECT
+
 
 @pytest.mark.asyncio
 class TestScoreServiceQuery:
@@ -1606,6 +2043,145 @@ class TestScoreServiceQuery:
 
         assert len(result.items) > 0
 
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.RunEntryService")
+    async def test_list_scores_around_score_id_run_runs(
+        self, mock_run_service_cls, mock_board_service_cls
+    ):
+        """Test list_scores with around_score_id on a RUN_RUNS board."""
+        board_id = BoardID()
+        target_entry_id = RunEntryID()
+        identity_id = IdentityID()
+
+        board = Board(
+            id=board_id,
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="Speedruns",
+            slug="speedruns",
+            short_code="SPD001",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        target_entry = RunEntry(
+            id=target_entry_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            score_event_id=ScoreEventID(),
+            primary_value=500.0,
+            player_name="Runner",
+        )
+
+        paginated = PaginatedResult(
+            items=[target_entry],
+            has_next=False,
+            has_prev=False,
+            next_position=None,
+            prev_position=None,
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_run_service = AsyncMock()
+        mock_run_service.get_run_entry = AsyncMock(return_value=target_entry)
+        mock_run_service.list_run_entries = AsyncMock(return_value=paginated)
+        mock_run_service_cls.return_value = mock_run_service
+
+        service = ScoreService(AsyncMock())
+        pagination = PaginationParams(limit=10, cursor=None, sort=None)
+        around_id = ScoreID(target_entry_id.uuid)
+
+        result = await service.list_scores(
+            board_id=board_id,
+            pagination=pagination,
+            around_score_id=around_id,
+        )
+
+        assert len(result.items) == 1
+        mock_run_service.get_run_entry.assert_called_once()
+
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.RunEntryService")
+    async def test_list_scores_around_score_id_run_runs_not_found(
+        self, mock_run_service_cls, mock_board_service_cls
+    ):
+        """Test list_scores raises when around_score_id not found on RUN_RUNS board."""
+        board_id = BoardID()
+
+        board = Board(
+            id=board_id,
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="Speedruns",
+            slug="speedruns",
+            short_code="SPD001",
+            sort_direction=SortDirection.ASCENDING,
+            board_type=BoardType.RUN_RUNS,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_run_service = AsyncMock()
+        mock_run_service.get_run_entry = AsyncMock(return_value=None)
+        mock_run_service_cls.return_value = mock_run_service
+
+        service = ScoreService(AsyncMock())
+        pagination = PaginationParams(limit=10, cursor=None, sort=None)
+        fake_id = ScoreID(RunEntryID().uuid)
+
+        with pytest.raises(EntityNotFoundError):
+            await service.list_scores(
+                board_id=board_id,
+                pagination=pagination,
+                around_score_id=fake_id,
+            )
+
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    async def test_list_scores_around_score_id_board_state_not_found(
+        self, mock_state_service_cls, mock_board_service_cls
+    ):
+        """Test list_scores raises when around_score_id not found on RUN_IDENTITY board."""
+        board_id = BoardID()
+
+        board = Board(
+            id=board_id,
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_state_service = AsyncMock()
+        mock_state_service.get_board_state = AsyncMock(return_value=None)
+        mock_state_service_cls.return_value = mock_state_service
+
+        service = ScoreService(AsyncMock())
+        pagination = PaginationParams(limit=10, cursor=None, sort=None)
+        fake_id = ScoreID(BoardStateID().uuid)
+
+        with pytest.raises(EntityNotFoundError):
+            await service.list_scores(
+                board_id=board_id,
+                pagination=pagination,
+                around_score_id=fake_id,
+            )
+
 
 @pytest.mark.asyncio
 class TestScoreServiceRatioIntegration:
@@ -1688,3 +2264,155 @@ class TestScoreServiceRatioIntegration:
 
         # Verify the code path works without errors
         # (No ratio boards configured, so no tasks added)
+
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    async def test_schedule_ratio_updates_adds_background_tasks(self, mock_board_state_service_cls):
+        """Test that dependent ratio configs get scheduled as background tasks."""
+        board_id = BoardID()
+        identity_id = IdentityID()
+        ratio_board_id = BoardID()
+
+        config1 = BoardRatioConfig(
+            board_id=ratio_board_id,
+            numerator_board_id=board_id,
+            denominator_board_id=BoardID(),
+        )
+        config2 = BoardRatioConfig(
+            board_id=BoardID(),
+            numerator_board_id=BoardID(),
+            denominator_board_id=board_id,
+        )
+
+        mock_state_service = AsyncMock()
+        mock_state_service.find_dependent_ratio_boards = AsyncMock(return_value=[config1, config2])
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        mock_background = Mock()
+        service = ScoreService(AsyncMock())
+
+        await service._schedule_ratio_updates(board_id, identity_id, mock_background)
+
+        assert mock_background.add_task.call_count == 2
+
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    async def test_recompute_ratio_background(self, mock_board_state_service_cls):
+        """Test that _recompute_ratio_background calls recompute_ratio_for_identity."""
+        identity_id = IdentityID()
+        config = BoardRatioConfig(
+            board_id=BoardID(),
+            numerator_board_id=BoardID(),
+            denominator_board_id=BoardID(),
+        )
+
+        mock_state_service = AsyncMock()
+        mock_state_service.recompute_ratio_for_identity = AsyncMock()
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        service = ScoreService(AsyncMock())
+        await service._recompute_ratio_background(config, identity_id)
+
+        mock_state_service.recompute_ratio_for_identity.assert_called_once_with(
+            ratio_config=config,
+            identity_id=identity_id,
+        )
+
+
+@pytest.mark.asyncio
+class TestScoreServiceBuildPayload:
+    """Tests for event payload construction."""
+
+    async def test_build_event_payload_ratio_returns_empty(self, service):
+        """Test that RATIO board type returns empty payload."""
+        board = Board(
+            id=BoardID(),
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="KD Ratio",
+            slug="kd-ratio",
+            short_code="KDR001",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RATIO,
+            keep_strategy=KeepStrategy.NA,
+        )
+
+        result = service._build_event_payload(board, value=1.0, delta=None)
+        assert result == {}
+
+
+@pytest.mark.asyncio
+class TestScoreServicePlayerNameAvailability:
+    """Tests for public player name availability check."""
+
+    @patch("leadr.scores.services.score_service.BoardStateRepository")
+    @patch("leadr.scores.services.score_service.RunEntryRepository")
+    async def test_check_player_name_available_across_boards(
+        self, mock_run_repo_cls, mock_state_repo_cls, service
+    ):
+        """Test name available across multiple board types."""
+        ri_board_id = BoardID()
+        rr_board_id = BoardID()
+
+        boards = [
+            (ri_board_id, "High Scores", BoardType.RUN_IDENTITY),
+            (rr_board_id, "Speedruns", BoardType.RUN_RUNS),
+        ]
+
+        mock_state_repo = AsyncMock()
+        mock_state_repo.is_player_name_available = AsyncMock(return_value=True)
+        mock_state_repo_cls.return_value = mock_state_repo
+
+        mock_run_repo = AsyncMock()
+        mock_run_repo.is_player_name_available = AsyncMock(return_value=True)
+        mock_run_repo_cls.return_value = mock_run_repo
+
+        normalised, is_available, conflicts = await service.check_player_name_availability(
+            boards=boards,
+            player_name="Player One",
+        )
+
+        assert normalised == "player one"
+        assert is_available is True
+        assert conflicts == []
+
+    @patch("leadr.scores.services.score_service.BoardStateRepository")
+    @patch("leadr.scores.services.score_service.RunEntryRepository")
+    async def test_check_player_name_conflict_on_some_boards(
+        self, mock_run_repo_cls, mock_state_repo_cls, service
+    ):
+        """Test name conflict detected on one of multiple boards."""
+        ri_board_id = BoardID()
+        rr_board_id = BoardID()
+
+        boards = [
+            (ri_board_id, "High Scores", BoardType.RUN_IDENTITY),
+            (rr_board_id, "Speedruns", BoardType.RUN_RUNS),
+        ]
+
+        mock_state_repo = AsyncMock()
+        mock_state_repo.is_player_name_available = AsyncMock(return_value=False)
+        mock_state_repo_cls.return_value = mock_state_repo
+
+        mock_run_repo = AsyncMock()
+        mock_run_repo.is_player_name_available = AsyncMock(return_value=True)
+        mock_run_repo_cls.return_value = mock_run_repo
+
+        normalised, is_available, conflicts = await service.check_player_name_availability(
+            boards=boards,
+            player_name="TakenName",
+        )
+
+        assert normalised == "takenname"
+        assert is_available is False
+        assert len(conflicts) == 1
+        assert conflicts[0] == (ri_board_id, "High Scores")
+
+    async def test_check_player_name_empty_returns_available(self, service):
+        """Test that whitespace-only name returns available with no conflicts."""
+        normalised, is_available, conflicts = await service.check_player_name_availability(
+            boards=[(BoardID(), "Board", BoardType.RUN_IDENTITY)],
+            player_name="   ",
+        )
+
+        assert normalised == ""
+        assert is_available is True
+        assert conflicts == []
