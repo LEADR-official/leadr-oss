@@ -277,6 +277,16 @@ class CommonSettings(BaseSettings):
         default=3600,
         description="Interval in seconds for cleaning up expired nonces (default: 3600s / 1 hour)",
     )
+    BACKGROUND_TASK_RETRY_DELAYS: list[int] = Field(
+        default=[30, 60, 120, 240, 480],
+        description="Retry delays in seconds. Length = max attempts. "
+        "Default: 5 retries with exponential backoff (30s, 60s, 2min, 4min, 8min).",
+    )
+    ADMIN_NOTIFICATION_EMAIL: str = Field(
+        default="",
+        description="Email address for admin notifications (e.g., task failures). "
+        "Leave empty to disable admin notifications.",
+    )
 
     # Anti-Cheat Configuration
     ANTICHEAT_ENABLED: bool = Field(

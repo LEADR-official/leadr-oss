@@ -44,6 +44,7 @@ from leadr.common.api.exceptions import (
     validation_error_handler,
 )
 from leadr.common.api.hooks import require_rate_limit_check
+from leadr.common.background_task_alerts import send_task_failure_alert
 from leadr.common.background_tasks import get_scheduler
 from leadr.common.database import async_session_factory, engine
 from leadr.common.domain.exceptions import EntityNotFoundError
@@ -107,6 +108,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Register and start background tasks
     scheduler = get_scheduler()
 
+    # Configure alert callback if admin email is set
+    if settings.ADMIN_NOTIFICATION_EMAIL:
+        scheduler.set_on_max_retries_exceeded(send_task_failure_alert)
+
     # Ensure we only run background tasks on one API instance
     # BACKGROUND_TASKS_ENABLED can be set to false to disable tasks (e.g., on read-only replicas)
     if settings.ENABLE_ADMIN_API and settings.BACKGROUND_TASKS_ENABLED:
@@ -114,16 +119,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "process-due-templates",
             process_due_templates,
             interval_seconds=settings.BACKGROUND_TASK_TEMPLATE_INTERVAL,
+            alert_on_max_retries=True,
         )
         scheduler.add_task(
             "expire-boards",
             expire_boards,
             interval_seconds=settings.BACKGROUND_TASK_EXPIRE_INTERVAL,
+            alert_on_max_retries=True,
         )
         scheduler.add_task(
             "cleanup-expired-nonces",
             cleanup_expired_nonces,
             interval_seconds=settings.BACKGROUND_TASK_NONCE_CLEANUP_INTERVAL,
+            alert_on_max_retries=False,  # Low priority, no alert needed
         )
     await scheduler.start()
 
