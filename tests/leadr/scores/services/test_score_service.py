@@ -481,6 +481,107 @@ class TestScoreServiceSubmission:
     @patch("leadr.scores.services.score_service.ScoreEventService")
     @patch("leadr.scores.services.score_service.BoardStateService")
     @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_zombie_state_treated_as_first_submission(
+        self,
+        mock_settings,
+        mock_board_state_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
+    ):
+        """Test zombie BoardStates are deleted and treated as first submission.
+
+        Zombie states have primary_value=None and no selected_event_id.
+        This tests the defense-in-depth fix for the zombie state bug where:
+        1. A score was flagged and removed, creating a zombie state
+        2. The zombie state had primary_value=None and selected_event_id=None
+        3. A new submission should delete the zombie and create a fresh state
+        """
+        mock_settings.ANTICHEAT_ENABLED = False
+
+        account_id = AccountID()
+        game_id = GameID()
+        board_id = BoardID()
+        identity_id = IdentityID()
+
+        board = Board(
+            id=board_id,
+            account_id=account_id,
+            game_id=game_id,
+            name="Test Board",
+            slug="test-board",
+            short_code="TST001",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.FIRST,
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_event_service = AsyncMock()
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_state_service = AsyncMock()
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        mock_session = AsyncMock()
+        service = ScoreService(mock_session)
+
+        # Create a zombie state (primary_value=None, no selected_event_id)
+        # This is what remains after a score is flagged and removed
+        zombie_state = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=None,  # Zombie indicator
+            player_name="OldPlayer",  # Stale data
+            aux={"selected_event_id": None, "event_count": 1},  # Zombie indicator
+        )
+
+        # New submission should create fresh state
+        new_event = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=account_id,
+            game_id=game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 500.0},
+        )
+        new_state = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=500.0,
+            player_name="NewPlayer",
+            aux={"selected_event_id": str(new_event.id), "event_count": 1},
+        )
+
+        mock_event_service.create_score_event = AsyncMock(return_value=new_event)
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=zombie_state)
+        mock_state_service.soft_delete = AsyncMock()
+        mock_state_service.create_board_state = AsyncMock(return_value=new_state)
+
+        _, entry, _ = await service.submit_score(
+            board_id=board_id,
+            identity_id=identity_id,
+            value=500.0,
+            player_name="NewPlayer",
+        )
+
+        # Should have deleted the zombie state
+        mock_state_service.soft_delete.assert_awaited_once_with(zombie_state.id)
+        # Should have created a fresh state (not upserted)
+        mock_state_service.create_board_state.assert_awaited_once()
+        # Result should have the new data
+        assert entry is not None
+        assert entry.primary_value == 500.0
+        assert entry.player_name == "NewPlayer"
+
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.settings")
     async def test_submit_score_run_identity_keep_latest(
         self,
         mock_settings,

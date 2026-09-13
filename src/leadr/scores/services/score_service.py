@@ -389,8 +389,21 @@ class ScoreService:
             identity_id=identity_id,
         )
 
+        # Defense-in-depth: detect zombie states (leftover from flag removal)
+        # Zombie states have primary_value=None and no selected_event_id
+        is_zombie = (
+            existing_state is not None
+            and existing_state.primary_value is None
+            and (existing_state.aux or {}).get("selected_event_id") is None
+        )
+
+        if is_zombie and existing_state is not None:
+            # Delete the zombie state - it has stale denormalized data
+            await board_state_service.soft_delete(existing_state.id)
+            existing_state = None
+
         if existing_state is None:
-            # First submission - create new state
+            # First submission (or zombie was deleted) - create new state
             aux = {
                 "selected_event_id": str(event.id),
                 "event_count": 1,

@@ -335,24 +335,22 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         event_count = (existing_state.aux or {}).get("event_count", 1)
 
         if eligible_event is None:
-            # No eligible event - set primary_value to NULL
-            existing_state.primary_value = None
-            existing_state.aux = {
-                "selected_event_id": None,
-                "event_count": event_count,
-            }
-        else:
-            # Update state with new selected event
-            value = eligible_event.event_payload.get("value")
-            existing_state.primary_value = float(value) if value is not None else None
-            existing_state.aux = {
-                "selected_event_id": str(ScoreEventID(eligible_event.id)),
-                "event_count": event_count,
-            }
-            # Update denormalized fields from the new event
-            existing_state.timezone = eligible_event.timezone
-            existing_state.country = eligible_event.country
-            existing_state.city = eligible_event.city
+            # No eligible events remain - delete the BoardState entirely
+            # This prevents zombie states with stale denormalized data
+            await board_state_service.soft_delete(existing_state.id)
+            return
+
+        # Update state with new selected event
+        value = eligible_event.event_payload.get("value")
+        existing_state.primary_value = float(value) if value is not None else None
+        existing_state.aux = {
+            "selected_event_id": str(ScoreEventID(eligible_event.id)),
+            "event_count": event_count,
+        }
+        # Update denormalized fields from the new event
+        existing_state.timezone = eligible_event.timezone
+        existing_state.country = eligible_event.country
+        existing_state.city = eligible_event.city
 
         await board_state_service.repository.update(existing_state)
 
@@ -402,16 +400,15 @@ class ScoreFlagService(BaseService[ScoreFlag, ScoreFlagRepository]):
         event_count = row[1]
 
         if total_value is None or event_count == 0:
-            # No eligible events - set to 0
-            state.primary_value = 0.0
-            state.aux = {
-                "event_count": 0,
-            }
-        else:
-            state.primary_value = float(total_value)
-            state.aux = {
-                "event_count": event_count,
-            }
+            # No eligible events remain - delete the BoardState entirely
+            # This prevents zombie states with stale denormalized data
+            await board_state_service.soft_delete(state.id)
+            return
+
+        state.primary_value = float(total_value)
+        state.aux = {
+            "event_count": event_count,
+        }
 
         await board_state_service.repository.update(state)
 

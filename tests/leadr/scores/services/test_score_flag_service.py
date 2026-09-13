@@ -735,8 +735,8 @@ class TestRecomputeRunIdentity:
             assert state.city == "Boston"
             mock_state_svc.return_value.repository.update.assert_awaited_once_with(state)
 
-    async def test_no_eligible_event(self, mock_session, service):
-        """When no eligible event exists, sets primary_value to None."""
+    async def test_no_eligible_event_deletes_state(self, mock_session, service):
+        """When no eligible event exists, deletes the BoardState entirely."""
         board = _make_board(keep_strategy=KeepStrategy.FIRST)
         identity_id = IdentityID()
         state = _make_board_state(board.id, identity_id, aux={"event_count": 2})
@@ -746,17 +746,15 @@ class TestRecomputeRunIdentity:
         mock_session.execute = AsyncMock(return_value=mock_result)
 
         with patch(f"{MODULE}.BoardStateService") as mock_state_svc:
-            mock_state_svc.return_value.repository.update = AsyncMock()
+            mock_state_svc.return_value.soft_delete = AsyncMock()
 
             await service._recompute_run_identity(board, identity_id, state)
 
-            assert state.primary_value is None
-            assert state.aux is not None
-            assert state.aux["selected_event_id"] is None
-            assert state.aux["event_count"] == 2
+            # Should delete the state, not set primary_value to None
+            mock_state_svc.return_value.soft_delete.assert_awaited_once_with(state.id)
 
-    async def test_keep_strategy_latest(self, mock_session, service):
-        """LATEST keep_strategy exercises the correct branch."""
+    async def test_keep_strategy_latest_no_event_deletes(self, mock_session, service):
+        """LATEST keep_strategy with no eligible event deletes state."""
         board = _make_board(keep_strategy=KeepStrategy.LATEST)
         identity_id = IdentityID()
         state = _make_board_state(board.id, identity_id, aux={"event_count": 1})
@@ -766,13 +764,13 @@ class TestRecomputeRunIdentity:
         mock_session.execute = AsyncMock(return_value=mock_result)
 
         with patch(f"{MODULE}.BoardStateService") as mock_state_svc:
-            mock_state_svc.return_value.repository.update = AsyncMock()
+            mock_state_svc.return_value.soft_delete = AsyncMock()
             await service._recompute_run_identity(board, identity_id, state)
 
-        assert state.primary_value is None
+        mock_state_svc.return_value.soft_delete.assert_awaited_once_with(state.id)
 
-    async def test_keep_strategy_best_ascending(self, mock_session, service):
-        """BEST with ASCENDING sort direction exercises the ascending branch."""
+    async def test_keep_strategy_best_ascending_no_event_deletes(self, mock_session, service):
+        """BEST with ASCENDING sort direction with no eligible event deletes state."""
         board = _make_board(
             keep_strategy=KeepStrategy.BEST,
             sort_direction=BoardSortDirection.ASCENDING,
@@ -785,13 +783,13 @@ class TestRecomputeRunIdentity:
         mock_session.execute = AsyncMock(return_value=mock_result)
 
         with patch(f"{MODULE}.BoardStateService") as mock_state_svc:
-            mock_state_svc.return_value.repository.update = AsyncMock()
+            mock_state_svc.return_value.soft_delete = AsyncMock()
             await service._recompute_run_identity(board, identity_id, state)
 
-        assert state.primary_value is None
+        mock_state_svc.return_value.soft_delete.assert_awaited_once_with(state.id)
 
-    async def test_keep_strategy_na_fallback(self, mock_session, service):
-        """NA keep_strategy hits the else branch (fallback to created_at asc)."""
+    async def test_keep_strategy_na_fallback_no_event_deletes(self, mock_session, service):
+        """NA keep_strategy with no eligible event deletes state."""
         board = _make_board(board_type=BoardType.RUN_RUNS, keep_strategy=KeepStrategy.NA)
         identity_id = IdentityID()
         state = _make_board_state(board.id, identity_id, aux={"event_count": 1})
@@ -801,10 +799,10 @@ class TestRecomputeRunIdentity:
         mock_session.execute = AsyncMock(return_value=mock_result)
 
         with patch(f"{MODULE}.BoardStateService") as mock_state_svc:
-            mock_state_svc.return_value.repository.update = AsyncMock()
+            mock_state_svc.return_value.soft_delete = AsyncMock()
             await service._recompute_run_identity(board, identity_id, state)
 
-        assert state.primary_value is None
+        mock_state_svc.return_value.soft_delete.assert_awaited_once_with(state.id)
 
 
 @pytest.mark.asyncio
@@ -840,8 +838,8 @@ class TestSyncCounterState:
             assert state.aux == {"event_count": 5}
             mock_state_svc.return_value.repository.update.assert_awaited_once_with(state)
 
-    async def test_no_eligible_events(self, mock_session, service):
-        """When no eligible events, sets primary_value to 0."""
+    async def test_no_eligible_events_deletes_state(self, mock_session, service):
+        """When no eligible events, deletes the BoardState entirely."""
         board = _make_board(board_type=BoardType.COUNTER)
         identity_id = IdentityID()
         state = _make_board_state(board.id, identity_id)
@@ -852,13 +850,13 @@ class TestSyncCounterState:
 
         with patch(f"{MODULE}.BoardStateService") as mock_state_svc:
             mock_state_svc.return_value.get_by_board_and_identity = AsyncMock(return_value=state)
-            mock_state_svc.return_value.repository.update = AsyncMock()
+            mock_state_svc.return_value.soft_delete = AsyncMock()
             mock_session.execute = AsyncMock(return_value=mock_result)
 
             await service._sync_counter_state(board, identity_id)
 
-            assert state.primary_value == 0.0
-            assert state.aux == {"event_count": 0}
+            # Should delete the state, not set primary_value to 0
+            mock_state_svc.return_value.soft_delete.assert_awaited_once_with(state.id)
 
 
 @pytest.mark.asyncio

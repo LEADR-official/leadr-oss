@@ -1,5 +1,6 @@
 """Board state service for managing materialized ranking state."""
 
+import logging
 from typing import Any
 
 from sqlalchemy import or_, select
@@ -20,6 +21,8 @@ from leadr.common.api.pagination import PaginationParams
 from leadr.common.domain.exceptions import EntityNotFoundError
 from leadr.common.domain.ids import BoardID, BoardStateID, IdentityID
 from leadr.common.domain.pagination_result import PaginatedResult
+
+logger = logging.getLogger(__name__)
 
 
 class BoardStateService:
@@ -325,7 +328,23 @@ class BoardStateService:
         )
 
         # If either source is missing, we can't compute a ratio
+        # Delete any existing ratio state to avoid stale data
         if numerator_state is None or denominator_state is None:
+            existing_ratio_state = await self.repository.get_by_board_and_identity(
+                ratio_config.board_id,
+                identity_id,
+            )
+            if existing_ratio_state is not None:
+                logger.warning(
+                    "Deleting ratio BoardState due to missing source: "
+                    "ratio_board_id=%s, identity_id=%s, "
+                    "numerator_missing=%s, denominator_missing=%s",
+                    ratio_config.board_id,
+                    identity_id,
+                    numerator_state is None,
+                    denominator_state is None,
+                )
+                await self.soft_delete(existing_ratio_state.id)
             return None
 
         numerator_value = numerator_state.primary_value or 0.0
