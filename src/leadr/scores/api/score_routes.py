@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from leadr.auth.dependencies import (
     AdminAuthContextDep,
     AuthContext,
+    ClientAuthContext,
     ClientAuthContextDep,
     ClientAuthContextWithNonceDep,
 )
@@ -418,6 +419,13 @@ async def handle_list_scores(
     board = await board_service.get_by_id(board_id)
     if board is None:
         raise HTTPException(status_code=404, detail="Board not found")
+
+    # Validate board belongs to the game (client auth only)
+    if isinstance(auth, ClientAuthContext) and board.game_id != auth.game_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Board does not belong to this game",
+        )
 
     try:
         result = await service.list_scores(

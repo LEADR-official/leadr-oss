@@ -702,6 +702,26 @@ class TestScoreRoutesClient:
         data = response.json()
         assert len(data["data"]) == 1
 
+    async def test_list_scores_client_wrong_game(
+        self,
+        mock_client_no_db: AsyncClient,
+        client_auth,
+        mock_board_service,
+        mock_score_service,
+    ):
+        """Test listing scores for a board from a different game returns 400."""
+        # Arrange
+        wrong_game_id = GameID()  # Different from client_auth.game_id
+        board = make_board(account_id=client_auth.account_id, game_id=wrong_game_id)
+        mock_board_service.get_by_id.return_value = board
+
+        # Act
+        response = await mock_client_no_db.get(f"/client/scores?board_id={board.id}")
+
+        # Assert
+        assert response.status_code == 400
+        assert "does not belong" in response.json()["error"].lower()
+
     async def test_list_scores_client_with_identity_filter(
         self,
         mock_client_no_db: AsyncClient,
