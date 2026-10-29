@@ -8,7 +8,6 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-from sqlalchemy.pool import NullPool
 
 from leadr.common import database
 from leadr.common.database import (
@@ -214,10 +213,10 @@ class TestGetPoolClass:
         assert _get_pool_class() is None
 
     @patch("leadr.common.database.settings")
-    def test_returns_nullpool_for_production(self, mock_settings) -> None:
-        """Test that NullPool is used for production (Neon)."""
+    def test_returns_none_for_production(self, mock_settings) -> None:
+        """Test that default QueuePool is used for production."""
         mock_settings.ENV = "PROD"
-        assert _get_pool_class() is NullPool
+        assert _get_pool_class() is None
 
 
 class TestGetPoolOptions:
@@ -238,11 +237,18 @@ class TestGetPoolOptions:
         assert options["pool_pre_ping"] is True
 
     @patch("leadr.common.database.settings")
-    def test_returns_empty_for_production(self, mock_settings) -> None:
-        """Test that no pool options for production (using NullPool)."""
+    def test_returns_pool_options_for_production(self, mock_settings) -> None:
+        """Test that pool options are set for production."""
         mock_settings.ENV = "PROD"
+        mock_settings.DB_POOL_SIZE = 20
+        mock_settings.DB_POOL_MAX_OVERFLOW = 10
+        mock_settings.DB_POOL_RECYCLE = 3600
+
         options = _get_pool_options()
-        assert options == {}
+        assert options["pool_size"] == 20
+        assert options["max_overflow"] == 10
+        assert options["pool_recycle"] == 3600
+        assert options["pool_pre_ping"] is True
 
 
 class TestGetDb:

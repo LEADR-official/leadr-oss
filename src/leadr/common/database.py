@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool, Pool
+from sqlalchemy.pool import Pool
 
 from leadr.config import settings
 
@@ -59,32 +59,24 @@ def _get_connect_args() -> dict[str, Any]:
 
 
 def _get_pool_class() -> type[Pool] | None:
-    """Get the connection pool class based on environment.
+    """Get the connection pool class.
 
-    In production with Neon, we disable client-side pooling because Neon
-    provides PgBouncer pooling on their end. Double pooling can cause
-    connection management issues.
-
-    See: https://neon.com/docs/connect/choose-connection#common-pitfalls
-
-    Returns NullPool for production (no client pooling), None for DEV/TEST
-    (use SQLAlchemy's default QueuePool).
+    Uses SQLAlchemy's default QueuePool in all environments. Neon provides
+    PgBouncer server-side pooling, and we set prepared_statement_cache_size=0
+    for compatibility. Client-side pooling is safe on a single persistent VM
+    (pool_size=20 is negligible vs Neon's pooler capacity).
     """
-    if settings.ENV in ("DEV", "TEST"):
-        return None  # Use default QueuePool
-    return NullPool
+    return None
 
 
 def _get_pool_options() -> dict[str, Any]:
-    """Get connection pool options (only used when pooling is enabled)."""
-    if settings.ENV in ("DEV", "TEST"):
-        return {
-            "pool_size": settings.DB_POOL_SIZE,
-            "max_overflow": settings.DB_POOL_MAX_OVERFLOW,
-            "pool_recycle": settings.DB_POOL_RECYCLE,
-            "pool_pre_ping": True,  # Verify connections before using them
-        }
-    return {}  # No pool options when using NullPool
+    """Get connection pool options."""
+    return {
+        "pool_size": settings.DB_POOL_SIZE,
+        "max_overflow": settings.DB_POOL_MAX_OVERFLOW,
+        "pool_recycle": settings.DB_POOL_RECYCLE,
+        "pool_pre_ping": True,
+    }
 
 
 # Create async engine with environment-appropriate settings
