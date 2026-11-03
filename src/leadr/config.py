@@ -414,6 +414,7 @@ class CommonSettings(BaseSettings):
             "leadr-client-nonce",
             "leadr-client",
             "leadr-api-key",
+            "user-agent",
         ],
         description="HTTP headers allowed in CORS requests.",
     )

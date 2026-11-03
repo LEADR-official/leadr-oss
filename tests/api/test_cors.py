@@ -161,3 +161,27 @@ class TestCORSMiddleware:
         assert response.status_code == 200
         allowed_headers = response.headers.get("access-control-allow-headers", "").lower()
         assert "leadr-api-key" in allowed_headers
+
+    @pytest.mark.asyncio
+    async def test_cors_allows_user_agent_header(self, test_app):
+        """Test that user-agent header is allowed for SDK client identification.
+
+        Firefox and Safari require explicit CORS permission for custom User-Agent values
+        sent by game SDKs, unlike Chrome which is more lenient.
+        """
+        async with AsyncClient(
+            transport=ASGITransport(app=test_app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.options(
+                "/v1/client/sessions",
+                headers={
+                    "Origin": "https://html.itch.zone",
+                    "Access-Control-Request-Method": "POST",
+                    "Access-Control-Request-Headers": "content-type, leadr-client, user-agent",
+                },
+            )
+
+        assert response.status_code == 200
+        allowed_headers = response.headers.get("access-control-allow-headers", "").lower()
+        assert "user-agent" in allowed_headers
