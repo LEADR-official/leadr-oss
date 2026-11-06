@@ -16,7 +16,11 @@ from leadr.common.domain.ids import (
 )
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.common.repositories import BaseRepository
-from leadr.scores.adapters.orm import ScoreEventORM, ScoreFlagORM, ScoreSubmissionMetaORM
+from leadr.scores.adapters.orm import (
+    ScoreEventORM,
+    ScoreFlagORM,
+    ScoreSubmissionMetaORM,
+)
 from leadr.scores.domain.anti_cheat.models import ScoreFlag, ScoreSubmissionMeta
 
 

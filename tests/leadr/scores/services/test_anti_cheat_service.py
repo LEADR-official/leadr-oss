@@ -393,3 +393,88 @@ class TestAntiCheatServiceVelocityDetection:
         )
 
         assert result.action == FlagAction.ACCEPT
+
+
+@pytest.mark.asyncio
+class TestAntiCheatServiceSkipRateLimiting:
+    """Test suite for skip_identity_rate_limit bypass (Godot SDK <0.2.0 web workaround)."""
+
+    async def test_rate_limit_bypassed_when_skip_flag_set(
+        self, service: AntiCheatService, score_event: ScoreEvent, identity_id: IdentityID
+    ):
+        """Test that rate limit is bypassed when skip_identity_rate_limit=True."""
+        now = datetime.now(UTC)
+        # Identity at rate limit - would normally REJECT
+        meta = ScoreSubmissionMeta(
+            score_event_id=score_event.id,
+            identity_id=identity_id,
+            board_id=score_event.board_id,
+            submission_count=50,
+            last_submission_at=now - timedelta(minutes=30),
+        )
+        service.meta_repo.get_by_identity_and_board = AsyncMock(return_value=meta)
+
+        result = await service.check_submission_for_event(
+            score_event=score_event,
+            trust_tier=TrustTier.B,  # 50/hr limit - would reject
+            identity_id=identity_id,
+            board_id=score_event.board_id,
+            skip_identity_rate_limit=True,  # Bypass
+        )
+
+        # Should accept because rate limit check was skipped
+        assert result.action == FlagAction.ACCEPT
+
+    async def test_rate_limit_not_bypassed_by_default(
+        self, service: AntiCheatService, score_event: ScoreEvent, identity_id: IdentityID
+    ):
+        """Test that rate limit is enforced when skip_identity_rate_limit=False."""
+        now = datetime.now(UTC)
+        # Identity at rate limit - should REJECT
+        meta = ScoreSubmissionMeta(
+            score_event_id=score_event.id,
+            identity_id=identity_id,
+            board_id=score_event.board_id,
+            submission_count=50,
+            last_submission_at=now - timedelta(minutes=30),
+        )
+        service.meta_repo.get_by_identity_and_board = AsyncMock(return_value=meta)
+
+        result = await service.check_submission_for_event(
+            score_event=score_event,
+            trust_tier=TrustTier.B,  # 50/hr limit
+            identity_id=identity_id,
+            board_id=score_event.board_id,
+            skip_identity_rate_limit=False,  # Default - enforce
+        )
+
+        # Should reject based on identity limit
+        assert result.action == FlagAction.REJECT
+        assert result.flag_type == FlagType.RATE_LIMIT
+
+    async def test_other_checks_still_run_when_rate_limit_bypassed(
+        self, service: AntiCheatService, score_event: ScoreEvent, identity_id: IdentityID
+    ):
+        """Test that duplicate/velocity checks still run even when rate limit bypassed."""
+        # Submission just 0.5 seconds ago - triggers velocity detection
+        recent_time = datetime.now(UTC) - timedelta(milliseconds=500)
+        meta = ScoreSubmissionMeta(
+            score_event_id=score_event.id,
+            identity_id=identity_id,
+            board_id=score_event.board_id,
+            submission_count=200,  # Way over rate limit
+            last_submission_at=recent_time,
+        )
+        service.meta_repo.get_by_identity_and_board = AsyncMock(return_value=meta)
+
+        result = await service.check_submission_for_event(
+            score_event=score_event,
+            trust_tier=TrustTier.B,
+            identity_id=identity_id,
+            board_id=score_event.board_id,
+            skip_identity_rate_limit=True,  # Bypass rate limit
+        )
+
+        # Should still flag for velocity (rapid submission) even with rate bypass
+        assert result.action == FlagAction.FLAG
+        assert result.flag_type == FlagType.VELOCITY

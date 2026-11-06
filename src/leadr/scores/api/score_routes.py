@@ -32,7 +32,7 @@ from leadr.scores.api.score_schemas import (
     ScoreResponse,
 )
 from leadr.scores.domain.anti_cheat.enums import FlagAction, ScoreStatus
-from leadr.scores.services.dependencies import ScoreServiceDep
+from leadr.scores.services.dependencies import HasFingerprintCollisionBugDep, ScoreServiceDep
 from leadr.scores.services.score_service import ScoreService
 
 router = APIRouter()
@@ -51,6 +51,7 @@ async def create_score_client(
     identity_service: IdentityServiceDep,
     pre_create_hook: PreCreateScoreHookDep,
     post_create_hook: PostCreateScoreHookDep,
+    skip_identity_rate_limit: HasFingerprintCollisionBugDep,
 ) -> ScoreClientResponse:
     """Create a new score (Client API).
 
@@ -130,6 +131,7 @@ async def create_score_client(
             background_tasks=background_tasks,
             value_display=score_request.value_display,
             metadata=score_request.metadata,
+            skip_identity_rate_limit=skip_identity_rate_limit,
         )
     except IntegrityError:
         raise HTTPException(

@@ -7,9 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from leadr.common.domain.ids import BoardID, IdentityID
 from leadr.config import settings
 from leadr.scores.domain.anti_cheat.enums import FlagAction, FlagConfidence, FlagType, TrustTier
-from leadr.scores.domain.anti_cheat.models import AntiCheatResult, ScoreSubmissionMeta
+from leadr.scores.domain.anti_cheat.models import (
+    AntiCheatResult,
+    ScoreSubmissionMeta,
+)
 from leadr.scores.domain.score_event import ScoreEvent
-from leadr.scores.services.anti_cheat_repositories import ScoreSubmissionMetaRepository
+from leadr.scores.services.anti_cheat_repositories import (
+    ScoreSubmissionMetaRepository,
+)
 
 
 class AntiCheatService:
@@ -41,6 +46,7 @@ class AntiCheatService:
         trust_tier: TrustTier,
         identity_id: IdentityID,
         board_id: BoardID,
+        skip_identity_rate_limit: bool = False,
     ) -> AntiCheatResult:
         """Check a score event submission for suspicious patterns.
 
@@ -49,6 +55,7 @@ class AntiCheatService:
             trust_tier: Trust tier of the identity (A/B/C)
             identity_id: ID of the identity submitting the score
             board_id: ID of the board being submitted to
+            skip_identity_rate_limit: If True, skip identity rate limiting (Godot SDK <0.2.0 web)
 
         Returns:
             AntiCheatResult indicating action to take (ACCEPT/FLAG/REJECT)
@@ -56,14 +63,16 @@ class AntiCheatService:
         # Fetch submission metadata once for all checks
         submission_meta = await self.meta_repo.get_by_identity_and_board(identity_id, board_id)
 
-        # Check rate limiting
-        rate_limit_result = await self._check_rate_limit(
-            submission_meta=submission_meta,
-            trust_tier=trust_tier,
-        )
+        # Check identity-based rate limiting (REJECT takes precedence)
+        # Can be bypassed for Godot SDK <0.2.0 web clients with fingerprint collision bug
+        if not skip_identity_rate_limit:
+            rate_limit_result = await self._check_rate_limit(
+                submission_meta=submission_meta,
+                trust_tier=trust_tier,
+            )
 
-        if rate_limit_result.action != FlagAction.ACCEPT:
-            return rate_limit_result
+            if rate_limit_result.action == FlagAction.REJECT:
+                return rate_limit_result
 
         # Get score value from event payload
         score_value = score_event.event_payload.get("value")

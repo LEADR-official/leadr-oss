@@ -306,7 +306,6 @@ class CommonSettings(BaseSettings):
         default=20,
         description="Rate limit for Tier C (unverified) devices: submissions per hour",
     )
-
     # Outlier Detection Thresholds (standard deviations)
     ANTICHEAT_OUTLIER_THRESHOLD_TIER_A: float = Field(
         default=4.0,
@@ -319,6 +318,14 @@ class CommonSettings(BaseSettings):
     ANTICHEAT_OUTLIER_THRESHOLD_TIER_C: float = Field(
         default=2.5,
         description="Outlier threshold for Tier C devices: standard deviations from mean",
+    )
+
+    # SDK Fingerprint Bug Workaround
+    # First Godot SDK version with web fingerprint fix (OS.get_unique_id() returns empty on web)
+    GODOT_SDK_FINGERPRINT_FIX_VERSION: str = Field(
+        default="0.2.0",
+        description="First Godot SDK version with web fingerprint fix. "
+        "Earlier versions on web platform skip identity rate limiting.",
     )
 
     # Other Anti-Cheat Thresholds

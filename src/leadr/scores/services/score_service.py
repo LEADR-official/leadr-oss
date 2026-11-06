@@ -30,7 +30,11 @@ from leadr.common.domain.pagination import SortDirection, SortField
 from leadr.common.domain.pagination_result import PaginatedResult
 from leadr.config import settings
 from leadr.scores.domain.anti_cheat.enums import FlagAction, TrustTier
-from leadr.scores.domain.anti_cheat.models import AntiCheatResult, ScoreFlag, ScoreSubmissionMeta
+from leadr.scores.domain.anti_cheat.models import (
+    AntiCheatResult,
+    ScoreFlag,
+    ScoreSubmissionMeta,
+)
 from leadr.scores.domain.score_event import ScoreEvent
 from leadr.scores.services.anti_cheat_repositories import (
     ScoreFlagRepository,
@@ -107,6 +111,7 @@ class ScoreService:
         background_tasks: BackgroundTasks | None = None,
         value_display: str | None = None,
         metadata: dict[str, Any] | None = None,
+        skip_identity_rate_limit: bool = False,
     ) -> tuple[ScoreEvent, BoardState | RunEntry | None, AntiCheatResult | None]:
         """Submit a score using the event-sourcing architecture.
 
@@ -128,6 +133,7 @@ class ScoreService:
             background_tasks: Optional BackgroundTasks for async ratio updates.
             value_display: Optional formatted display string for the score value.
             metadata: Optional custom metadata dictionary.
+            skip_identity_rate_limit: If True, skip identity rate limiting (Godot SDK <0.2.0 web).
 
         Returns:
             Tuple of (ScoreEvent, ranking_entry, anti_cheat_result).
@@ -178,6 +184,7 @@ class ScoreService:
                 trust_tier=trust_tier,
                 identity_id=identity_id,
                 board_id=board_id,
+                skip_identity_rate_limit=skip_identity_rate_limit,
             )
 
             # Update submission metadata for future anti-cheat checks
