@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy.exc import IntegrityError
 
 from leadr.auth.dependencies import (
@@ -41,6 +41,7 @@ client_router = APIRouter()
 
 @client_router.post("/scores", status_code=status.HTTP_201_CREATED)
 async def create_score_client(
+    request: Request,
     score_request: ScoreClientCreateRequest,
     geo: GeoInfoDep,
     service: ScoreServiceDep,
@@ -82,6 +83,9 @@ async def create_score_client(
 
     # Identity derived from authenticated session
     identity = auth.identity
+
+    # Set context for access logging (fingerprint is the identity's external key)
+    request.state.client_fingerprint = identity.external_key
 
     # Persist identity display name if it changed
     if score_request.player_name and identity.display_name != score_request.player_name:
