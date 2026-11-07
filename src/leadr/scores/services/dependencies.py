@@ -90,8 +90,8 @@ def has_fingerprint_collision_bug(request: Request) -> bool:
     Returns:
         True if request is from affected SDK version, False otherwise
     """
-    user_agent = request.headers.get("user-agent", "")
-    sdk_info = parse_sdk_info(user_agent)
+    leadr_client = request.headers.get("leadr-client", "")
+    sdk_info = parse_sdk_info(leadr_client)
 
     if sdk_info is None:
         return False

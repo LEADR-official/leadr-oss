@@ -380,6 +380,7 @@ class AuthContextDependency:
             )
             request.state.account_id = str(client_ctx.account_id)
             request.state.game_id = str(client_ctx.game_id)
+            request.state.client_fingerprint = str(client_ctx.identity.external_key)
             return client_ctx
 
         # Should never reach here due to __init__ validation

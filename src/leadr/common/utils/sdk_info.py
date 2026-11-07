@@ -1,4 +1,4 @@
-"""SDK information parsing from user-agent headers."""
+"""SDK information parsing from leadr-client header."""
 
 import re
 from dataclasses import dataclass
@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class SdkInfo:
-    """Parsed SDK information from user-agent header.
+    """Parsed SDK information from leadr-client header.
 
     Attributes:
         sdk_type: SDK identifier (e.g., "sdk-godot", "sdk-unity")
@@ -19,28 +19,27 @@ class SdkInfo:
     platform: str
 
 
-# Pattern matches: leadr_client=sdk-godot/0.1.2; platform=web; arch=wasm32
+# Pattern matches: sdk-godot; v=0.1.2; runtime=godot-4.6; platform=web; arch=wasm32
 _SDK_PATTERN = re.compile(
-    r"leadr_client=([a-zA-Z0-9_-]+)/([0-9]+\.[0-9]+\.[0-9]+)"
-    r"(?:;?\s*platform=([a-zA-Z0-9_-]+))?"
+    r"^(sdk-[a-zA-Z0-9_-]+);\s*v=([0-9]+\.[0-9]+\.[0-9]+)(?:;.*?platform=([a-zA-Z0-9_-]+))?"
 )
 
 
-def parse_sdk_info(user_agent: str) -> SdkInfo | None:
-    """Parse SDK info from user-agent header.
+def parse_sdk_info(leadr_client: str) -> SdkInfo | None:
+    """Parse SDK info from leadr-client header.
 
-    Expected format: leadr_client=sdk-godot/0.1.2; platform=web; arch=wasm32
+    Expected format: sdk-godot; v=0.1.2; runtime=godot-4.6; platform=web; arch=wasm32
 
     Args:
-        user_agent: Raw user-agent header string
+        leadr_client: Raw leadr-client header string
 
     Returns:
-        SdkInfo if valid LEADR SDK user-agent, None otherwise
+        SdkInfo if valid LEADR SDK header, None otherwise
     """
-    if not user_agent:
+    if not leadr_client:
         return None
 
-    match = _SDK_PATTERN.search(user_agent)
+    match = _SDK_PATTERN.match(leadr_client)
     if not match:
         return None
 

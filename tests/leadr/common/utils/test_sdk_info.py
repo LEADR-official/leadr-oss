@@ -8,30 +8,40 @@ from leadr.common.utils.sdk_info import SdkInfo, parse_sdk_info, version_less_th
 class TestParseSdkInfo:
     """Tests for parse_sdk_info function."""
 
-    def test_parse_godot_web_user_agent(self):
-        """Test parsing Godot SDK web user-agent."""
-        user_agent = "leadr_client=sdk-godot/0.1.2; platform=web; arch=wasm32"
-        result = parse_sdk_info(user_agent)
+    def test_parse_godot_web_header(self):
+        """Test parsing Godot SDK web leadr-client header."""
+        header = "sdk-godot; v=0.1.2; runtime=godot-4.6; platform=web; arch=wasm32"
+        result = parse_sdk_info(header)
 
         assert result is not None
         assert result.sdk_type == "sdk-godot"
         assert result.version == "0.1.2"
         assert result.platform == "web"
 
-    def test_parse_godot_windows_user_agent(self):
-        """Test parsing Godot SDK Windows user-agent."""
-        user_agent = "leadr_client=sdk-godot/0.1.4; platform=windows; arch=x86_64"
-        result = parse_sdk_info(user_agent)
+    def test_parse_godot_macos_header(self):
+        """Test parsing Godot SDK macOS leadr-client header."""
+        header = "sdk-godot; v=0.2.0; runtime=godot-4.4; platform=macos; arch=arm64"
+        result = parse_sdk_info(header)
+
+        assert result is not None
+        assert result.sdk_type == "sdk-godot"
+        assert result.version == "0.2.0"
+        assert result.platform == "macos"
+
+    def test_parse_godot_windows_header(self):
+        """Test parsing Godot SDK Windows leadr-client header."""
+        header = "sdk-godot; v=0.1.4; runtime=godot-4.6; platform=windows; arch=x86_64"
+        result = parse_sdk_info(header)
 
         assert result is not None
         assert result.sdk_type == "sdk-godot"
         assert result.version == "0.1.4"
         assert result.platform == "windows"
 
-    def test_parse_unity_user_agent(self):
-        """Test parsing Unity SDK user-agent."""
-        user_agent = "leadr_client=sdk-unity/1.0.0; platform=android"
-        result = parse_sdk_info(user_agent)
+    def test_parse_unity_header(self):
+        """Test parsing Unity SDK leadr-client header."""
+        header = "sdk-unity; v=1.0.0; runtime=unity-2023; platform=android; arch=arm64"
+        result = parse_sdk_info(header)
 
         assert result is not None
         assert result.sdk_type == "sdk-unity"
@@ -39,40 +49,46 @@ class TestParseSdkInfo:
         assert result.platform == "android"
 
     def test_parse_without_platform(self):
-        """Test parsing user-agent without platform."""
-        user_agent = "leadr_client=sdk-godot/0.1.2"
-        result = parse_sdk_info(user_agent)
+        """Test parsing header without platform."""
+        header = "sdk-godot; v=0.1.2; runtime=godot-4.6"
+        result = parse_sdk_info(header)
 
         assert result is not None
         assert result.sdk_type == "sdk-godot"
         assert result.version == "0.1.2"
         assert result.platform == "unknown"
 
-    def test_parse_with_extra_info(self):
-        """Test parsing user-agent with additional info."""
-        user_agent = "Mozilla/5.0 leadr_client=sdk-godot/0.1.2; platform=web; extra=stuff"
-        result = parse_sdk_info(user_agent)
+    def test_parse_minimal_header(self):
+        """Test parsing minimal header with just type and version."""
+        header = "sdk-godot; v=0.1.2"
+        result = parse_sdk_info(header)
 
         assert result is not None
         assert result.sdk_type == "sdk-godot"
         assert result.version == "0.1.2"
-        assert result.platform == "web"
+        assert result.platform == "unknown"
 
     def test_parse_empty_string(self):
-        """Test parsing empty user-agent."""
+        """Test parsing empty header."""
         result = parse_sdk_info("")
         assert result is None
 
-    def test_parse_non_leadr_user_agent(self):
-        """Test parsing non-LEADR user-agent."""
-        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-        result = parse_sdk_info(user_agent)
+    def test_parse_non_leadr_header(self):
+        """Test parsing non-LEADR header."""
+        header = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        result = parse_sdk_info(header)
         assert result is None
 
-    def test_parse_malformed_leadr_user_agent(self):
-        """Test parsing malformed LEADR user-agent."""
-        user_agent = "leadr_client=sdk-godot"  # Missing version
-        result = parse_sdk_info(user_agent)
+    def test_parse_malformed_header_missing_version(self):
+        """Test parsing malformed header without version."""
+        header = "sdk-godot; platform=web"
+        result = parse_sdk_info(header)
+        assert result is None
+
+    def test_parse_malformed_header_wrong_prefix(self):
+        """Test parsing header without sdk- prefix."""
+        header = "godot; v=0.1.2; platform=web"
+        result = parse_sdk_info(header)
         assert result is None
 
     def test_sdk_info_immutable(self):
