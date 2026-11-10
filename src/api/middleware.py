@@ -89,6 +89,8 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             "account_id": getattr(request.state, "account_id", None),
             "game_id": getattr(request.state, "game_id", None),
             "client_fingerprint": getattr(request.state, "client_fingerprint", None),
+            "reject_reason": getattr(request.state, "reject_reason", None),
+            "reject_detail": getattr(request.state, "reject_detail", None),
             "leadr_client": _sanitise_header(request.headers.get("leadr-client")),
             "user_agent": _sanitise_header(request.headers.get("user-agent")),
         }
@@ -188,7 +190,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if self._service.is_blocked(client_ip):
             logger.warning(
                 "Blocked rate-limited IP",
-                extra={"client_ip": client_ip, "path": request.url.path},
+                extra={
+                    "client_ip": client_ip,
+                    "path": request.url.path,
+                    "reject_reason": "IP_BLOCK",
+                },
             )
             return JSONResponse(
                 status_code=429,

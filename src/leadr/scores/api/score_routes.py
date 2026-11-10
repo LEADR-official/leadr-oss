@@ -145,6 +145,11 @@ async def create_score_client(
 
     # Handle anti-cheat REJECT
     if anti_cheat_result and anti_cheat_result.action == FlagAction.REJECT:
+        # Set reject context for access logging
+        request.state.reject_reason = (
+            anti_cheat_result.flag_type.value if anti_cheat_result.flag_type else "ANTI_CHEAT"
+        )
+        request.state.reject_detail = anti_cheat_result.reason
         raise HTTPException(
             status_code=429,
             detail=anti_cheat_result.reason or "Rate limit exceeded",

@@ -1,6 +1,6 @@
 """Score service for managing score operations."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -686,8 +686,14 @@ class ScoreService:
             await meta_repo.create(meta)
         else:
             # Update existing metadata
+            # Reset count if sliding window expired (>1 hour since last submission)
+            one_hour_ago = now - timedelta(hours=1)
+            if existing_meta.last_submission_at < one_hour_ago:
+                existing_meta.submission_count = 1  # New window
+            else:
+                existing_meta.submission_count += 1
+
             existing_meta.score_event_id = event.id
-            existing_meta.submission_count += 1
             existing_meta.last_submission_at = now
             existing_meta.last_score_value = value
             await meta_repo.update(existing_meta)

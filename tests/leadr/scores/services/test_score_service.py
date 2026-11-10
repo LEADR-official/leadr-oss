@@ -1,5 +1,6 @@
 """Tests for ScoreService."""
 
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -1570,6 +1571,112 @@ class TestScoreServiceSubmission:
         # Existing metadata was updated (not created)
         mock_meta_repo.update.assert_called_once()
         assert existing_meta.submission_count == 4
+
+    @patch("leadr.scores.services.score_service.ScoreFlagRepository")
+    @patch("leadr.scores.services.score_service.BoardService")
+    @patch("leadr.scores.services.score_service.ScoreEventService")
+    @patch("leadr.scores.services.score_service.BoardStateService")
+    @patch("leadr.scores.services.score_service.AntiCheatService")
+    @patch("leadr.scores.services.score_service.ScoreSubmissionMetaRepository")
+    @patch("leadr.scores.services.score_service.settings")
+    async def test_submit_score_resets_count_when_window_expired(
+        self,
+        mock_settings,
+        mock_meta_repo_cls,
+        mock_ac_service_cls,
+        mock_board_state_service_cls,
+        mock_event_service_cls,
+        mock_board_service_cls,
+        mock_flag_repo_cls,
+    ):
+        """Test submission_count resets to 1 when sliding window (1 hour) expired."""
+        mock_settings.ANTICHEAT_ENABLED = True
+        board_id = BoardID()
+        identity_id = IdentityID()
+
+        board = Board(
+            id=board_id,
+            account_id=AccountID(),
+            game_id=GameID(),
+            name="High Scores",
+            slug="high-scores",
+            short_code="ABC123",
+            sort_direction=SortDirection.DESCENDING,
+            board_type=BoardType.RUN_IDENTITY,
+            keep_strategy=KeepStrategy.BEST,
+        )
+
+        event = ScoreEvent(
+            id=ScoreEventID(),
+            account_id=board.account_id,
+            game_id=board.game_id,
+            board_id=board_id,
+            identity_id=identity_id,
+            event_payload={"value": 100.0},
+        )
+
+        state = BoardState(
+            id=BoardStateID(),
+            board_id=board_id,
+            identity_id=identity_id,
+            primary_value=100.0,
+            player_name="Player1",
+        )
+
+        ac_result = AntiCheatResult(action=FlagAction.ACCEPT)
+
+        # Existing metadata with high count but last submission >1 hour ago
+        two_hours_ago = datetime.now(UTC) - timedelta(hours=2)
+        existing_meta = ScoreSubmissionMeta(
+            score_event_id=ScoreEventID(),
+            identity_id=identity_id,
+            board_id=board_id,
+            submission_count=50,  # At the limit
+            last_submission_at=two_hours_ago,  # Window expired
+            last_score_value=90.0,
+        )
+
+        mock_board_service = AsyncMock()
+        mock_board_service.get_by_id_or_raise = AsyncMock(return_value=board)
+        mock_board_service_cls.return_value = mock_board_service
+
+        mock_event_service = AsyncMock()
+        mock_event_service.create_score_event = AsyncMock(return_value=event)
+        mock_event_service_cls.return_value = mock_event_service
+
+        mock_state_service = AsyncMock()
+        mock_state_service.get_by_board_and_identity = AsyncMock(return_value=None)
+        mock_state_service.create_board_state = AsyncMock(return_value=state)
+        mock_board_state_service_cls.return_value = mock_state_service
+
+        mock_ac_service = AsyncMock()
+        mock_ac_service.check_submission_for_event = AsyncMock(return_value=ac_result)
+        mock_ac_service_cls.return_value = mock_ac_service
+
+        mock_meta_repo = AsyncMock()
+        mock_meta_repo.get_by_identity_and_board = AsyncMock(return_value=existing_meta)
+        mock_meta_repo.update = AsyncMock()
+        mock_meta_repo_cls.return_value = mock_meta_repo
+
+        mock_flag_repo = AsyncMock()
+        mock_flag_repo_cls.return_value = mock_flag_repo
+
+        service = ScoreService(AsyncMock())
+        result_event, result_entry, result_ac = await service.submit_score(
+            board_id=board_id,
+            identity_id=identity_id,
+            value=100.0,
+            player_name="Player1",
+        )
+
+        # Submission should succeed (window reset)
+        assert result_entry is not None
+        assert result_ac is not None
+        assert result_ac.action == FlagAction.ACCEPT
+
+        # Count should reset to 1, not increment to 51
+        mock_meta_repo.update.assert_called_once()
+        assert existing_meta.submission_count == 1
 
     @patch("leadr.scores.services.score_service.ScoreFlagRepository")
     @patch("leadr.scores.services.score_service.BoardService")
